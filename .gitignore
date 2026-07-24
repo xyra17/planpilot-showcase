@@ -1,0 +1,43 @@
+# ==== 环境变量（含密钥，绝不提交）====
+**/.env
+!**/.env.example
+
+# ==== Python ====
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.pyd
+**/*.egg-info/
+**/dist/
+**/build/
+**/.venv/
+**/venv/
+**/.Python
+
+# ==== 用户上传文件 ====
+backend/uploads/
+
+# ==== Celery 运行状态 ====
+backend/celerybeat-schedule
+backend/celerybeat-schedule.db
+
+# ==== Node / 前端 ====
+frontend/node_modules/
+frontend/.next/
+frontend/tsconfig.tsbuildinfo
+frontend/.env.local
+
+# ==== 测试报告（本地生成）====
+backend/tests/integration/reports/*.html
+backend/tests/integration/reports/test_data_snapshot.json
+
+# ==== 系统 ====
+.DS_Store
+**/.DS_Store
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# ==== Claude AI 工作目录 ====
+.claude/

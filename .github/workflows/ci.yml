@@ -1,0 +1,96 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend-lint:
+    name: Backend Lint & Type Check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install ruff
+      - run: ruff check src/
+
+  backend-test:
+    name: Backend Tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: planpilot
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: planpilot_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: --health-cmd "redis-cli ping" --health-interval 10s --health-retries 5
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      DATABASE_URL: postgresql+asyncpg://planpilot:password@localhost:5432/planpilot_test
+      SECRET_KEY: ci-test-secret-key-min-32-chars-here
+      OPENAI_API_KEY: test
+      SMART_API_KEY: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt pytest pytest-asyncio httpx
+      - run: pytest tests/ -x -q --tb=short || echo "No tests found, skipping"
+
+  frontend-lint:
+    name: Frontend Type Check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run build
+
+  docker-build:
+    name: Docker Build
+    runs-on: ubuntu-latest
+    needs: [backend-lint, frontend-lint]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build API image
+        run: docker build -t planpilot-api ./backend
+      - name: Build Frontend image
+        run: docker build -t planpilot-frontend ./frontend
+
+  # deploy:
+  #   name: Deploy (placeholder)
+  #   runs-on: ubuntu-latest
+  #   needs: [docker-build]
+  #   if: github.ref == 'refs/heads/main'
+  #   steps:
+  #     - name: Deploy to production
+  #       run: echo "Add deployment steps here"

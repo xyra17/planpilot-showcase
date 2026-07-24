@@ -1,0 +1,26 @@
+# 测试报告（本地生成，不进版本库）
+tests/integration/reports/*.html
+tests/integration/reports/test_data_snapshot.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+
+# 环境变量
+.env
+
+# 上传目录
+uploads/
+
+# 编辑器
+.DS_Store
+*.swp
+.idea/

@@ -1,0 +1,99 @@
+{
+  "user": {
+    "email": "integration@planpilot.dev",
+    "username": "int_tester",
+    "password": "IntTest@2026"
+  },
+  "user2": {
+    "email": "integration2@planpilot.dev",
+    "username": "int_tester2",
+    "password": "IntTest@2026"
+  },
+  "goals": [
+    {
+      "type": "exam",
+      "title": "CPA备考2026",
+      "deadline": "2026-12-31",
+      "daily_hours": 2.0,
+      "current_level": "beginner",
+      "work_schedule": "all",
+      "meta": {}
+    },
+    {
+      "type": "skill",
+      "title": "Python编程技能",
+      "deadline": "2026-10-31",
+      "daily_hours": 1.5,
+      "current_level": "intermediate",
+      "work_schedule": "weekday",
+      "meta": {}
+    }
+  ],
+  "tasks": [
+    {"title": "第一章：会计基础概念", "estimated_mins": 60, "type": "study"},
+    {"title": "第二章：资产负债表", "estimated_mins": 90, "type": "study"},
+    {"title": "第三章：利润表练习", "estimated_mins": 45, "type": "practice"},
+    {"title": "复习第一章要点", "estimated_mins": 30, "type": "review"},
+    {"title": "模拟题训练", "estimated_mins": 120, "type": "practice"}
+  ],
+  "checkins": [
+    {"mode": "quick", "quick_status": "all_done"},
+    {"mode": "quick", "quick_status": "mostly_done"},
+    {"mode": "quick", "quick_status": "half_done"},
+    {"mode": "natural", "text": "今天完成了两个章节的学习，感觉掌握得不错"},
+    {"mode": "quick", "quick_status": "all_done"},
+    {"mode": "quick", "quick_status": "barely_done"},
+    {"mode": "quick", "quick_status": "all_done"}
+  ],
+  "knowledge_texts": [
+    {
+      "filename": "python_basics.txt",
+      "content": "Python基础知识：变量是存储数据的容器。函数是可复用的代码块。类是对象的蓝图，支持封装、继承和多态。装饰器是修改函数行为的语法糖。生成器使用yield关键字实现惰性求值。"
+    },
+    {
+      "filename": "cpa_accounting.txt",
+      "content": "CPA会计基础：资产=负债+所有者权益（会计恒等式）。资产包括流动资产和非流动资产。流动负债指一年内到期的债务。收入确认原则要求在风险和报酬转移时确认收入。"
+    },
+    {
+      "filename": "study_notes.md",
+      "content": "# 学习笔记\n\n## Python装饰器\n装饰器本质是一个接收函数作为参数并返回新函数的高阶函数。\n\n```python\ndef my_decorator(func):\n    def wrapper(*args, **kwargs):\n        print('before')\n        result = func(*args, **kwargs)\n        print('after')\n        return result\n    return wrapper\n```\n\n## 注意事项\n- 使用@语法糖简化调用\n- functools.wraps保留原函数元信息\n"
+    }
+  ],
+  "notes": [
+    "CPA第一章核心考点：会计要素包括资产、负债、所有者权益、收入、费用、利润六大类。",
+    "Python函数学习笔记：默认参数必须放在位置参数之后，*args收集多余位置参数，**kwargs收集关键字参数。",
+    "今日学习总结：完成了资产负债表的编制练习，理解了借贷记账法的核心逻辑。"
+  ],
+  "schedule_blocks": [
+    {
+      "id": "block-1",
+      "label": "早间学习",
+      "taskId": null,
+      "goalTitle": "CPA备考2026",
+      "startHour": 8.0,
+      "durationMinutes": 90,
+      "color": "#3b82f6",
+      "progress": 0.0
+    },
+    {
+      "id": "block-2",
+      "label": "午间复习",
+      "taskId": null,
+      "goalTitle": "Python编程技能",
+      "startHour": 13.0,
+      "durationMinutes": 60,
+      "color": "#10b981",
+      "progress": 0.0
+    },
+    {
+      "id": "block-3",
+      "label": "晚间练习",
+      "taskId": null,
+      "goalTitle": "CPA备考2026",
+      "startHour": 20.0,
+      "durationMinutes": 45,
+      "color": "#f59e0b",
+      "progress": 0.5
+    }
+  ]
+}
