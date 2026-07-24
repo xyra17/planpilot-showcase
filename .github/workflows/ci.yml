@@ -57,7 +57,7 @@ jobs:
           python-version: "3.11"
           cache: pip
       - run: pip install -r requirements.txt pytest pytest-asyncio httpx
-      - run: pytest tests/ -x -q --tb=short || echo "No tests found, skipping"
+      - run: pytest tests/ -x -q --tb=short
 
   frontend-lint:
     name: Frontend Type Check
