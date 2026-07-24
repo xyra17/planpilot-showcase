@@ -723,8 +723,8 @@ async def get_intent_placeholder(
 
     prompt = (
         f"用户正在制定「{goal.title}」的{type_label}计划。"
-        "请为"补充说明"输入框生成一句 placeholder 示例文字，引导用户描述自己的基础水平、希望重点学习的内容、可以跳过的部分。"
-        "要求：以"例如："开头，内容必须针对该具体目标，30-50字，只输出 placeholder 文字，不要任何解释。"
+        "请为「补充说明」输入框生成一句 placeholder 示例文字，引导用户描述自己的基础水平、希望重点学习的内容、可以跳过的部分。"
+        "要求：以「例如：」开头，内容必须针对该具体目标，30-50字，只输出 placeholder 文字，不要任何解释。"
     )
 
     placeholder = ""
