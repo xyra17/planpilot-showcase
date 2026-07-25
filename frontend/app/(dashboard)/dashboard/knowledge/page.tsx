@@ -5,7 +5,7 @@ import Link from "next/link";
 import {
   Search, Upload, FileText, FileSpreadsheet, Trash2,
   BookOpen, MessageSquare, Target, LayoutGrid, List,
-  Plus, X, FolderOpen, Check, ChevronDown, Pencil, Link2,
+  Plus, X, FolderOpen, Check, ChevronDown, Pencil, Link2, StickyNote,
 } from "lucide-react";
 import { useGoalStore } from "@/lib/stores/goalStore";
 import { useKnowledge } from "@/lib/knowledge-context";
@@ -281,7 +281,7 @@ export default function KnowledgePage() {
         <button
           onClick={() => setF("all", "")}
           className={cn(
-            "flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium transition w-full mb-3",
+            "flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium transition w-full mb-2",
             filter.type === "all" ? "text-white" : "text-gray-500 hover:bg-gray-50",
           )}
           style={filter.type === "all" ? { backgroundColor: "var(--accent)" } : {}}
@@ -289,6 +289,15 @@ export default function KnowledgePage() {
           <BookOpen size={14} className="flex-shrink-0" />
           全部资料
         </button>
+
+        {/* 知识笔记快捷入口 */}
+        <Link
+          href="/dashboard/notes?tab=card"
+          className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium text-gray-500 hover:bg-gray-50 transition w-full mb-3"
+        >
+          <StickyNote size={14} className="flex-shrink-0" />
+          知识笔记
+        </Link>
 
         {/* 待分类 */}
         <div className="px-3 mb-1.5 flex items-center justify-between">
@@ -387,8 +396,11 @@ export default function KnowledgePage() {
           <div className="flex items-center gap-3">
             <div className="relative">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="搜索资料或笔记…"
+              <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="搜索资料或 AI 摘录…"
                 className="pl-9 pr-4 py-2 border border-gray-200 rounded-xl text-sm outline-none w-56 focus:border-gray-300 transition" />
+              <p className="absolute -bottom-4 left-0 text-[10px] text-gray-400 whitespace-nowrap">
+                知识笔记已移至<Link href="/dashboard/notes?tab=card" className="underline hover:text-gray-600">笔记中心</Link>
+              </p>
             </div>
             <button onClick={() => setUrlImportOpen(true)}
               className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 transition">

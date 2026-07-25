@@ -8,7 +8,7 @@ import FlashCardsWall from "@/components/notes/FlashCard";
 type Tab = "card" | "log";
 
 const TAB_META: Record<Tab, { label: string; icon: React.ReactNode }> = {
-  card: { label: "备忘录", icon: <StickyNote size={14} /> },
+  card: { label: "知识笔记", icon: <StickyNote size={14} /> },
   log:  { label: "学习记录", icon: <CalendarDays size={14} /> },
 };
 
