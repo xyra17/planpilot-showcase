@@ -1,6 +1,16 @@
 from unittest.mock import MagicMock, patch
 
-from src.core.llm_router import create_pro_llm, create_routine_llm
+from src.core.llm_router import (
+    create_pro_llm,
+    create_routine_llm,
+    local_circuit,
+    model_metrics,
+)
+
+
+def setup_function():
+    local_circuit.reset()
+    model_metrics.reset()
 
 
 def test_routine_route_prefers_local_and_falls_back_to_flash():
@@ -46,3 +56,31 @@ def test_pro_route_never_uses_local_model():
 
     assert result is pro
     assert factory.call_args.kwargs["model"] == "deepseek-v4-pro"
+
+
+def test_open_circuit_skips_local_model():
+    local_circuit.record_failure()
+    local_circuit.record_failure()
+    flash = MagicMock()
+
+    with patch("src.core.llm_router.ChatOpenAI", return_value=flash) as factory:
+        result = create_routine_llm(max_tokens=20)
+
+    assert result is flash
+    assert factory.call_count == 1
+    assert factory.call_args.kwargs["model"] == "deepseek-v4-flash"
+    assert local_circuit.snapshot()["state"] == "open"
+
+
+def test_metrics_do_not_contain_prompt_or_response_content():
+    model_metrics.record("local", "success", 125.0)
+    snapshot = model_metrics.snapshot()
+
+    assert snapshot["local"] == {
+        "requests": 1,
+        "successes": 1,
+        "failures": 0,
+        "average_latency_ms": 125.0,
+    }
+    assert "prompt" not in str(snapshot).lower()
+    assert "response" not in str(snapshot).lower()

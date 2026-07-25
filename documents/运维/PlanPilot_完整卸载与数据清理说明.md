@@ -63,6 +63,29 @@ docker compose down --remove-orphans
 
 ## 3. 停止并移除 Qwen3 Embedding 后台服务
 
+先移除本地生成模型服务：
+
+```bash
+cd /Users/Admin/Desktop/PlanPilot
+./scripts/macos/uninstall_local_llm_service.sh
+```
+
+也可以手动执行：
+
+```bash
+launchctl bootout gui/$(id -u)/com.planpilot.llm
+```
+
+对应配置、日志和运行模型为：
+
+- `~/Library/LaunchAgents/com.planpilot.llm.plist`
+- `~/Library/Logs/PlanPilot/llm.stdout.log`
+- `~/Library/Logs/PlanPilot/llm.stderr.log`
+- `~/Library/Application Support/PlanPilot/models/Qwen3.5-9B-MLX-4bit/`
+
+最后一项逻辑大小约 5.6 GB，是 APFS 写时复制运行副本；确认不再使用后可以和
+Embedding 运行模型一起删除。
+
 先卸载当前用户的 launchd 服务：
 
 ```bash
@@ -89,6 +112,7 @@ launchctl bootout \
 
 ```bash
 launchctl print gui/$(id -u)/com.planpilot.embedding
+launchctl print gui/$(id -u)/com.planpilot.llm
 ```
 
 预期返回“Could not find service”。
@@ -196,6 +220,7 @@ launchctl print gui/$(id -u)/com.planpilot.embedding
 
 - `/Users/Admin/Desktop/PlanPilot`
 - `/Users/Admin/Library/LaunchAgents/com.planpilot.embedding.plist`
+- `/Users/Admin/Library/LaunchAgents/com.planpilot.llm.plist`
 - `/Users/Admin/Library/Application Support/PlanPilot`
 - `/Users/Admin/Library/Logs/PlanPilot`
 

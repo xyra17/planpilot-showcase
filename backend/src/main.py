@@ -1,6 +1,7 @@
 import logging
 from contextlib import asynccontextmanager
 
+import httpx
 import sentry_sdk
 import structlog
 from fastapi import FastAPI
@@ -20,6 +21,7 @@ import src.api.plans as plans
 import src.api.schedule as schedule
 import src.api.tasks as tasks
 from src.config import settings
+from src.core.llm_router import get_llm_runtime_status
 from src.database import engine
 
 logger = logging.getLogger(__name__)
@@ -100,3 +102,25 @@ app.include_router(schedule.router)
 @app.get("/health")
 async def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/health/ai")
+async def ai_health() -> dict:
+    local_reachable = False
+    local_error: str | None = None
+    if settings.local_model_enabled and settings.openai_base_url:
+        try:
+            async with httpx.AsyncClient(timeout=2.0) as client:
+                response = await client.get(f"{settings.openai_base_url.rstrip('/')}/models")
+                response.raise_for_status()
+            local_reachable = True
+        except Exception as exc:
+            local_error = type(exc).__name__
+
+    return {
+        **get_llm_runtime_status(),
+        "local_reachable": local_reachable,
+        "local_error_type": local_error,
+        "flash_configured": bool(settings.smart_api_key and settings.smart_model_name),
+        "pro_configured": bool(settings.smart_api_key and settings.smart_pro_model_name),
+    }

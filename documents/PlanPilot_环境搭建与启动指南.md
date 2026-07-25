@@ -235,6 +235,29 @@ python -m mlx_lm server \
 模型路由和后续微调方案见
 [`技术规格说明书/本地模型路由与微调路线.md`](技术规格说明书/本地模型路由与微调路线.md)。
 
+macOS 推荐安装为登录后台服务：
+
+```bash
+cd /path/to/PlanPilot
+./scripts/macos/install_local_llm_service.sh
+```
+
+安装器会在 `~/Library/Application Support/PlanPilot/models/` 创建 APFS
+写时复制运行副本，以绕过 macOS 后台服务不能读取 Desktop/Downloads 的限制。
+停止并移除服务配置：
+
+```bash
+./scripts/macos/uninstall_local_llm_service.sh
+```
+
+该卸载脚本默认保留模型运行副本，避免误删大文件；完整清理方式见卸载文档。
+
+AI 运行状态可访问：
+
+```bash
+curl http://localhost:8000/health/ai
+```
+
 ### 4.3 前端环境变量（必须）
 
 在 `frontend/` 目录下创建 `.env.local` 文件：

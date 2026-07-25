@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     model_name: str = "deepseek-chat"
     local_model_enabled: bool = True
     local_model_timeout_seconds: float = 30.0
+    local_model_failure_threshold: int = 2
+    local_model_circuit_cooldown_seconds: float = 60.0
     smart_api_key: str = ""
     smart_base_url: str = ""
     smart_model_name: str = "deepseek-v4-flash"
