@@ -2,6 +2,7 @@
 
 import type { Editor } from "@tiptap/react";
 import { Image as ImageIcon } from "lucide-react";
+import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 
 interface EditorToolbarProps {
@@ -10,6 +11,24 @@ interface EditorToolbarProps {
 }
 
 export default function EditorToolbar({ editor, noteId }: EditorToolbarProps) {
+  const [imageSelected, setImageSelected] = useState(editor.isActive("image"));
+  const [imageWidth, setImageWidth] = useState(
+    Number(editor.getAttributes("image").width) || 100
+  );
+
+  useEffect(() => {
+    const syncImageState = () => {
+      setImageSelected(editor.isActive("image"));
+      setImageWidth(Number(editor.getAttributes("image").width) || 100);
+    };
+    editor.on("selectionUpdate", syncImageState);
+    editor.on("transaction", syncImageState);
+    return () => {
+      editor.off("selectionUpdate", syncImageState);
+      editor.off("transaction", syncImageState);
+    };
+  }, [editor]);
+
   const btn = (active: boolean, onClick: () => void, label: string) => (
     <button
       key={label}
@@ -75,6 +94,34 @@ export default function EditorToolbar({ editor, noteId }: EditorToolbarProps) {
       >
         <ImageIcon size={14} />
       </button>
+      {imageSelected && (
+        <>
+          {divider("image-size")}
+          <span className="px-1 text-[11px] text-gray-400">图片</span>
+          {[
+            ["小", 35],
+            ["中", 60],
+            ["大", 85],
+            ["原宽", 100],
+          ].map(([label, width]) => (
+            <button
+              key={label}
+              type="button"
+              onMouseDown={(event) => {
+                event.preventDefault();
+                editor.chain().focus().updateAttributes("image", { width }).run();
+              }}
+              className={`rounded px-2 py-1 text-xs font-medium transition-colors ${
+                imageWidth === width
+                  ? "bg-blue-50 text-blue-600"
+                  : "text-gray-500 hover:bg-gray-100 hover:text-gray-900"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </>
+      )}
     </div>
   );
 }

@@ -217,6 +217,8 @@
 .ProseMirror code { background: #f3f4f6; border-radius: 3px; padding: 1px 4px; font-size: 0.85em; font-family: monospace; }
 .ProseMirror blockquote { border-left: 3px solid #d1d5db; padding-left: 0.75rem; color: #6b7280; margin: 0.5rem 0; }
 .ProseMirror hr { border: none; border-top: 1px solid #e5e7eb; margin: 0.75rem 0; }
+.ProseMirror img { display: block; max-width: 100%; height: auto; }
+.ProseMirror figure[data-node-view-wrapper] { max-width: 100%; }
 .ProseMirror ul[data-type="taskList"] { list-style: none; padding-left: 0; }
 .ProseMirror ul[data-type="taskList"] li { display: flex; align-items: flex-start; gap: 0.5rem; }
 .ProseMirror ul[data-type="taskList"] li > label { flex-shrink: 0; margin-top: 2px; }

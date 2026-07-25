@@ -1,6 +1,6 @@
 "use client";
 
-import { useEditor, EditorContent } from "@tiptap/react";
+import { useEditor, EditorContent, ReactNodeViewRenderer } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import TaskList from "@tiptap/extension-task-list";
@@ -12,6 +12,7 @@ import { Extension, InputRule } from "@tiptap/core";
 import { useEffect, useRef, useCallback } from "react";
 import EditorToolbar from "./EditorToolbar";
 import SlashMenu from "./SlashMenu";
+import ResizableImage from "./ResizableImage";
 import { useState } from "react";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -54,6 +55,27 @@ const MarkdownShortcuts = Extension.create({
   name: "markdownShortcuts",
   addInputRules() {
     return [HighlightInputRule, UnderlineInputRule];
+  },
+});
+
+const ResizableImageExtension = Image.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      width: {
+        default: 100,
+        parseHTML: (element) => {
+          const value = Number(element.getAttribute("data-width"));
+          return Number.isFinite(value) ? Math.min(100, Math.max(20, value)) : 100;
+        },
+        renderHTML: (attributes) => ({
+          "data-width": attributes.width,
+        }),
+      },
+    };
+  },
+  addNodeView() {
+    return ReactNodeViewRenderer(ResizableImage);
   },
 });
 
@@ -138,7 +160,7 @@ export default function TiptapEditor({
       TaskItem.configure({ nested: true }),
       Highlight,
       Underline,
-      Image.configure({ inline: false }),
+      ResizableImageExtension.configure({ inline: false }),
       MarkdownShortcuts,
     ],
     content,
@@ -219,7 +241,7 @@ export default function TiptapEditor({
       className={`flex flex-col border border-gray-200 rounded-lg overflow-hidden bg-white ${className}`}
     >
       {showToolbar && editor && <EditorToolbar editor={editor} noteId={noteId} />}
-      <EditorContent editor={editor} className="flex-1" />
+      <EditorContent editor={editor} className="flex-1 min-h-0 overflow-y-auto overscroll-contain" />
       {slashMenu && editor && (
         <SlashMenu
           editor={editor}
