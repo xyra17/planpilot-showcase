@@ -205,6 +205,13 @@ def create_routine_llm(*, tools: Sequence[Any] | None = None, **kwargs: Any) -> 
     return primary.with_fallbacks(fallbacks) if fallbacks else primary
 
 
+def create_structured_routine_llm(**kwargs: Any) -> Any:
+    """创建强制返回单个 JSON 对象的日常模型。"""
+    model_kwargs = dict(kwargs.pop("model_kwargs", {}))
+    model_kwargs["response_format"] = {"type": "json_object"}
+    return create_routine_llm(model_kwargs=model_kwargs, **kwargs)
+
+
 def create_pro_llm(**kwargs: Any) -> ChatOpenAI:
     """创建仅用于复杂重规划和最终质量审核的 DeepSeek Pro。"""
     if not settings.smart_api_key or not settings.smart_pro_model_name:

@@ -3,6 +3,7 @@ from unittest.mock import MagicMock, patch
 from src.core.llm_router import (
     create_pro_llm,
     create_routine_llm,
+    create_structured_routine_llm,
     local_circuit,
     model_metrics,
 )
@@ -84,3 +85,14 @@ def test_metrics_do_not_contain_prompt_or_response_content():
     }
     assert "prompt" not in str(snapshot).lower()
     assert "response" not in str(snapshot).lower()
+
+
+def test_structured_route_enforces_json_object():
+    routed = MagicMock()
+    with patch("src.core.llm_router.create_routine_llm", return_value=routed) as factory:
+        result = create_structured_routine_llm(max_tokens=200)
+
+    assert result is routed
+    assert factory.call_args.kwargs["model_kwargs"]["response_format"] == {
+        "type": "json_object"
+    }

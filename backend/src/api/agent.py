@@ -12,7 +12,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sse_starlette.sse import EventSourceResponse
 
 from src.config import settings
-from src.core.llm_router import create_pro_llm, create_routine_llm
+from src.core.llm_quality import compact_text
+from src.core.llm_router import (
+    create_pro_llm,
+    create_routine_llm,
+    create_structured_routine_llm,
+)
 from src.database import get_db
 from src.deps import get_current_user
 from src.models import (
@@ -690,7 +695,7 @@ async def get_plan_context(
             temperature=0.3,
         )
         result = await llm.ainvoke([HumanMessage(content=understanding_prompt)])
-        initial_understanding = result.content.strip()
+        initial_understanding = compact_text(result.content, 180)
     except Exception:
         pass
 
@@ -730,7 +735,7 @@ async def get_intent_placeholder(
             temperature=0.7,
         )
         result = await llm.ainvoke([HumanMessage(content=prompt)])
-        placeholder = result.content.strip()
+        placeholder = compact_text(result.content, 50)
     except Exception:
         pass
 
@@ -904,7 +909,7 @@ async def generate_macro_plan(
         "}"
     )
 
-    llm = create_routine_llm(
+    llm = create_structured_routine_llm(
         max_tokens=2048,
         temperature=0.3,
     )
@@ -1360,7 +1365,7 @@ async def verify_start(
     if not task:
         raise HTTPException(status_code=404, detail="任务不存在")
 
-    llm = create_routine_llm(max_tokens=500)
+    llm = create_structured_routine_llm(max_tokens=500)
     prompt = (
         f"学习者刚完成了任务「{task.title}」。\n\n"
         "请生成一道深度检验理解的题目，以及该题目的参考答案要点。\n"
