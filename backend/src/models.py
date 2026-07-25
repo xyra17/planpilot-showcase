@@ -145,7 +145,7 @@ class KnowledgeItem(Base):
     task_id: Mapped[str | None] = mapped_column(String, ForeignKey("tasks.id"), nullable=True, index=True)
     note_id: Mapped[str | None] = mapped_column(String, ForeignKey("knowledge_items.id", ondelete="SET NULL"), nullable=True, index=True)
     tags: Mapped[list[str]] = mapped_column(JSON, default=list)
-    embedding: Mapped[list[float] | None] = mapped_column(Vector(1536), nullable=True)
+    embedding: Mapped[list[float] | None] = mapped_column(Vector(1024), nullable=True)
     processing_status: Mapped[str] = mapped_column(String, default="uploaded", index=True)
     processing_error: Mapped[str | None] = mapped_column(Text, nullable=True)
     retry_count: Mapped[int] = mapped_column(Integer, default=0)
@@ -186,7 +186,7 @@ class KnowledgeChunk(Base):
     content: Mapped[str] = mapped_column(Text, nullable=False)
     start_char: Mapped[int] = mapped_column(Integer, nullable=False)
     end_char: Mapped[int] = mapped_column(Integer, nullable=False)
-    embedding: Mapped[list[float] | None] = mapped_column(Vector(1536), nullable=True)
+    embedding: Mapped[list[float] | None] = mapped_column(Vector(1024), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     item: Mapped["KnowledgeItem"] = relationship("KnowledgeItem", back_populates="chunks")

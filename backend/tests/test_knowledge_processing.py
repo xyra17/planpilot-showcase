@@ -51,7 +51,7 @@ async def test_embed_chunks_batches_and_preserves_order():
 
             class Row:
                 def __init__(self, value):
-                    self.embedding = [float(value)] * 1536
+                    self.embedding = [float(value)] * 1024
 
             class Response:
                 data = [Row(start + index) for index in range(len(input))]

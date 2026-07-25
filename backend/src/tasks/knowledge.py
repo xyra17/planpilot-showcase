@@ -72,8 +72,8 @@ async def _embed_chunks(
     clients: list,
     title: str,
     chunks: list[tuple[str, int, int]],
-    model: str = "text-embedding-3-small",
-    dimensions: int = 1536,
+    model: str = "qwen3-embedding-0.6b",
+    dimensions: int = 1024,
 ) -> list[list[float]]:
     last_error: Exception | None = None
     inputs = [f"{title}\n{chunk}" for chunk, _, _ in chunks]

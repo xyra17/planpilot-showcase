@@ -36,6 +36,7 @@ services:
     working_dir: /app
     environment:
       REDIS_URL: redis://redis:6379/0
+      EMBEDDING_BASE_URL: http://host.docker.internal:1234/v1
     env_file:
       - ./backend/.env
     depends_on:
@@ -54,6 +55,7 @@ services:
     working_dir: /app
     environment:
       REDIS_URL: redis://redis:6379/0
+      EMBEDDING_BASE_URL: http://host.docker.internal:1234/v1
     env_file:
       - ./backend/.env
     depends_on:
@@ -91,6 +93,7 @@ services:
     working_dir: /app
     environment:
       REDIS_URL: redis://redis:6379/0
+      EMBEDDING_BASE_URL: http://host.docker.internal:1234/v1
     env_file:
       - ./backend/.env
     depends_on:

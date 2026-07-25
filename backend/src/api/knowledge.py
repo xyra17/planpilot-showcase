@@ -639,7 +639,7 @@ async def search_knowledge(
                     (
                         1
                         - KnowledgeChunk.embedding.cosine_distance(
-                            cast(query_vec, Vector(1536))
+                            cast(query_vec, Vector(1024))
                         )
                     ).label("score"),
                 )
@@ -683,7 +683,7 @@ async def search_knowledge(
                     (
                         1
                         - KnowledgeItem.embedding.cosine_distance(
-                            cast(query_vec, Vector(1536))
+                            cast(query_vec, Vector(1024))
                         )
                     ).label("score"),
                 )
