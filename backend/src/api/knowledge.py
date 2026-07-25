@@ -116,14 +116,16 @@ class NoteCreate(BaseModel):
     goalId: str | None = None
     taskId: str | None = None
     title: str | None = None
-    content: str
+    content: str = ""
     noteType: str = "flash_card"
     kb_id: str | None = None
+    noteDate: str | None = None
 
 
 class NoteUpdate(BaseModel):
     title: str | None = None
     content: str | None = None
+    goalId: str | None = None
 
 
 # ── Helpers ───────────────────────────────────────────────────
@@ -297,7 +299,7 @@ def _note_to_out(item: KnowledgeItem, goal_title: str, attachment_ids: list[str]
         title=item.title or "",
         content=item.content,
         noteType=item.source_type,
-        date=item.created_at.strftime("%Y-%m-%d") if item.created_at else "",
+        date=item.note_date or (item.created_at.strftime("%Y-%m-%d") if item.created_at else ""),
         savedAt=item.created_at.isoformat() if item.created_at else "",
         attachmentIds=attachment_ids or [],
     )
@@ -878,7 +880,7 @@ async def list_notes(
     if task_id:
         stmt = stmt.where(KnowledgeItem.task_id == task_id)
     if date:
-        stmt = stmt.where(func.date(KnowledgeItem.created_at) == date)
+        stmt = stmt.where(KnowledgeItem.note_date == date)
     stmt = stmt.order_by(KnowledgeItem.created_at.desc())
     items = (await db.execute(stmt)).scalars().all()
     goal_ids = {item.goal_id for item in items if item.goal_id}
@@ -970,6 +972,12 @@ async def update_note(
         item.content = body.content
         if body.title is None:
             item.title = body.content[:80]
+    if body.goalId is not None:
+        if body.goalId == "":
+            item.goal_id = None
+        else:
+            await _get_user_goal(body.goalId, current_user.id, db)
+            item.goal_id = body.goalId
     await db.commit()
     await db.refresh(item)
     return _note_to_out(item, await _goal_title(item.goal_id, current_user.id, db))
@@ -998,9 +1006,10 @@ async def create_note(
         goal_id=body.goalId or None,
         task_id=body.taskId or None,
         kb_id=kb_id,
-        title=body.title or body.content[:80],
+        title=body.title or body.content[:80] or "草稿",
         content=body.content,
         source_type=body.noteType,
+        note_date=body.noteDate,
         processing_status="ready",
         processed_at=datetime.now(UTC).replace(tzinfo=None),
         content_length=len(body.content),

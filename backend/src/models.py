@@ -144,6 +144,7 @@ class KnowledgeItem(Base):
     file_path: Mapped[str | None] = mapped_column(Text, nullable=True)
     task_id: Mapped[str | None] = mapped_column(String, ForeignKey("tasks.id"), nullable=True, index=True)
     note_id: Mapped[str | None] = mapped_column(String, ForeignKey("knowledge_items.id", ondelete="SET NULL"), nullable=True, index=True)
+    note_date: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
     tags: Mapped[list[str]] = mapped_column(JSON, default=list)
     embedding: Mapped[list[float] | None] = mapped_column(Vector(1024), nullable=True)
     processing_status: Mapped[str] = mapped_column(String, default="uploaded", index=True)

@@ -147,7 +147,8 @@ export default function DailyJournal() {
   const [weekAnchor, setWeekAnchor] = useState(new Date(today + "T00:00:00"));
   const [notes, setNotes] = useState<StudyNote[]>([]);
   const [loading, setLoading] = useState(false);
-  const [editing, setEditing] = useState<StudyNote | "new" | null>(null);
+  const [editing, setEditing] = useState<StudyNote | null>(null);
+  const [isNewDraft, setIsNewDraft] = useState(false);
   const [draftTitle, setDraftTitle] = useState("");
   const [draftContent, setDraftContent] = useState("");
   const [draftGoalId, setDraftGoalId] = useState<string | null>(null);
@@ -185,14 +186,23 @@ export default function DailyJournal() {
   const handleSelectDate = (date: string) => {
     setSelectedDate(date);
     setEditing(null);
+    setIsNewDraft(false);
   };
 
-  const startNew = () => {
+  const startNew = async () => {
     setDraftTitle("");
     setDraftContent("");
-    setDraftGoalId(activeGoals[0]?.id ?? null);
+    const goalId = activeGoals[0]?.id ?? null;
+    setDraftGoalId(goalId);
     setPendingFiles([]);
-    setEditing("new");
+    const draft = await api.post<StudyNote>("/api/v1/knowledge/notes", {
+      content: "",
+      noteType: "daily_log",
+      noteDate: selectedDate,
+      goalId: goalId ?? undefined,
+    });
+    setIsNewDraft(true);
+    setEditing({ ...draft, attachmentIds: [] });
   };
 
   const startEdit = (note: StudyNote) => {
@@ -200,28 +210,30 @@ export default function DailyJournal() {
     setDraftContent(note.content);
     setDraftGoalId(note.goalId ?? null);
     setPendingFiles([]);
+    setIsNewDraft(false);
     setEditing(note);
   };
 
+  const handleCancel = async () => {
+    if (isNewDraft && editing && !draftContent && !draftTitle) {
+      await api.del(`/api/v1/knowledge/${editing.id}`).catch(() => {});
+    }
+    setEditing(null);
+    setIsNewDraft(false);
+  };
+
   const handleSave = async () => {
+    if (!editing) return;
     try {
-      const isNew = editing === "new";
-      let note: StudyNote;
-      if (isNew) {
-        const created = await api.post<StudyNote>("/api/v1/knowledge/notes", {
+      const updated = await api.patch<StudyNote>(
+        `/api/v1/knowledge/notes/${editing.id}`,
+        {
           content: draftContent,
           title: draftTitle || undefined,
-          goalId: draftGoalId,
-          noteType: "daily_log",
-        });
-        note = { ...created, attachmentIds: [] };
-      } else {
-        const updated = await api.patch<StudyNote>(
-          `/api/v1/knowledge/notes/${(editing as StudyNote).id}`,
-          { content: draftContent, title: draftTitle || undefined }
-        );
-        note = { ...updated, attachmentIds: (editing as StudyNote).attachmentIds };
-      }
+          goalId: draftGoalId ?? "",
+        }
+      );
+      const note: StudyNote = { ...updated, attachmentIds: editing.attachmentIds };
       for (const file of pendingFiles) {
         const fd = new FormData();
         fd.append("file", file);
@@ -231,6 +243,7 @@ export default function DailyJournal() {
       }
       await loadNotes(selectedDate);
       setEditing(null);
+      setIsNewDraft(false);
     } catch {}
   };
 
@@ -249,7 +262,7 @@ export default function DailyJournal() {
   };
 
   const weekDays = getWeekDays(weekAnchor);
-  const currentNoteId = editing !== "new" && editing ? (editing as StudyNote).id : undefined;
+  const currentNoteId = editing?.id;
 
   return (
     <div className="flex gap-3 h-full">
@@ -394,11 +407,11 @@ export default function DailyJournal() {
         ) : (
           <div className="flex flex-col flex-1 min-h-0">
             <div className="flex items-center gap-2 mb-3 flex-shrink-0">
-              <button onClick={() => setEditing(null)} className="flex items-center gap-1 text-sm text-gray-400 hover:text-gray-700 transition">
+              <button onClick={handleCancel} className="flex items-center gap-1 text-sm text-gray-400 hover:text-gray-700 transition">
                 <ChevronLeft size={14} />返回
               </button>
               <span className="text-sm text-gray-300">/</span>
-              <span className="text-sm text-gray-500">{editing === "new" ? "新建学习记录" : "编辑"}</span>
+              <span className="text-sm text-gray-500">{isNewDraft ? "新建学习记录" : "编辑"}</span>
             </div>
             <input
               value={draftTitle}
@@ -422,7 +435,7 @@ export default function DailyJournal() {
               </div>
             )}
             <TiptapEditor
-              key={editing === "new" ? "new" : (editing as StudyNote).id}
+              key={editing?.id ?? "new"}
               content={draftContent}
               onChange={setDraftContent}
               placeholder="记录今天的学习心得…"
@@ -431,14 +444,14 @@ export default function DailyJournal() {
             />
             <FileAttachmentZone
               noteId={currentNoteId ?? null}
-              attachmentIds={editing !== "new" ? (editing as StudyNote).attachmentIds : []}
+              attachmentIds={editing?.attachmentIds ?? []}
               pendingFiles={pendingFiles}
               onAddFiles={(files) => setPendingFiles((prev) => [...prev, ...files])}
               onRemovePending={(idx) => setPendingFiles((prev) => prev.filter((_, i) => i !== idx))}
-              onRemoveSaved={(attId) => { if (editing !== "new") handleRemoveSaved((editing as StudyNote).id, attId); }}
+              onRemoveSaved={(attId) => { if (editing) handleRemoveSaved(editing.id, attId); }}
             />
             <div className="flex justify-end gap-2 mt-3 flex-shrink-0">
-              <button onClick={() => setEditing(null)} className="px-4 py-1.5 rounded-lg text-sm text-gray-500 border border-gray-200 hover:bg-gray-50 transition">
+              <button onClick={handleCancel} className="px-4 py-1.5 rounded-lg text-sm text-gray-500 border border-gray-200 hover:bg-gray-50 transition">
                 取消
               </button>
               <button onClick={handleSave} className="px-4 py-1.5 rounded-lg text-sm font-medium text-white transition" style={{ background: "var(--accent)" }}>
