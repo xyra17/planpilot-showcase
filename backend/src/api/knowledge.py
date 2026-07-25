@@ -5,7 +5,7 @@ from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -120,6 +120,17 @@ class NoteCreate(BaseModel):
     noteType: str = "flash_card"
     kb_id: str | None = None
     noteDate: str | None = None
+
+    @field_validator("noteDate")
+    @classmethod
+    def validate_note_date(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        try:
+            datetime.strptime(v, "%Y-%m-%d")
+        except ValueError:
+            raise ValueError("noteDate must be in YYYY-MM-DD format")
+        return v
 
 
 class NoteUpdate(BaseModel):
@@ -473,6 +484,17 @@ async def delete_item(
             os.remove(item.file_path)
         except FileNotFoundError:
             pass
+    # 级联删除该笔记的专属附件
+    attachments = (await db.execute(
+        select(KnowledgeItem).where(KnowledgeItem.note_id == item_id)
+    )).scalars().all()
+    for att in attachments:
+        if att.file_path:
+            try:
+                os.remove(att.file_path)
+            except FileNotFoundError:
+                pass
+        await db.delete(att)
     await db.delete(item)
     await db.commit()
 

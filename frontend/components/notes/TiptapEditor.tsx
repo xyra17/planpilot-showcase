@@ -9,9 +9,18 @@ import Highlight from "@tiptap/extension-highlight";
 import Underline from "@tiptap/extension-underline";
 import Image from "@tiptap/extension-image";
 import { Extension, InputRule } from "@tiptap/core";
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import EditorToolbar from "./EditorToolbar";
 import SlashMenu from "./SlashMenu";
+import { useState } from "react";
+
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+const SERVE_RE = /\/api\/v1\/knowledge\/files\/([^"' >]+)\/serve/g;
+
+function getToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem("access_token");
+}
 
 // ==text== → 高亮
 const HighlightInputRule = new InputRule({
@@ -77,6 +86,50 @@ export default function TiptapEditor({
   const [slashMenu, setSlashMenu] = useState<{ top: number; left: number } | null>(null);
   const editorWrapRef = useRef<HTMLDivElement>(null);
 
+  // blob URL → original API path
+  const blobToApi = useRef<Map<string, string>>(new Map());
+  // API path → blob URL (cache per mount)
+  const apiToBlob = useRef<Map<string, string>>(new Map());
+  // prevent onChange loop when programmatically setting content
+  const suppressUpdate = useRef(false);
+
+  const resolveImages = useCallback(async (html: string): Promise<string> => {
+    const token = getToken();
+    if (!token || !SERVE_RE.test(html)) return html;
+    SERVE_RE.lastIndex = 0;
+
+    const matches = Array.from(html.matchAll(new RegExp(SERVE_RE.source, "g")));
+    const unique = Array.from(new Set(matches.map((m) => m[0])));
+
+    await Promise.all(
+      unique.map(async (apiPath) => {
+        if (apiToBlob.current.has(apiPath)) return;
+        try {
+          const res = await fetch(`${BASE_URL}${apiPath}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (!res.ok) return;
+          const blob = await res.blob();
+          const blobUrl = URL.createObjectURL(blob);
+          blobToApi.current.set(blobUrl, apiPath);
+          apiToBlob.current.set(apiPath, blobUrl);
+        } catch {}
+      })
+    );
+
+    return html.replace(new RegExp(SERVE_RE.source, "g"), (apiPath) =>
+      apiToBlob.current.get(apiPath) ?? apiPath
+    );
+  }, []);
+
+  const dehydrate = useCallback((html: string): string => {
+    let out = html;
+    blobToApi.current.forEach((apiPath, blobUrl) => {
+      out = out.split(blobUrl).join(apiPath);
+    });
+    return out;
+  }, []);
+
   const editor = useEditor({
     extensions: [
       StarterKit,
@@ -91,7 +144,8 @@ export default function TiptapEditor({
     content,
     editable: !readOnly,
     onUpdate: ({ editor }) => {
-      const html = editor.getHTML();
+      if (suppressUpdate.current) return;
+      const html = dehydrate(editor.getHTML());
       onChange(html);
       if (onSave) {
         if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
@@ -125,14 +179,22 @@ export default function TiptapEditor({
   });
 
   useEffect(() => {
-    if (editor && content !== editor.getHTML()) {
-      editor.commands.setContent(content);
-    }
-  }, [content]);
+    if (!editor) return;
+    const currentDehydrated = dehydrate(editor.getHTML());
+    if (content === currentDehydrated) return;
+    resolveImages(content).then((resolved) => {
+      suppressUpdate.current = true;
+      editor.commands.setContent(resolved);
+      suppressUpdate.current = false;
+    });
+  }, [content, editor]);
 
   useEffect(() => {
     return () => {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      blobToApi.current.forEach((_, blobUrl) => {
+        URL.revokeObjectURL(blobUrl);
+      });
     };
   }, []);
 
