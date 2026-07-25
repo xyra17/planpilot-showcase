@@ -40,6 +40,8 @@ app.router.lifespan_context = _noop_lifespan
 async def _setup_db():
     async with _TEST_ENGINE.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+    yield
+    await _TEST_ENGINE.dispose()
 
 
 # ── 4. Per-test DB session ────────────────────────────────────────

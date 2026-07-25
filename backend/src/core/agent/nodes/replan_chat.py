@@ -26,7 +26,7 @@ async def node(state: AgentState) -> dict:
             pass
 
     llm = ChatOpenAI(
-        model=settings.smart_model_name or settings.model_name,
+        model=settings.smart_pro_model_name or settings.smart_model_name,
         api_key=settings.smart_api_key or settings.openai_api_key,
         base_url=settings.smart_base_url or settings.openai_base_url or None,
         max_tokens=200,

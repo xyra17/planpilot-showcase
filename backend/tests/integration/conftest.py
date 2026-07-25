@@ -1,4 +1,3 @@
-import asyncio
 import json
 import os
 from pathlib import Path
@@ -41,13 +40,6 @@ from src.main import app  # noqa: E402
 
 REPORTS_DIR = Path(__file__).parent / "reports"
 REPORTS_DIR.mkdir(exist_ok=True)
-
-
-@pytest.fixture(scope="session")
-def event_loop():
-    loop = asyncio.new_event_loop()
-    yield loop
-    loop.close()
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -93,6 +85,7 @@ async def client(setup_db):
     from src.redis_client import close_redis
 
     await close_redis()
+    await _PG_ENGINE.dispose()
 
 
 @pytest.fixture(scope="session")

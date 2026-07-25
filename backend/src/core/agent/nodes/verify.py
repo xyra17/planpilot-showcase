@@ -31,7 +31,7 @@ async def node(state: AgentState) -> dict:
             pass
 
     llm = ChatOpenAI(
-        model=settings.smart_model_name,
+        model=settings.smart_pro_model_name,
         api_key=settings.smart_api_key,
         base_url=settings.smart_base_url or None,
         max_tokens=200,

@@ -189,9 +189,9 @@ async def checkin(
             CheckinRecord.mode != "natural",
         )
         .order_by(CheckinRecord.date.desc())
-        .limit(3)
+        .limit(2)
     )).scalars().all()
-    replan = completion_rate < 0.6 and len(recent) >= 3 and all(r.completion_rate < 0.6 for r in recent)
+    replan = completion_rate < 0.6 and len(recent) >= 2 and all(r.completion_rate < 0.6 for r in recent)
 
     record = CheckinRecord(
         goal_id=goal_id,

@@ -96,7 +96,7 @@ async def _generate_replan_options(
     pending_titles = [t.title for t in pending_tasks[:10]]
 
     llm = ChatOpenAI(
-        model=settings.smart_model_name,
+        model=settings.smart_pro_model_name,
         api_key=settings.smart_api_key,
         base_url=settings.smart_base_url or None,
         max_tokens=1500,
@@ -199,7 +199,7 @@ async def _do_replan(db: AsyncSession, user_id: str, goal_id: str) -> list[dict]
     pending_titles = [t.title for t in pending_tasks[:10]]
 
     llm = ChatOpenAI(
-        model=settings.smart_model_name,
+        model=settings.smart_pro_model_name,
         api_key=settings.smart_api_key,
         base_url=settings.smart_base_url or None,
         max_tokens=1024,
@@ -1113,20 +1113,48 @@ def _fallback_questions(tasks: list) -> list[ReviewQuestion]:
 
 
 async def _upsert_brief_cache(user_id: str, db: AsyncSession, brief_dict: dict, generated_by: str) -> None:
-    from sqlalchemy.dialects.postgresql import insert as pg_insert
     today = date.today().isoformat()
-    stmt = pg_insert(DailyBriefCache).values(
-        id=str(uuid.uuid4()),
-        user_id=user_id,
-        date=today,
-        content=brief_dict,
-        is_read=False,
-        generated_by=generated_by,
-    ).on_conflict_do_update(
-        constraint="uq_daily_brief_cache_user_date",
-        set_={"content": brief_dict, "generated_by": generated_by, "generated_at": datetime.utcnow()},
-    )
-    await db.execute(stmt)
+    bind = db.get_bind()
+
+    if bind.dialect.name == "postgresql":
+        from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+        stmt = pg_insert(DailyBriefCache).values(
+            id=str(uuid.uuid4()),
+            user_id=user_id,
+            date=today,
+            content=brief_dict,
+            is_read=False,
+            generated_by=generated_by,
+        ).on_conflict_do_update(
+            constraint="uq_daily_brief_cache_user_date",
+            set_={
+                "content": brief_dict,
+                "generated_by": generated_by,
+                "generated_at": datetime.utcnow(),
+            },
+        )
+        await db.execute(stmt)
+    else:
+        cached = (await db.execute(
+            select(DailyBriefCache).where(
+                DailyBriefCache.user_id == user_id,
+                DailyBriefCache.date == today,
+            )
+        )).scalar_one_or_none()
+        if cached:
+            cached.content = brief_dict
+            cached.generated_by = generated_by
+            cached.generated_at = datetime.utcnow()
+        else:
+            db.add(DailyBriefCache(
+                id=str(uuid.uuid4()),
+                user_id=user_id,
+                date=today,
+                content=brief_dict,
+                is_read=False,
+                generated_by=generated_by,
+            ))
     await db.commit()
 
 
@@ -1407,7 +1435,7 @@ async def verify_answer(
     )
 
     llm = ChatOpenAI(
-        model=settings.smart_model_name,
+        model=settings.smart_pro_model_name,
         api_key=settings.smart_api_key,
         base_url=settings.smart_base_url or None,
         max_tokens=700,

@@ -80,29 +80,31 @@ async def test_verify_answer_pass(client: AsyncClient, auth: dict, goal_id: str)
 
     # 先生成问题（存入缓存）
     q_mock = _mock_llm("请解释 Python 类的概念")
-    with patch("src.api.agent.ChatOpenAI", return_value=q_mock):
+    with patch("src.api.agent.ChatOpenAI", return_value=q_mock) as llm_factory:
         await client.post(
             "/api/v1/agent/verify",
             json={"goal_id": goal_id, "task_id": task_id},
             headers=auth,
         )
+    assert llm_factory.call_args.kwargs["model"] == "deepseek-v4-flash"
 
     # 提交答案（passed=true）
     eval_resp = json.dumps({"passed": True, "feedback": "回答准确，概念理解到位！"})
     a_mock = _mock_llm(eval_resp)
-    with patch("src.api.agent.ChatOpenAI", return_value=a_mock):
+    with patch("src.api.agent.ChatOpenAI", return_value=a_mock) as llm_factory:
         r = await client.post(
             "/api/v1/agent/verify/answer",
             json={"goal_id": goal_id, "task_id": task_id, "answer": "类是对象的模板"},
             headers=auth,
         )
+    assert llm_factory.call_args.kwargs["model"] == "deepseek-v4-pro"
     assert r.status_code == 200
     data = r.json()
     assert data["passed"] is True
     assert "feedback" in data
 
 
-async def test_verify_answer_fail_with_followup(client: AsyncClient, auth: dict, goal_id: str):
+async def test_verify_answer_fail_with_suggestion(client: AsyncClient, auth: dict, goal_id: str):
     today = date.today().isoformat()
     r_task = await client.post(
         "/api/v1/tasks",
@@ -120,9 +122,11 @@ async def test_verify_answer_fail_with_followup(client: AsyncClient, auth: dict,
         )
 
     eval_resp = json.dumps({
+        "score": 45,
         "passed": False,
         "feedback": "回答不够准确",
-        "follow_up": "能举个实际使用装饰器的例子吗？",
+        "suggestion": "重新阅读装饰器概念，并完成一个日志装饰器练习。",
+        "follow_up": None,
     })
     a_mock = _mock_llm(eval_resp)
     with patch("src.api.agent.ChatOpenAI", return_value=a_mock):
@@ -134,7 +138,8 @@ async def test_verify_answer_fail_with_followup(client: AsyncClient, auth: dict,
     assert r.status_code == 200
     data = r.json()
     assert data["passed"] is False
-    assert "follow_up" in data
+    assert "suggestion" in data
+    assert "follow_up" not in data
 
 
 async def test_manual_replan(client: AsyncClient, auth: dict, goal_id: str):
@@ -143,8 +148,9 @@ async def test_manual_replan(client: AsyncClient, auth: dict, goal_id: str):
         {"title": "简化任务2", "estimated_mins": 15, "type": "review"},
     ])
     mock = _mock_llm(replan_tasks)
-    with patch("src.api.agent.ChatOpenAI", return_value=mock):
+    with patch("src.api.agent.ChatOpenAI", return_value=mock) as llm_factory:
         r = await client.post(f"/api/v1/agent/replan/{goal_id}", headers=auth)
+    assert llm_factory.call_args.kwargs["model"] == "deepseek-v4-pro"
     assert r.status_code == 200
     tasks = r.json()["tasks"]
     assert len(tasks) == 2

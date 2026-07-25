@@ -2,6 +2,10 @@ from pydantic import model_validator
 from pydantic_settings import BaseSettings
 
 _DEFAULT_SECRET_KEY = "change-this-in-production-min-32-chars"
+_PLACEHOLDER_SECRET_KEYS = {
+    _DEFAULT_SECRET_KEY,
+    "replace-with-a-random-secret-at-least-32-characters",
+}
 
 
 class Settings(BaseSettings):
@@ -13,7 +17,8 @@ class Settings(BaseSettings):
     model_name: str = "deepseek-chat"
     smart_api_key: str = ""
     smart_base_url: str = ""
-    smart_model_name: str = "deepseek-chat"
+    smart_model_name: str = "deepseek-v4-flash"
+    smart_pro_model_name: str = "deepseek-v4-pro"
 
     redis_url: str = "redis://localhost:6379/0"
     tavily_api_key: str = ""
@@ -31,7 +36,7 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def enforce_secret_key(self) -> "Settings":
-        if self.secret_key == _DEFAULT_SECRET_KEY:
+        if self.secret_key in _PLACEHOLDER_SECRET_KEYS:
             raise ValueError(
                 "SECRET_KEY 使用了默认占位值，拒绝启动。"
                 "请在 backend/.env 中设置一个随机字符串（至少 32 位）：\n"
