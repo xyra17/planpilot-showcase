@@ -2,7 +2,7 @@ import json
 import logging
 import math
 import uuid
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from langchain_core.messages import HumanMessage
@@ -1131,7 +1131,7 @@ async def _upsert_brief_cache(user_id: str, db: AsyncSession, brief_dict: dict, 
             set_={
                 "content": brief_dict,
                 "generated_by": generated_by,
-                "generated_at": datetime.utcnow(),
+                "generated_at": datetime.now(UTC).replace(tzinfo=None),
             },
         )
         await db.execute(stmt)
@@ -1145,7 +1145,7 @@ async def _upsert_brief_cache(user_id: str, db: AsyncSession, brief_dict: dict, 
         if cached:
             cached.content = brief_dict
             cached.generated_by = generated_by
-            cached.generated_at = datetime.utcnow()
+            cached.generated_at = datetime.now(UTC).replace(tzinfo=None)
         else:
             db.add(DailyBriefCache(
                 id=str(uuid.uuid4()),

@@ -8,6 +8,7 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
@@ -153,6 +154,53 @@ class KnowledgeItem(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     kb: Mapped["KnowledgeBase | None"] = relationship("KnowledgeBase", back_populates="items")
+    chunks: Mapped[list["KnowledgeChunk"]] = relationship(
+        "KnowledgeChunk",
+        back_populates="item",
+        cascade="all, delete-orphan",
+        order_by="KnowledgeChunk.chunk_index",
+    )
+
+    __table_args__ = (
+        Index(
+            "ix_knowledge_items_embedding_hnsw",
+            "embedding",
+            postgresql_using="hnsw",
+            postgresql_ops={"embedding": "vector_cosine_ops"},
+            postgresql_with={"m": 16, "ef_construction": 64},
+        ),
+    )
+
+
+class KnowledgeChunk(Base):
+    __tablename__ = "knowledge_chunks"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=new_uuid)
+    item_id: Mapped[str] = mapped_column(
+        String,
+        ForeignKey("knowledge_items.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    start_char: Mapped[int] = mapped_column(Integer, nullable=False)
+    end_char: Mapped[int] = mapped_column(Integer, nullable=False)
+    embedding: Mapped[list[float] | None] = mapped_column(Vector(1536), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    item: Mapped["KnowledgeItem"] = relationship("KnowledgeItem", back_populates="chunks")
+
+    __table_args__ = (
+        UniqueConstraint("item_id", "chunk_index", name="uq_knowledge_chunks_item_index"),
+        Index(
+            "ix_knowledge_chunks_embedding_hnsw",
+            "embedding",
+            postgresql_using="hnsw",
+            postgresql_ops={"embedding": "vector_cosine_ops"},
+            postgresql_with={"m": 16, "ef_construction": 64},
+        ),
+    )
 
 
 class DailyBriefCache(Base):
@@ -208,4 +256,3 @@ class PasswordResetToken(Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     used: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
-

@@ -97,9 +97,19 @@ async def test_search_knowledge_keyword(client: AsyncClient, auth_headers: dict,
 
 
 async def test_create_note(client: AsyncClient, auth_headers: dict, shared: dict, seed: dict):
+    goal_id = shared.get("goal_id_1")
+    if not goal_id:
+        goal_response = await client.post(
+            "/api/v1/goals",
+            json=seed["goals"][0],
+            headers=auth_headers,
+        )
+        assert goal_response.status_code == 201, goal_response.text
+        goal_id = goal_response.json()["id"]
+        shared["goal_id_1"] = goal_id
     r = await client.post(
         "/api/v1/knowledge/notes",
-        json={"goalId": shared["goal_id_1"], "content": seed["notes"][0]},
+        json={"goalId": goal_id, "content": seed["notes"][0]},
         headers=auth_headers,
     )
     assert r.status_code in (200, 201), r.text

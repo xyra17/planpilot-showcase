@@ -190,7 +190,11 @@ async def reset_password(
     record = (
         await db.execute(select(PasswordResetToken).where(PasswordResetToken.token == body.token))
     ).scalar_one_or_none()
-    if not record or record.used or record.expires_at < datetime.utcnow():
+    if (
+        not record
+        or record.used
+        or record.expires_at < datetime.now(timezone.utc).replace(tzinfo=None)
+    ):
         raise HTTPException(status_code=400, detail="链接无效或已过期，请重新申请")
     user = (await db.execute(select(User).where(User.id == record.user_id))).scalar_one_or_none()
     if not user:

@@ -4,6 +4,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
 try:
@@ -52,6 +53,14 @@ def _mock_celery():
         yield
 
 
+@pytest_asyncio.fixture(autouse=True, loop_scope="function")
+async def _close_redis_after_test():
+    yield
+    from src.redis_client import close_redis
+
+    await close_redis()
+
+
 @pytest.fixture(scope="session", autouse=True)
 async def setup_db():
     from sqlalchemy import text
@@ -82,9 +91,6 @@ async def client(setup_db):
         transport=ASGITransport(app=app), base_url="http://test"
     ) as ac:
         yield ac
-    from src.redis_client import close_redis
-
-    await close_redis()
     await _PG_ENGINE.dispose()
 
 

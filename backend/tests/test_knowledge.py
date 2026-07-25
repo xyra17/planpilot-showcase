@@ -3,7 +3,7 @@ import io
 from httpx import AsyncClient
 from sqlalchemy import select
 
-from src.models import KnowledgeItem
+from src.models import KnowledgeChunk, KnowledgeItem
 
 
 async def test_upload_txt(client: AsyncClient, auth: dict):
@@ -130,6 +130,71 @@ async def test_search_knowledge(client: AsyncClient, auth: dict, db):
     assert results[0]["score"] > 0
 
 
+async def test_chunk_search_returns_source_citation(client: AsyncClient, auth: dict, db):
+    content = b"intro text\nunique retrieval phrase appears in the second section"
+    uploaded = await client.post(
+        "/api/v1/knowledge/upload",
+        files={"file": ("citation.txt", io.BytesIO(content), "text/plain")},
+        headers=auth,
+    )
+    item = (await db.execute(
+        select(KnowledgeItem).where(KnowledgeItem.id == uploaded.json()["id"])
+    )).scalar_one()
+    item.content = content.decode()
+    item.content_length = len(item.content)
+    item.processing_status = "ready"
+    db.add(KnowledgeChunk(
+        item_id=item.id,
+        chunk_index=1,
+        content="unique retrieval phrase appears in the second section",
+        start_char=11,
+        end_char=len(item.content),
+    ))
+    await db.commit()
+
+    response = await client.get(
+        "/api/v1/knowledge/search?q=unique+retrieval+phrase",
+        headers=auth,
+    )
+    assert response.status_code == 200
+    result = response.json()[0]
+    assert result["id"] == item.id
+    assert result["chunk_index"] == 1
+    assert result["citation"] == "citation.txt · 第 2 段"
+    assert result["start_char"] == 11
+
+
+async def test_search_quality_evaluation(client: AsyncClient, auth: dict, db):
+    content = b"quality benchmark needle"
+    uploaded = await client.post(
+        "/api/v1/knowledge/upload",
+        files={"file": ("quality.txt", io.BytesIO(content), "text/plain")},
+        headers=auth,
+    )
+    item = (await db.execute(
+        select(KnowledgeItem).where(KnowledgeItem.id == uploaded.json()["id"])
+    )).scalar_one()
+    item.content = content.decode()
+    item.processing_status = "ready"
+    await db.commit()
+
+    response = await client.post(
+        "/api/v1/knowledge/search/evaluate",
+        json={
+            "cases": [{
+                "query": "quality benchmark needle",
+                "expected_item_ids": [item.id],
+            }],
+            "limit": 5,
+        },
+        headers=auth,
+    )
+    assert response.status_code == 200
+    metrics = response.json()
+    assert metrics["recall_at_k"] == 1.0
+    assert metrics["mrr"] == 1.0
+
+
 async def test_rejects_unsupported_and_empty_files(client: AsyncClient, auth: dict):
     unsupported = await client.post(
         "/api/v1/knowledge/upload",
@@ -184,6 +249,26 @@ async def test_retry_failed_file(client: AsyncClient, auth: dict, db):
     assert response.status_code == 200
     assert response.json()["status"] == "queued"
     assert response.json()["error"] is None
+
+
+async def test_reindex_legacy_ready_file(client: AsyncClient, auth: dict, db):
+    uploaded = await client.post(
+        "/api/v1/knowledge/upload",
+        files={"file": ("legacy.txt", io.BytesIO(b"legacy content"), "text/plain")},
+        headers=auth,
+    )
+    item = (await db.execute(
+        select(KnowledgeItem).where(KnowledgeItem.id == uploaded.json()["id"])
+    )).scalar_one()
+    item.content = "legacy content"
+    item.processing_status = "ready"
+    await db.commit()
+
+    response = await client.post("/api/v1/knowledge/reindex", headers=auth)
+    assert response.status_code == 200
+    assert item.id in response.json()["item_ids"]
+    await db.refresh(item)
+    assert item.processing_status == "queued"
 
 
 async def test_search_no_results(client: AsyncClient, auth: dict):

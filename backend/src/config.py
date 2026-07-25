@@ -19,6 +19,10 @@ class Settings(BaseSettings):
     smart_base_url: str = ""
     smart_model_name: str = "deepseek-v4-flash"
     smart_pro_model_name: str = "deepseek-v4-pro"
+    embedding_api_key: str = ""
+    embedding_base_url: str = ""
+    embedding_model_name: str = "text-embedding-3-small"
+    embedding_dimensions: int = 1536
 
     redis_url: str = "redis://localhost:6379/0"
     tavily_api_key: str = ""
@@ -45,6 +49,10 @@ class Settings(BaseSettings):
         if len(self.secret_key) < 32:
             raise ValueError(
                 f"SECRET_KEY 长度不足（当前 {len(self.secret_key)} 位，要求至少 32 位）"
+            )
+        if self.embedding_dimensions != 1536:
+            raise ValueError(
+                "EMBEDDING_DIMENSIONS 必须为 1536，与数据库 vector(1536) 保持一致"
             )
         return self
 

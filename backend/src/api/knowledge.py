@@ -1,17 +1,17 @@
 import os
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database import get_db
 from src.deps import get_current_user
-from src.models import Goal, KnowledgeBase, KnowledgeItem, Task, User
+from src.models import Goal, KnowledgeBase, KnowledgeChunk, KnowledgeItem, Task, User
 
 router = APIRouter(prefix="/api/v1/knowledge", tags=["knowledge"])
 
@@ -72,6 +72,28 @@ class SearchResultOut(BaseModel):
     score: float
     goal_id: str | None
     kb_id: str | None
+    source_type: str
+    source_url: str | None
+    chunk_index: int | None = None
+    start_char: int | None = None
+    end_char: int | None = None
+    citation: str
+
+
+class SearchEvaluationCase(BaseModel):
+    query: str = Field(min_length=1, max_length=500)
+    expected_item_ids: list[str] = Field(min_length=1)
+
+
+class SearchEvaluationRequest(BaseModel):
+    cases: list[SearchEvaluationCase] = Field(min_length=1, max_length=100)
+    limit: int = Field(default=5, ge=1, le=20)
+    goal_id: str | None = None
+
+
+class ReindexResult(BaseModel):
+    queued: int
+    item_ids: list[str]
 
 
 _NOTE_TYPES = {"chat_note", "daily_log", "flash_card", "task_note"}
@@ -157,13 +179,19 @@ def _get_embed_clients() -> list:
 
         from src.config import settings
         _embed_clients = []
-        if settings.openai_base_url:
+        if settings.embedding_api_key and settings.embedding_base_url:
             _embed_clients.append(
-                AsyncOpenAI(api_key=settings.openai_api_key or "local", base_url=settings.openai_base_url)
+                AsyncOpenAI(
+                    api_key=settings.embedding_api_key,
+                    base_url=settings.embedding_base_url,
+                )
             )
-        if settings.smart_api_key:
+        elif settings.openai_base_url:
             _embed_clients.append(
-                AsyncOpenAI(api_key=settings.smart_api_key, base_url=settings.smart_base_url or None)
+                AsyncOpenAI(
+                    api_key=settings.openai_api_key or "local",
+                    base_url=settings.openai_base_url,
+                )
             )
     return _embed_clients
 
@@ -222,6 +250,42 @@ def _dispatch_processing(item: KnowledgeItem) -> None:
         # The row has already been committed. Preserve it and expose a retryable state.
         item.processing_status = "failed"
         item.processing_error = f"处理任务派发失败：{type(exc).__name__}"[:500]
+
+
+@router.post("/reindex", response_model=ReindexResult)
+async def reindex_legacy_items(
+    limit: int = 100,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> ReindexResult:
+    """Queue legacy ready documents that do not have chunk-level indexes."""
+    safe_limit = max(1, min(limit, 500))
+    items = (await db.execute(
+        select(KnowledgeItem)
+        .where(
+            KnowledgeItem.user_id == current_user.id,
+            KnowledgeItem.processing_status == "ready",
+            KnowledgeItem.source_type.in_({"upload", "url"}),
+            ~KnowledgeItem.chunks.any(),
+        )
+        .order_by(KnowledgeItem.created_at.asc())
+        .limit(safe_limit)
+    )).scalars().all()
+
+    for item in items:
+        item.processing_status = "queued"
+        item.processing_error = None
+        item.retry_count = 0
+    await db.commit()
+
+    for item in items:
+        _dispatch_processing(item)
+    await db.commit()
+    queued_items = [item for item in items if item.processing_status == "queued"]
+    return ReindexResult(
+        queued=len(queued_items),
+        item_ids=[item.id for item in queued_items],
+    )
 
 
 def _note_to_out(item: KnowledgeItem, goal_title: str, attachment_ids: list[str] | None = None) -> NoteOut:
@@ -338,7 +402,11 @@ async def upload_file(
         source_type="upload",
         file_path=saved_path,
         processing_status="queued" if ext in INDEXABLE_EXTENSIONS else "ready",
-        processed_at=datetime.utcnow() if ext in ATTACHMENT_EXTENSIONS else None,
+        processed_at=(
+            datetime.now(UTC).replace(tzinfo=None)
+            if ext in ATTACHMENT_EXTENSIONS
+            else None
+        ),
     )
     try:
         db.add(item)
@@ -552,17 +620,72 @@ async def search_knowledge(
         query_vec = None
         for _client in _get_embed_clients():
             try:
-                resp = await _client.embeddings.create(model="text-embedding-3-small", input=q[:2000])
+                from src.config import settings
+
+                resp = await _client.embeddings.create(
+                    model=settings.embedding_model_name,
+                    input=q[:2000],
+                )
                 query_vec = resp.data[0].embedding
                 break
             except Exception:
                 continue
 
         if query_vec:
+            chunk_stmt = (
+                select(
+                    KnowledgeChunk,
+                    KnowledgeItem,
+                    (
+                        1
+                        - KnowledgeChunk.embedding.cosine_distance(
+                            cast(query_vec, Vector(1536))
+                        )
+                    ).label("score"),
+                )
+                .join(KnowledgeItem, KnowledgeItem.id == KnowledgeChunk.item_id)
+                .where(
+                    KnowledgeItem.user_id == current_user.id,
+                    KnowledgeItem.processing_status == "ready",
+                    KnowledgeChunk.embedding.is_not(None),
+                )
+            )
+            if goal_id:
+                chunk_stmt = chunk_stmt.where(KnowledgeItem.goal_id == goal_id)
+            chunk_stmt = chunk_stmt.order_by(sa_text("score DESC")).limit(limit)
+
+            chunk_rows = (await db.execute(chunk_stmt)).all()
+            chunk_results = []
+            for chunk, item, score in chunk_rows:
+                if float(score) < 0.3:
+                    continue
+                chunk_results.append(SearchResultOut(
+                    id=item.id,
+                    title=item.title,
+                    snippet=chunk.content[:300].strip(),
+                    score=round(float(score), 3),
+                    goal_id=item.goal_id,
+                    kb_id=item.kb_id,
+                    source_type=item.source_type,
+                    source_url=item.source_url,
+                    chunk_index=chunk.chunk_index,
+                    start_char=chunk.start_char,
+                    end_char=chunk.end_char,
+                    citation=f"{item.title} · 第 {chunk.chunk_index + 1} 段",
+                ))
+            if chunk_results:
+                return chunk_results
+
+            # Backwards compatibility for records not yet re-indexed into chunks.
             stmt = (
                 select(
                     KnowledgeItem,
-                    (1 - KnowledgeItem.embedding.op("<->")(cast(query_vec, Vector(1536)))).label("score"),
+                    (
+                        1
+                        - KnowledgeItem.embedding.cosine_distance(
+                            cast(query_vec, Vector(1536))
+                        )
+                    ).label("score"),
                 )
                 .where(
                     KnowledgeItem.user_id == current_user.id,
@@ -590,6 +713,9 @@ async def search_knowledge(
                     score=round(float(score), 3),
                     goal_id=item.goal_id,
                     kb_id=item.kb_id,
+                    source_type=item.source_type,
+                    source_url=item.source_url,
+                    citation=item.title,
                 ))
             if results:
                 return results
@@ -600,7 +726,41 @@ async def search_knowledge(
     from sqlalchemy import or_
 
     q_safe = q.replace("%", r"\%").replace("_", r"\_")
-    ilike_filter = or_(
+    chunk_filter = KnowledgeChunk.content.ilike(f"%{q_safe}%")
+    chunk_stmt = (
+        select(KnowledgeChunk, KnowledgeItem)
+        .join(KnowledgeItem, KnowledgeItem.id == KnowledgeChunk.item_id)
+        .where(
+            KnowledgeItem.user_id == current_user.id,
+            KnowledgeItem.processing_status == "ready",
+            chunk_filter,
+        )
+    )
+    if goal_id:
+        chunk_stmt = chunk_stmt.where(KnowledgeItem.goal_id == goal_id)
+    chunk_rows = (await db.execute(chunk_stmt.limit(limit * 3))).all()
+    chunk_scored = []
+    for chunk, item in chunk_rows:
+        score = _keyword_score(item.title + " " + chunk.content, q)
+        chunk_scored.append(SearchResultOut(
+            id=item.id,
+            title=item.title,
+            snippet=chunk.content[:300].strip(),
+            score=round(score, 3),
+            goal_id=item.goal_id,
+            kb_id=item.kb_id,
+            source_type=item.source_type,
+            source_url=item.source_url,
+            chunk_index=chunk.chunk_index,
+            start_char=chunk.start_char,
+            end_char=chunk.end_char,
+            citation=f"{item.title} · 第 {chunk.chunk_index + 1} 段",
+        ))
+    if chunk_scored:
+        chunk_scored.sort(key=lambda result: result.score, reverse=True)
+        return chunk_scored[:limit]
+
+    item_filter = or_(
         KnowledgeItem.title.ilike(f"%{q_safe}%"),
         KnowledgeItem.content.ilike(f"%{q_safe}%"),
     )
@@ -609,7 +769,7 @@ async def search_knowledge(
         .where(
             KnowledgeItem.user_id == current_user.id,
             KnowledgeItem.processing_status == "ready",
-            ilike_filter,
+            item_filter,
         )
     )
     if goal_id:
@@ -630,10 +790,61 @@ async def search_knowledge(
             score=round(score, 3),
             goal_id=item.goal_id,
             kb_id=item.kb_id,
+            source_type=item.source_type,
+            source_url=item.source_url,
+            citation=item.title,
         ))
 
     scored.sort(key=lambda x: x.score, reverse=True)
     return scored[:limit]
+
+
+@router.post("/search/evaluate")
+async def evaluate_search_quality(
+    body: SearchEvaluationRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Measure recall@k and MRR against a user-supplied relevance set."""
+    case_results = []
+    recall_total = 0.0
+    reciprocal_rank_total = 0.0
+
+    for case in body.cases:
+        results = await search_knowledge(
+            q=case.query,
+            goal_id=body.goal_id,
+            limit=body.limit,
+            current_user=current_user,
+            db=db,
+        )
+        ranked_ids = [result.id for result in results]
+        expected = set(case.expected_item_ids)
+        matched = expected.intersection(ranked_ids)
+        recall = len(matched) / len(expected)
+        first_rank = next(
+            (index + 1 for index, item_id in enumerate(ranked_ids) if item_id in expected),
+            None,
+        )
+        reciprocal_rank = 1 / first_rank if first_rank else 0.0
+        recall_total += recall
+        reciprocal_rank_total += reciprocal_rank
+        case_results.append({
+            "query": case.query,
+            "expected_item_ids": case.expected_item_ids,
+            "retrieved_item_ids": ranked_ids,
+            "recall": round(recall, 4),
+            "reciprocal_rank": round(reciprocal_rank, 4),
+        })
+
+    count = len(case_results)
+    return {
+        "limit": body.limit,
+        "case_count": count,
+        "recall_at_k": round(recall_total / count, 4),
+        "mrr": round(reciprocal_rank_total / count, 4),
+        "cases": case_results,
+    }
 
 
 # ── Chat Notes ────────────────────────────────────────────────
@@ -791,7 +1002,7 @@ async def create_note(
         content=body.content,
         source_type=body.noteType,
         processing_status="ready",
-        processed_at=datetime.utcnow(),
+        processed_at=datetime.now(UTC).replace(tzinfo=None),
         content_length=len(body.content),
     )
     db.add(item)
