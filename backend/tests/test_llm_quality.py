@@ -1,5 +1,5 @@
 from src.core.agent.nodes.intent import _keyword_intent
-from src.core.llm_quality import compact_text, enforce_chinese_only
+from src.core.llm_quality import compact_text, enforce_chinese_only, ensure_nonempty_text
 
 
 def test_verification_intent_covers_natural_question_requests():
@@ -10,6 +10,13 @@ def test_verification_intent_covers_natural_question_requests():
 def test_failed_task_report_is_checkin_not_replan():
     assert _keyword_intent("我没完成今天的任务") == "checkin"
     assert _keyword_intent("今天没有完成学习") == "checkin"
+
+
+def test_generated_v2_intent_boundaries():
+    assert _keyword_intent("想换成后端深挖") == "replan_request"
+    assert _keyword_intent("学完了，给我出几道题") == "verification"
+    assert _keyword_intent("只背了20个，帮我记录一下") == "checkin"
+    assert _keyword_intent("想系统学习，帮我看看怎么开始") == "goal_setup"
 
 
 def test_compact_text_prefers_complete_first_sentence():
@@ -29,3 +36,7 @@ def test_compact_text_removes_markdown_noise():
 
 def test_enforce_chinese_only_removes_latin_abbreviations():
     assert enforce_chinese_only("先确认 SMART 目标和 Python 基础。") == "先确认 目标和 基础。"
+
+
+def test_empty_model_message_uses_visible_fallback():
+    assert ensure_nonempty_text("  ", "安全兜底") == "安全兜底"

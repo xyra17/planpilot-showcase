@@ -26,3 +26,8 @@ def enforce_chinese_only(text: str) -> str:
     normalized = re.sub(r"[ \t]+", " ", normalized)
     normalized = re.sub(r" *\n *", "\n", normalized)
     return normalized.strip()
+
+
+def ensure_nonempty_text(text: str, fallback: str) -> str:
+    """避免推理 token 耗尽或安全阻断造成前端空白消息。"""
+    return text if text.strip() else fallback
