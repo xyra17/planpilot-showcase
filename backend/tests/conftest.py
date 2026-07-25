@@ -1,8 +1,8 @@
 import uuid
 from contextlib import asynccontextmanager
 from datetime import date, timedelta
+from unittest.mock import AsyncMock, patch
 
-import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -23,6 +23,8 @@ _db.AsyncSessionLocal = _TestSession
 # ── 2. Import app + override lifespan (prevent engine.dispose) ───
 from src.database import Base, get_db  # noqa: E402
 from src.main import app  # noqa: E402
+
+app.state.limiter.enabled = False
 
 
 @asynccontextmanager
@@ -54,8 +56,18 @@ async def client(db: AsyncSession) -> AsyncClient:
         yield db
 
     app.dependency_overrides[get_db] = _override
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
-        yield c
+    redis_mock = AsyncMock()
+    redis_mock.exists.return_value = 0
+    with (
+        patch("src.tasks.knowledge.process_knowledge_item.apply_async", return_value=None),
+        patch("src.redis_client.get_redis", return_value=redis_mock),
+    ):
+        test_host = f"test-{uuid.uuid4().hex}"
+        async with AsyncClient(
+            transport=ASGITransport(app=app, client=(test_host, 123)),
+            base_url="http://test",
+        ) as c:
+            yield c
     app.dependency_overrides.clear()
 
 

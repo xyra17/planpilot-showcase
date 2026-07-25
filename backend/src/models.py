@@ -3,7 +3,17 @@ from datetime import datetime
 from typing import Any
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import JSON
 
@@ -135,6 +145,11 @@ class KnowledgeItem(Base):
     note_id: Mapped[str | None] = mapped_column(String, ForeignKey("knowledge_items.id", ondelete="SET NULL"), nullable=True, index=True)
     tags: Mapped[list[str]] = mapped_column(JSON, default=list)
     embedding: Mapped[list[float] | None] = mapped_column(Vector(1536), nullable=True)
+    processing_status: Mapped[str] = mapped_column(String, default="uploaded", index=True)
+    processing_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    retry_count: Mapped[int] = mapped_column(Integer, default=0)
+    processed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    content_length: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     kb: Mapped["KnowledgeBase | None"] = relationship("KnowledgeBase", back_populates="items")
@@ -193,5 +208,4 @@ class PasswordResetToken(Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     used: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
-
 

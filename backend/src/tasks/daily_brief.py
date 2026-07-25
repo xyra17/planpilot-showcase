@@ -31,7 +31,7 @@ async def _main():
             .join(CheckinRecord, CheckinRecord.user_id == User.id)
             .join(Goal, Goal.user_id == User.id)
             .where(
-                User.is_active == True,
+                User.is_active.is_(True),
                 CheckinRecord.date >= seven_days_ago,
                 Goal.status == "active",
             )

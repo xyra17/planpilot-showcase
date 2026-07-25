@@ -3,7 +3,6 @@ from datetime import date, timedelta
 import pytest
 from httpx import AsyncClient
 
-
 pytestmark = pytest.mark.integration
 
 

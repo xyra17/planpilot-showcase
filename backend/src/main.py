@@ -1,5 +1,4 @@
 import logging
-
 from contextlib import asynccontextmanager
 
 import sentry_sdk
@@ -10,7 +9,6 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
-import src.api.schedule as schedule
 import src.api.agent as agent
 import src.api.auth as auth
 import src.api.checkin as checkin
@@ -19,9 +17,10 @@ import src.api.goals as goals
 import src.api.knowledge as knowledge
 import src.api.notifications as notifications
 import src.api.plans as plans
+import src.api.schedule as schedule
 import src.api.tasks as tasks
 from src.config import settings
-from src.database import Base, engine
+from src.database import engine
 
 logger = logging.getLogger(__name__)
 

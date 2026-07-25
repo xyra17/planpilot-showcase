@@ -106,9 +106,13 @@ function FileAttachmentZone({ noteId, attachmentIds, pendingFiles, onAddFiles, o
       {attachmentIds.map((id) => (
         <div key={id} className="flex items-center gap-1 px-2 py-1 rounded-lg bg-gray-50 border border-gray-200 text-xs text-gray-600">
           <Paperclip size={11} className="text-gray-400" />
-          <a href={`/api/v1/knowledge/files/${id}/serve`} target="_blank" rel="noopener noreferrer" className="hover:text-blue-600">
+          <button
+            type="button"
+            onClick={() => api.openFile(`/api/v1/knowledge/files/${id}/serve`).catch(() => {})}
+            className="hover:text-blue-600"
+          >
             附件
-          </a>
+          </button>
           <button onClick={() => onRemoveSaved(id)} className="ml-1 text-gray-400 hover:text-red-500"><X size={10} /></button>
         </div>
       ))}
@@ -125,7 +129,7 @@ function FileAttachmentZone({ noteId, attachmentIds, pendingFiles, onAddFiles, o
         <input
           type="file"
           className="hidden"
-          accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip"
+          accept=".pdf,.docx,.xlsx,.csv,.txt,.md,.png,.jpg,.jpeg,.gif,.webp"
           multiple
           onChange={(e) => { if (e.target.files) onAddFiles(Array.from(e.target.files)); }}
         />

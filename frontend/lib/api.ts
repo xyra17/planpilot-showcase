@@ -49,10 +49,24 @@ export const api = {
       body: formData,
     });
     if (!res.ok) {
-      const err = await res.json().catch(() => ({ message: res.statusText }));
-      throw new Error((err as { message?: string }).message ?? "上传失败");
+      const err = await res.json().catch(() => ({ detail: res.statusText }));
+      throw new Error(
+        (err as { detail?: string; message?: string }).detail ??
+        (err as { message?: string }).message ??
+        "上传失败"
+      );
     }
     return res.json() as Promise<T>;
+  },
+  openFile: async (path: string): Promise<void> => {
+    const token = getToken();
+    const res = await fetch(`${BASE_URL}${path}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) throw new Error("附件打开失败");
+    const objectUrl = URL.createObjectURL(await res.blob());
+    window.open(objectUrl, "_blank", "noopener,noreferrer");
+    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
   },
 };
 

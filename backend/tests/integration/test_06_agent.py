@@ -3,7 +3,6 @@ import os
 import pytest
 from httpx import AsyncClient
 
-
 pytestmark = pytest.mark.integration
 
 HAS_LLM = bool(os.getenv("SMART_API_KEY") and os.getenv("SMART_API_KEY") not in ("", "test"))

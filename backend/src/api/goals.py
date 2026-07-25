@@ -1,8 +1,9 @@
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, field_validator, model_validator
-from sqlalchemy import delete as sql_delete, select
+from sqlalchemy import delete as sql_delete
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.database import get_db
@@ -392,7 +393,7 @@ async def get_goal_plan(
 
     plan = (await db.execute(
         select(Plan)
-        .where(Plan.goal_id == goal_id, Plan.is_current == True)
+        .where(Plan.goal_id == goal_id, Plan.is_current.is_(True))
         .order_by(Plan.created_at.desc())
         .limit(1)
     )).scalar_one_or_none()

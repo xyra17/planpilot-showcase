@@ -1,8 +1,9 @@
 import io
-from datetime import date, timedelta
 
-import pytest
 from httpx import AsyncClient
+from sqlalchemy import select
+
+from src.models import KnowledgeItem
 
 
 async def test_upload_txt(client: AsyncClient, auth: dict):
@@ -16,6 +17,7 @@ async def test_upload_txt(client: AsyncClient, auth: dict):
     data = r.json()
     assert data["name"] == "test.txt"
     assert data["type"] == "txt"
+    assert data["status"] == "queued"
     return data["id"]
 
 
@@ -107,18 +109,81 @@ async def test_delete_kb(client: AsyncClient, auth: dict):
     assert r.status_code == 204
 
 
-async def test_search_knowledge(client: AsyncClient, auth: dict):
+async def test_search_knowledge(client: AsyncClient, auth: dict, db):
     content = b"Python decorators and metaclasses explained"
-    await client.post(
+    uploaded = await client.post(
         "/api/v1/knowledge/upload",
         files={"file": ("search.txt", io.BytesIO(content), "text/plain")},
         headers=auth,
     )
+    item = (await db.execute(
+        select(KnowledgeItem).where(KnowledgeItem.id == uploaded.json()["id"])
+    )).scalar_one()
+    item.content = content.decode()
+    item.content_length = len(item.content)
+    item.processing_status = "ready"
+    await db.commit()
     r = await client.get("/api/v1/knowledge/search?q=python+decorators", headers=auth)
     assert r.status_code == 200
     results = r.json()
     assert len(results) > 0
     assert results[0]["score"] > 0
+
+
+async def test_rejects_unsupported_and_empty_files(client: AsyncClient, auth: dict):
+    unsupported = await client.post(
+        "/api/v1/knowledge/upload",
+        files={"file": ("malware.exe", io.BytesIO(b"MZ"), "application/octet-stream")},
+        headers=auth,
+    )
+    assert unsupported.status_code == 415
+
+    empty = await client.post(
+        "/api/v1/knowledge/upload",
+        files={"file": ("empty.txt", io.BytesIO(b""), "text/plain")},
+        headers=auth,
+    )
+    assert empty.status_code == 400
+
+
+async def test_rejects_invalid_or_multiple_goal_links(client: AsyncClient, auth: dict):
+    invalid_goal = await client.post(
+        "/api/v1/knowledge/upload",
+        files={"file": ("goal.txt", io.BytesIO(b"content"), "text/plain")},
+        data={"goal_ids": "not-a-user-goal"},
+        headers=auth,
+    )
+    assert invalid_goal.status_code == 404
+
+    multiple_goals = await client.post(
+        "/api/v1/knowledge/upload",
+        files={"file": ("goals.txt", io.BytesIO(b"content"), "text/plain")},
+        data={"goal_ids": ["goal-a", "goal-b"]},
+        headers=auth,
+    )
+    assert multiple_goals.status_code == 422
+
+
+async def test_retry_failed_file(client: AsyncClient, auth: dict, db):
+    uploaded = await client.post(
+        "/api/v1/knowledge/upload",
+        files={"file": ("retry.txt", io.BytesIO(b"retry me"), "text/plain")},
+        headers=auth,
+    )
+    item = (await db.execute(
+        select(KnowledgeItem).where(KnowledgeItem.id == uploaded.json()["id"])
+    )).scalar_one()
+    item.processing_status = "failed"
+    item.processing_error = "temporary error"
+    await db.commit()
+
+    response = await client.post(
+        f"/api/v1/knowledge/{item.id}/retry",
+        headers=auth,
+    )
+    assert response.status_code == 200
+    assert response.json()["status"] == "queued"
+    assert response.json()["error"] is None
 
 
 async def test_search_no_results(client: AsyncClient, auth: dict):

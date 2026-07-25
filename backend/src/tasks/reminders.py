@@ -1,6 +1,6 @@
 import asyncio
-import email.mime.text
 import email.mime.multipart
+import email.mime.text
 
 import aiosmtplib
 
@@ -27,14 +27,16 @@ async def _main():
         return
 
     from datetime import date
+
     from sqlalchemy import select
+
     from src.models import CheckinRecord, Goal, Task, User
 
     today = date.today().isoformat()
 
     async with AsyncSessionLocal() as db:
         users = (await db.execute(
-            select(User).where(User.is_active == True)
+            select(User).where(User.is_active.is_(True))
         )).scalars().all()
 
         for user in users:

@@ -24,8 +24,8 @@ os.environ.setdefault("SECRET_KEY", "integration-test-secret-32chars!!")
 os.environ.setdefault("SENTRY_DSN", "")
 # SMART_API_KEY / OPENAI_API_KEY 从真实 .env 继承
 
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
-from sqlalchemy.pool import NullPool
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine  # noqa: E402
+from sqlalchemy.pool import NullPool  # noqa: E402
 
 # 父级 conftest 已将 src.database.engine 替换为 SQLite，这里重新 patch 为 PostgreSQL
 # NullPool 避免 asyncpg 连接池与事件循环的并发冲突
@@ -53,7 +53,10 @@ def event_loop():
 @pytest.fixture(scope="session", autouse=True)
 def _mock_celery():
     """Prevent Celery broker connection errors during tests."""
-    with patch("src.tasks.deviation.check_all_deviations.apply_async", return_value=None):
+    with (
+        patch("src.tasks.deviation.check_all_deviations.apply_async", return_value=None),
+        patch("src.tasks.knowledge.process_knowledge_item.apply_async", return_value=None),
+    ):
         yield
 
 
@@ -87,6 +90,9 @@ async def client(setup_db):
         transport=ASGITransport(app=app), base_url="http://test"
     ) as ac:
         yield ac
+    from src.redis_client import close_redis
+
+    await close_redis()
 
 
 @pytest.fixture(scope="session")

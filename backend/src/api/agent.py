@@ -15,7 +15,15 @@ from sse_starlette.sse import EventSourceResponse
 from src.config import settings
 from src.database import get_db
 from src.deps import get_current_user
-from src.models import CheckinRecord, DailyBriefCache, Goal, KnowledgeBase, KnowledgeItem, Plan, Task, User
+from src.models import (
+    CheckinRecord,
+    DailyBriefCache,
+    Goal,
+    KnowledgeItem,
+    Plan,
+    Task,
+    User,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -371,6 +379,7 @@ async def stream(
     db: AsyncSession = Depends(get_db),
 ) -> EventSourceResponse:
     from langchain_core.messages import HumanMessage
+
     from src.core.agent.graph import get_agent
 
     async def generate():
@@ -763,7 +772,7 @@ async def generate_macro_plan(
 
     # 取消旧的 is_current 计划
     old_plans = (await db.execute(
-        select(Plan).where(Plan.goal_id == goal_id, Plan.is_current == True)
+        select(Plan).where(Plan.goal_id == goal_id, Plan.is_current.is_(True))
     )).scalars().all()
     for p in old_plans:
         p.is_current = False
@@ -868,8 +877,6 @@ async def generate_macro_plan(
     intent_note = ""
     if user_intent_supplement:
         intent_note = f"【用户特别说明】（请将以下要求作为高优先级约束融入计划）：{user_intent_supplement}\n"
-
-    schedule_label = {"weekday": "仅工作日", "weekend": "仅周末", "all": "每天"}.get(work_schedule, "每天")
 
     # 获取所有可用日期列表（含截止日当天）
     available_dates = _get_available_dates(today, deadline_date, work_schedule)

@@ -1,9 +1,9 @@
 import os
 import secrets
 from datetime import datetime, timedelta, timezone
+from email.mime.text import MIMEText
 
 import aiosmtplib
-from email.mime.text import MIMEText
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials
 from passlib.context import CryptContext
@@ -12,6 +12,7 @@ from slowapi.util import get_remote_address
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.config import settings
 from src.database import get_db
 from src.deps import ALGORITHM, bearer_scheme, create_access_token, get_current_user
 from src.models import PasswordResetToken, User
@@ -25,7 +26,6 @@ from src.schemas.auth import (
     UpdateProfileRequest,
     UserOut,
 )
-from src.config import settings
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -107,7 +107,8 @@ async def update_me(
 async def logout(
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
 ) -> None:
-    from jose import jwt as jose_jwt, JWTError
+    from jose import JWTError
+    from jose import jwt as jose_jwt
     try:
         payload = jose_jwt.decode(
             credentials.credentials, settings.secret_key, algorithms=[ALGORITHM]
@@ -205,6 +206,7 @@ async def delete_me(    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> None:
     import os
+
     from src.models import CheckinRecord, DailySchedule, KnowledgeBase, KnowledgeItem
 
     # 清理上传文件 + 知识条目（先删 items，再删 kb，避免 FK 约束）

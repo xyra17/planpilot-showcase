@@ -25,6 +25,10 @@ type KnowledgeFile = {
   goalIds: string[];
   kbId: string;
   taskId: string;   // "" = 未关联任务
+  status: "uploaded" | "queued" | "parsing" | "embedding" | "ready" | "failed";
+  error: string | null;
+  retryCount: number;
+  contentLength: number;
 };
 
 type FilterState = { type: "all" | "kb" | "goal"; id: string };
@@ -32,6 +36,31 @@ type FilterState = { type: "all" | "kb" | "goal"; id: string };
 // ── 初始数据 ──────────────────────────────────────────────────
 const INITIAL_KBS: KnowledgeBase[] = [];
 const INITIAL_FILES: KnowledgeFile[] = [];
+
+const STATUS_META: Record<KnowledgeFile["status"], { label: string; cls: string }> = {
+  uploaded: { label: "等待处理", cls: "bg-gray-100 text-gray-600" },
+  queued: { label: "排队中", cls: "bg-blue-50 text-blue-600" },
+  parsing: { label: "解析中", cls: "bg-amber-50 text-amber-700" },
+  embedding: { label: "建立索引", cls: "bg-violet-50 text-violet-700" },
+  ready: { label: "可用于 AI", cls: "bg-emerald-50 text-emerald-700" },
+  failed: { label: "处理失败", cls: "bg-red-50 text-red-600" },
+};
+
+function ProcessingBadge({ file, onRetry }: { file: KnowledgeFile; onRetry: () => void }) {
+  const meta = STATUS_META[file.status] ?? STATUS_META.uploaded;
+  return (
+    <div className="flex items-center gap-1.5" title={file.error ?? undefined}>
+      <span className={cn("text-[11px] px-2 py-0.5 rounded-full whitespace-nowrap", meta.cls)}>
+        {meta.label}
+      </span>
+      {file.status === "failed" && (
+        <button onClick={onRetry} className="text-[11px] text-blue-600 hover:underline">
+          重试
+        </button>
+      )}
+    </div>
+  );
+}
 
 const iconMap: Record<string, React.ReactNode> = {
   pdf:   <FileText        size={16} className="text-red-500"   />,
@@ -89,6 +118,18 @@ export default function KnowledgePage() {
       .then((r) => setKbs(r.items ?? []))
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (!files.some((file) => ["uploaded", "queued", "parsing", "embedding"].includes(file.status))) {
+      return;
+    }
+    const timer = window.setInterval(() => {
+      api.get<{ items: KnowledgeFile[] }>("/api/v1/knowledge/files")
+        .then((response) => setFiles(response.items ?? []))
+        .catch(() => {});
+    }, 3000);
+    return () => window.clearInterval(timer);
+  }, [files]);
 
   useEffect(() => {
     if (filter.type === "goal" && filter.id) {
@@ -151,9 +192,7 @@ export default function KnowledgePage() {
 
   // ── 上传 ─────────────────────────────────────────────────────
   function toggleGoal(id: string) {
-    setUploadGoalIds((prev) =>
-      prev.includes(id) ? prev.filter((g) => g !== id) : [...prev, id],
-    );
+    setUploadGoalIds((prev) => prev.includes(id) ? [] : [id]);
   }
 
   async function submitUpload() {
@@ -167,8 +206,8 @@ export default function KnowledgePage() {
     try {
       const saved = await api.upload<KnowledgeFile>("/api/v1/knowledge/upload", formData);
       setFiles((prev) => [saved, ...prev]);
-    } catch {
-      // 上传失败，不插入假数据
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "上传失败");
     } finally {
       setUploading(false);
       setUploadOpen(false);
@@ -177,6 +216,27 @@ export default function KnowledgePage() {
       setUploadGoalIds([]);
       setUploadTaskId("");
       if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
+  async function retryFile(id: string) {
+    try {
+      const updated = await api.post<KnowledgeFile>(`/api/v1/knowledge/${id}/retry`, {});
+      setFiles((prev) => prev.map((file) => file.id === id ? updated : file));
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "重试失败");
+    }
+  }
+
+  async function deleteFile(id: string) {
+    setDeletingId(id);
+    try {
+      await api.del(`/api/v1/knowledge/${id}`);
+      setFiles((prev) => prev.filter((file) => file.id !== id));
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "删除失败");
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -190,8 +250,8 @@ export default function KnowledgePage() {
         kb_id: urlKbId || null,
       });
       setFiles((prev) => [saved, ...prev]);
-    } catch {
-      // ignore
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "网址导入失败");
     } finally {
       setUrlImporting(false);
       setUrlImportOpen(false);
@@ -378,12 +438,6 @@ export default function KnowledgePage() {
               taskGroupMap.get(key)!.push(f);
             }
             const getTaskTitle = (tid: string) => goalTasks.find((t) => t.id === tid)?.title ?? "未关联任务";
-            const deleteFile = async (id: string) => {
-              setDeletingId(id);
-              try { await api.del(`/api/v1/knowledge/${id}`); } catch { /* ignore */ }
-              setFiles((prev) => prev.filter((f) => f.id !== id));
-              setDeletingId(null);
-            };
             const sortedGroups = [
               ...Array.from(taskGroupMap.entries()).filter(([k]) => k !== ""),
               ...Array.from(taskGroupMap.entries()).filter(([k]) => k === ""),
@@ -414,6 +468,9 @@ export default function KnowledgePage() {
                               <span>{file.size}</span>
                               <span>{file.uploadDate}</span>
                             </div>
+                            <div className="mt-2">
+                              <ProcessingBadge file={file} onRetry={() => retryFile(file.id)} />
+                            </div>
                           </div>
                         ))}
                       </div>
@@ -425,6 +482,7 @@ export default function KnowledgePage() {
                               {iconMap[file.type] ?? <FileText size={14} className="text-gray-400" />}
                             </div>
                             <span className="flex-1 text-sm text-gray-800 font-medium truncate">{file.name}</span>
+                            <ProcessingBadge file={file} onRetry={() => retryFile(file.id)} />
                             <span className="text-xs text-gray-400 flex-shrink-0">{file.size} · {file.uploadDate}</span>
                             <button onClick={() => deleteFile(file.id)} disabled={deletingId === file.id}
                               className="text-gray-300 hover:text-red-500 transition p-1 rounded disabled:opacity-50 flex-shrink-0">
@@ -451,12 +509,7 @@ export default function KnowledgePage() {
                       </div>
                       <p className="flex-1 text-sm font-medium text-gray-800 leading-snug line-clamp-2 min-w-0">{file.name}</p>
                       <button
-                        onClick={async () => {
-                          setDeletingId(file.id);
-                          try { await api.del(`/api/v1/knowledge/${file.id}`); } catch { /* ignore */ }
-                          setFiles((prev) => prev.filter((f) => f.id !== file.id));
-                          setDeletingId(null);
-                        }}
+                        onClick={() => deleteFile(file.id)}
                         disabled={deletingId === file.id}
                         className="text-gray-300 hover:text-red-500 transition p-0.5 rounded flex-shrink-0 disabled:opacity-50">
                         <Trash2 size={13} />
@@ -465,6 +518,9 @@ export default function KnowledgePage() {
                     <div className="flex items-center justify-between text-xs text-gray-400 mb-2">
                       <span>{file.size}</span>
                       <span>{file.uploadDate}</span>
+                    </div>
+                    <div className="mb-2">
+                      <ProcessingBadge file={file} onRetry={() => retryFile(file.id)} />
                     </div>
                     <div className="flex flex-wrap gap-1">
                       {fileKb && (
@@ -486,9 +542,10 @@ export default function KnowledgePage() {
           ) : (
             <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
               <div className="grid grid-cols-12 px-4 py-2.5 border-b border-gray-100 text-xs font-medium text-gray-400 uppercase tracking-wide">
-                <div className="col-span-4">文件名</div>
+                <div className="col-span-3">文件名</div>
+                <div className="col-span-2">处理状态</div>
                 <div className="col-span-2">知识库</div>
-                <div className="col-span-3">关联目标</div>
+                <div className="col-span-2">关联目标</div>
                 <div className="col-span-1">大小</div>
                 <div className="col-span-1">日期</div>
                 <div className="col-span-1" />
@@ -498,16 +555,19 @@ export default function KnowledgePage() {
                 const fileKb = kbs.find((k) => k.id === file.kbId);
                 return (
                   <div key={file.id} className="grid grid-cols-12 px-4 py-3 border-b border-gray-50 hover:bg-gray-50 transition items-center group">
-                    <div className="col-span-4 flex items-center gap-2.5">
+                    <div className="col-span-3 flex items-center gap-2.5">
                       {iconMap[file.type] ?? <FileText size={15} className="text-gray-400" />}
                       <span className="text-sm text-gray-800 truncate font-medium">{file.name}</span>
+                    </div>
+                    <div className="col-span-2">
+                      <ProcessingBadge file={file} onRetry={() => retryFile(file.id)} />
                     </div>
                     <div className="col-span-2">
                       {fileKb ? (
                         <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">{fileKb.name}</span>
                       ) : <span className="text-xs text-gray-300">—</span>}
                     </div>
-                    <div className="col-span-3 flex flex-wrap gap-1">
+                    <div className="col-span-2 flex flex-wrap gap-1">
                       {fileGoals.length === 0
                         ? <span className="text-xs text-gray-300">—</span>
                         : fileGoals.map((g) => (
@@ -521,12 +581,7 @@ export default function KnowledgePage() {
                     <div className="col-span-1 text-xs text-gray-400">{file.uploadDate}</div>
                     <div className="col-span-1 flex justify-end">
                       <button
-                        onClick={async () => {
-                          setDeletingId(file.id);
-                          try { await api.del(`/api/v1/knowledge/${file.id}`); } catch { /* ignore */ }
-                          setFiles((prev) => prev.filter((f) => f.id !== file.id));
-                          setDeletingId(null);
-                        }}
+                        onClick={() => deleteFile(file.id)}
                         disabled={deletingId === file.id}
                         className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 transition p-1 rounded disabled:opacity-50">
                         <Trash2 size={13} />
@@ -785,6 +840,7 @@ export default function KnowledgePage() {
                 </>
               )}
               <input ref={fileInputRef} type="file" className="hidden"
+                accept=".pdf,.txt,.md,.docx,.csv,.xlsx,.png,.jpg,.jpeg,.gif,.webp"
                 onChange={(e) => setUploadFile(e.target.files?.[0] ?? null)} />
             </div>
 

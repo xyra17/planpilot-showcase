@@ -19,7 +19,9 @@ def check_all_deviations(self, user_id: str | None = None):
 
 async def _main(user_id: str | None = None):
     from datetime import date, timedelta
+
     from sqlalchemy import select
+
     from src.models import CheckinRecord, Goal, User
 
     four_days_ago = (date.today() - timedelta(days=4)).isoformat()
@@ -27,7 +29,7 @@ async def _main(user_id: str | None = None):
     async with AsyncSessionLocal() as db:
         stmt = (
             select(Goal).join(User, User.id == Goal.user_id)
-            .where(Goal.status == "active", User.is_active == True)
+            .where(Goal.status == "active", User.is_active.is_(True))
         )
         if user_id:
             stmt = stmt.where(Goal.user_id == user_id)

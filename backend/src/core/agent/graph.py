@@ -65,8 +65,9 @@ async def get_agent():
         return _agent
 
     try:
-        from psycopg_pool import AsyncConnectionPool
         from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+        from psycopg_pool import AsyncConnectionPool
+
         from src.config import settings
 
         pg_url = settings.database_url.replace("+asyncpg", "")

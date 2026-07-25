@@ -1,4 +1,3 @@
-from datetime import date
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
@@ -63,7 +62,7 @@ async def mark_all_read(
     rows = (await db.execute(
         select(DailyBriefCache).where(
             DailyBriefCache.user_id == current_user.id,
-            DailyBriefCache.is_read == False,
+            DailyBriefCache.is_read.is_(False),
         )
     )).scalars().all()
     for r in rows:

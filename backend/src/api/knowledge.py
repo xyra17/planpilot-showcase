@@ -1,7 +1,8 @@
-import csv
-import io
 import os
 import uuid
+from datetime import datetime
+from urllib.parse import urlparse
+
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
@@ -15,36 +16,23 @@ from src.models import Goal, KnowledgeBase, KnowledgeItem, Task, User
 router = APIRouter(prefix="/api/v1/knowledge", tags=["knowledge"])
 
 UPLOAD_DIR = "uploads"
-_MAX_CONTENT = 50_000
-
-
-def _extract_text(raw: bytes, ext: str) -> str:
-    try:
-        if ext in ("txt", "md"):
-            return raw.decode("utf-8", errors="replace")[:_MAX_CONTENT]
-        if ext == "pdf":
-            import pypdf
-            reader = pypdf.PdfReader(io.BytesIO(raw))
-            return "\n".join(p.extract_text() or "" for p in reader.pages)[:_MAX_CONTENT]
-        if ext == "docx":
-            import docx as _docx
-            doc = _docx.Document(io.BytesIO(raw))
-            return "\n".join(p.text for p in doc.paragraphs)[:_MAX_CONTENT]
-        if ext == "csv":
-            text = raw.decode("utf-8", errors="replace")
-            reader = csv.reader(io.StringIO(text))
-            return "\n".join(",".join(row) for row in reader)[:_MAX_CONTENT]
-        if ext in ("xlsx", "xls"):
-            import openpyxl
-            wb = openpyxl.load_workbook(io.BytesIO(raw), read_only=True, data_only=True)
-            lines = []
-            for ws in wb.worksheets:
-                for row in ws.iter_rows(values_only=True):
-                    lines.append("\t".join("" if v is None else str(v) for v in row))
-            return "\n".join(lines)[:_MAX_CONTENT]
-    except Exception:
-        pass
-    return ""
+MAX_UPLOAD_BYTES = 20 * 1024 * 1024
+INDEXABLE_EXTENSIONS = {"txt", "md", "pdf", "docx", "csv", "xlsx"}
+ATTACHMENT_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp"}
+ALLOWED_EXTENSIONS = INDEXABLE_EXTENSIONS | ATTACHMENT_EXTENSIONS
+MIME_TYPES = {
+    "txt": {"text/plain"},
+    "md": {"text/plain", "text/markdown"},
+    "pdf": {"application/pdf"},
+    "docx": {"application/vnd.openxmlformats-officedocument.wordprocessingml.document"},
+    "csv": {"text/csv", "application/csv", "text/plain"},
+    "xlsx": {"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"},
+    "png": {"image/png"},
+    "jpg": {"image/jpeg"},
+    "jpeg": {"image/jpeg"},
+    "gif": {"image/gif"},
+    "webp": {"image/webp"},
+}
 
 
 # ── Output schemas ────────────────────────────────────────────
@@ -58,6 +46,10 @@ class KnowledgeFileOut(BaseModel):
     goalIds: list[str]
     kbId: str
     taskId: str
+    status: str
+    error: str | None
+    retryCount: int
+    contentLength: int
 
 
 class KnowledgeBaseOut(BaseModel):
@@ -139,6 +131,10 @@ def _to_file_out(item: KnowledgeItem) -> KnowledgeFileOut:
         goalIds=[item.goal_id] if item.goal_id else [],
         kbId=item.kb_id or "",
         taskId=item.task_id or "",
+        status=item.processing_status,
+        error=item.processing_error,
+        retryCount=item.retry_count,
+        contentLength=item.content_length,
     )
 
 
@@ -158,6 +154,7 @@ def _get_embed_clients() -> list:
     global _embed_clients
     if _embed_clients is None:
         from openai import AsyncOpenAI
+
         from src.config import settings
         _embed_clients = []
         if settings.openai_base_url:
@@ -194,6 +191,37 @@ async def _get_kb(kb_id: str, user_id: str, db: AsyncSession) -> KnowledgeBase:
     if not kb:
         raise HTTPException(404, "知识库不存在")
     return kb
+
+
+async def _get_user_goal(goal_id: str, user_id: str, db: AsyncSession) -> Goal:
+    goal = (await db.execute(
+        select(Goal).where(Goal.id == goal_id, Goal.user_id == user_id)
+    )).scalar_one_or_none()
+    if not goal:
+        raise HTTPException(404, "目标不存在")
+    return goal
+
+
+async def _get_user_task(task_id: str, user_id: str, db: AsyncSession) -> Task:
+    task = (await db.execute(
+        select(Task)
+        .join(Goal, Goal.id == Task.goal_id)
+        .where(Task.id == task_id, Goal.user_id == user_id)
+    )).scalar_one_or_none()
+    if not task:
+        raise HTTPException(404, "任务不存在")
+    return task
+
+
+def _dispatch_processing(item: KnowledgeItem) -> None:
+    from src.tasks.knowledge import process_knowledge_item
+
+    try:
+        process_knowledge_item.apply_async(args=[item.id], countdown=2)
+    except Exception as exc:
+        # The row has already been committed. Preserve it and expose a retryable state.
+        item.processing_status = "failed"
+        item.processing_error = f"处理任务派发失败：{type(exc).__name__}"[:500]
 
 
 def _note_to_out(item: KnowledgeItem, goal_title: str, attachment_ids: list[str] | None = None) -> NoteOut:
@@ -256,27 +284,47 @@ async def upload_file(
     os.makedirs(UPLOAD_DIR, exist_ok=True)
     filename = file.filename or "untitled"
     ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else "bin"
-    saved_path = os.path.join(UPLOAD_DIR, f"{uuid.uuid4()}.{ext}")
-    raw = await file.read()
-    with open(saved_path, "wb") as f:
-        f.write(raw)
-    content = _extract_text(raw, ext)
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(415, f"不支持的文件类型：.{ext}")
+    content_type = (file.content_type or "").lower()
+    if (
+        content_type
+        and content_type != "application/octet-stream"
+        and content_type not in MIME_TYPES[ext]
+    ):
+        raise HTTPException(415, "文件扩展名与内容类型不匹配")
 
-    if kb_id:
-        kb = (await db.execute(
-            select(KnowledgeBase).where(KnowledgeBase.id == kb_id, KnowledgeBase.user_id == current_user.id)
-        )).scalar_one_or_none()
-        if not kb:
-            kb_id = None
+    raw = await file.read(MAX_UPLOAD_BYTES + 1)
+    if not raw:
+        raise HTTPException(400, "文件为空")
+    if len(raw) > MAX_UPLOAD_BYTES:
+        raise HTTPException(413, "文件不能超过 20 MB")
+    if ext == "pdf" and not raw.startswith(b"%PDF"):
+        raise HTTPException(415, "PDF 文件签名无效")
+    if ext in {"docx", "xlsx"} and not raw.startswith(b"PK"):
+        raise HTTPException(415, "Office 文件签名无效")
 
     goal_id = goal_ids[0] if goal_ids else None
-
+    if len(goal_ids) > 1:
+        raise HTTPException(422, "当前一个文件只能关联一个目标")
+    if goal_id:
+        await _get_user_goal(goal_id, current_user.id, db)
     if task_id:
-        task = (await db.execute(
-            select(Task).where(Task.id == task_id, Task.goal_id == goal_id)
-        )).scalar_one_or_none()
-        if not task:
-            task_id = None
+        task = await _get_user_task(task_id, current_user.id, db)
+        if goal_id and task.goal_id != goal_id:
+            raise HTTPException(422, "任务不属于所选目标")
+        goal_id = goal_id or task.goal_id
+    if note_id:
+        await _get_note(note_id, current_user.id, db)
+    if kb_id:
+        await _get_kb(kb_id, current_user.id, db)
+
+    saved_path = os.path.join(UPLOAD_DIR, f"{uuid.uuid4()}.{ext}")
+    try:
+        with open(saved_path, "wb") as f:
+            f.write(raw)
+    except OSError as exc:
+        raise HTTPException(500, "文件保存失败") from exc
 
     item = KnowledgeItem(
         id=str(uuid.uuid4()),
@@ -286,17 +334,53 @@ async def upload_file(
         task_id=task_id,
         note_id=note_id,
         title=filename,
-        content=content,
+        content="",
         source_type="upload",
         file_path=saved_path,
+        processing_status="queued" if ext in INDEXABLE_EXTENSIONS else "ready",
+        processed_at=datetime.utcnow() if ext in ATTACHMENT_EXTENSIONS else None,
     )
-    db.add(item)
+    try:
+        db.add(item)
+        await db.commit()
+        await db.refresh(item)
+    except Exception:
+        try:
+            os.remove(saved_path)
+        except FileNotFoundError:
+            pass
+        raise
+    if ext in INDEXABLE_EXTENSIONS:
+        _dispatch_processing(item)
+        if item.processing_status == "failed":
+            await db.commit()
+
+    return _to_file_out(item)
+
+
+@router.post("/{item_id}/retry", response_model=KnowledgeFileOut)
+async def retry_processing(
+    item_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> KnowledgeFileOut:
+    item = (await db.execute(
+        select(KnowledgeItem).where(
+            KnowledgeItem.id == item_id,
+            KnowledgeItem.user_id == current_user.id,
+        )
+    )).scalar_one_or_none()
+    if not item:
+        raise HTTPException(404, "文件不存在")
+    if item.processing_status not in {"failed", "uploaded"}:
+        raise HTTPException(409, "该文件当前不需要重试")
+    item.processing_status = "queued"
+    item.processing_error = None
+    item.retry_count = 0
+    await db.commit()
+    _dispatch_processing(item)
     await db.commit()
     await db.refresh(item)
-    # 向量化派发
-    from src.tasks.knowledge import vectorize_item
-    vectorize_item.apply_async(args=[item.id], countdown=2)
-
     return _to_file_out(item)
 
 
@@ -462,7 +546,8 @@ async def search_knowledge(
     # 尝试语义向量搜索
     try:
         from pgvector.sqlalchemy import Vector
-        from sqlalchemy import cast, text as sa_text
+        from sqlalchemy import cast
+        from sqlalchemy import text as sa_text
 
         query_vec = None
         for _client in _get_embed_clients():
@@ -482,6 +567,7 @@ async def search_knowledge(
                 .where(
                     KnowledgeItem.user_id == current_user.id,
                     KnowledgeItem.embedding.is_not(None),
+                    KnowledgeItem.processing_status == "ready",
                 )
             )
             if goal_id:
@@ -520,7 +606,11 @@ async def search_knowledge(
     )
     stmt = (
         select(KnowledgeItem)
-        .where(KnowledgeItem.user_id == current_user.id, ilike_filter)
+        .where(
+            KnowledgeItem.user_id == current_user.id,
+            KnowledgeItem.processing_status == "ready",
+            ilike_filter,
+        )
     )
     if goal_id:
         stmt = stmt.where(KnowledgeItem.goal_id == goal_id)
@@ -620,50 +710,37 @@ async def import_url(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> KnowledgeFileOut:
-    import httpx
-    try:
-        async with httpx.AsyncClient(timeout=30) as client:
-            resp = await client.get(f"https://r.jina.ai/{body.url}", headers={"Accept": "text/plain"})
-        content = resp.text[:_MAX_CONTENT]
-    except Exception:
-        raise HTTPException(400, "无法解析该 URL，请检查地址是否有效")
-
-    if not content.strip():
-        raise HTTPException(400, "页面内容为空，无法导入")
+    parsed_url = urlparse(body.url)
+    if parsed_url.scheme not in {"http", "https"} or not parsed_url.netloc:
+        raise HTTPException(422, "仅支持有效的 HTTP/HTTPS URL")
+    if len(body.url) > 2048:
+        raise HTTPException(422, "URL 过长")
+    if body.goal_id:
+        await _get_user_goal(body.goal_id, current_user.id, db)
+    if body.kb_id:
+        await _get_kb(body.kb_id, current_user.id, db)
 
     title = body.url.split("/")[-1][:120] or body.url[:120]
-    # 取第一行非空内容作为标题
-    for line in content.splitlines():
-        if line.strip():
-            title = line.strip()[:120]
-            break
-
-    goal_id = body.goal_id
-    kb_id = body.kb_id
-    if kb_id:
-        kb = (await db.execute(
-            select(KnowledgeBase).where(KnowledgeBase.id == kb_id, KnowledgeBase.user_id == current_user.id)
-        )).scalar_one_or_none()
-        if not kb:
-            kb_id = None
 
     item = KnowledgeItem(
         id=str(uuid.uuid4()),
         user_id=current_user.id,
-        goal_id=goal_id,
-        kb_id=kb_id,
+        goal_id=body.goal_id,
+        kb_id=body.kb_id,
         title=title,
-        content=content,
+        content="",
         source_type="url",
         source_url=body.url,
+        processing_status="queued",
+        content_length=0,
     )
     db.add(item)
     await db.commit()
     await db.refresh(item)
 
-    # 异步向量化
-    from src.tasks.knowledge import vectorize_item
-    vectorize_item.apply_async(args=[item.id], countdown=2)
+    _dispatch_processing(item)
+    if item.processing_status == "failed":
+        await db.commit()
 
     return _to_file_out(item)
 
@@ -713,6 +790,9 @@ async def create_note(
         title=body.title or body.content[:80],
         content=body.content,
         source_type=body.noteType,
+        processing_status="ready",
+        processed_at=datetime.utcnow(),
+        content_length=len(body.content),
     )
     db.add(item)
     await db.commit()

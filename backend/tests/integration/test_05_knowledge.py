@@ -2,7 +2,10 @@ import io
 
 import pytest
 from httpx import AsyncClient
+from sqlalchemy import select
 
+import src.database as database
+from src.models import KnowledgeItem
 
 pytestmark = pytest.mark.integration
 
@@ -70,11 +73,19 @@ async def test_search_knowledge_keyword(client: AsyncClient, auth_headers: dict,
     # 上传专用搜索文件
     cpa_txt = seed["knowledge_texts"][1]
     content = cpa_txt["content"].encode("utf-8")
-    await client.post(
+    uploaded = await client.post(
         "/api/v1/knowledge/upload",
         files={"file": (cpa_txt["filename"], io.BytesIO(content), "text/plain")},
         headers=auth_headers,
     )
+    async with database.AsyncSessionLocal() as db:
+        item = (await db.execute(
+            select(KnowledgeItem).where(KnowledgeItem.id == uploaded.json()["id"])
+        )).scalar_one()
+        item.content = cpa_txt["content"]
+        item.content_length = len(item.content)
+        item.processing_status = "ready"
+        await db.commit()
     r = await client.get("/api/v1/knowledge/search?q=资产", headers=auth_headers)
     assert r.status_code == 200
     results = r.json()
