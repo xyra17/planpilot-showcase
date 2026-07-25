@@ -145,11 +145,23 @@ export default function TiptapEditor({
     editable: !readOnly,
     onUpdate: ({ editor }) => {
       if (suppressUpdate.current) return;
-      const html = dehydrate(editor.getHTML());
+      const rawHtml = editor.getHTML();
+      const html = dehydrate(rawHtml);
       onChange(html);
       if (onSave) {
         if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
         saveTimerRef.current = setTimeout(() => onSave(html), 800);
+      }
+      // Resolve freshly-inserted API image paths to blob URLs immediately
+      SERVE_RE.lastIndex = 0;
+      if (SERVE_RE.test(rawHtml)) {
+        SERVE_RE.lastIndex = 0;
+        resolveImages(rawHtml).then((resolved) => {
+          if (resolved === rawHtml) return;
+          suppressUpdate.current = true;
+          editor.commands.setContent(resolved);
+          suppressUpdate.current = false;
+        });
       }
     },
     editorProps: {

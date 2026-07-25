@@ -57,7 +57,7 @@ Next.js 14 生产构建无 TypeScript 错误，`/dashboard/notes` 路由正常�
 - `resolveImages(html)`：启动时将 API 路径 fetch（带 Bearer Token）→ 创建 Blob URL，替换 HTML 中的 src
 - `dehydrate(html)`：保存前将 Blob URL 还原为 API 路径
 - `suppressUpdate` ref：防止 `setContent()` 触发 onChange 死循环
-- 组件卸载时 `URL.revokeObjectObject()` 释放内存
+- 组件卸载时 `URL.revokeObjectURL()` 释放内存
 
 ### noteDate 校验（knowledge.py）
 
@@ -76,7 +76,13 @@ def validate_note_date(cls, v):
 
 ---
 
-## 四、遗留说明
+## 五、补丁修复（patch commit）
+
+**问题：** 工具栏上传图片后，`setImage` 触发 `onUpdate` → `dehydrate` 返回 API 路径 → `onChange` 更新父组件 `content` → `useEffect` 判断 `content === dehydrate(editor.getHTML())` 相等 → 提前返回，图片 src 始终停留在需要鉴权的 API 路径，无法即时显示。
+
+**修复：** 在 `onUpdate` 末尾检测编辑器 HTML 中是否仍有未解析的 SERVE_RE 路径；若有，立即异步调用 `resolveImages` 并通过 `suppressUpdate` 保护更新编辑器内容，使新插入图片在上传后立即以 Blob URL 显示。
+
+前端 build 验证通过，笔误 `revokeObjectObject` → `revokeObjectURL` 一并修正。
 
 - **测试数据库迁移**：`note_date` 列通过 asyncpg 直接 `ALTER TABLE ADD COLUMN IF NOT EXISTS` 补全（生产环境请运行 `alembic upgrade head`）
 - `note_id` 外键策略为 `ondelete="SET NULL"`，仅用于普通附件的软关联；专属附件的级联删除由应用层逻辑保证
