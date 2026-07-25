@@ -2,10 +2,9 @@ import json
 import logging
 
 from langchain_core.messages import AIMessage, SystemMessage
-from langchain_openai import ChatOpenAI
 
-from src.config import settings
 from src.core.agent.state import AgentState
+from src.core.llm_router import create_routine_llm
 
 logger = logging.getLogger(__name__)
 
@@ -31,10 +30,7 @@ _SYSTEM = """你是 PlanPilot 计划生成专家。根据用户提供的目标�
 
 
 async def node(state: AgentState) -> dict:
-    llm = ChatOpenAI(
-        model=settings.smart_model_name,
-        api_key=settings.smart_api_key,
-        base_url=settings.smart_base_url or None,
+    llm = create_routine_llm(
         max_tokens=2048,
         streaming=True,
     )

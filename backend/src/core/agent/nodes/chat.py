@@ -1,10 +1,9 @@
 from langchain_core.messages import SystemMessage
-from langchain_openai import ChatOpenAI
 from sqlalchemy import select
 
-from src.config import settings
 from src.core.agent.state import AgentState
 from src.core.agent.tools import chat_tools
+from src.core.llm_router import create_routine_llm
 from src.database import AsyncSessionLocal
 from src.models import Goal, LearningDebt
 
@@ -81,13 +80,11 @@ async def node(state: AgentState) -> dict:
         )
         system_text += f"\n\n【当前学习债务（未补欠账）】\n{debt_lines}\n在回答学习计划或进度问题时，适当提醒用户优先处理高影响债务。"
 
-    llm = ChatOpenAI(
-        model=settings.smart_model_name or settings.model_name,
-        api_key=settings.smart_api_key or settings.openai_api_key,
-        base_url=settings.smart_base_url or settings.openai_base_url or None,
+    llm = create_routine_llm(
+        tools=chat_tools,
         max_tokens=1024,
         streaming=True,
-    ).bind_tools(chat_tools)
+    )
     messages = [SystemMessage(content=system_text)] + list(state.get("messages", []))
     response = await llm.ainvoke(messages)
     return {"messages": [response]}

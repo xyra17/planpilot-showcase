@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     openai_base_url: str = ""
     model_name: str = "deepseek-chat"
+    local_model_enabled: bool = True
+    local_model_timeout_seconds: float = 30.0
     smart_api_key: str = ""
     smart_base_url: str = ""
     smart_model_name: str = "deepseek-v4-flash"

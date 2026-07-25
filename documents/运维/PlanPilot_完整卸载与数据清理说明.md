@@ -4,7 +4,7 @@
 **适用环境**：当前 Mac 本地开发环境
 
 仅删除 `/Users/Admin/Desktop/PlanPilot` 不等于完整卸载。PlanPilot 还使用了
-Docker 数据卷、本地 Qwen3 Embedding 后台服务、模型文件和历史版本归档。
+Docker 数据卷、本地 Qwen3 Embedding 后台服务、生成模型文件和历史版本归档。
 
 本文只提供清理步骤，不会自动执行。涉及数据库、用户上传文件和模型的步骤
 不可恢复，执行前请先确认备份。
@@ -105,7 +105,14 @@ Qwen3 Embedding 的原始归档位于：
 - 如果以后不再使用，可以删除整个上述目录。
 
 不要删除整个 `/Users/Admin/Downloads/models/`，其中还有其他模型，例如
-`Qwen3.5-9B-MLX-4bit`。
+`Qwen3.5-9B-MLX-4bit`。该生成模型当前由 PlanPilot 使用，具体路径为：
+
+`/Users/Admin/Downloads/models/lmstudio-community/Qwen3.5-9B-MLX-4bit`
+
+目前生成模型通过终端中的 MLX-LM 服务运行，没有新增 launchd 项。卸载前可
+停止对应的 `python -m mlx_lm server` 进程；确认其他项目不使用后，才删除该
+模型目录。若后续按架构路线新增 `com.planpilot.llm.plist`，也应像 Embedding
+服务一样先 `launchctl bootout`，再删除 plist 和对应日志。
 
 机器中原有的 `text-embedding-nomic-embed-text-v1.5` 不是本项目新增内容，
 不需要随 PlanPilot 删除。

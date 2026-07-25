@@ -1,9 +1,8 @@
 from langchain_core.messages import SystemMessage
-from langchain_openai import ChatOpenAI
 from sqlalchemy import select
 
-from src.config import settings
 from src.core.agent.state import AgentState
+from src.core.llm_router import create_routine_llm
 from src.database import AsyncSessionLocal
 from src.models import Goal
 
@@ -49,10 +48,7 @@ async def node(state: AgentState) -> dict:
         except Exception:
             pass
 
-    llm = ChatOpenAI(
-        model=settings.smart_model_name or settings.model_name,
-        api_key=settings.smart_api_key or settings.openai_api_key,
-        base_url=settings.smart_base_url or settings.openai_base_url or None,
+    llm = create_routine_llm(
         max_tokens=256,
         streaming=True,
     )

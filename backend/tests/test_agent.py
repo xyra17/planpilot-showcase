@@ -46,7 +46,7 @@ async def test_verify_start(client: AsyncClient, auth: dict, goal_id: str):
     task_id = r_task.json()["id"]
 
     mock = _mock_llm("请用自己的话解释 Python 函数的作用是什么？")
-    with patch("src.api.agent.ChatOpenAI", return_value=mock):
+    with patch("src.api.agent.create_routine_llm", return_value=mock):
         r = await client.post(
             "/api/v1/agent/verify",
             json={"goal_id": goal_id, "task_id": task_id},
@@ -60,7 +60,7 @@ async def test_verify_start(client: AsyncClient, auth: dict, goal_id: str):
 
 async def test_verify_task_not_found(client: AsyncClient, auth: dict, goal_id: str):
     mock = _mock_llm("任意问题")
-    with patch("src.api.agent.ChatOpenAI", return_value=mock):
+    with patch("src.api.agent.create_routine_llm", return_value=mock):
         r = await client.post(
             "/api/v1/agent/verify",
             json={"goal_id": goal_id, "task_id": "nonexistent"},
@@ -80,24 +80,24 @@ async def test_verify_answer_pass(client: AsyncClient, auth: dict, goal_id: str)
 
     # 先生成问题（存入缓存）
     q_mock = _mock_llm("请解释 Python 类的概念")
-    with patch("src.api.agent.ChatOpenAI", return_value=q_mock) as llm_factory:
+    with patch("src.api.agent.create_routine_llm", return_value=q_mock) as llm_factory:
         await client.post(
             "/api/v1/agent/verify",
             json={"goal_id": goal_id, "task_id": task_id},
             headers=auth,
         )
-    assert llm_factory.call_args.kwargs["model"] == "deepseek-v4-flash"
+    assert llm_factory.call_args.kwargs["max_tokens"] == 500
 
     # 提交答案（passed=true）
     eval_resp = json.dumps({"passed": True, "feedback": "回答准确，概念理解到位！"})
     a_mock = _mock_llm(eval_resp)
-    with patch("src.api.agent.ChatOpenAI", return_value=a_mock) as llm_factory:
+    with patch("src.api.agent.create_pro_llm", return_value=a_mock) as llm_factory:
         r = await client.post(
             "/api/v1/agent/verify/answer",
             json={"goal_id": goal_id, "task_id": task_id, "answer": "类是对象的模板"},
             headers=auth,
         )
-    assert llm_factory.call_args.kwargs["model"] == "deepseek-v4-pro"
+    assert llm_factory.call_args.kwargs["max_tokens"] == 700
     assert r.status_code == 200
     data = r.json()
     assert data["passed"] is True
@@ -114,7 +114,7 @@ async def test_verify_answer_fail_with_suggestion(client: AsyncClient, auth: dic
     task_id = r_task.json()["id"]
 
     q_mock = _mock_llm("解释装饰器的工作原理")
-    with patch("src.api.agent.ChatOpenAI", return_value=q_mock):
+    with patch("src.api.agent.create_routine_llm", return_value=q_mock):
         await client.post(
             "/api/v1/agent/verify",
             json={"goal_id": goal_id, "task_id": task_id},
@@ -129,7 +129,7 @@ async def test_verify_answer_fail_with_suggestion(client: AsyncClient, auth: dic
         "follow_up": None,
     })
     a_mock = _mock_llm(eval_resp)
-    with patch("src.api.agent.ChatOpenAI", return_value=a_mock):
+    with patch("src.api.agent.create_pro_llm", return_value=a_mock):
         r = await client.post(
             "/api/v1/agent/verify/answer",
             json={"goal_id": goal_id, "task_id": task_id, "answer": "不知道"},
@@ -148,9 +148,9 @@ async def test_manual_replan(client: AsyncClient, auth: dict, goal_id: str):
         {"title": "简化任务2", "estimated_mins": 15, "type": "review"},
     ])
     mock = _mock_llm(replan_tasks)
-    with patch("src.api.agent.ChatOpenAI", return_value=mock) as llm_factory:
+    with patch("src.api.agent.create_pro_llm", return_value=mock) as llm_factory:
         r = await client.post(f"/api/v1/agent/replan/{goal_id}", headers=auth)
-    assert llm_factory.call_args.kwargs["model"] == "deepseek-v4-pro"
+    assert llm_factory.call_args.kwargs["max_tokens"] == 1024
     assert r.status_code == 200
     tasks = r.json()["tasks"]
     assert len(tasks) == 2
@@ -159,6 +159,6 @@ async def test_manual_replan(client: AsyncClient, auth: dict, goal_id: str):
 
 async def test_manual_replan_unknown_goal(client: AsyncClient, auth: dict):
     mock = _mock_llm("[]")
-    with patch("src.api.agent.ChatOpenAI", return_value=mock):
+    with patch("src.api.agent.create_pro_llm", return_value=mock):
         r = await client.post("/api/v1/agent/replan/nonexistent", headers=auth)
     assert r.status_code == 404

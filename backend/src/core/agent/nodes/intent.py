@@ -1,8 +1,7 @@
 from langchain_core.messages import HumanMessage, SystemMessage
-from langchain_openai import ChatOpenAI
 
-from src.config import settings
 from src.core.agent.state import AgentState
+from src.core.llm_router import create_routine_llm
 
 _SYSTEM = """判断用户消息的意图，只输出以下之一的英文单词，不加任何解释：
 goal_setup - 用户想要设定新目标或制定/修改学习计划（例如："我想学Python"、"帮我整个计划"、"给我排一下课程"、"我打算开始学设计"、"做个英语学习计划"、"帮我建一个目标"）
@@ -58,13 +57,8 @@ async def node(state: AgentState) -> dict:
     if intent:
         return {"intent": intent}
 
-    # LLM 兜底（用大模型）
-    llm = ChatOpenAI(
-        model=settings.smart_model_name,
-        api_key=settings.smart_api_key,
-        base_url=settings.smart_base_url or None,
-        max_tokens=10,
-    )
+    # 关键词无法判断时由本地模型分类，服务不可用则自动回退 Flash。
+    llm = create_routine_llm(max_tokens=10)
     result = await llm.ainvoke(
         [SystemMessage(content=_SYSTEM), HumanMessage(content=last)]
     )

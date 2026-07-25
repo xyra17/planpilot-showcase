@@ -36,6 +36,7 @@ services:
     working_dir: /app
     environment:
       REDIS_URL: redis://redis:6379/0
+      OPENAI_BASE_URL: http://host.docker.internal:8080/v1
       EMBEDDING_BASE_URL: http://host.docker.internal:1234/v1
     env_file:
       - ./backend/.env
@@ -55,6 +56,7 @@ services:
     working_dir: /app
     environment:
       REDIS_URL: redis://redis:6379/0
+      OPENAI_BASE_URL: http://host.docker.internal:8080/v1
       EMBEDDING_BASE_URL: http://host.docker.internal:1234/v1
     env_file:
       - ./backend/.env
@@ -93,6 +95,7 @@ services:
     working_dir: /app
     environment:
       REDIS_URL: redis://redis:6379/0
+      OPENAI_BASE_URL: http://host.docker.internal:8080/v1
       EMBEDDING_BASE_URL: http://host.docker.internal:1234/v1
     env_file:
       - ./backend/.env

@@ -160,19 +160,22 @@ SECRET_KEY=请替换为随机字符串例如abc123xyz789def456uvw012rst345mn
 ACCESS_TOKEN_EXPIRE_DAYS=30
 
 # ═══════════════════════════════════════════════════
-# AI 接口配置（二选一：本地 LLM 或 DeepSeek 云端）
+# AI 接口配置（本地优先，DeepSeek 自动回退）
 # ═══════════════════════════════════════════════════
 
 # 选项 A：使用 DeepSeek 云端 API（推荐，简单）
 # 在 https://platform.deepseek.com/ 注册后获取 API Key
 SMART_API_KEY=sk-xxxx你的DeepSeek密钥xxxx
 SMART_BASE_URL=https://api.deepseek.com/v1
-SMART_MODEL_NAME=deepseek-chat
+SMART_MODEL_NAME=deepseek-v4-flash
+SMART_PRO_MODEL_NAME=deepseek-v4-pro
 
-# 选项 B：使用 OpenAI（或兼容接口）
-# OPENAI_API_KEY=sk-xxxx
-# OPENAI_BASE_URL=https://api.openai.com/v1
-# MODEL_NAME=gpt-4o-mini
+# 本地 Qwen3.5-9B（MLX-LM 服务监听 8080）
+OPENAI_API_KEY=local
+OPENAI_BASE_URL=http://localhost:8080/v1
+MODEL_NAME=/Users/yourname/Downloads/models/lmstudio-community/Qwen3.5-9B-MLX-4bit
+LOCAL_MODEL_ENABLED=true
+LOCAL_MODEL_TIMEOUT_SECONDS=30
 
 # ═══════════════════════════════════════════════════
 # Redis（Docker 内部地址，不要修改）
@@ -203,6 +206,9 @@ SENTRY_DSN=
 | `SMART_API_KEY` | 必填 | DeepSeek API 密钥，AI 功能核心依赖 |
 | `SMART_BASE_URL` | 必填 | DeepSeek 接口地址（保持默认即可） |
 | `SMART_MODEL_NAME` | 必填 | 使用的模型名称（保持默认即可） |
+| `SMART_PRO_MODEL_NAME` | 必填 | 仅用于复杂重规划和最终审核 |
+| `OPENAI_BASE_URL` | 推荐 | 本地 MLX 生成服务；不配置则日常请求直接使用 Flash |
+| `LOCAL_MODEL_ENABLED` | 推荐 | 可随时设为 `false` 关闭本地生成模型 |
 | `REDIS_URL` | 必填（保持默认） | Redis 地址，Docker 内固定不变 |
 | `SMTP_*` | 可选 | 邮件功能，不填则无法发邮件通知 |
 | `SENTRY_DSN` | 可选 | 错误上报，不填则禁用 |
@@ -213,7 +219,23 @@ SENTRY_DSN=
 > 3. 进入"API Keys"页面，点击"创建 API Key"
 > 4. 复制生成的密钥（格式为 `sk-...`）填入上方
 
-### 4.2 前端环境变量（必须）
+### 4.2 启动本地生成模型
+
+安装 MLX-LM 后启动 OpenAI-compatible 服务：
+
+```bash
+python -m mlx_lm server \
+  --model /Users/yourname/Downloads/models/lmstudio-community/Qwen3.5-9B-MLX-4bit \
+  --host 0.0.0.0 --port 8080 --max-tokens 2048 --prompt-cache-size 4
+```
+
+访问 `http://localhost:8080/v1/models` 可验证服务。Docker Compose 已把容器内
+的 `OPENAI_BASE_URL` 覆盖为 `http://host.docker.internal:8080/v1`。
+
+模型路由和后续微调方案见
+[`技术规格说明书/本地模型路由与微调路线.md`](技术规格说明书/本地模型路由与微调路线.md)。
+
+### 4.3 前端环境变量（必须）
 
 在 `frontend/` 目录下创建 `.env.local` 文件：
 

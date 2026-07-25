@@ -6,13 +6,13 @@ from datetime import UTC, date, datetime, timedelta
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from langchain_core.messages import HumanMessage
-from langchain_openai import ChatOpenAI
 from pydantic import BaseModel
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sse_starlette.sse import EventSourceResponse
 
 from src.config import settings
+from src.core.llm_router import create_pro_llm, create_routine_llm
 from src.database import get_db
 from src.deps import get_current_user
 from src.models import (
@@ -95,12 +95,7 @@ async def _generate_replan_options(
     )
     pending_titles = [t.title for t in pending_tasks[:10]]
 
-    llm = ChatOpenAI(
-        model=settings.smart_pro_model_name,
-        api_key=settings.smart_api_key,
-        base_url=settings.smart_base_url or None,
-        max_tokens=1500,
-    )
+    llm = create_pro_llm(max_tokens=1500)
     prompt = (
         f"学习目标：{goal.title}，截止日期：{goal.deadline}，每日学习{goal.daily_hours}小时。\n"
         f"近期打卡记录：{checkin_summary or '无'}\n"
@@ -198,12 +193,7 @@ async def _do_replan(db: AsyncSession, user_id: str, goal_id: str) -> list[dict]
     )
     pending_titles = [t.title for t in pending_tasks[:10]]
 
-    llm = ChatOpenAI(
-        model=settings.smart_pro_model_name,
-        api_key=settings.smart_api_key,
-        base_url=settings.smart_base_url or None,
-        max_tokens=1024,
-    )
+    llm = create_pro_llm(max_tokens=1024)
     prompt = (
         f"学习目标：{goal.title}，截止日期：{goal.deadline}，每日学习{goal.daily_hours}小时。\n"
         f"近期打卡记录：{checkin_summary or '无'}\n"
@@ -695,10 +685,7 @@ async def get_plan_context(
 
     initial_understanding = ""
     try:
-        llm = ChatOpenAI(
-            model=settings.smart_model_name,
-            api_key=settings.smart_api_key,
-            base_url=settings.smart_base_url or None,
+        llm = create_routine_llm(
             max_tokens=200,
             temperature=0.3,
         )
@@ -738,10 +725,7 @@ async def get_intent_placeholder(
 
     placeholder = ""
     try:
-        llm = ChatOpenAI(
-            model=settings.smart_model_name,
-            api_key=settings.smart_api_key,
-            base_url=settings.smart_base_url or None,
+        llm = create_routine_llm(
             max_tokens=100,
             temperature=0.7,
         )
@@ -920,10 +904,7 @@ async def generate_macro_plan(
         "}"
     )
 
-    llm = ChatOpenAI(
-        model=settings.smart_model_name,
-        api_key=settings.smart_api_key,
-        base_url=settings.smart_base_url or None,
+    llm = create_routine_llm(
         max_tokens=2048,
         temperature=0.3,
     )
@@ -1077,12 +1058,7 @@ async def _generate_review_questions(
         "只输出 JSON 数组，不含其他文字：\n"
         '[{"question":"...","hint":"..."}]'
     )
-    llm = ChatOpenAI(
-        api_key=settings.smart_api_key,
-        base_url=settings.smart_base_url,
-        model=settings.smart_model_name,
-        temperature=0.3,
-    )
+    llm = create_routine_llm(temperature=0.3)
     resp = await llm.ainvoke([HumanMessage(content=prompt)])
     raw = resp.content.strip()
     if "```" in raw:
@@ -1384,12 +1360,7 @@ async def verify_start(
     if not task:
         raise HTTPException(status_code=404, detail="任务不存在")
 
-    llm = ChatOpenAI(
-        model=settings.smart_model_name,
-        api_key=settings.smart_api_key,
-        base_url=settings.smart_base_url or None,
-        max_tokens=500,
-    )
+    llm = create_routine_llm(max_tokens=500)
     prompt = (
         f"学习者刚完成了任务「{task.title}」。\n\n"
         "请生成一道深度检验理解的题目，以及该题目的参考答案要点。\n"
@@ -1434,12 +1405,7 @@ async def verify_answer(
         f"谈谈你对「{task.title}」的理解",
     )
 
-    llm = ChatOpenAI(
-        model=settings.smart_pro_model_name,
-        api_key=settings.smart_api_key,
-        base_url=settings.smart_base_url or None,
-        max_tokens=700,
-    )
+    llm = create_pro_llm(max_tokens=700)
     eval_prompt = (
         f"任务：「{task.title}」\n"
         f"考查问题：{question}\n"
@@ -1518,22 +1484,8 @@ async def generate_daily_tasks(
     today = date.today().isoformat()
     week_ago = (date.today() - timedelta(days=7)).isoformat()
 
-    # 本地模型优先，失败则回退 Smart API
-    _llm_candidates = []
-    if settings.openai_base_url:
-        _llm_candidates.append(ChatOpenAI(
-            model=settings.model_name or "deepseek-chat",
-            openai_api_key=settings.openai_api_key or "local",
-            openai_api_base=settings.openai_base_url,
-            temperature=0.3,
-        ))
-    if settings.smart_api_key:
-        _llm_candidates.append(ChatOpenAI(
-            model=settings.smart_model_name or "deepseek-chat",
-            openai_api_key=settings.smart_api_key,
-            openai_api_base=settings.smart_base_url,
-            temperature=0.3,
-        ))
+    # 路由器内部负责本地优先与 Flash 自动回退。
+    _llm_candidates = [create_routine_llm(temperature=0.3)]
 
     result: list[GoalDailyPlan] = []
 
@@ -1744,10 +1696,7 @@ async def note_assist(
     }
     prompt_text = prompts.get(body.command, prompts["summarize"])
 
-    llm = ChatOpenAI(
-        model=settings.smart_model_name,
-        api_key=settings.smart_api_key,
-        base_url=settings.smart_base_url or None,
+    llm = create_routine_llm(
         max_tokens=600,
         temperature=0.7,
     )
