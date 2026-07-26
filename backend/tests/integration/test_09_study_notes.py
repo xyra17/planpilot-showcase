@@ -200,3 +200,93 @@ async def test_invalid_note_date_format(
             headers=auth_headers,
         )
         assert r.status_code == 422, f"期望 422，实际 {r.status_code}，noteDate={bad_date}"
+
+
+# ── 9. 目标为主、任务为可选关联，且标题与时间输出正确 ─────────────────────
+
+async def test_note_goal_task_relation_and_clean_title(
+    client: AsyncClient, auth_headers: dict, seed: dict
+):
+    goal_response = await client.post(
+        "/api/v1/goals", json=seed["goals"][0], headers=auth_headers
+    )
+    assert goal_response.status_code == 201, goal_response.text
+    goal_id = goal_response.json()["id"]
+
+    task_response = await client.post(
+        "/api/v1/tasks",
+        json={
+            "title": "学习关联任务",
+            "goalId": goal_id,
+            "date": "2026-02-01",
+        },
+        headers=auth_headers,
+    )
+    assert task_response.status_code == 201, task_response.text
+    task_id = task_response.json()["id"]
+
+    note_response = await client.post(
+        "/api/v1/knowledge/notes",
+        json={
+            "content": "<p>正文内容</p>",
+            "noteType": "daily_log",
+            "noteDate": "2026-02-01",
+            "goalId": goal_id,
+            "taskId": task_id,
+        },
+        headers=auth_headers,
+    )
+    assert note_response.status_code == 201, note_response.text
+    note = note_response.json()
+    assert note["title"] == ""
+    assert note["goalId"] == goal_id
+    assert note["taskId"] == task_id
+    assert note["taskTitle"] == "学习关联任务"
+    assert note["taskAvailable"] is True
+    assert note["createdAt"].endswith("Z")
+    assert note["updatedAt"].endswith("Z")
+
+
+# ── 10. 任务删除后笔记保留目标和任务标题快照 ──────────────────────────────
+
+async def test_deleted_task_keeps_note_snapshot(
+    client: AsyncClient, auth_headers: dict, seed: dict
+):
+    goal_response = await client.post(
+        "/api/v1/goals", json=seed["goals"][0], headers=auth_headers
+    )
+    assert goal_response.status_code == 201, goal_response.text
+    goal_id = goal_response.json()["id"]
+    task_response = await client.post(
+        "/api/v1/tasks",
+        json={"title": "稍后会删除的任务", "goalId": goal_id, "date": "2026-02-02"},
+        headers=auth_headers,
+    )
+    task_id = task_response.json()["id"]
+    note_response = await client.post(
+        "/api/v1/knowledge/notes",
+        json={
+            "content": "<p>保留上下文</p>",
+            "noteType": "daily_log",
+            "noteDate": "2026-02-02",
+            "goalId": goal_id,
+            "taskId": task_id,
+        },
+        headers=auth_headers,
+    )
+    note_id = note_response.json()["id"]
+
+    delete_response = await client.delete(
+        f"/api/v1/tasks/{task_id}", headers=auth_headers
+    )
+    assert delete_response.status_code == 204
+
+    get_response = await client.get(
+        f"/api/v1/knowledge/notes/{note_id}", headers=auth_headers
+    )
+    assert get_response.status_code == 200, get_response.text
+    note = get_response.json()
+    assert note["goalId"] == goal_id
+    assert note["taskId"] is None
+    assert note["taskTitle"] == "稍后会删除的任务"
+    assert note["taskAvailable"] is False

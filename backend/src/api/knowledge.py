@@ -104,11 +104,15 @@ class NoteOut(BaseModel):
     goalId: str
     goalTitle: str
     taskId: str | None
+    taskTitle: str
+    taskAvailable: bool
     title: str
     content: str
     noteType: str
     date: str
     savedAt: str
+    createdAt: str
+    updatedAt: str
     attachmentIds: list[str] = []
 
 
@@ -137,6 +141,7 @@ class NoteUpdate(BaseModel):
     title: str | None = None
     content: str | None = None
     goalId: str | None = None
+    taskId: str | None = None
 
 
 # ── Helpers ───────────────────────────────────────────────────
@@ -301,17 +306,37 @@ async def reindex_legacy_items(
     )
 
 
-def _note_to_out(item: KnowledgeItem, goal_title: str, attachment_ids: list[str] | None = None) -> NoteOut:
+def _utc_iso(value: datetime | None) -> str:
+    if value is None:
+        return ""
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=UTC)
+    return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
+
+
+def _note_to_out(
+    item: KnowledgeItem,
+    goal_title: str,
+    attachment_ids: list[str] | None = None,
+    task_title: str = "",
+    task_available: bool = False,
+) -> NoteOut:
+    created_at = _utc_iso(item.created_at)
+    updated_at = _utc_iso(item.updated_at or item.created_at)
     return NoteOut(
         id=item.id,
         goalId=item.goal_id or "",
         goalTitle=goal_title,
         taskId=item.task_id or None,
+        taskTitle=task_title or item.task_title_snapshot or "",
+        taskAvailable=task_available,
         title=item.title or "",
         content=item.content,
         noteType=item.source_type,
         date=item.note_date or (item.created_at.strftime("%Y-%m-%d") if item.created_at else ""),
-        savedAt=item.created_at.isoformat() if item.created_at else "",
+        savedAt=updated_at,
+        createdAt=created_at,
+        updatedAt=updated_at,
         attachmentIds=attachment_ids or [],
     )
 
@@ -911,6 +936,19 @@ async def list_notes(
         goals = {g.id: g.title for g in (await db.execute(
             select(Goal).where(Goal.id.in_(goal_ids), Goal.user_id == current_user.id)
         )).scalars()}
+    task_ids = {item.task_id for item in items if item.task_id}
+    tasks: dict[str, str] = {}
+    if task_ids:
+        tasks = {
+            task.id: task.title
+            for task in (
+                await db.execute(
+                    select(Task)
+                    .join(Goal, Task.goal_id == Goal.id)
+                    .where(Task.id.in_(task_ids), Goal.user_id == current_user.id)
+                )
+            ).scalars()
+        }
     note_ids = [item.id for item in items]
     att_map: dict[str, list[str]] = {}
     if note_ids:
@@ -920,7 +958,16 @@ async def list_notes(
         )).all()
         for att_id, nid in att_rows:
             att_map.setdefault(nid, []).append(att_id)
-    return [_note_to_out(item, goals.get(item.goal_id or "", ""), att_map.get(item.id)) for item in items]
+    return [
+        _note_to_out(
+            item,
+            goals.get(item.goal_id or "", ""),
+            att_map.get(item.id),
+            tasks.get(item.task_id or "", ""),
+            bool(item.task_id and item.task_id in tasks),
+        )
+        for item in items
+    ]
 
 
 @router.get("/notes/{note_id}", response_model=NoteOut)
@@ -930,7 +977,18 @@ async def get_note(
     db: AsyncSession = Depends(get_db),
 ) -> NoteOut:
     item = await _get_note(note_id, current_user.id, db)
-    return _note_to_out(item, await _goal_title(item.goal_id, current_user.id, db))
+    task_title = ""
+    task_available = False
+    if item.task_id:
+        task = await _get_user_task(item.task_id, current_user.id, db)
+        task_title = task.title
+        task_available = True
+    return _note_to_out(
+        item,
+        await _goal_title(item.goal_id, current_user.id, db),
+        task_title=task_title,
+        task_available=task_available,
+    )
 
 
 class UrlImportBody(BaseModel):
@@ -992,17 +1050,41 @@ async def update_note(
         item.title = body.title
     if body.content is not None:
         item.content = body.content
-        if body.title is None:
-            item.title = body.content[:80]
     if body.goalId is not None:
         if body.goalId == "":
             item.goal_id = None
         else:
             await _get_user_goal(body.goalId, current_user.id, db)
             item.goal_id = body.goalId
+        if item.task_id:
+            current_task = await _get_user_task(item.task_id, current_user.id, db)
+            if current_task.goal_id != item.goal_id:
+                item.task_id = None
+    if "taskId" in body.model_fields_set:
+        if not body.taskId:
+            item.task_id = None
+            item.task_title_snapshot = None
+        else:
+            task = await _get_user_task(body.taskId, current_user.id, db)
+            if item.goal_id and task.goal_id != item.goal_id:
+                raise HTTPException(422, "任务不属于所选目标")
+            item.goal_id = item.goal_id or task.goal_id
+            item.task_id = task.id
+            item.task_title_snapshot = task.title
     await db.commit()
     await db.refresh(item)
-    return _note_to_out(item, await _goal_title(item.goal_id, current_user.id, db))
+    task_title = ""
+    task_available = False
+    if item.task_id:
+        task = await _get_user_task(item.task_id, current_user.id, db)
+        task_title = task.title
+        task_available = True
+    return _note_to_out(
+        item,
+        await _goal_title(item.goal_id, current_user.id, db),
+        task_title=task_title,
+        task_available=task_available,
+    )
 
 
 @router.post("/notes", status_code=201, response_model=NoteOut)
@@ -1011,7 +1093,14 @@ async def create_note(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> NoteOut:
-    goal_title = await _goal_title(body.goalId or None, current_user.id, db)
+    goal_id = body.goalId or None
+    task = None
+    if body.taskId:
+        task = await _get_user_task(body.taskId, current_user.id, db)
+        if goal_id and task.goal_id != goal_id:
+            raise HTTPException(422, "任务不属于所选目标")
+        goal_id = goal_id or task.goal_id
+    goal_title = await _goal_title(goal_id, current_user.id, db)
 
     # 验证 kb_id 所有权
     kb_id = body.kb_id
@@ -1025,10 +1114,11 @@ async def create_note(
     item = KnowledgeItem(
         id=str(uuid.uuid4()),
         user_id=current_user.id,
-        goal_id=body.goalId or None,
+        goal_id=goal_id,
         task_id=body.taskId or None,
+        task_title_snapshot=task.title if task else None,
         kb_id=kb_id,
-        title=body.title or body.content[:80] or "草稿",
+        title=body.title or "",
         content=body.content,
         source_type=body.noteType,
         note_date=body.noteDate,
@@ -1039,4 +1129,9 @@ async def create_note(
     db.add(item)
     await db.commit()
     await db.refresh(item)
-    return _note_to_out(item, goal_title)
+    return _note_to_out(
+        item,
+        goal_title,
+        task_title=task.title if task else "",
+        task_available=bool(task),
+    )

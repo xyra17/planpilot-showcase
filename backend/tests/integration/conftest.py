@@ -68,6 +68,25 @@ async def setup_db():
         # pgvector 扩展必须在建表前存在
         await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         await conn.run_sync(Base.metadata.create_all)
+        # create_all 不会更新已经存在的测试表；补齐最新学习记录 schema。
+        await conn.execute(text(
+            "ALTER TABLE knowledge_items "
+            "ADD COLUMN IF NOT EXISTS task_title_snapshot TEXT"
+        ))
+        await conn.execute(text(
+            "ALTER TABLE knowledge_items "
+            "ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITHOUT TIME ZONE "
+            "NOT NULL DEFAULT now()"
+        ))
+        await conn.execute(text(
+            "ALTER TABLE knowledge_items "
+            "DROP CONSTRAINT IF EXISTS knowledge_items_task_id_fkey"
+        ))
+        await conn.execute(text(
+            "ALTER TABLE knowledge_items "
+            "ADD CONSTRAINT knowledge_items_task_id_fkey "
+            "FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL"
+        ))
         # 清空上次运行遗留数据（保留 schema），确保测试幂等
         for table in reversed(Base.metadata.sorted_tables):
             await conn.execute(table.delete())

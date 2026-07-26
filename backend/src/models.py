@@ -142,7 +142,10 @@ class KnowledgeItem(Base):
     source_type: Mapped[str] = mapped_column(String, default="upload")  # upload | url | search | system
     source_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     file_path: Mapped[str | None] = mapped_column(Text, nullable=True)
-    task_id: Mapped[str | None] = mapped_column(String, ForeignKey("tasks.id"), nullable=True, index=True)
+    task_id: Mapped[str | None] = mapped_column(
+        String, ForeignKey("tasks.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    task_title_snapshot: Mapped[str | None] = mapped_column(Text, nullable=True)
     note_id: Mapped[str | None] = mapped_column(String, ForeignKey("knowledge_items.id", ondelete="SET NULL"), nullable=True, index=True)
     note_date: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
     tags: Mapped[list[str]] = mapped_column(JSON, default=list)
@@ -153,6 +156,9 @@ class KnowledgeItem(Base):
     processed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     content_length: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now()
+    )
 
     kb: Mapped["KnowledgeBase | None"] = relationship("KnowledgeBase", back_populates="items")
     chunks: Mapped[list["KnowledgeChunk"]] = relationship(

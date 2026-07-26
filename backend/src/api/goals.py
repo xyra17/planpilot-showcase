@@ -359,6 +359,8 @@ async def goal_progress(
 class TaskBriefOut(BaseModel):
     id: str
     title: str
+    date: str
+    status: str
 
 
 @router.get("/{goal_id}/tasks", response_model=list[TaskBriefOut])
@@ -376,7 +378,10 @@ async def list_goal_tasks(
         select(Task).where(Task.goal_id == goal_id)
         .order_by(Task.scheduled_date, Task.created_at)
     )).scalars().all()
-    return [TaskBriefOut(id=t.id, title=t.title) for t in tasks]
+    return [
+        TaskBriefOut(id=t.id, title=t.title, date=t.scheduled_date, status=t.status)
+        for t in tasks
+    ]
 
 
 @router.get("/{goal_id}/plan")

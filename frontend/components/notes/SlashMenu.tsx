@@ -5,10 +5,16 @@ import { api } from "@/lib/api";
 import type { Editor } from "@tiptap/react";
 
 const COMMANDS = [
-  { id: "summarize", icon: "📝", label: "总结要点",   desc: "AI 生成核心要点列表" },
-  { id: "quiz",      icon: "🎯", label: "生成考题",   desc: "出 3 道思考题+参考答案" },
-  { id: "expand",    icon: "✨", label: "展开说明",   desc: "对选中内容补充细节" },
-  { id: "checklist", icon: "☑️", label: "整理清单",   desc: "转换成可操作任务清单" },
+  { id: "heading1", kind: "block", icon: "H1", label: "一级标题", desc: "大标题" },
+  { id: "heading2", kind: "block", icon: "H2", label: "二级标题", desc: "章节标题" },
+  { id: "bullet", kind: "block", icon: "•", label: "项目列表", desc: "创建无序列表" },
+  { id: "todo", kind: "block", icon: "☑", label: "待办列表", desc: "创建可勾选事项" },
+  { id: "quote", kind: "block", icon: "❝", label: "引用", desc: "突出引用内容" },
+  { id: "divider", kind: "block", icon: "—", label: "分割线", desc: "分隔内容区块" },
+  { id: "summarize", kind: "ai", icon: "📝", label: "AI 总结要点", desc: "生成核心要点列表" },
+  { id: "quiz", kind: "ai", icon: "🎯", label: "AI 生成考题", desc: "生成思考题和参考答案" },
+  { id: "expand", kind: "ai", icon: "✨", label: "AI 展开说明", desc: "补充选中内容的细节" },
+  { id: "checklist", kind: "ai", icon: "☑️", label: "AI 整理清单", desc: "转换成可操作任务清单" },
 ] as const;
 
 interface SlashMenuProps {
@@ -50,6 +56,37 @@ export default function SlashMenu({ editor, goalId, position, onClose }: SlashMe
       to: editor.state.selection.from,
     }).run();
 
+    if (command === "heading1") {
+      editor.chain().focus().toggleHeading({ level: 1 }).run();
+      onClose();
+      return;
+    }
+    if (command === "heading2") {
+      editor.chain().focus().toggleHeading({ level: 2 }).run();
+      onClose();
+      return;
+    }
+    if (command === "bullet") {
+      editor.chain().focus().toggleBulletList().run();
+      onClose();
+      return;
+    }
+    if (command === "todo") {
+      editor.chain().focus().toggleTaskList().run();
+      onClose();
+      return;
+    }
+    if (command === "quote") {
+      editor.chain().focus().toggleBlockquote().run();
+      onClose();
+      return;
+    }
+    if (command === "divider") {
+      editor.chain().focus().setHorizontalRule().run();
+      onClose();
+      return;
+    }
+
     // 插入占位符
     const placeholder = `\n生成中…\n`;
     editor.chain().focus().insertContent(placeholder).run();
@@ -89,7 +126,7 @@ export default function SlashMenu({ editor, goalId, position, onClose }: SlashMe
       style={{ top: position.top, left: position.left }}
     >
       <div className="px-3 py-2 border-b border-gray-100">
-        <p className="text-xs text-gray-400 font-medium">AI 写作指令</p>
+        <p className="text-xs text-gray-400 font-medium">插入区块或使用 AI</p>
       </div>
       {COMMANDS.map((cmd, i) => (
         <button
@@ -101,7 +138,7 @@ export default function SlashMenu({ editor, goalId, position, onClose }: SlashMe
             i === activeIdx ? "bg-blue-50" : "hover:bg-gray-50"
           } disabled:opacity-40`}
         >
-          <span className="text-lg w-6 flex-shrink-0">{loading === cmd.id ? "⏳" : cmd.icon}</span>
+          <span className="text-sm font-semibold text-gray-500 w-6 flex-shrink-0">{loading === cmd.id ? "⏳" : cmd.icon}</span>
           <div>
             <p className="text-sm font-medium text-gray-700">{cmd.label}</p>
             <p className="text-xs text-gray-400">{cmd.desc}</p>

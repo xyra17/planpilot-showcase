@@ -8,11 +8,15 @@ export type KnowledgeNote = {
   goalId: string;
   goalTitle: string;
   taskId: string | null;
+  taskTitle: string;
+  taskAvailable: boolean;
   title: string;
   content: string;
   noteType: string;
   date: string;
   savedAt: string;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export type CreateNotePayload = {

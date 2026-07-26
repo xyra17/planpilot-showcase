@@ -1,7 +1,10 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { ChevronLeft, ChevronRight, Plus, Trash2, Pencil, Paperclip, X } from "lucide-react";
+import {
+  ChevronLeft, ChevronRight, Plus, Trash2, Pencil, Paperclip, X,
+  Target, ListChecks, Clock3, Check, LoaderCircle,
+} from "lucide-react";
 import { api } from "@/lib/api";
 import TiptapEditor from "./TiptapEditor";
 import type { KnowledgeNote } from "@/lib/knowledge-context";
@@ -37,10 +40,39 @@ function toDateStr(d: Date) {
 }
 
 function stripHtml(html: string) {
-  return html.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
+  return html
+    .replace(/<br\s*\/?>/gi, " ")
+    .replace(/<\/p>/gi, " ")
+    .replace(/<[^>]*>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 type StudyNote = KnowledgeNote & { attachmentIds: string[] };
+type TaskBrief = { id: string; title: string; date: string; status: string };
+
+function noteDisplayTitle(note: StudyNote) {
+  const explicitTitle = stripHtml(note.title || "");
+  if (explicitTitle && explicitTitle !== "草稿") return explicitTitle;
+  return stripHtml(note.content).slice(0, 52) || "无标题";
+}
+
+function relativeTime(iso: string) {
+  const timestamp = Date.parse(iso);
+  if (!Number.isFinite(timestamp)) return "";
+  const seconds = Math.max(0, Math.floor((Date.now() - timestamp) / 1000));
+  if (seconds < 60) return "刚刚";
+  if (seconds < 3600) return `${Math.floor(seconds / 60)} 分钟前`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)} 小时前`;
+  if (seconds < 86400 * 7) return `${Math.floor(seconds / 86400)} 天前`;
+  return new Date(timestamp).toLocaleDateString("zh-CN", {
+    year: "numeric", month: "short", day: "numeric",
+  });
+}
 
 function MonthCalendar({ today, selectedDate, onSelect }: {
   today: string;
@@ -152,13 +184,35 @@ export default function DailyJournal() {
   const [draftTitle, setDraftTitle] = useState("");
   const [draftContent, setDraftContent] = useState("");
   const [draftGoalId, setDraftGoalId] = useState<string | null>(null);
+  const [draftTaskId, setDraftTaskId] = useState<string | null>(null);
+  const [goalTasks, setGoalTasks] = useState<TaskBrief[]>([]);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [saveStatus, setSaveStatus] = useState<"saved" | "dirty" | "saving" | "error">("saved");
 
   const { goals, fetchGoals } = useGoalStore();
 
   useEffect(() => { fetchGoals(); }, []);
 
   const activeGoals = goals.filter((g) => g.status === "active");
+
+  useEffect(() => {
+    if (!draftGoalId) {
+      setGoalTasks([]);
+      setDraftTaskId(null);
+      return;
+    }
+    api.get<TaskBrief[]>(`/api/v1/goals/${draftGoalId}/tasks`)
+      .then((tasks) => {
+        setGoalTasks(tasks);
+        setDraftTaskId((current) =>
+          current && tasks.some((task) => task.id === current) ? current : null
+        );
+      })
+      .catch(() => {
+        setGoalTasks([]);
+        setDraftTaskId(null);
+      });
+  }, [draftGoalId]);
 
   const shiftWeek = (delta: number) =>
     setWeekAnchor((prev) => {
@@ -192,15 +246,15 @@ export default function DailyJournal() {
   const startNew = async () => {
     setDraftTitle("");
     setDraftContent("");
-    const goalId = activeGoals[0]?.id ?? null;
-    setDraftGoalId(goalId);
+    setDraftGoalId(null);
+    setDraftTaskId(null);
     setPendingFiles([]);
     const draft = await api.post<StudyNote>("/api/v1/knowledge/notes", {
       content: "",
       noteType: "daily_log",
       noteDate: selectedDate,
-      goalId: goalId ?? undefined,
     });
+    setSaveStatus("saved");
     setIsNewDraft(true);
     setEditing({ ...draft, attachmentIds: [] });
   };
@@ -209,13 +263,15 @@ export default function DailyJournal() {
     setDraftTitle(note.title ?? "");
     setDraftContent(note.content);
     setDraftGoalId(note.goalId ?? null);
+    setDraftTaskId(note.taskId ?? null);
     setPendingFiles([]);
     setIsNewDraft(false);
     setEditing(note);
+    setSaveStatus("saved");
   };
 
   const handleCancel = async () => {
-    if (isNewDraft && editing && !draftContent && !draftTitle) {
+    if (isNewDraft && editing) {
       await api.del(`/api/v1/knowledge/${editing.id}`).catch(() => {});
     }
     setEditing(null);
@@ -224,13 +280,15 @@ export default function DailyJournal() {
 
   const handleSave = async () => {
     if (!editing) return;
+    setSaveStatus("saving");
     try {
       const updated = await api.patch<StudyNote>(
         `/api/v1/knowledge/notes/${editing.id}`,
         {
           content: draftContent,
-          title: draftTitle || undefined,
+          title: draftTitle,
           goalId: draftGoalId ?? "",
+          taskId: draftTaskId ?? "",
         }
       );
       const note: StudyNote = { ...updated, attachmentIds: editing.attachmentIds };
@@ -244,7 +302,10 @@ export default function DailyJournal() {
       await loadNotes(selectedDate);
       setEditing(null);
       setIsNewDraft(false);
-    } catch {}
+      setSaveStatus("saved");
+    } catch {
+      setSaveStatus("error");
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -379,7 +440,14 @@ export default function DailyJournal() {
                             {note.goalTitle}
                           </span>
                         )}
-                        <span className="text-sm font-semibold text-gray-800 truncate">{note.title || "无标题"}</span>
+                        {note.taskTitle && (
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium shrink-0 ${
+                            note.taskAvailable ? "bg-gray-100 text-gray-500" : "bg-amber-50 text-amber-600"
+                          }`}>
+                            <ListChecks size={10} />
+                            {note.taskAvailable ? note.taskTitle : `原任务：${note.taskTitle}`}
+                          </span>
+                        )}
                       </div>
                       <div className="flex items-center gap-1 flex-shrink-0">
                         <button onClick={() => startEdit(note)} className="p-1.5 rounded-lg text-gray-300 hover:text-blue-500 hover:bg-blue-50 transition">
@@ -390,14 +458,22 @@ export default function DailyJournal() {
                         </button>
                       </div>
                     </div>
+                    <h3 className="text-[15px] font-semibold text-gray-800 truncate mb-1">
+                      {noteDisplayTitle(note)}
+                    </h3>
                     <p className="text-sm text-gray-500 line-clamp-2 mb-2">
-                      {stripHtml(note.content).slice(0, 120) || "（无内容）"}
+                      {stripHtml(note.content).slice(0, 160) || "开始记录你的学习过程…"}
                     </p>
                     <div className="flex items-center justify-between text-xs text-gray-400">
                       {note.attachmentIds.length > 0 ? (
                         <span className="flex items-center gap-1"><Paperclip size={11} />{note.attachmentIds.length} 个附件</span>
                       ) : <span />}
-                      <span>{new Date(note.savedAt).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}</span>
+                      <span
+                        className="flex items-center gap-1"
+                        title={new Date(note.updatedAt || note.savedAt).toLocaleString("zh-CN")}
+                      >
+                        <Clock3 size={11} />编辑于 {relativeTime(note.updatedAt || note.savedAt)}
+                      </span>
                     </div>
                   </div>
                 ))}
@@ -415,32 +491,60 @@ export default function DailyJournal() {
             </div>
             <input
               value={draftTitle}
-              onChange={(e) => setDraftTitle(e.target.value)}
-              placeholder="标题（可选）"
-              className="w-full text-base font-semibold text-gray-800 border-0 border-b border-gray-100 px-0 pb-2 mb-3 focus:outline-none focus:border-gray-300 placeholder:text-gray-300 flex-shrink-0 bg-transparent"
+              onChange={(e) => { setDraftTitle(e.target.value); setSaveStatus("dirty"); }}
+              placeholder="无标题"
+              className="w-full text-2xl font-bold text-gray-900 border-0 px-1 py-1 mb-2 focus:outline-none placeholder:text-gray-300 flex-shrink-0 bg-transparent"
             />
-            {activeGoals.length > 0 && (
-              <div className="flex items-center gap-2 mb-3 flex-shrink-0">
-                <span className="text-xs text-gray-400 shrink-0">关联目标</span>
+            <div className="flex items-center gap-2 mb-3 flex-wrap flex-shrink-0 rounded-xl border border-gray-100 bg-gray-50/70 px-3 py-2">
+              <Target size={13} className="text-gray-400" />
+              <span className="text-xs text-gray-400 shrink-0">目标</span>
+              {activeGoals.length > 0 ? (
                 <select
                   value={draftGoalId ?? ""}
-                  onChange={(e) => setDraftGoalId(e.target.value || null)}
-                  className="text-xs text-gray-600 border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:border-gray-400 bg-white"
+                  onChange={(e) => {
+                    setDraftGoalId(e.target.value || null);
+                    setDraftTaskId(null);
+                    setSaveStatus("dirty");
+                  }}
+                  className="max-w-[220px] text-xs text-gray-700 border-0 rounded-lg px-2 py-1 focus:outline-none bg-white shadow-sm"
                 >
-                  <option value="">不关联</option>
+                  <option value="">不关联目标</option>
                   {activeGoals.map((g) => (
                     <option key={g.id} value={g.id}>{g.title}</option>
                   ))}
                 </select>
-              </div>
-            )}
+              ) : <span className="text-xs text-gray-400">暂无进行中的目标</span>}
+              {draftGoalId && (
+                <>
+                  <span className="mx-1 h-4 w-px bg-gray-200" />
+                  <ListChecks size={13} className="text-gray-400" />
+                  <span className="text-xs text-gray-400 shrink-0">任务</span>
+                  <select
+                    value={draftTaskId ?? ""}
+                    onChange={(e) => {
+                      setDraftTaskId(e.target.value || null);
+                      setSaveStatus("dirty");
+                    }}
+                    className="max-w-[280px] text-xs text-gray-700 border-0 rounded-lg px-2 py-1 focus:outline-none bg-white shadow-sm"
+                  >
+                    <option value="">不关联具体任务</option>
+                    {goalTasks.map((task) => (
+                      <option key={task.id} value={task.id}>
+                        {task.title}{task.date ? ` · ${task.date}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </>
+              )}
+            </div>
             <TiptapEditor
               key={editing?.id ?? "new"}
               content={draftContent}
-              onChange={setDraftContent}
+              onChange={(html) => { setDraftContent(html); setSaveStatus("dirty"); }}
               placeholder="记录今天的学习心得…"
               className="flex-1 border border-gray-100 rounded-xl mb-3 min-h-0"
               noteId={currentNoteId}
+              goalId={draftGoalId ?? undefined}
             />
             <FileAttachmentZone
               noteId={currentNoteId ?? null}
@@ -450,13 +554,30 @@ export default function DailyJournal() {
               onRemovePending={(idx) => setPendingFiles((prev) => prev.filter((_, i) => i !== idx))}
               onRemoveSaved={(attId) => { if (editing) handleRemoveSaved(editing.id, attId); }}
             />
-            <div className="flex justify-end gap-2 mt-3 flex-shrink-0">
-              <button onClick={handleCancel} className="px-4 py-1.5 rounded-lg text-sm text-gray-500 border border-gray-200 hover:bg-gray-50 transition">
-                取消
-              </button>
-              <button onClick={handleSave} className="px-4 py-1.5 rounded-lg text-sm font-medium text-white transition" style={{ background: "var(--accent)" }}>
-                保存
-              </button>
+            <div className="flex items-center justify-between gap-2 mt-3 flex-shrink-0">
+              <span className={`inline-flex items-center gap-1.5 text-xs ${
+                saveStatus === "error" ? "text-red-500" : "text-gray-400"
+              }`}>
+                {saveStatus === "saving" && <LoaderCircle size={12} className="animate-spin" />}
+                {saveStatus === "saved" && <Check size={12} />}
+                {saveStatus === "dirty" && <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />}
+                {saveStatus === "saving" ? "保存中…" :
+                  saveStatus === "dirty" ? "有未保存的更改" :
+                  saveStatus === "error" ? "保存失败，请重试" : "已保存"}
+              </span>
+              <div className="flex gap-2">
+                <button onClick={handleCancel} className="px-4 py-1.5 rounded-lg text-sm text-gray-500 border border-gray-200 hover:bg-gray-50 transition">
+                  取消
+                </button>
+                <button
+                  onClick={handleSave}
+                  disabled={saveStatus === "saving"}
+                  className="px-4 py-1.5 rounded-lg text-sm font-medium text-white transition disabled:opacity-50"
+                  style={{ background: "var(--accent)" }}
+                >
+                  保存
+                </button>
+              </div>
             </div>
           </div>
         )}
