@@ -353,7 +353,7 @@ export default function NotesLibrary({
 
       {editing && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/25 p-4 backdrop-blur-[1px]">
-          <div role="dialog" aria-modal="true" aria-label={isNewDraft ? "新建学习日志" : "编辑学习日志"} className="flex h-[min(760px,90vh)] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+          <div role="dialog" aria-modal="true" aria-label={isNewDraft ? "新建学习日志" : "编辑学习日志"} className="journal-dialog flex h-[min(760px,90vh)] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3">
               <span className="text-sm font-medium text-gray-600">
                 {isNewDraft ? "新建学习日志" : "编辑学习日志"}

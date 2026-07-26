@@ -1000,7 +1000,7 @@ export default function GoalDetailPage({ params }: { params: { id: string } }) {
 
       {showRescheduleConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.45)" }}>
-          <div role="dialog" aria-modal="true" aria-label="确认重新规划时间" className="bg-white rounded-2xl w-full max-w-sm shadow-xl p-6 space-y-4">
+          <div role="dialog" aria-modal="true" aria-label="确认重新规划时间" className="journal-dialog bg-white rounded-2xl w-full max-w-sm shadow-xl p-6 space-y-4">
             <h3 className="text-sm font-semibold text-gray-900">重新规划时间</h3>
             <p className="text-xs text-gray-500 leading-relaxed">将对所有未掌握的任务从今日开始重新安排时间，已掌握 / 已完成的任务不受影响。是否继续？</p>
             <div className="flex gap-2">
@@ -1015,7 +1015,7 @@ export default function GoalDetailPage({ params }: { params: { id: string } }) {
 
       {rescheduleResult && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.45)" }}>
-          <div role="dialog" aria-modal="true" aria-label="规划完成" className="bg-white rounded-2xl w-full max-w-sm shadow-xl p-6 space-y-4">
+          <div role="dialog" aria-modal="true" aria-label="规划完成" className="journal-dialog bg-white rounded-2xl w-full max-w-sm shadow-xl p-6 space-y-4">
             <h3 className="text-sm font-semibold text-gray-900">规划完成</h3>
             <p className="text-xs text-gray-500 leading-relaxed">
               预计 <span className="font-semibold text-gray-800">{rescheduleResult.estimatedDate}</span> 完成，提前了{" "}

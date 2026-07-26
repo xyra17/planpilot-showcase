@@ -50,7 +50,7 @@ export default function ResizableImage({
     <NodeViewWrapper
       ref={wrapperRef}
       as="figure"
-      className={`group relative my-3 max-w-full rounded-lg ${
+      className={`resizable-image group relative my-3 max-w-full rounded-lg ${
         selected ? "ring-2 ring-blue-500 ring-offset-2" : ""
       }`}
       style={{ width: `${width}%` }}
@@ -65,7 +65,7 @@ export default function ResizableImage({
       />
       {selected && (
         <>
-          <span className="absolute left-2 top-2 rounded-md bg-gray-900/75 px-2 py-1 text-[11px] font-medium text-white">
+          <span className="image-size-label absolute left-2 top-2 rounded-md bg-gray-900/75 px-2 py-1 text-[11px] font-medium text-white">
             {width}%
           </span>
           <button
@@ -73,7 +73,7 @@ export default function ResizableImage({
             aria-label="拖动调整图片大小"
             title="拖动调整图片大小"
             onPointerDown={startResize}
-            className="absolute -bottom-2 -right-2 h-5 w-5 cursor-nwse-resize rounded-full border-2 border-white bg-blue-500 shadow-md"
+            className="image-resize-handle absolute -bottom-2 -right-2 h-5 w-5 cursor-nwse-resize rounded-full border-2 border-white bg-blue-500 shadow-md"
           />
         </>
       )}

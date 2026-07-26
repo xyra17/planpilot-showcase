@@ -126,7 +126,7 @@ export function DailyPlanModal({ onClose }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.45)" }}>
-      <div role="dialog" aria-modal="true" aria-label="今日时间规划" className="bg-white rounded-3xl w-full max-w-lg max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
+      <div role="dialog" aria-modal="true" aria-label="今日时间规划" className="journal-dialog bg-white rounded-3xl w-full max-w-lg max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
         {/* 头部 */}
         <div className="px-6 pt-6 pb-4 border-b border-gray-100 flex-shrink-0">
           <div className="flex items-center justify-between mb-1">

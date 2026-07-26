@@ -862,7 +862,7 @@ export default function KnowledgePage() {
       {uploadOpen && (
         <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50"
           onClick={() => setUploadOpen(false)}>
-          <div role="dialog" aria-modal="true" aria-label="上传学习资料" className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 p-6 max-h-[90vh] overflow-y-auto"
+          <div role="dialog" aria-modal="true" aria-label="上传学习资料" className="journal-dialog bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 p-6 max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-5">
               <h2 className="text-base font-bold text-gray-900">上传学习资料</h2>
@@ -988,7 +988,7 @@ export default function KnowledgePage() {
       {urlImportOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm px-4"
           onClick={() => setUrlImportOpen(false)}>
-          <div role="dialog" aria-modal="true" aria-label="导入网址资料" className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-5"
+          <div role="dialog" aria-modal="true" aria-label="导入网址资料" className="journal-dialog bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-5"
             onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <h2 className="text-base font-semibold text-gray-800">导入网页 / URL</h2>

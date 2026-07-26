@@ -51,11 +51,11 @@ export function ConfirmDialogProvider({ children }: { children: React.ReactNode 
             aria-modal="true"
             aria-labelledby="global-confirm-title"
             aria-describedby="global-confirm-description"
-            className="w-full max-w-sm rounded-2xl border border-gray-100 bg-white p-5 shadow-2xl"
+            className="journal-dialog w-full max-w-sm rounded-2xl border border-gray-100 bg-white p-5 shadow-2xl"
             onMouseDown={(event) => event.stopPropagation()}
           >
             <div className="flex items-start gap-3">
-              <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+              <span className="journal-dialog-icon journal-dialog-warning flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
                 <AlertTriangle size={17} />
               </span>
               <div className="min-w-0 flex-1">

@@ -736,6 +736,135 @@ html {
 [data-theme="journal"] .study-calendar-day[data-selected="true"]::after {
   background:var(--surface);
 }
+
+/* 手账主题：清理普通交互中的固定蓝 / 紫色泄漏 */
+[data-theme="journal"] .calm-app .bg-blue-50,
+[data-theme="journal"] .calm-app .bg-blue-100,
+[data-theme="journal"] .calm-app .bg-indigo-50,
+[data-theme="journal"] .calm-app .bg-purple-50 {
+  background-color:var(--accent-light) !important;
+}
+[data-theme="journal"] .calm-app .bg-blue-500,
+[data-theme="journal"] .calm-app .bg-blue-600,
+[data-theme="journal"] .calm-app .bg-indigo-600,
+[data-theme="journal"] .calm-app .bg-purple-600 {
+  background-color:var(--accent) !important;
+}
+[data-theme="journal"] .calm-app .text-blue-400,
+[data-theme="journal"] .calm-app .text-blue-500,
+[data-theme="journal"] .calm-app .text-blue-600,
+[data-theme="journal"] .calm-app .text-blue-700,
+[data-theme="journal"] .calm-app .text-blue-800,
+[data-theme="journal"] .calm-app .text-indigo-600,
+[data-theme="journal"] .calm-app .text-purple-600 {
+  color:var(--accent) !important;
+}
+[data-theme="journal"] .calm-app .border-blue-100,
+[data-theme="journal"] .calm-app .border-blue-200,
+[data-theme="journal"] .calm-app .border-blue-300,
+[data-theme="journal"] .calm-app .border-blue-400,
+[data-theme="journal"] .calm-app .border-indigo-200,
+[data-theme="journal"] .calm-app .border-purple-200 {
+  border-color:color-mix(in srgb,var(--accent) 30%,var(--border)) !important;
+}
+[data-theme="journal"] .calm-app .hover\:bg-blue-50:hover,
+[data-theme="journal"] .calm-app .hover\:bg-indigo-50:hover,
+[data-theme="journal"] .calm-app .hover\:bg-purple-50:hover {
+  background-color:color-mix(in srgb,var(--surface) 70%,var(--accent-light)) !important;
+}
+[data-theme="journal"] .calm-app .hover\:text-blue-500:hover,
+[data-theme="journal"] .calm-app .hover\:text-blue-600:hover,
+[data-theme="journal"] .calm-app .hover\:text-indigo-600:hover,
+[data-theme="journal"] .calm-app .hover\:text-purple-600:hover {
+  color:var(--accent) !important;
+}
+[data-theme="journal"] .calm-app .focus\:ring-blue-200:focus,
+[data-theme="journal"] .calm-app .focus\:ring-blue-300:focus,
+[data-theme="journal"] .calm-app .focus\:ring-blue-400:focus,
+[data-theme="journal"] .calm-app .focus\:ring-blue-500:focus,
+[data-theme="journal"] .calm-app .focus\:ring-blue-600:focus {
+  --tw-ring-color:color-mix(in srgb,var(--accent) 42%,transparent) !important;
+}
+
+/* 手账弹窗图标：线稿 + 不规则纸片底座 */
+[data-theme="journal"] .journal-dialog-icon,
+[data-theme="journal"] .plan-mode-icon,
+[data-theme="journal"] .slash-menu-icon {
+  color:var(--accent) !important;
+  border:1px dashed color-mix(in srgb,var(--accent) 42%,transparent);
+  border-radius:9px 6px 10px 7px !important;
+  background:color-mix(in srgb,var(--surface) 68%,var(--accent-light)) !important;
+  box-shadow:1px 1px 0 color-mix(in srgb,var(--text-1) 8%,transparent);
+  transform:rotate(-.8deg);
+}
+[data-theme="journal"] .journal-dialog-icon svg,
+[data-theme="journal"] .plan-mode-icon svg,
+[data-theme="journal"] .slash-menu-icon svg {
+  color:inherit !important;
+  stroke:currentColor !important;
+}
+[data-theme="journal"] .journal-dialog-success {
+  color:var(--ok-text) !important;
+  background:var(--ok-bg) !important;
+  border-color:color-mix(in srgb,var(--ok-text) 34%,transparent);
+}
+[data-theme="journal"] .journal-dialog-warning {
+  color:var(--warn-text) !important;
+  background:var(--warn-bg) !important;
+  border-color:color-mix(in srgb,var(--warn-text) 34%,transparent);
+}
+[data-theme="journal"] .journal-dialog {
+  color:var(--text-1);
+}
+[data-theme="journal"] .journal-dialog h2,
+[data-theme="journal"] .journal-dialog h3 {
+  font-family:"Patrick Hand","Kaiti SC",cursive;
+  font-weight:400 !important;
+  letter-spacing:.01em;
+}
+[data-theme="journal"] .journal-dialog svg.text-blue-500,
+[data-theme="journal"] .journal-dialog svg.text-blue-600,
+[data-theme="journal"] .journal-dialog svg.text-indigo-600,
+[data-theme="journal"] .journal-dialog svg.text-purple-600 {
+  color:var(--accent) !important;
+  stroke:currentColor !important;
+}
+[data-theme="journal"] .plan-mode-icon {
+  margin-right:2px;
+}
+
+/* 编辑器浮层、附件与图片控件 */
+[data-theme="journal"] .slash-menu {
+  border:1.5px solid color-mix(in srgb,var(--text-1) 32%,transparent) !important;
+  border-radius:13px 9px 15px 10px !important;
+  background:var(--surface) !important;
+  box-shadow:4px 5px 0 color-mix(in srgb,var(--text-1) 14%,transparent) !important;
+}
+[data-theme="journal"] .slash-menu-item {
+  color:var(--text-2);
+  background:transparent !important;
+}
+[data-theme="journal"] .slash-menu-item:hover,
+[data-theme="journal"] .slash-menu-item.bg-blue-50 {
+  background:color-mix(in srgb,var(--surface) 72%,var(--accent-light)) !important;
+}
+[data-theme="journal"] .pending-attachment {
+  color:var(--accent) !important;
+  border-color:color-mix(in srgb,var(--accent) 28%,transparent) !important;
+  background:color-mix(in srgb,var(--surface) 72%,var(--accent-light)) !important;
+}
+[data-theme="journal"] .resizable-image.ring-blue-500 {
+  --tw-ring-color:var(--accent) !important;
+}
+[data-theme="journal"] .image-size-label {
+  color:var(--surface) !important;
+  background:color-mix(in srgb,var(--text-1) 82%,transparent) !important;
+}
+[data-theme="journal"] .image-resize-handle {
+  border-color:var(--surface) !important;
+  background:var(--accent) !important;
+  box-shadow:0 0 0 1px color-mix(in srgb,var(--text-1) 24%,transparent);
+}
 [data-theme="journal"] .calm-eyebrow {
   display:block;
   color:var(--accent) !important;

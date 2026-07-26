@@ -156,7 +156,7 @@ function FileAttachmentZone({ noteId, attachmentIds, pendingFiles, onAddFiles, o
         </div>
       ))}
       {pendingFiles.map((f, idx) => (
-        <div key={idx} className="flex items-center gap-1 px-2 py-1 rounded-lg bg-blue-50 border border-blue-200 text-xs text-blue-700">
+        <div key={idx} className="pending-attachment flex items-center gap-1 px-2 py-1 rounded-lg bg-blue-50 border border-blue-200 text-xs text-blue-700">
           <Paperclip size={11} />
           <span className="max-w-[120px] truncate">{f.name}</span>
           <button onClick={() => onRemovePending(idx)} className="ml-1 text-blue-400 hover:text-red-500"><X size={10} /></button>

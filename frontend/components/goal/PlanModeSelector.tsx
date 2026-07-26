@@ -170,7 +170,7 @@ export default function PlanModeSelector({
 
   return (
     <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4">
-      <div role="dialog" aria-modal="true" aria-label="选择计划生成方式" className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+      <div role="dialog" aria-modal="true" aria-label="选择计划生成方式" className="journal-dialog bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <div className="flex items-center gap-2">
             {step === 2 && (
@@ -204,7 +204,9 @@ export default function PlanModeSelector({
                   }`}
                 >
                   <div className="flex items-center gap-2 mb-0.5">
-                    {m.icon}
+                    <span className="plan-mode-icon flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg">
+                      {m.icon}
+                    </span>
                     <span className="text-sm font-medium text-gray-800">{m.label}</span>
                     {m.requiresKb && !hasKb && (
                       <span className="text-xs text-gray-400 ml-auto">需关联知识库</span>
