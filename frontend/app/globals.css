@@ -512,9 +512,12 @@ html {
   --heat-0:#E4DCCF; --heat-1:#DAC7A8; --heat-2:#BE9B66; --heat-3:#8A7556; --heat-4:#45413B;
   --brief-from:#F2E0B9; --brief-to:#E8C98E;
   --journal-tape:#DABE8E;
-  --scrollbar-track:transparent;
-  --scrollbar-thumb:color-mix(in srgb,var(--accent-muted) 38%,var(--border));
-  --scrollbar-thumb-hover:color-mix(in srgb,var(--accent) 48%,var(--border));
+  --journal-scroll-track:#E8DECD;
+  --journal-scroll-thumb:#B9A17D;
+  --journal-scroll-hover:#8F693E;
+  --scrollbar-track:var(--journal-scroll-track);
+  --scrollbar-thumb:var(--journal-scroll-thumb);
+  --scrollbar-thumb-hover:var(--journal-scroll-hover);
   --border-subtle:rgba(63,58,52,.24);
 }
 [data-theme="journal"][data-journal="wood"] {
@@ -524,6 +527,9 @@ html {
   --heat-0:#E4DCCF; --heat-1:#DAC7A8; --heat-2:#BE9B66; --heat-3:#8A7556; --heat-4:#45413B;
   --brief-from:#F2E0B9; --brief-to:#E8C98E;
   --journal-tape:#DABE8E;
+  --journal-scroll-track:#E8DECD;
+  --journal-scroll-thumb:#B9A17D;
+  --journal-scroll-hover:#8F693E;
 }
 [data-theme="journal"][data-journal="slate"] {
   --accent:#66877A; --accent-dark:#29413F; --accent-light:#E4EDE8; --accent-muted:#B7C9C1;
@@ -532,6 +538,9 @@ html {
   --heat-0:#DDE3E0; --heat-1:#C7D6CF; --heat-2:#9DB7AC; --heat-3:#66877A; --heat-4:#29413F;
   --brief-from:#E2EAE5; --brief-to:#CADBD3;
   --journal-tape:#C5D5CE;
+  --journal-scroll-track:#DDE6E2;
+  --journal-scroll-thumb:#91AAA1;
+  --journal-scroll-hover:#54796D;
 }
 [data-theme="journal"][data-journal="newspaper"] {
   --accent:#8E453D; --accent-dark:#302E2A; --accent-light:#E7D1B8; --accent-muted:#C79373;
@@ -540,6 +549,9 @@ html {
   --heat-0:#DDD2B7; --heat-1:#D7BFA5; --heat-2:#C58D73; --heat-3:#8E453D; --heat-4:#302E2A;
   --brief-from:#E5CF9C; --brief-to:#D5B77D;
   --journal-tape:#C9AE78;
+  --journal-scroll-track:#E2D6BC;
+  --journal-scroll-thumb:#B88970;
+  --journal-scroll-hover:#8E453D;
 }
 [data-theme="journal"][data-journal="night"] {
   --accent:#D39A58; --accent-dark:#E7BE88; --accent-light:#493B2B; --accent-muted:#725A3D;
@@ -548,6 +560,9 @@ html {
   --heat-0:#3A3731; --heat-1:#554B3B; --heat-2:#806849; --heat-3:#B27E45; --heat-4:#E0B170;
   --brief-from:#4C402D; --brief-to:#644A2D;
   --journal-tape:#786342;
+  --journal-scroll-track:#3C3831;
+  --journal-scroll-thumb:#806A4D;
+  --journal-scroll-hover:#D39A58;
 }
 [data-theme="journal"] body {
   color:var(--text-1);
@@ -972,36 +987,45 @@ html {
   border-color:color-mix(in srgb,var(--text-1) 22%,transparent);
 }
 
-/* 手账滚动条：页面、弹窗、卡片和编辑器统一为纸墨配色 */
-[data-theme="journal"],
-[data-theme="journal"] *,
-[data-theme="journal"] *::before,
-[data-theme="journal"] *::after {
+/* 手账滚动条：根页面与所有内部滚动区使用同一套轨道 / 滑块 / 悬停层级 */
+html[data-theme="journal"],
+html[data-theme="journal"] body,
+html[data-theme="journal"] * {
   scrollbar-width:thin;
-  scrollbar-color:color-mix(in srgb,var(--accent) 42%,var(--border))
-    color-mix(in srgb,var(--surface) 74%,transparent);
+  scrollbar-color:var(--journal-scroll-thumb) var(--journal-scroll-track);
 }
-[data-theme="journal"] ::-webkit-scrollbar {
+html[data-theme="journal"]::-webkit-scrollbar,
+html[data-theme="journal"] body::-webkit-scrollbar,
+html[data-theme="journal"] *::-webkit-scrollbar {
   width:8px;
   height:8px;
 }
-[data-theme="journal"] ::-webkit-scrollbar-track {
+html[data-theme="journal"]::-webkit-scrollbar-track,
+html[data-theme="journal"] body::-webkit-scrollbar-track,
+html[data-theme="journal"] *::-webkit-scrollbar-track {
+  border:1px solid color-mix(in srgb,var(--text-1) 7%,transparent);
   border-radius:999px;
-  background:color-mix(in srgb,var(--surface) 72%,transparent);
+  background-color:var(--journal-scroll-track);
 }
-[data-theme="journal"] ::-webkit-scrollbar-thumb {
+html[data-theme="journal"]::-webkit-scrollbar-thumb,
+html[data-theme="journal"] body::-webkit-scrollbar-thumb,
+html[data-theme="journal"] *::-webkit-scrollbar-thumb {
   min-width:30px;
   min-height:30px;
-  border:2px solid transparent;
+  border:2px solid var(--journal-scroll-track);
   border-radius:999px;
-  background-color:color-mix(in srgb,var(--accent) 42%,var(--border));
-  background-clip:content-box;
+  background-color:var(--journal-scroll-thumb);
+  background-clip:padding-box;
 }
-[data-theme="journal"] ::-webkit-scrollbar-thumb:hover {
-  background-color:color-mix(in srgb,var(--accent) 68%,var(--border));
+html[data-theme="journal"]::-webkit-scrollbar-thumb:hover,
+html[data-theme="journal"] body::-webkit-scrollbar-thumb:hover,
+html[data-theme="journal"] *::-webkit-scrollbar-thumb:hover {
+  background-color:var(--journal-scroll-hover);
 }
-[data-theme="journal"] ::-webkit-scrollbar-corner {
-  background:transparent;
+html[data-theme="journal"]::-webkit-scrollbar-corner,
+html[data-theme="journal"] body::-webkit-scrollbar-corner,
+html[data-theme="journal"] *::-webkit-scrollbar-corner {
+  background:var(--journal-scroll-track);
 }
 [data-theme="journal"] .editor-toolbar {
   scrollbar-width:none;
