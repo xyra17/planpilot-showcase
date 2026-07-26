@@ -16,7 +16,7 @@ const THEME_INIT_SCRIPT = `(function(){try{
   var mode=localStorage.getItem('theme-mode-'+uid)||'default';
   var color=localStorage.getItem('theme-color-'+uid)||'indigo';
   var journal=localStorage.getItem('journal-palette-'+uid)||'wood';
-  if(['wood','slate','newspaper','night'].indexOf(journal)<0)journal='wood';
+  if(['wood','slate','newspaper','wheat','night'].indexOf(journal)<0)journal='wood';
   if(mode==='sketch'){mode='default';localStorage.setItem('theme-mode-'+uid,mode);}
   if(color.indexOf('calm-')===0){mode='journal';color='indigo';localStorage.setItem('theme-mode-'+uid,mode);localStorage.setItem('theme-color-'+uid,color);}
   document.documentElement.setAttribute('data-theme',mode);

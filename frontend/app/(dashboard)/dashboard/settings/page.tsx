@@ -23,6 +23,7 @@ const JOURNAL_PALETTES: {
   { value: "wood", label: "原木纸稿", desc: "米白纸 · 石墨 · 赭石", swatches: ["#F7F0E2", "#37342F", "#B57935"] },
   { value: "slate", label: "青灰纸稿", desc: "灰白纸 · 深青墨 · 灰绿", swatches: ["#EEF1ED", "#29413F", "#66877A"] },
   { value: "newspaper", label: "旧报纸稿", desc: "淡黄纸 · 炭黑墨 · 暗红", swatches: ["#F1E4C4", "#302E2A", "#8E453D"] },
+  { value: "wheat", label: "麦香素描", desc: "暖麦纸 · 深石墨 · 麦金", swatches: ["#F3E8CF", "#4A4840", "#A98A52"] },
   { value: "night", label: "深夜纸稿", desc: "深色纸 · 浅石墨 · 暖金", swatches: ["#25231F", "#EEE4D2", "#D39A58"] },
 ];
 
