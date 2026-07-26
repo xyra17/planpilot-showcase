@@ -125,44 +125,44 @@ body {
 
 /* ── Calm 全局风格：配色与框架作为一个完整方案启用 ── */
 [data-color="calm-amber"] {
-  --accent:#3157D5; --accent-dark:#161A3D; --accent-light:#E6EBFF; --accent-muted:#AAB9F0;
-  --bg:#EFE5D3; --surface:#FFF7E8; --border:#DED0B8;
-  --text-1:#252536; --text-2:#696475; --text-3:#9992A0;
-  --heat-0:#EEE6D8; --heat-1:#D9DFF7; --heat-2:#94A8EC; --heat-3:#3157D5; --heat-4:#161A3D;
-  --brief-from:#161A3D; --brief-to:#3157D5;
-  --calm-sidebar:#161A3D; --calm-panel:#F5E9D3; --calm-glow:rgba(255,184,77,.24);
+  --accent:#C27A3C; --accent-dark:#273142; --accent-light:#F4E3D2; --accent-muted:#E2B98F;
+  --bg:#EAE1D4; --surface:#F9F5EE; --border:#DED3C3;
+  --text-1:#2B3038; --text-2:#666A70; --text-3:#96989A;
+  --heat-0:#E9E4DC; --heat-1:#ECD6BF; --heat-2:#D9AA7C; --heat-3:#C27A3C; --heat-4:#273142;
+  --brief-from:#273142; --brief-to:#46566D;
+  --calm-sidebar:#273142; --calm-panel:#F1E9DE; --calm-glow:rgba(194,122,60,.15);
 }
 [data-color="calm-pine"] {
-  --accent:#A82F5B; --accent-dark:#3D1426; --accent-light:#F8DFE8; --accent-muted:#DDA0B7;
-  --bg:#DCEBDD; --surface:#F4F7EF; --border:#C9D8C9;
-  --text-1:#27342D; --text-2:#617066; --text-3:#8B988F;
-  --heat-0:#DFE8DE; --heat-1:#C5DCC9; --heat-2:#86B095; --heat-3:#A82F5B; --heat-4:#3D1426;
-  --brief-from:#3D1426; --brief-to:#A82F5B;
-  --calm-sidebar:#3D1426; --calm-panel:#E7F0E5; --calm-glow:rgba(93,155,118,.24);
+  --accent:#A86E47; --accent-dark:#2F3B35; --accent-light:#F0E1D5; --accent-muted:#D7AD90;
+  --bg:#E2E7DE; --surface:#F6F7F1; --border:#D4DCCF;
+  --text-1:#2E3732; --text-2:#667068; --text-3:#949C96;
+  --heat-0:#E5E9E2; --heat-1:#D5DFD2; --heat-2:#9FB3A3; --heat-3:#6F8A76; --heat-4:#2F3B35;
+  --brief-from:#2F3B35; --brief-to:#53665C;
+  --calm-sidebar:#2F3B35; --calm-panel:#ECF0E8; --calm-glow:rgba(168,110,71,.13);
 }
 [data-color="calm-mist"] {
-  --accent:#91AD12; --accent-dark:#25262B; --accent-light:#EEF7C5; --accent-muted:#D4E66D;
-  --bg:#E3E2DD; --surface:#F5F4EF; --border:#D2D1CB;
-  --text-1:#25262B; --text-2:#66686F; --text-3:#92949A;
-  --heat-0:#E5E4DF; --heat-1:#E6EEB9; --heat-2:#C8D95E; --heat-3:#91AD12; --heat-4:#4D5D08;
-  --brief-from:#25262B; --brief-to:#565861;
-  --calm-sidebar:#25262B; --calm-panel:#ECEBE5; --calm-glow:rgba(215,240,72,.25);
+  --accent:#BE6957; --accent-dark:#31414D; --accent-light:#F5E0DB; --accent-muted:#DEA397;
+  --bg:#E3EAEC; --surface:#F7F9F8; --border:#D3DEE1;
+  --text-1:#2F3940; --text-2:#68747A; --text-3:#96A0A4;
+  --heat-0:#E5EAEB; --heat-1:#D3DFE2; --heat-2:#9FB6BE; --heat-3:#668894; --heat-4:#31414D;
+  --brief-from:#31414D; --brief-to:#536A78;
+  --calm-sidebar:#31414D; --calm-panel:#EDF2F3; --calm-glow:rgba(190,105,87,.14);
 }
 [data-color="calm-terra"] {
-  --accent:#D45F35; --accent-dark:#192B57; --accent-light:#FAE0D3; --accent-muted:#E9A383;
-  --bg:#EAD8BC; --surface:#F9EDD9; --border:#DCC5A4;
-  --text-1:#26304A; --text-2:#687087; --text-3:#949AAB;
-  --heat-0:#E8DDCB; --heat-1:#F0C5B0; --heat-2:#E6936D; --heat-3:#D45F35; --heat-4:#192B57;
-  --brief-from:#192B57; --brief-to:#31559A;
-  --calm-sidebar:#192B57; --calm-panel:#F2E2C8; --calm-glow:rgba(214,107,61,.23);
+  --accent:#AA7A35; --accent-dark:#40394B; --accent-light:#F1E6D2; --accent-muted:#D8BA82;
+  --bg:#E9E3E9; --surface:#F8F5F7; --border:#DED5E0;
+  --text-1:#38333E; --text-2:#6D6673; --text-3:#9A949E;
+  --heat-0:#E8E4E8; --heat-1:#E6DBC5; --heat-2:#CDB17B; --heat-3:#AA7A35; --heat-4:#40394B;
+  --brief-from:#40394B; --brief-to:#62586F;
+  --calm-sidebar:#40394B; --calm-panel:#F0EBF0; --calm-glow:rgba(170,122,53,.14);
 }
 [data-color="calm-sunset"] {
-  --accent:#E06F60; --accent-dark:#173D35; --accent-light:#FBE1DC; --accent-muted:#F0AAA0;
-  --bg:#F1DCD8; --surface:#FFF4EF; --border:#E8CBC4;
-  --text-1:#263C37; --text-2:#61736E; --text-3:#8E9B97;
-  --heat-0:#EEE1DD; --heat-1:#D3E5DB; --heat-2:#8EBBA7; --heat-3:#3F8A75; --heat-4:#173D35;
-  --brief-from:#173D35; --brief-to:#2D7865;
-  --calm-sidebar:#173D35; --calm-panel:#F8E6E1; --calm-glow:rgba(228,127,112,.24);
+  --accent:#9B6841; --accent-dark:#3B3936; --accent-light:#EEE0D2; --accent-muted:#D2AA87;
+  --bg:#E7DED1; --surface:#F7F2EA; --border:#D9CDBD;
+  --text-1:#363432; --text-2:#6C6862; --text-3:#98938B;
+  --heat-0:#E6E0D7; --heat-1:#DDCDBB; --heat-2:#BE9A78; --heat-3:#9B6841; --heat-4:#3B3936;
+  --brief-from:#3B3936; --brief-to:#5B5650;
+  --calm-sidebar:#3B3936; --calm-panel:#EEE7DD; --calm-glow:rgba(155,104,65,.14);
 }
 
 [data-color^="calm-"] .calm-app {
@@ -229,7 +229,7 @@ body {
 [data-color^="calm-"] .calm-sidebar .text-gray-400,
 [data-color^="calm-"] .calm-sidebar .text-gray-300,
 [data-color^="calm-"] .calm-collapse {
-  color: color-mix(in srgb, var(--surface) 68%, transparent) !important;
+  color: color-mix(in srgb, var(--surface) 85%, transparent) !important;
 }
 [data-color^="calm-"] .calm-app .bg-white {
   background-color: var(--surface) !important;
@@ -249,7 +249,7 @@ body {
   color: var(--surface) !important;
 }
 [data-color^="calm-"] .calm-nav-idle {
-  color: color-mix(in srgb, var(--surface) 72%, transparent) !important;
+  color: color-mix(in srgb, var(--surface) 92%, transparent) !important;
 }
 [data-color^="calm-"] .calm-nav-idle:hover,
 [data-color^="calm-"] .calm-collapse:hover {
