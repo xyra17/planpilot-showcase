@@ -93,15 +93,15 @@ function MonthCalendar({ today, selectedDate, onSelect }: {
     .toLocaleDateString("zh-CN", { year: "numeric", month: "long" });
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-2">
-        <button onClick={() => shiftMonth(-1)} className="p-0.5 rounded hover:bg-gray-100 text-gray-300 hover:text-gray-500"><ChevronLeft size={13} /></button>
-        <span className="text-sm font-medium text-gray-500">{monthLabel}</span>
-        <button onClick={() => shiftMonth(1)} className="p-0.5 rounded hover:bg-gray-100 text-gray-300 hover:text-gray-500"><ChevronRight size={13} /></button>
+    <div className="study-month-calendar">
+      <div className="study-calendar-header flex items-center justify-between mb-2">
+        <button type="button" aria-label="上个月" onClick={() => shiftMonth(-1)} className="study-calendar-nav p-0.5 rounded hover:bg-gray-100 text-gray-300 hover:text-gray-500"><ChevronLeft size={13} /></button>
+        <span className="study-calendar-label text-sm font-medium text-gray-500">{monthLabel}</span>
+        <button type="button" aria-label="下个月" onClick={() => shiftMonth(1)} className="study-calendar-nav p-0.5 rounded hover:bg-gray-100 text-gray-300 hover:text-gray-500"><ChevronRight size={13} /></button>
       </div>
       <div className="grid grid-cols-7 mb-1">
         {WEEK_LABELS.map((w) => (
-          <div key={w} className="text-center text-[10px] text-gray-300 font-medium py-0.5">{w}</div>
+          <div key={w} className="study-calendar-weekday text-center text-[10px] text-gray-300 font-medium py-0.5">{w}</div>
         ))}
       </div>
       <div className="grid grid-cols-7 gap-y-0.5">
@@ -113,8 +113,13 @@ function MonthCalendar({ today, selectedDate, onSelect }: {
           return (
             <button
               key={ds}
+              type="button"
+              data-selected={isSelected || undefined}
+              data-today={isToday || undefined}
+              aria-current={isToday ? "date" : undefined}
+              aria-pressed={isSelected}
               onClick={() => onSelect(ds)}
-              className={`w-full aspect-square flex items-center justify-center text-[12px] rounded-full transition
+              className={`study-calendar-day w-full aspect-square flex items-center justify-center text-[12px] rounded-full transition
                 ${isSelected ? "text-white font-bold" : isToday ? "font-semibold" : "text-gray-500 hover:bg-gray-50"}`}
               style={isSelected ? { background: "var(--accent)" } : isToday ? { color: "var(--accent)" } : undefined}
             >
