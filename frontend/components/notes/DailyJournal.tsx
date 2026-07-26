@@ -9,6 +9,8 @@ import { api } from "@/lib/api";
 import TiptapEditor from "./TiptapEditor";
 import type { KnowledgeNote } from "@/lib/knowledge-context";
 import { useGoalStore } from "@/lib/stores/goalStore";
+import { useToast } from "@/components/ui/Toast";
+import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 const WEEK_LABELS = ["日", "一", "二", "三", "四", "五", "六"];
 
@@ -179,6 +181,8 @@ export default function DailyJournal({
   onCreateHandled?: () => void;
   initialGoalId?: string;
 }) {
+  const { showToast } = useToast();
+  const { confirmAction } = useConfirmDialog();
   const todayDate = new Date();
   const today = toDateStr(todayDate);
   const [selectedDate, setSelectedDate] = useState(today);
@@ -201,6 +205,10 @@ export default function DailyJournal({
   const pendingExitRef = useRef<null | (() => void | Promise<void>)>(null);
 
   const { goals, fetchGoals } = useGoalStore();
+
+  useEffect(() => {
+    if (window.matchMedia("(max-width: 768px)").matches) setSidebarOpen(false);
+  }, []);
 
   useEffect(() => { fetchGoals(); }, []);
 
@@ -254,13 +262,17 @@ export default function DailyJournal({
       const data = await api.get<StudyNote[]>(
         `/api/v1/knowledge/notes?note_type=daily_log&date=${date}`
       );
-      setNotes(data.map((n) => ({ ...n, attachmentIds: n.attachmentIds ?? [] })));
+      setNotes(
+        data
+          .filter((note) => !initialGoalId || note.goalId === initialGoalId)
+          .map((n) => ({ ...n, attachmentIds: n.attachmentIds ?? [] }))
+      );
     } catch {
       setNotes([]);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [initialGoalId]);
 
   useEffect(() => { loadNotes(selectedDate); }, [selectedDate]);
 
@@ -368,12 +380,25 @@ export default function DailyJournal({
       setSaveStatus("saved");
     } catch {
       setSaveStatus("error");
+      showToast("学习笔记保存失败，请重试", "error");
     }
   };
 
   const handleDelete = async (id: string) => {
-    await api.del(`/api/v1/knowledge/${id}`).catch(() => {});
-    setNotes((prev) => prev.filter((n) => n.id !== id));
+    const confirmed = await confirmAction({
+      title: "删除学习笔记",
+      description: "删除后无法恢复，确定继续吗？",
+      confirmLabel: "删除",
+      tone: "danger",
+    });
+    if (!confirmed) return;
+    try {
+      await api.del(`/api/v1/knowledge/${id}`);
+      setNotes((prev) => prev.filter((n) => n.id !== id));
+      showToast("学习笔记已删除", "success");
+    } catch {
+      showToast("删除失败，请稍后重试", "error");
+    }
   };
 
   const handleRemoveSaved = async (noteId: string, attId: string) => {

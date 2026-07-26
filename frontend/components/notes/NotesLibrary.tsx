@@ -2,13 +2,16 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  MoreHorizontal,
+  FileText, MoreHorizontal,
   Pencil, Plus, Search, Trash2, X,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import type { KnowledgeNote } from "@/lib/knowledge-context";
 import { useGoalStore } from "@/lib/stores/goalStore";
 import TiptapEditor from "./TiptapEditor";
+import EmptyState from "@/components/ui/EmptyState";
+import { useToast } from "@/components/ui/Toast";
+import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 type EditableNoteType = "daily_log" | "flash_card";
 type NoteWithAttachments = KnowledgeNote & { attachmentIds?: string[] };
@@ -48,6 +51,8 @@ export default function NotesLibrary({
   onCreateHandled?: () => void;
   initialGoalId?: string;
 }) {
+  const { showToast } = useToast();
+  const { confirmAction } = useConfirmDialog();
   const [notes, setNotes] = useState<NoteWithAttachments[]>([]);
   const [query, setQuery] = useState("");
   const [dateFilter, setDateFilter] = useState("");
@@ -79,13 +84,14 @@ export default function NotesLibrary({
     const normalized = query.trim().toLowerCase();
     return notes.filter((note) => {
       if (!allowed.has(note.noteType)) return false;
+      if (initialGoalId && note.goalId !== initialGoalId) return false;
       if (dateFilter && note.date !== dateFilter) return false;
       if (!normalized) return true;
       return `${note.title} ${stripHtml(note.content)} ${note.goalTitle}`
         .toLowerCase()
         .includes(normalized);
     });
-  }, [notes, query, dateFilter]);
+  }, [notes, query, dateFilter, initialGoalId]);
 
   const openNew = useCallback(async () => {
     const today = new Date().toLocaleDateString("sv-SE");
@@ -96,7 +102,10 @@ export default function NotesLibrary({
       noteDate: today,
       goalId: initialGoalId || null,
     }).catch(() => null);
-    if (!draft) return;
+    if (!draft) {
+      showToast("无法创建学习日志，请稍后重试", "error");
+      return;
+    }
     setTitle("");
     setContent("");
     setGoalId(initialGoalId);
@@ -104,7 +113,7 @@ export default function NotesLibrary({
     setSavedSnapshot(JSON.stringify({ title: "", content: "", goalId: initialGoalId, noteDate: today }));
     setIsNewDraft(true);
     setEditing(draft);
-  }, [initialGoalId]);
+  }, [initialGoalId, showToast]);
 
   useEffect(() => {
     if (createSignal <= 0) return;
@@ -163,14 +172,30 @@ export default function NotesLibrary({
       });
       setEditing(null);
       setIsNewDraft(false);
+      showToast("学习日志已保存", "success");
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : "保存失败，请重试", "error");
     } finally {
       setSaving(false);
     }
   };
 
   const remove = async (id: string) => {
+    const confirmed = await confirmAction({
+      title: "删除学习日志",
+      description: "删除后无法恢复，确定继续吗？",
+      confirmLabel: "删除",
+      tone: "danger",
+    });
+    if (!confirmed) return;
     setNotes((current) => current.filter((note) => note.id !== id));
-    await api.del(`/api/v1/knowledge/${id}`).catch(load);
+    try {
+      await api.del(`/api/v1/knowledge/${id}`);
+      showToast("学习日志已删除", "success");
+    } catch {
+      await load();
+      showToast("删除失败，内容已恢复", "error");
+    }
   };
 
   const convert = async (note: NoteWithAttachments, noteType: EditableNoteType) => {
@@ -198,7 +223,9 @@ export default function NotesLibrary({
             学习日志
           </h2>
           <p className="mt-0.5 text-xs text-gray-400">
-            按日期记录整体学习进展，可按需关联某个目标
+            {initialGoalId
+              ? `正在查看「${goals.find((goal) => goal.id === initialGoalId)?.title ?? "当前目标"}」的关联日志`
+              : "按日期记录整体学习进展，可按需关联某个目标"}
           </p>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
@@ -234,17 +261,23 @@ export default function NotesLibrary({
       </div>
 
       {visibleNotes.length === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center rounded-2xl border border-dashed border-gray-200 text-gray-400">
-          <p className="text-sm">{query ? "没有匹配的笔记" : "这里还没有内容"}</p>
-          {!query && (
+        <div className="flex flex-1 items-center">
+          <div className="w-full">
+          <EmptyState
+            icon={FileText}
+            title={query || dateFilter ? "没有匹配的学习日志" : "这里还没有学习日志"}
+            description={query || dateFilter ? "试试清除搜索词或日期条件。" : "按日期记录一次复盘、阶段进展或跨目标的学习总结。"}
+            action={!query && !dateFilter ? (
             <button
               onClick={openNew}
-              className="mt-3 inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium"
+              className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium"
               style={{ background: "var(--accent-light)", color: "var(--accent)" }}
             >
-              <Plus size={12} />创建第一篇
+              <Plus size={12} />创建第一篇日志
             </button>
-          )}
+            ) : undefined}
+          />
+          </div>
         </div>
       ) : (
         <div className="grid flex-1 min-h-0 grid-cols-1 content-start gap-3 overflow-y-auto pr-1 md:grid-cols-2 xl:grid-cols-3">

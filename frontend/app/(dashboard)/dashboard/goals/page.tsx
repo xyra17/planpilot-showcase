@@ -7,6 +7,9 @@ import { Plus, Pencil, Target, Trash2 } from "lucide-react";
 import { useGoalStore } from "@/lib/stores/goalStore";
 import { useTasks } from "@/lib/tasks-context";
 import { api } from "@/lib/api";
+import WorkspaceHeader from "@/components/ui/WorkspaceHeader";
+import EmptyState from "@/components/ui/EmptyState";
+import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 const TYPE_LABEL: Record<string, string> = {
   exam: "考试",
@@ -21,6 +24,7 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 export default function GoalsPage() {
+  const { confirmAction } = useConfirmDialog();
   const router = useRouter();
   const { goals, isLoading, fetchGoals, deleteGoal } = useGoalStore();
   const { refresh: refreshTasks } = useTasks();
@@ -62,11 +66,23 @@ export default function GoalsPage() {
     const goal = goals.find((g) => g.id === id);
     if (!goal) return;
 
-    if (!window.confirm("确认删除该目标？相关任务和打卡记录将一并删除，此操作不可恢复。")) return;
+    const shouldDelete = await confirmAction({
+      title: "删除学习目标",
+      description: "相关任务和打卡记录将一并删除，此操作不可恢复。",
+      confirmLabel: "继续删除",
+      tone: "danger",
+    });
+    if (!shouldDelete) return;
 
     let deleteKb = false;
     if (goal.kb_id) {
-      deleteKb = window.confirm("该目标关联了知识库，是否同时删除关联的知识库及其所有内容？\n\n点击「确定」同时删除，点击「取消」仅删除目标。");
+      deleteKb = await confirmAction({
+        title: "处理关联知识库",
+        description: "该目标关联了知识库。是否同时删除关联知识库及其中的所有内容？",
+        confirmLabel: "同时删除",
+        cancelLabel: "保留知识库",
+        tone: "danger",
+      });
     }
 
     setDeletingId(id);
@@ -82,26 +98,19 @@ export default function GoalsPage() {
 
   return (
     <div className="flex h-full flex-col bg-white">
-      <header
-        className="flex flex-shrink-0 items-end justify-between gap-4 border-b-2 border-gray-200 bg-white px-6 pt-4"
-        style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}
-      >
-        <div
-          className="-mb-px flex items-center gap-2 whitespace-nowrap border-b-[3px] px-5 py-3 text-base font-semibold"
-          style={{ borderColor: "var(--accent)", color: "var(--accent)" }}
-        >
-          <Target size={17} />
-          我的目标
-        </div>
-        <Link
-          href="/dashboard/goals/new"
-          className="mb-2 inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white rounded-xl transition hover:opacity-90"
-          style={{ backgroundColor: "var(--accent)" }}
-        >
-          <Plus size={16} />
-          新建目标
-        </Link>
-      </header>
+      <WorkspaceHeader
+        tabs={[{ key: "goals", label: "我的目标", icon: Target }]}
+        activeKey="goals"
+        actions={(
+          <Link
+            href="/dashboard/goals/new"
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white rounded-xl transition hover:opacity-90"
+            style={{ backgroundColor: "var(--accent)" }}
+          >
+            <Plus size={16} />新建目标
+          </Link>
+        )}
+      />
 
       <main className="min-h-0 flex-1 overflow-y-auto p-6">
         <div className="mb-6">
@@ -120,9 +129,16 @@ export default function GoalsPage() {
         )}
 
         {!isLoading && goals.length === 0 && (
-          <div className="text-center py-16 text-gray-400">
-            <p className="text-sm">还没有目标，点击右上角新建一个吧</p>
-          </div>
+          <EmptyState
+            icon={Target}
+            title="还没有学习目标"
+            description="创建目标后，PlanPilot 会帮助你拆解任务并追踪进度。"
+            action={(
+              <Link href="/dashboard/goals/new" className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium text-white" style={{ backgroundColor: "var(--accent)" }}>
+                <Plus size={14} />新建目标
+              </Link>
+            )}
+          />
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">

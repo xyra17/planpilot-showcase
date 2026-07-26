@@ -86,6 +86,59 @@ html {
   background:transparent;
 }
 
+.workspace-header {
+  min-height:64px;
+}
+
+@media (max-width:768px) {
+  .calm-app {
+    min-width:0;
+  }
+  .calm-sidebar {
+    width:3.5rem !important;
+  }
+  .calm-sidebar-header {
+    justify-content:center !important;
+    padding-inline:.5rem !important;
+  }
+  .calm-sidebar .calm-brand-text,
+  .calm-sidebar .calm-brand-icon,
+  .calm-sidebar .calm-nav-label,
+  .calm-sidebar .calm-user-label,
+  .calm-sidebar .calm-user-area svg {
+    display:none !important;
+  }
+  .calm-sidebar nav a,
+  .calm-sidebar .calm-user-area a {
+    justify-content:center !important;
+    padding-inline:0 !important;
+  }
+  .workspace-header {
+    min-height:58px;
+    align-items:flex-end;
+    gap:.5rem;
+    overflow-x:auto;
+    padding-left:.75rem;
+    padding-right:.75rem;
+    padding-top:.5rem;
+  }
+  .workspace-header nav > * {
+    padding:.75rem .75rem;
+    font-size:.875rem;
+  }
+  .workspace-header-actions {
+    position:sticky;
+    right:0;
+    padding-left:.5rem;
+    background:var(--surface);
+  }
+  .workspace-header-actions a,
+  .workspace-header-actions button {
+    padding:.5rem .75rem;
+    font-size:.75rem;
+  }
+}
+
 /* ── Brief card — 上深下浅，使用方案自身深色 ── */
 .brief-card {
   background: linear-gradient(to bottom, var(--accent-dark) 0%, var(--accent) 100%);

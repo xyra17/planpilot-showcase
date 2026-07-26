@@ -12,6 +12,8 @@ import { useGoalStore } from "@/lib/stores/goalStore";
 import { useKnowledge } from "@/lib/knowledge-context";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import WorkspaceHeader from "@/components/ui/WorkspaceHeader";
+import { useToast } from "@/components/ui/Toast";
 
 // ── 类型 ─────────────────────────────────────────────────────
 type KnowledgeBase = { id: string; name: string };
@@ -74,6 +76,7 @@ function fileExt(name: string) {
 
 // ── 主页面 ────────────────────────────────────────────────────
 export default function KnowledgePage() {
+  const { showToast } = useToast();
   const { goals, fetchGoals } = useGoalStore();
   const [query,      setQuery]      = useState("");
   const [filter,     setFilter]     = useState<FilterState>({ type: "all", id: "" });
@@ -81,6 +84,10 @@ export default function KnowledgePage() {
   const [kbs,        setKbs]        = useState<KnowledgeBase[]>(INITIAL_KBS);
   const [filesView,  setFilesView]  = useState<"grid" | "list">("list");
   const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  useEffect(() => {
+    if (window.matchMedia("(max-width: 768px)").matches) setSidebarOpen(false);
+  }, []);
 
   // 新建知识库
   const [newKbOpen,  setNewKbOpen]  = useState(false);
@@ -186,6 +193,7 @@ export default function KnowledgePage() {
     try {
       const created = await api.post<{ id: string; name: string }>("/api/v1/knowledge/kbs", { name });
       setKbs((prev) => [...prev, { id: created.id, name: created.name }]);
+      showToast("待分类分组已创建", "success");
     } catch {
       // 后端不可用时忽略
     }
@@ -209,8 +217,9 @@ export default function KnowledgePage() {
     try {
       const saved = await api.upload<KnowledgeFile>("/api/v1/knowledge/upload", formData);
       setFiles((prev) => [saved, ...prev]);
+      showToast("文件已上传，正在建立索引", "success");
     } catch (error) {
-      alert(error instanceof Error ? error.message : "上传失败");
+      showToast(error instanceof Error ? error.message : "上传失败", "error");
     } finally {
       setUploading(false);
       setUploadOpen(false);
@@ -226,8 +235,9 @@ export default function KnowledgePage() {
     try {
       const updated = await api.post<KnowledgeFile>(`/api/v1/knowledge/${id}/retry`, {});
       setFiles((prev) => prev.map((file) => file.id === id ? updated : file));
+      showToast("已重新加入处理队列", "success");
     } catch (error) {
-      alert(error instanceof Error ? error.message : "重试失败");
+      showToast(error instanceof Error ? error.message : "重试失败", "error");
     }
   }
 
@@ -236,8 +246,9 @@ export default function KnowledgePage() {
     try {
       await api.del(`/api/v1/knowledge/${id}`);
       setFiles((prev) => prev.filter((file) => file.id !== id));
+      showToast("资料已删除", "success");
     } catch (error) {
-      alert(error instanceof Error ? error.message : "删除失败");
+      showToast(error instanceof Error ? error.message : "删除失败", "error");
     } finally {
       setDeletingId(null);
     }
@@ -253,8 +264,9 @@ export default function KnowledgePage() {
         kb_id: urlKbId || null,
       });
       setFiles((prev) => [saved, ...prev]);
+      showToast("网址已导入，正在建立索引", "success");
     } catch (error) {
-      alert(error instanceof Error ? error.message : "网址导入失败");
+      showToast(error instanceof Error ? error.message : "网址导入失败", "error");
     } finally {
       setUrlImporting(false);
       setUrlImportOpen(false);
@@ -278,18 +290,10 @@ export default function KnowledgePage() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-white">
-      <header
-        className="flex flex-shrink-0 items-end border-b-2 border-gray-200 bg-white px-6 pt-4"
-        style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}
-      >
-        <div
-          className="-mb-px flex items-center gap-2 whitespace-nowrap border-b-[3px] px-5 py-3 text-base font-semibold"
-          style={{ borderColor: "var(--accent)", color: "var(--accent)" }}
-        >
-          <BookOpen size={17} />
-          知识库
-        </div>
-      </header>
+      <WorkspaceHeader
+        tabs={[{ key: "knowledge", label: "知识库", icon: BookOpen }]}
+        activeKey="knowledge"
+      />
 
       <div className="flex min-h-0 flex-1 overflow-hidden">
       {/* ── 左侧导航 ── */}
@@ -417,18 +421,18 @@ export default function KnowledgePage() {
       </div>
 
       {/* ── 主内容 ── */}
-      <div className="flex-1 overflow-y-auto p-7">
+      <div className="flex-1 overflow-y-auto p-4 md:p-7">
         {/* 顶栏 */}
-        <div className="flex items-center justify-between mb-7">
+        <div className="mb-7 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-xl font-bold text-gray-900">学习资料</h1>
             <p className="text-xs text-gray-400 mt-0.5">{filterLabel()}</p>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="relative">
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:gap-3">
+            <div className="relative min-w-[12rem] flex-1 sm:flex-none">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="搜索学习资料…"
-                className="pl-9 pr-4 py-2 border border-gray-200 rounded-xl text-sm outline-none w-56 focus:border-gray-300 transition" />
+                className="w-full rounded-xl border border-gray-200 py-2 pl-9 pr-4 text-sm outline-none transition focus:border-gray-300 sm:w-56" />
             </div>
             <button onClick={() => setUrlImportOpen(true)}
               className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 transition">
@@ -491,7 +495,7 @@ export default function KnowledgePage() {
                       <span className="flex-shrink-0 text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-full">{groupFiles.length}</span>
                     </div>
                     {filesView === "grid" ? (
-                      <div className="grid grid-cols-3 gap-3">
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
                         {groupFiles.map((file) => (
                           <div key={file.id} className="bg-white rounded-2xl border border-gray-100 p-4 hover:border-gray-200 hover:shadow-sm transition">
                             <div className="flex items-start gap-2.5 mb-3">
@@ -537,7 +541,7 @@ export default function KnowledgePage() {
               </div>
             );
           })() : filesView === "grid" ? (
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {filteredFiles.map((file) => {
                 const fileGoals = goals.filter((g) => file.goalIds.includes(g.id));
                 const fileKb = kbs.find((k) => k.id === file.kbId);
@@ -858,7 +862,7 @@ export default function KnowledgePage() {
       {uploadOpen && (
         <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50"
           onClick={() => setUploadOpen(false)}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 p-6 max-h-[90vh] overflow-y-auto"
+          <div role="dialog" aria-modal="true" aria-label="上传学习资料" className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 p-6 max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-5">
               <h2 className="text-base font-bold text-gray-900">上传学习资料</h2>
@@ -984,7 +988,7 @@ export default function KnowledgePage() {
       {urlImportOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm px-4"
           onClick={() => setUrlImportOpen(false)}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-5"
+          <div role="dialog" aria-modal="true" aria-label="导入网址资料" className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-5"
             onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <h2 className="text-base font-semibold text-gray-800">导入网页 / URL</h2>

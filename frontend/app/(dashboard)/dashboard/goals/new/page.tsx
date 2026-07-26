@@ -337,7 +337,7 @@ export default function NewGoalPage() {
           const todayTasks = planPreview.phases.flatMap(p => p.tasks).filter(t => t.scheduled_date === todayStr);
           return (
             <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
-              <div className="bg-white rounded-2xl p-6 max-w-sm w-full mx-4 shadow-xl">
+              <div role="dialog" aria-modal="true" aria-label="确认创建学习目标" className="bg-white rounded-2xl p-6 max-w-sm w-full mx-4 shadow-xl">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
                     <CheckCircle2 size={18} className="text-blue-600" />
@@ -386,7 +386,7 @@ export default function NewGoalPage() {
     return (
       <>
         <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-6 max-w-sm w-full mx-4 shadow-xl">
+          <div role="dialog" aria-modal="true" aria-label="目标创建结果" className="bg-white rounded-2xl p-6 max-w-sm w-full mx-4 shadow-xl">
             <div className="flex items-center gap-3 mb-5">
               <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
                 <CheckCircle2 size={20} className="text-green-600" />

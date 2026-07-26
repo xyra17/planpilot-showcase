@@ -6,6 +6,7 @@ import dynamic from "next/dynamic";
 import {
   BookOpen, CalendarDays,
 } from "lucide-react";
+import WorkspaceHeader from "@/components/ui/WorkspaceHeader";
 
 const DailyJournal = dynamic(
   () => import("@/components/notes/DailyJournal"),
@@ -20,11 +21,6 @@ const NotesLibrary = dynamic(
 type Tab = "card" | "log";
 
 const VALID_TABS = new Set<Tab>(["card", "log"]);
-
-const TAB_META: Record<Tab, { label: string; icon: React.ReactNode }> = {
-  log: { label: "学习笔记", icon: <CalendarDays size={17} /> },
-  card: { label: "学习日志", icon: <BookOpen size={17} /> },
-};
 
 function NotesWorkspaceLoading() {
   return (
@@ -55,51 +51,49 @@ function NotesContent() {
     router.replace(`/dashboard/notes?${params.toString()}`);
   }
 
+  function clearGoalFilter() {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("goalId");
+    params.delete("create");
+    router.replace(`/dashboard/notes?${params.toString()}`);
+  }
+
   return (
     <div className="h-full flex flex-col bg-white">
-      <header
-        className="flex flex-shrink-0 items-end justify-between gap-4 border-b-2 border-gray-200 bg-white px-6 pt-4"
-        style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}
-      >
-        <div className="flex min-w-0 items-center gap-1">
-          {(["log", "card"] as Tab[]).map((item) => {
-            const meta = TAB_META[item];
-            return (
-              <button
-                key={item}
-                onClick={() => setTab(item)}
-                className={`-mb-px flex items-center gap-2 whitespace-nowrap border-b-[3px] px-5 py-3 text-base font-semibold transition ${
-                  tab === item
-                    ? ""
-                    : "border-transparent text-gray-500 hover:text-gray-700"
-                }`}
-                style={tab === item ? {
-                  borderColor: "var(--accent)",
-                  color: "var(--accent)",
-                } : undefined}
-              >
-                {meta.icon}{meta.label}
-              </button>
-            );
-          })}
-        </div>
-      </header>
+      <WorkspaceHeader
+        tabs={[
+          { key: "log", label: "学习笔记", icon: CalendarDays },
+          { key: "card", label: "学习日志", icon: BookOpen },
+        ]}
+        activeKey={tab}
+        onChange={(key) => setTab(key as Tab)}
+      />
 
-      <main className="flex-1 min-h-0 overflow-hidden p-6">
-        {tab === "log" && (
-          <DailyJournal
-            initialGoalId={initialGoalId}
-            createSignal={createRequested ? 1 : 0}
-            onCreateHandled={clearCreateRequest}
-          />
+      <main className="flex flex-1 min-h-0 flex-col overflow-hidden p-6">
+        {initialGoalId && (
+          <div className="mb-3 flex flex-shrink-0 items-center justify-between rounded-xl border border-gray-100 bg-gray-50 px-3 py-2 text-xs text-gray-500">
+            <span>仅显示当前目标关联的内容</span>
+            <button onClick={clearGoalFilter} className="font-medium hover:underline" style={{ color: "var(--accent)" }}>
+              查看全部
+            </button>
+          </div>
         )}
-        {tab === "card" && (
-          <NotesLibrary
-            initialGoalId={initialGoalId}
-            createSignal={createRequested ? 1 : 0}
-            onCreateHandled={clearCreateRequest}
-          />
-        )}
+        <div className="min-h-0 flex-1">
+          {tab === "log" && (
+            <DailyJournal
+              initialGoalId={initialGoalId}
+              createSignal={createRequested ? 1 : 0}
+              onCreateHandled={clearCreateRequest}
+            />
+          )}
+          {tab === "card" && (
+            <NotesLibrary
+              initialGoalId={initialGoalId}
+              createSignal={createRequested ? 1 : 0}
+              onCreateHandled={clearCreateRequest}
+            />
+          )}
+        </div>
       </main>
     </div>
   );

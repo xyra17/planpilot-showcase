@@ -7,6 +7,8 @@ import { Home, Target, BookOpen, FileText, Settings, ChevronLeft, ChevronRight, 
 import { useAuthStore } from "@/lib/stores/authStore";
 import { cn } from "@/lib/utils";
 import { NotificationBell } from "@/components/NotificationBell";
+import { ToastProvider } from "@/components/ui/Toast";
+import { ConfirmDialogProvider } from "@/components/ui/ConfirmDialog";
 
 const navItems = [
   { href: "/dashboard",           label: "首页",   icon: Home     },
@@ -32,6 +34,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const avatarText = user?.username?.slice(0, 2).toUpperCase() ?? "?";
 
   return (
+    <ToastProvider>
+    <ConfirmDialogProvider>
     <div className="calm-app flex h-screen bg-white">
       <aside className={cn(
         "calm-sidebar bg-white border-r border-gray-100 flex flex-col flex-shrink-0 transition-all duration-200 overflow-hidden",
@@ -86,7 +90,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 style={isActive ? { background: "var(--accent-light)", color: "var(--accent)" } : {}}
               >
                 <Icon size={17} className="flex-shrink-0" />
-                {!collapsed && <span className="whitespace-nowrap">{label}</span>}
+                {!collapsed && <span className="calm-nav-label whitespace-nowrap">{label}</span>}
               </Link>
             );
           })}
@@ -108,7 +112,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </div>
             {!collapsed && (
               <>
-                <span className="text-sm text-gray-700 font-medium flex-1 truncate whitespace-nowrap">
+                <span className="calm-user-label text-sm text-gray-700 font-medium flex-1 truncate whitespace-nowrap">
                   {user?.username ?? "..."}
                 </span>
                 <Settings
@@ -126,5 +130,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       <main className="calm-main flex-1 overflow-y-auto min-w-0">{children}</main>
     </div>
+    </ConfirmDialogProvider>
+    </ToastProvider>
   );
 }

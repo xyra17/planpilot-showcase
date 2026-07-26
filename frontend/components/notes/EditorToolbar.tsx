@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { useToast } from "@/components/ui/Toast";
 
 interface EditorToolbarProps {
   editor: Editor;
@@ -15,6 +16,7 @@ interface EditorToolbarProps {
 }
 
 export default function EditorToolbar({ editor, noteId }: EditorToolbarProps) {
+  const { showToast } = useToast();
   const [imageSelected, setImageSelected] = useState(editor.isActive("image"));
   const [imageWidth, setImageWidth] = useState(
     Number(editor.getAttributes("image").width) || 100
@@ -115,7 +117,10 @@ export default function EditorToolbar({ editor, noteId }: EditorToolbarProps) {
             try {
               const res = await api.upload<{ id: string }>("/api/v1/knowledge/upload", fd);
               editor.chain().focus().setImage({ src: `/api/v1/knowledge/files/${res.id}/serve` }).run();
-            } catch {}
+              showToast("图片已插入", "success");
+            } catch {
+              showToast("图片上传失败，请重试", "error");
+            }
           };
           input.click();
         }}
@@ -143,9 +148,10 @@ export default function EditorToolbar({ editor, noteId }: EditorToolbarProps) {
               }}
               className={`rounded px-2 py-1 text-xs font-medium transition-colors ${
                 imageWidth === width
-                  ? "bg-blue-50 text-blue-600"
+                  ? ""
                   : "text-gray-500 hover:bg-gray-100 hover:text-gray-900"
               }`}
+              style={imageWidth === width ? { backgroundColor: "var(--accent-light)", color: "var(--accent)" } : undefined}
             >
               {label}
             </button>

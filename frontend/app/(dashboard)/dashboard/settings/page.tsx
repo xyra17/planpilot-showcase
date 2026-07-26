@@ -598,7 +598,7 @@ export default function SettingsPage() {
       {/* ── 注销账号确认弹窗 ── */}
       {deleteOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm mx-4">
+          <div role="dialog" aria-modal="true" aria-label="注销账号确认" className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm mx-4">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center flex-shrink-0">
                 <Trash2 size={18} className="text-red-500" />
