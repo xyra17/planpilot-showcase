@@ -631,8 +631,10 @@ html {
 }
 [data-theme="journal"] .calm-brand-icon {
   display:flex;
-  color:var(--surface);
-  background:var(--text-1);
+  color:var(--accent);
+  border:1px dashed color-mix(in srgb,var(--accent) 48%,transparent);
+  background:color-mix(in srgb,var(--surface) 66%,var(--accent-light));
+  box-shadow:1px 2px 0 color-mix(in srgb,var(--text-1) 12%,transparent);
   border-radius:45% 55% 47% 53%;
   transform:rotate(-2deg);
 }
@@ -942,10 +944,21 @@ html {
   padding-bottom:.625rem;
 }
 [data-theme="journal"] .calm-nav-active {
-  color:var(--surface) !important;
-  background:var(--text-1) !important;
-  box-shadow:2px 2px 0 color-mix(in srgb,var(--text-1) 18%,transparent);
-  transform:rotate(-.35deg);
+  position:relative;
+  color:var(--accent) !important;
+  background:color-mix(in srgb,var(--surface) 64%,var(--accent-light)) !important;
+  box-shadow:1px 2px 0 color-mix(in srgb,var(--text-1) 11%,transparent);
+  transform:rotate(-.18deg);
+}
+[data-theme="journal"] .calm-nav-active::before {
+  position:absolute;
+  left:4px;
+  top:22%;
+  bottom:22%;
+  width:3px;
+  border-radius:999px;
+  background:var(--accent);
+  content:"";
 }
 [data-theme="journal"] .calm-nav-idle {
   color:var(--text-2) !important;
@@ -1186,6 +1199,24 @@ html {
 [data-theme="journal"] .goal-detail-scroll::-webkit-scrollbar-thumb {
   border:1px solid transparent;
   background-color:color-mix(in srgb,var(--journal-scroll-thumb) 72%,transparent);
+}
+[data-theme="journal"] .goal-status {
+  border:1px solid color-mix(in srgb,var(--accent) 22%,transparent);
+  background:color-mix(in srgb,var(--surface) 48%,var(--accent-light)) !important;
+}
+[data-theme="journal"] .goal-task-item {
+  border:1px solid transparent;
+}
+[data-theme="journal"] .goal-task-item:hover {
+  border-color:color-mix(in srgb,var(--accent) 18%,transparent);
+  background:
+    repeating-linear-gradient(1deg,transparent 0 5px,color-mix(in srgb,var(--text-1) 2%,transparent) 5px 6px),
+    color-mix(in srgb,var(--surface) 78%,var(--accent-light)) !important;
+  box-shadow:1px 2px 0 color-mix(in srgb,var(--text-1) 7%,transparent);
+}
+[data-theme="journal"] .goal-task-meta {
+  color:var(--text-3) !important;
+  background:color-mix(in srgb,var(--surface) 78%,var(--accent-light));
 }
 
 /* 手账纸稿：弹窗与表单使用叠纸布局 */

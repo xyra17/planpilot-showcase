@@ -211,7 +211,7 @@ function DayTaskList({
 
       <div className="space-y-1 max-h-40 overflow-y-auto">
         {dayTasks.map((task) => (
-          <div key={task.id} className="group flex items-start gap-2 px-2 py-1.5 rounded-xl hover:bg-gray-50 transition">
+          <div key={task.id} className="goal-task-item group flex items-start gap-2 px-2.5 py-2 rounded-xl transition">
             <button onClick={() => toggleTask(task.id)} className="mt-0.5 flex-shrink-0">
               {task.done
                 ? <CheckCircle2 size={14} style={{ color: "var(--accent)" }} />
@@ -241,8 +241,8 @@ function DayTaskList({
             ) : (
               <>
                 <div className="flex-1 min-w-0">
-                  <p className={cn("text-xs leading-snug", task.done ? "line-through text-gray-400" : "text-gray-700")}>{task.title}</p>
-                  <span className="text-xs text-gray-400 flex items-center gap-0.5 mt-0.5">
+                  <p className={cn("text-[13px] font-medium leading-snug", task.done ? "line-through text-gray-400" : "text-gray-700")}>{task.title}</p>
+                  <span className="goal-task-meta mt-1 flex w-fit items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] text-gray-400">
                     <span className={cn("w-1.5 h-1.5 rounded-full flex-shrink-0", PRIORITY_DOT[task.priority ?? "medium"])} />
                     <Clock size={9} />{task.estimatedMinutes} 分钟
                   </span>
@@ -364,16 +364,16 @@ function GoalTasksWorkspace({
             </p>
           )}
           {filteredToday.map((task) => (
-            <div key={task.id} className="group flex items-center gap-2 rounded-xl p-2 transition hover:bg-gray-50">
+            <div key={task.id} className="goal-task-item group flex items-start gap-2 rounded-xl px-2.5 py-2.5 transition">
               <button type="button" onClick={() => onToggleTask(task.id)} className="mt-0.5 flex-shrink-0" aria-label={task.done ? "标记为未完成" : "标记为已完成"}>
                 {task.done
                   ? <CheckCircle2 size={15} style={{ color: "var(--accent)" }} />
                   : <Circle size={15} className="flex-shrink-0 text-gray-300 transition group-hover:text-gray-400" />}
               </button>
               <div className="min-w-0 flex-1">
-                <p className={cn("text-xs leading-snug", task.done ? "text-gray-400 line-through" : "text-gray-700")}>{task.title}</p>
-                {task.description && <p className="mt-0.5 text-xs leading-snug text-gray-400">{task.description}</p>}
-                <span className="mt-0.5 flex items-center gap-1 text-xs text-gray-400"><Clock size={10} />{task.estimatedMinutes} 分钟</span>
+                <p className={cn("text-[13px] font-medium leading-snug", task.done ? "text-gray-400 line-through" : "text-gray-700")}>{task.title}</p>
+                {task.description && <p className="mt-1 text-[11px] leading-relaxed text-gray-400">{task.description}</p>}
+                <span className="goal-task-meta mt-1.5 flex w-fit items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] text-gray-400"><Clock size={10} />{task.estimatedMinutes} 分钟</span>
               </div>
               {task.done && (
                 <button
@@ -821,7 +821,10 @@ export default function GoalDetailPage({ params }: { params: { id: string } }) {
         <span className="hidden min-[900px]:inline text-xs text-gray-400 truncate">
           截止 {goal.deadline} · {planTotalDays != null ? `计划 ${planTotalDays} 天` : `剩余 ${daysLeft} 天`} · 每日 {goal.daily_hours}h
         </span>
-        <span className="ml-auto text-xs font-medium px-2.5 py-1 rounded-full bg-blue-50 text-blue-600">
+        <span
+          className="goal-status ml-auto text-xs font-medium px-2.5 py-1 rounded-full"
+          style={{ color: "var(--accent)", backgroundColor: "var(--accent-light)" }}
+        >
           {STATUS_LABEL[goal.status] ?? goal.status}
         </span>
       </div>
