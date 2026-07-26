@@ -12,7 +12,6 @@ const THEME_OPTIONS: { value: ThemeMode; label: string; desc: string; icon: Reac
   { value: "default",  label: "默认", desc: "干净的白底蓝色系",         icon: Monitor, preview: "bg-white border-gray-200"      },
   { value: "dark",     label: "暗黑", desc: "深色背景，护眼减蓝光",     icon: Moon,    preview: "bg-slate-800 border-slate-600"  },
   { value: "eye-care", label: "护眼", desc: "暖黄纸质感，长时阅读友好", icon: Eye,     preview: "bg-amber-50 border-amber-200"   },
-  { value: "sketch",   label: "手绘", desc: "草图风格，圆角变直角",     icon: Pencil,  preview: "bg-yellow-50 border-yellow-300" },
   { value: "journal",  label: "手账纸稿", desc: "纸张、铅笔与便签质感", icon: NotebookPen, preview: "bg-[#f2eadb] border-[#9a8b75]" },
 ];
 

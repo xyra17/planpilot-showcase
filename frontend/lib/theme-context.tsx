@@ -3,7 +3,7 @@
 import { createContext, useContext, useState, useEffect } from "react";
 import { useAuthStore } from "@/lib/stores/authStore";
 
-export type ThemeMode = "default" | "dark" | "eye-care" | "sketch" | "journal";
+export type ThemeMode = "default" | "dark" | "eye-care" | "journal";
 
 export type ColorScheme =
   | "blue" | "indigo" | "violet" | "rose" | "amber" | "emerald" | "teal"
@@ -54,6 +54,10 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let savedMode = (localStorage.getItem(modeKey) as ThemeMode) || "default";
     let savedColor = (localStorage.getItem(colorKey) as ColorScheme | string) || "indigo";
+    if ((savedMode as string) === "sketch") {
+      savedMode = "default";
+      localStorage.setItem(modeKey, savedMode);
+    }
     // 将已删除的全局配色平滑迁移到新的独立手账纸稿风格。
     if (savedColor.startsWith("calm-")) {
       savedMode = "journal";

@@ -415,18 +415,6 @@ body {
 [data-theme="dark"] .ProseMirror mark { background-color: #713f12; color: #fef3c7; }
 [data-theme="dark"] .ProseMirror code { background: #253346; color: #e2e8f0; }
 
-/* ── Sketch ── */
-[data-theme="sketch"] body       { background-color:#fefef8; }
-[data-theme="sketch"] .bg-white  { background-color:#ffffff !important; }
-[data-theme="sketch"] .bg-gray-50{ background-color:#fefef8 !important; }
-[data-theme="sketch"] .border-gray-100 { border-color:#ccc4a8 !important; }
-[data-theme="sketch"] .rounded-2xl  { border-radius:4px !important; }
-[data-theme="sketch"] .rounded-xl   { border-radius:3px !important; }
-[data-theme="sketch"] .rounded-lg   { border-radius:2px !important; }
-[data-theme="sketch"] .rounded-full { border-radius:3px !important; }
-[data-theme="sketch"] .shadow-sm    { box-shadow:3px 3px 0 #ccc4a8 !important; }
-[data-theme="sketch"] .brief-card   { border:2px solid var(--accent); box-shadow:4px 4px 0 var(--accent-muted); }
-
 /* ── Journal：独立的手账纸稿全局风格 ── */
 [data-theme="journal"] {
   --accent:#B57935; --accent-dark:#3F3A34; --accent-light:#F0DFC5; --accent-muted:#D8B985;
