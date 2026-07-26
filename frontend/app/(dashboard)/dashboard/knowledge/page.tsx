@@ -294,7 +294,7 @@ export default function KnowledgePage() {
 
         {/* 笔记中心快捷入口 */}
         <Link
-          href="/dashboard/notes?tab=all"
+          href="/dashboard/notes?tab=card"
           className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium text-gray-500 hover:bg-gray-50 transition w-full mb-3"
         >
           <StickyNote size={14} className="flex-shrink-0" />
@@ -401,7 +401,7 @@ export default function KnowledgePage() {
               <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="搜索学习资料…"
                 className="pl-9 pr-4 py-2 border border-gray-200 rounded-xl text-sm outline-none w-56 focus:border-gray-300 transition" />
               <p className="absolute -bottom-4 left-0 text-[10px] text-gray-400 whitespace-nowrap">
-                所有笔记已集中到<Link href="/dashboard/notes?tab=all" className="underline hover:text-gray-600">笔记中心</Link>
+                知识卡片已集中到<Link href="/dashboard/notes?tab=card" className="underline hover:text-gray-600">笔记中心</Link>
               </p>
             </div>
             <button onClick={() => setUrlImportOpen(true)}
@@ -610,7 +610,7 @@ export default function KnowledgePage() {
         </section>
 
         <Link
-          href="/dashboard/notes?tab=quick"
+          href="/dashboard/notes?tab=card"
           className="flex items-center justify-between rounded-2xl border border-violet-100 bg-violet-50/60 px-5 py-4 transition hover:border-violet-200 hover:bg-violet-50"
         >
           <div className="flex items-center gap-3">
@@ -619,7 +619,7 @@ export default function KnowledgePage() {
             </span>
             <div>
               <p className="text-sm font-semibold text-gray-800">AI 对话摘录已归入笔记中心</p>
-              <p className="mt-0.5 text-xs text-gray-500">与快速记录一起搜索、整理和关联目标</p>
+              <p className="mt-0.5 text-xs text-gray-500">与知识卡片一起搜索、整理和关联目标</p>
             </div>
           </div>
           <span className="text-xs font-medium text-violet-600">前往查看 →</span>

@@ -10,8 +10,7 @@ import type { KnowledgeNote } from "@/lib/knowledge-context";
 import { useGoalStore } from "@/lib/stores/goalStore";
 import TiptapEditor from "./TiptapEditor";
 
-type LibraryMode = "all" | "quick" | "card";
-type EditableNoteType = "quick_note" | "daily_log" | "flash_card";
+type EditableNoteType = "daily_log" | "flash_card";
 type NoteWithAttachments = KnowledgeNote & { attachmentIds?: string[] };
 
 const TYPE_META: Record<string, { label: string; icon: React.ReactNode; cls: string }> = {
@@ -49,11 +48,9 @@ function relativeTime(iso: string) {
 }
 
 export default function NotesLibrary({
-  mode,
   createSignal = 0,
   onCreateHandled,
 }: {
-  mode: LibraryMode;
   createSignal?: number;
   onCreateHandled?: () => void;
 }) {
@@ -81,11 +78,8 @@ export default function NotesLibrary({
   useEffect(() => { load(); }, [load]);
 
   const visibleNotes = useMemo(() => {
-    const allowed = mode === "quick"
-      ? new Set(["quick_note", "chat_note"])
-      : mode === "card"
-        ? new Set(["flash_card"])
-        : new Set(["quick_note", "chat_note", "daily_log", "flash_card", "task_note"]);
+    // 历史快速记录和 AI 摘录继续在知识卡片页可见，避免旧数据失去入口。
+    const allowed = new Set(["flash_card", "quick_note", "chat_note", "task_note"]);
     const normalized = query.trim().toLowerCase();
     return notes.filter((note) => {
       if (!allowed.has(note.noteType)) return false;
@@ -94,16 +88,13 @@ export default function NotesLibrary({
         .toLowerCase()
         .includes(normalized);
     });
-  }, [mode, notes, query]);
-
-  const defaultType: EditableNoteType = mode === "card" ? "flash_card" : "quick_note";
+  }, [notes, query]);
 
   const openNew = useCallback(async () => {
-    if (mode === "all") return;
     const draft = await api.post<NoteWithAttachments>("/api/v1/knowledge/notes", {
       title: "",
       content: "",
-      noteType: defaultType,
+      noteType: "flash_card",
     }).catch(() => null);
     if (!draft) return;
     setTitle("");
@@ -112,7 +103,7 @@ export default function NotesLibrary({
     setSavedSnapshot(JSON.stringify({ title: "", content: "", goalId: "" }));
     setIsNewDraft(true);
     setEditing(draft);
-  }, [defaultType, mode]);
+  }, []);
 
   useEffect(() => {
     if (createSignal <= 0) return;
@@ -201,14 +192,10 @@ export default function NotesLibrary({
       <div className="flex items-center justify-between gap-3 mb-5">
         <div>
           <h2 className="text-lg font-semibold text-gray-900">
-            {mode === "all" ? "全部笔记" : mode === "quick" ? "快速记录" : "知识卡片"}
+            知识卡片
           </h2>
           <p className="mt-0.5 text-xs text-gray-400">
-            {mode === "all"
-              ? "集中查看所有由你或 AI 保存的文字内容"
-              : mode === "quick"
-                ? "先记下来，之后再整理成日志或知识卡片"
-                : "沉淀可以长期复用的概念、方法与经验"}
+            沉淀可以长期复用的概念、方法与经验
           </p>
         </div>
         <div className="relative">
@@ -225,7 +212,7 @@ export default function NotesLibrary({
       {visibleNotes.length === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center rounded-2xl border border-dashed border-gray-200 text-gray-400">
           <p className="text-sm">{query ? "没有匹配的笔记" : "这里还没有内容"}</p>
-          {mode !== "all" && !query && (
+          {!query && (
             <button
               onClick={openNew}
               className="mt-3 inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium"
@@ -277,7 +264,6 @@ export default function NotesLibrary({
                       <div className="absolute right-0 top-8 z-20 w-36 overflow-hidden rounded-xl border border-gray-100 bg-white p-1 shadow-xl">
                         <p className="px-2 py-1 text-[10px] font-medium text-gray-400">转换为</p>
                         {([
-                          ["quick_note", "快速记录"],
                           ["daily_log", "学习日志"],
                           ["flash_card", "知识卡片"],
                         ] as Array<[EditableNoteType, string]>).map(([type, label]) => (
@@ -315,7 +301,7 @@ export default function NotesLibrary({
           <div className="flex h-[min(760px,90vh)] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3">
               <span className="text-sm font-medium text-gray-600">
-                {isNewDraft ? `新建${mode === "card" ? "知识卡片" : "快速记录"}` : "编辑笔记"}
+                {isNewDraft ? "新建知识卡片" : "编辑笔记"}
               </span>
               <button onClick={closeEditor} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100">
                 <X size={15} />

@@ -4,7 +4,7 @@ import { Suspense, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import {
-  BookOpen, CalendarDays, ChevronDown, LayoutGrid, Lightbulb, Plus,
+  BookOpen, CalendarDays, ChevronDown, Plus,
 } from "lucide-react";
 
 const DailyJournal = dynamic(
@@ -17,16 +17,13 @@ const NotesLibrary = dynamic(
   { ssr: false, loading: () => <NotesWorkspaceLoading /> }
 );
 
-type Tab = "all" | "quick" | "log" | "card";
-type CreatableTab = "quick" | "log" | "card";
+type Tab = "card" | "log";
 
-const VALID_TABS = new Set<Tab>(["all", "quick", "log", "card"]);
+const VALID_TABS = new Set<Tab>(["card", "log"]);
 
 const TAB_META: Record<Tab, { label: string; icon: React.ReactNode }> = {
-  all: { label: "全部笔记", icon: <LayoutGrid size={14} /> },
-  quick: { label: "快速记录", icon: <Lightbulb size={14} /> },
-  log: { label: "学习日志", icon: <CalendarDays size={14} /> },
   card: { label: "知识卡片", icon: <BookOpen size={14} /> },
+  log: { label: "学习日志", icon: <CalendarDays size={14} /> },
 };
 
 function NotesWorkspaceLoading() {
@@ -41,14 +38,13 @@ function NotesContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [newMenuOpen, setNewMenuOpen] = useState(false);
-  const [createSignals, setCreateSignals] = useState<Record<CreatableTab, number>>({
-    quick: 0,
-    log: 0,
+  const [createSignals, setCreateSignals] = useState<Record<Tab, number>>({
     card: 0,
+    log: 0,
   });
 
   const raw = searchParams.get("tab");
-  const tab: Tab = raw && VALID_TABS.has(raw as Tab) ? raw as Tab : "all";
+  const tab: Tab = raw && VALID_TABS.has(raw as Tab) ? raw as Tab : "card";
 
   function setTab(nextTab: Tab) {
     const params = new URLSearchParams(searchParams.toString());
@@ -56,13 +52,13 @@ function NotesContent() {
     router.replace(`/dashboard/notes?${params.toString()}`);
   }
 
-  function createNote(type: CreatableTab) {
+  function createNote(type: Tab) {
     setTab(type);
     setCreateSignals((current) => ({ ...current, [type]: current[type] + 1 }));
     setNewMenuOpen(false);
   }
 
-  function clearCreateSignal(type: CreatableTab) {
+  function clearCreateSignal(type: Tab) {
     setCreateSignals((current) => ({ ...current, [type]: 0 }));
   }
 
@@ -100,7 +96,7 @@ function NotesContent() {
           </button>
           {newMenuOpen && (
             <div className="absolute right-0 top-11 z-40 w-48 overflow-hidden rounded-xl border border-gray-100 bg-white p-1.5 shadow-xl">
-              {(["quick", "log", "card"] as CreatableTab[]).map((type) => (
+              {(["card", "log"] as Tab[]).map((type) => (
                 <button
                   key={type}
                   onClick={() => createNote(type)}
@@ -116,14 +112,6 @@ function NotesContent() {
       </header>
 
       <main className="flex-1 min-h-0 overflow-hidden p-6">
-        {tab === "all" && <NotesLibrary mode="all" />}
-        {tab === "quick" && (
-          <NotesLibrary
-            mode="quick"
-            createSignal={createSignals.quick}
-            onCreateHandled={() => clearCreateSignal("quick")}
-          />
-        )}
         {tab === "log" && (
           <DailyJournal
             createSignal={createSignals.log}
@@ -132,7 +120,6 @@ function NotesContent() {
         )}
         {tab === "card" && (
           <NotesLibrary
-            mode="card"
             createSignal={createSignals.card}
             onCreateHandled={() => clearCreateSignal("card")}
           />
