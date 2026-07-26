@@ -169,14 +169,14 @@ function StudyCalendar({ data }: { data: { date: string; minutes: number }[] }) 
 
   return (
     <div>
-      <div className="flex items-center mb-3">
-        <div className="flex items-center gap-2 flex-1">
-          <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "var(--accent-light)" }}>
+      <div className="dashboard-module-header mb-3 flex items-center gap-2">
+          <div className="dashboard-module-icon w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "var(--accent-light)" }}>
             <Activity size={14} style={{ color: "var(--accent)" }} />
           </div>
-          <div className="text-sm font-semibold text-gray-900">学习热力图</div>
-        </div>
-        <div className="flex items-center gap-0.5">
+          <div className="dashboard-module-title text-sm font-semibold text-gray-900">学习热力图</div>
+      </div>
+      <div className="mx-auto w-full max-w-[620px]">
+        <div className="mb-3 flex items-center justify-center gap-0.5">
           <button onClick={prevYear} className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-gray-100 text-gray-400 transition text-[11px] font-bold">«</button>
           <button onClick={prevMonth} className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-gray-100 text-gray-500 transition leading-none">‹</button>
           <span className="text-sm font-medium text-gray-400 mx-2">{year}年{month + 1}月</span>
@@ -187,19 +187,17 @@ function StudyCalendar({ data }: { data: { date: string; minutes: number }[] }) 
             className={cn("w-6 h-6 flex items-center justify-center rounded-md transition text-[11px] font-bold",
               isCurrentYear ? "text-gray-200 cursor-not-allowed" : "hover:bg-gray-100 text-gray-400")}>»</button>
         </div>
-        <div className="flex-1" />
-      </div>
 
-      <div className="flex">
+      <div className="flex justify-center">
         {/* 行标签：星期X */}
-        <div className="flex flex-col gap-[4px] flex-shrink-0 mr-10">
+        <div className="mr-8 flex flex-shrink-0 flex-col gap-[4px]">
           {WEEK_ROW_LABELS.map((d) => (
             <div key={d} style={{ width: 40, height: 14, lineHeight: "14px", fontSize: 11 }}
               className="text-gray-400 text-right leading-none">{d}</div>
           ))}
         </div>
         {/* 6 周列，flex-1 撑满宽度 */}
-        <div className="flex flex-1 gap-3">
+        <div className="flex w-full max-w-[470px] gap-3">
         {Array.from({ length: 6 }, (_, wi) => (
           <div key={wi} className="flex-1 flex flex-col gap-[4px]">
             {Array.from({ length: 7 }, (_, di) => {
@@ -228,10 +226,11 @@ function StudyCalendar({ data }: { data: { date: string; minutes: number }[] }) 
         </div>
       </div>
 
-      <div className="flex items-center gap-1.5 mt-3">
+      <div className="mt-3 flex items-center justify-center gap-1.5">
         <span className="text-xs text-gray-400">学习时长（少）</span>
         {HEAT_COLORS.map((c, i) => <div key={i} style={{ width: 12, height: 12, backgroundColor: c, borderRadius: 3 }} />)}
         <span className="text-xs text-gray-400">学习时长（多）</span>
+      </div>
       </div>
     </div>
   );
@@ -296,21 +295,21 @@ function TodayTasksPanel() {
       {/* 面板头 */}
       <div className="flex items-center justify-between mb-4 flex-shrink-0">
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "var(--accent-light)" }}>
+          <div className="dashboard-module-icon w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "var(--accent-light)" }}>
             {panelTab === "tasks"
               ? <CheckCircle2 size={14} style={{ color: "var(--accent)" }} />
               : <CalendarCheck size={14} style={{ color: "var(--accent)" }} />}
           </div>
           <div className="flex items-center gap-0">
             <button onClick={() => setPanelTab("tasks")}
-              className={cn("text-sm font-semibold px-0.5 pb-0.5 border-b-2 transition",
+              className={cn("dashboard-module-title text-sm font-semibold px-0.5 pb-0.5 border-b-2 transition",
                 panelTab === "tasks" ? "" : "border-transparent text-gray-400 hover:text-gray-700")}
               style={panelTab === "tasks" ? { borderColor: "var(--accent)", color: "var(--accent)" } : {}}>
               今日任务
             </button>
             <span className="text-gray-200 mx-2 text-sm select-none">/</span>
             <button onClick={() => setPanelTab("checkin")}
-              className={cn("text-sm font-semibold px-0.5 pb-0.5 border-b-2 transition",
+              className={cn("dashboard-module-title text-sm font-semibold px-0.5 pb-0.5 border-b-2 transition",
                 panelTab === "checkin" ? "" : "border-transparent text-gray-400 hover:text-gray-700")}
               style={panelTab === "checkin" ? { borderColor: "var(--accent)", color: "var(--accent)" } : {}}>
               今日打卡
@@ -817,10 +816,10 @@ function DailySchedulePanel() {
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: "var(--accent-light)" }}>
+          <div className="dashboard-module-icon w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: "var(--accent-light)" }}>
             <Calendar size={14} style={{ color: "var(--accent)" }} />
           </div>
-          <span className="text-sm font-semibold text-gray-900">今日时间规划</span>
+          <span className="dashboard-module-title text-sm font-semibold text-gray-900">今日时间规划</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="relative">
@@ -1349,8 +1348,8 @@ export default function DashboardPage() {
       {briefLoaded && !dailyBrief && (
         <div className="brief-card rounded-2xl p-5 relative overflow-hidden opacity-60">
           <div className="flex items-center gap-2 mb-2">
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: "rgba(255,255,255,0.2)" }}><Sparkles size={14} className="text-white" /></div>
-            <span className="text-sm font-semibold text-white">AI 每日简报</span>
+            <div className="dashboard-module-icon w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: "rgba(255,255,255,0.2)" }}><Sparkles size={14} className="text-white" /></div>
+            <span className="dashboard-module-title text-sm font-semibold text-white">AI 每日简报</span>
           </div>
           <p className="text-sm text-white/75">暂无简报，完成首次 Check-in 后生成</p>
         </div>
@@ -1361,8 +1360,8 @@ export default function DashboardPage() {
           <div className="absolute -bottom-8 -right-16 w-48 h-48 rounded-full pointer-events-none" style={{ background: "rgba(255,255,255,0.05)" }} />
           <div className="relative flex items-start justify-between mb-3">
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: "rgba(255,255,255,0.2)" }}><Sparkles size={14} className="text-white" /></div>
-              <span className="text-sm font-semibold text-white">AI 每日简报</span>
+              <div className="dashboard-module-icon w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: "rgba(255,255,255,0.2)" }}><Sparkles size={14} className="text-white" /></div>
+              <span className="dashboard-module-title text-sm font-semibold text-white">AI 每日简报</span>
               <span className="text-xs px-2 py-0.5 rounded-full text-white/80" style={{ background: "rgba(255,255,255,0.18)" }}>基于昨日生成</span>
             </div>
             <button onClick={() => setBriefOpen((v) => !v)} className="text-white/70 hover:text-white transition text-xs px-2.5 py-1 rounded-lg" style={{ background: "rgba(255,255,255,0.15)" }}>
@@ -1454,11 +1453,11 @@ export default function DashboardPage() {
         <div className="journal-card bg-gray-50 rounded-2xl shadow-sm border border-gray-100 p-5">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "var(--accent-light)" }}>
+              <div className="dashboard-module-icon w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "var(--accent-light)" }}>
                 <TrendingUp size={14} style={{ color: "var(--accent)" }} />
               </div>
               <div>
-                <h2 className="text-sm font-semibold text-gray-900">学习时长趋势</h2>
+                <h2 className="dashboard-module-title text-sm font-semibold text-gray-900">学习时长趋势</h2>
                 <p className="text-xs text-gray-400">单位：小时</p>
               </div>
             </div>
@@ -1502,10 +1501,10 @@ export default function DashboardPage() {
         <div className="journal-card bg-gray-50 rounded-2xl shadow-sm border border-gray-100 p-5 flex flex-col h-[360px]">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "var(--accent-light)" }}>
+              <div className="dashboard-module-icon w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "var(--accent-light)" }}>
                 <Target size={14} style={{ color: "var(--accent)" }} />
               </div>
-              <h2 className="text-sm font-semibold text-gray-900">目标进度</h2>
+              <h2 className="dashboard-module-title text-sm font-semibold text-gray-900">目标进度</h2>
             </div>
             <Link href="/dashboard/goals" className="text-xs flex items-center gap-0.5 hover:underline" style={{ color: "var(--accent)" }}>
               全部 <ArrowRight size={11} />

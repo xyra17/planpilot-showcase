@@ -22,6 +22,21 @@ body {
   box-shadow: var(--shadow-sm);
 }
 
+.dashboard-module-header {
+  min-height: 28px;
+}
+.dashboard-module-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+}
+.dashboard-module-title {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+  letter-spacing: 0;
+}
+
 /* ═══════════════════════════════════════════
    BASE TOKENS
 ═══════════════════════════════════════════ */

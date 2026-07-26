@@ -113,11 +113,6 @@ export default function GoalsPage() {
       />
 
       <main className="min-h-0 flex-1 overflow-y-auto p-6">
-        <div className="mb-6">
-          <h1 className="text-xl font-bold text-gray-900">目标总览</h1>
-          <p className="mt-1 text-sm text-gray-500">管理和追踪你的学习目标</p>
-        </div>
-
         {deleteError && (
           <div className="mb-4 text-sm text-red-600 bg-red-50 border border-red-100 px-4 py-2 rounded-lg">
             {deleteError}
