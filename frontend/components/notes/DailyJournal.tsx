@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   ChevronLeft, ChevronRight, Plus, Trash2, Pencil, Paperclip, X,
-  Target, ListChecks, Clock3, Check, LoaderCircle,
+  Target, ListChecks, Clock3, Check, LoaderCircle, AlertTriangle,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import TiptapEditor from "./TiptapEditor";
@@ -188,12 +188,25 @@ export default function DailyJournal() {
   const [goalTasks, setGoalTasks] = useState<TaskBrief[]>([]);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [saveStatus, setSaveStatus] = useState<"saved" | "dirty" | "saving" | "error">("saved");
+  const [discardOpen, setDiscardOpen] = useState(false);
+  const pendingExitRef = useRef<null | (() => void | Promise<void>)>(null);
 
   const { goals, fetchGoals } = useGoalStore();
 
   useEffect(() => { fetchGoals(); }, []);
 
   const activeGoals = goals.filter((g) => g.status === "active");
+  const hasUnsavedChanges = saveStatus === "dirty" || saveStatus === "error";
+
+  useEffect(() => {
+    const warnBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!hasUnsavedChanges) return;
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warnBeforeUnload);
+    return () => window.removeEventListener("beforeunload", warnBeforeUnload);
+  }, [hasUnsavedChanges]);
 
   useEffect(() => {
     if (!draftGoalId) {
@@ -237,10 +250,27 @@ export default function DailyJournal() {
 
   useEffect(() => { loadNotes(selectedDate); }, [selectedDate]);
 
-  const handleSelectDate = (date: string) => {
+  const runOrConfirmDiscard = (action: () => void | Promise<void>) => {
+    if (!hasUnsavedChanges) {
+      void action();
+      return;
+    }
+    pendingExitRef.current = action;
+    setDiscardOpen(true);
+  };
+
+  const performSelectDate = async (date: string) => {
+    if (isNewDraft && editing) {
+      await api.del(`/api/v1/knowledge/${editing.id}`).catch(() => {});
+    }
     setSelectedDate(date);
     setEditing(null);
     setIsNewDraft(false);
+  };
+
+  const handleSelectDate = (date: string) => {
+    if (date === selectedDate) return;
+    runOrConfirmDiscard(() => performSelectDate(date));
   };
 
   const startNew = async () => {
@@ -270,12 +300,22 @@ export default function DailyJournal() {
     setSaveStatus("saved");
   };
 
-  const handleCancel = async () => {
+  const performCancel = async () => {
     if (isNewDraft && editing) {
       await api.del(`/api/v1/knowledge/${editing.id}`).catch(() => {});
     }
     setEditing(null);
     setIsNewDraft(false);
+  };
+
+  const handleCancel = () => runOrConfirmDiscard(performCancel);
+
+  const confirmDiscard = async () => {
+    const action = pendingExitRef.current;
+    pendingExitRef.current = null;
+    setDiscardOpen(false);
+    setSaveStatus("saved");
+    if (action) await action();
   };
 
   const handleSave = async () => {
@@ -331,10 +371,18 @@ export default function DailyJournal() {
       <div className={`flex-shrink-0 transition-all duration-200 ${sidebarOpen ? "w-[216px]" : "w-8"}`}>
         {sidebarOpen ? (
           <div className="flex flex-col gap-3">
-            <div className="select-none bg-white border border-gray-100 rounded-xl p-3 relative">
-              <button onClick={() => setSidebarOpen(false)} className="absolute top-2 right-2 p-0.5 rounded hover:bg-gray-100 text-gray-300 hover:text-gray-500">
+            <div className="h-9 flex items-center justify-between px-1 flex-shrink-0">
+              <span className="text-xs font-medium text-gray-400">日期导航</span>
+              <button
+                onClick={() => setSidebarOpen(false)}
+                title="收起日期导航"
+                aria-label="收起日期导航"
+                className="h-8 w-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition"
+              >
                 <ChevronLeft size={14} />
               </button>
+            </div>
+            <div className="select-none bg-white border border-gray-100 rounded-xl p-3 relative">
               <p className="text-xs font-medium text-gray-400 tracking-widest uppercase mb-1">
                 {new Date(selectedDate + "T00:00:00").toLocaleDateString("zh-CN", { weekday: "long" })}
               </p>
@@ -398,7 +446,12 @@ export default function DailyJournal() {
             </div>
           </div>
         ) : (
-          <button onClick={() => setSidebarOpen(true)} className="w-8 h-full flex items-start pt-3 justify-center text-gray-300 hover:text-gray-500 transition">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            title="展开日期导航"
+            aria-label="展开日期导航"
+            className="w-8 h-9 flex items-center justify-center rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition"
+          >
             <ChevronRight size={14} />
           </button>
         )}
@@ -408,7 +461,7 @@ export default function DailyJournal() {
       <div className="flex-1 min-w-0 flex flex-col min-h-0">
         {editing === null ? (
           <>
-            <div className="flex items-center justify-between mb-3 flex-shrink-0">
+            <div className="h-9 flex items-center justify-between mb-3 flex-shrink-0">
               <span className="text-sm font-medium text-gray-500">
                 {new Date(selectedDate + "T00:00:00").toLocaleDateString("zh-CN", { month: "long", day: "numeric", weekday: "short" })}
                 {notes.length > 0 && <span className="ml-2 text-gray-400">共 {notes.length} 篇</span>}
@@ -482,7 +535,7 @@ export default function DailyJournal() {
           </>
         ) : (
           <div className="flex flex-col flex-1 min-h-0">
-            <div className="flex items-center gap-2 mb-3 flex-shrink-0">
+            <div className="h-9 flex items-center gap-2 mb-3 flex-shrink-0">
               <button onClick={handleCancel} className="flex items-center gap-1 text-sm text-gray-400 hover:text-gray-700 transition">
                 <ChevronLeft size={14} />返回
               </button>
@@ -582,6 +635,50 @@ export default function DailyJournal() {
           </div>
         )}
       </div>
+
+      {discardOpen && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-gray-950/25 px-4 backdrop-blur-[1px]"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="discard-note-title"
+        >
+          <div className="w-full max-w-sm rounded-2xl border border-gray-100 bg-white p-5 shadow-2xl">
+            <div className="flex items-start gap-3">
+              <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-amber-50 text-amber-500">
+                <AlertTriangle size={17} />
+              </div>
+              <div>
+                <h2 id="discard-note-title" className="text-base font-semibold text-gray-900">
+                  当前内容尚未保存
+                </h2>
+                <p className="mt-1 text-sm leading-6 text-gray-500">
+                  返回后，本次修改将不会保留。你可以继续编辑，或者确认放弃修改。
+                </p>
+              </div>
+            </div>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  pendingExitRef.current = null;
+                  setDiscardOpen(false);
+                }}
+                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-50"
+              >
+                继续编辑
+              </button>
+              <button
+                type="button"
+                onClick={confirmDiscard}
+                className="rounded-lg bg-red-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-600"
+              >
+                放弃修改
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
