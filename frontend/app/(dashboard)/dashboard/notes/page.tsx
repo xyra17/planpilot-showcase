@@ -22,8 +22,8 @@ type Tab = "card" | "log";
 const VALID_TABS = new Set<Tab>(["card", "log"]);
 
 const TAB_META: Record<Tab, { label: string; icon: React.ReactNode }> = {
-  log: { label: "学习笔记", icon: <CalendarDays size={14} /> },
-  card: { label: "学习日志", icon: <BookOpen size={14} /> },
+  log: { label: "学习笔记", icon: <CalendarDays size={17} /> },
+  card: { label: "学习日志", icon: <BookOpen size={17} /> },
 };
 
 function NotesWorkspaceLoading() {
@@ -60,11 +60,15 @@ function NotesContent() {
               <button
                 key={item}
                 onClick={() => setTab(item)}
-                className={`-mb-px flex items-center gap-1.5 whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium transition ${
+                className={`-mb-px flex items-center gap-2 whitespace-nowrap border-b-[3px] px-5 py-3 text-base font-semibold transition ${
                   tab === item
-                    ? "border-blue-500 text-blue-600"
+                    ? ""
                     : "border-transparent text-gray-500 hover:text-gray-700"
                 }`}
+                style={tab === item ? {
+                  borderColor: "var(--accent)",
+                  color: "var(--accent)",
+                } : undefined}
               >
                 {meta.icon}{meta.label}
               </button>
