@@ -422,7 +422,7 @@ body {
 /* ── Journal：独立的手账纸稿全局风格 ── */
 [data-theme="journal"] {
   --accent:#B57935; --accent-dark:#3F3A34; --accent-light:#F0DFC5; --accent-muted:#D8B985;
-  --bg:#F1EBDD; --surface:#FBF8F1; --border:#C8BDAA;
+  --bg:#E9DFCC; --surface:#F7F0E2; --border:#B8AA94;
   --text-1:#37342F; --text-2:#686158; --text-3:#928878;
   --heat-0:#E4DCCF; --heat-1:#DAC7A8; --heat-2:#BE9B66; --heat-3:#8A7556; --heat-4:#45413B;
   --brief-from:#F2E0B9; --brief-to:#E8C98E;
@@ -431,23 +431,23 @@ body {
 }
 [data-theme="journal"][data-journal="wood"] {
   --accent:#B57935; --accent-dark:#3F3A34; --accent-light:#F0DFC5; --accent-muted:#D8B985;
-  --bg:#F1EBDD; --surface:#FBF8F1; --border:#C8BDAA;
+  --bg:#E9DFCC; --surface:#F7F0E2; --border:#B8AA94;
   --text-1:#37342F; --text-2:#686158; --text-3:#928878;
   --heat-0:#E4DCCF; --heat-1:#DAC7A8; --heat-2:#BE9B66; --heat-3:#8A7556; --heat-4:#45413B;
   --brief-from:#F2E0B9; --brief-to:#E8C98E;
   --journal-tape:#DABE8E;
 }
 [data-theme="journal"][data-journal="slate"] {
-  --accent:#66877A; --accent-dark:#29413F; --accent-light:#E4EDE8; --accent-muted:#B7C9C1;
-  --bg:#E9EDEB; --surface:#F8FAF8; --border:#B1BDB8;
+  --accent:#66877A; --accent-dark:#29413F; --accent-light:#DCE8E2; --accent-muted:#A9C0B6;
+  --bg:#DCE2DF; --surface:#F0F3EF; --border:#9EADA8;
   --text-1:#29413F; --text-2:#586B67; --text-3:#7E908A;
   --heat-0:#DDE3E0; --heat-1:#C7D6CF; --heat-2:#9DB7AC; --heat-3:#66877A; --heat-4:#29413F;
-  --brief-from:#E2EAE5; --brief-to:#CADBD3;
-  --journal-tape:#C5D5CE;
+  --brief-from:#D5E1DA; --brief-to:#B7CEC3;
+  --journal-tape:#B7CBC2;
 }
 [data-theme="journal"][data-journal="newspaper"] {
   --accent:#8E453D; --accent-dark:#302E2A; --accent-light:#E7D1B8; --accent-muted:#C79373;
-  --bg:#E9E0CA; --surface:#FAF5E8; --border:#B6A689;
+  --bg:#D8C9A8; --surface:#F1E4C4; --border:#9E8D6F;
   --text-1:#302E2A; --text-2:#625B4D; --text-3:#897E69;
   --heat-0:#DDD2B7; --heat-1:#D7BFA5; --heat-2:#C58D73; --heat-3:#8E453D; --heat-4:#302E2A;
   --brief-from:#E5CF9C; --brief-to:#D5B77D;
@@ -548,7 +548,7 @@ body {
   background-color:var(--surface) !important;
 }
 [data-theme="journal"] .calm-app .bg-gray-100 {
-  background-color:color-mix(in srgb,var(--accent-muted) 14%,var(--surface)) !important;
+  background-color:color-mix(in srgb,var(--accent-muted) 32%,var(--surface)) !important;
 }
 [data-theme="journal"] .calm-app .text-gray-900,
 [data-theme="journal"] .calm-app .text-gray-800 {
@@ -710,7 +710,7 @@ body {
 /* 手账纸稿：弹窗与表单使用叠纸布局 */
 [data-theme="journal"] .calm-app .fixed.inset-0[class*="bg-black"],
 [data-theme="journal"] .calm-app .fixed.inset-0[class*="bg-gray-950"] {
-  background-color:color-mix(in srgb,var(--text-1) 34%,transparent) !important;
+  background-color:color-mix(in srgb,var(--text-1) 42%,transparent) !important;
   background-image:repeating-linear-gradient(3deg,transparent 0 5px,color-mix(in srgb,var(--surface) 3%,transparent) 5px 6px);
 }
 [data-theme="journal"] .calm-app .shadow-xl,
@@ -734,14 +734,14 @@ body {
 [data-theme="journal"] .calm-app textarea,
 [data-theme="journal"] .calm-app select {
   color:var(--text-1);
-  background-color:color-mix(in srgb,var(--surface) 96%,var(--accent-light)) !important;
+  background-color:color-mix(in srgb,var(--surface) 91%,var(--accent-light)) !important;
   border:1.5px solid color-mix(in srgb,var(--text-1) 27%,transparent);
   border-radius:9px 6px 10px 7px;
   box-shadow:inset 1px 1px 0 color-mix(in srgb,var(--text-1) 6%,transparent);
 }
 [data-theme="journal"] .calm-app textarea {
   line-height:1.75;
-  background-image:repeating-linear-gradient(transparent 0 27px,color-mix(in srgb,var(--text-1) 6%,transparent) 27px 28px);
+  background-image:repeating-linear-gradient(transparent 0 27px,color-mix(in srgb,var(--text-1) 9%,transparent) 27px 28px);
 }
 [data-theme="journal"] .calm-app input::placeholder,
 [data-theme="journal"] .calm-app textarea::placeholder {
