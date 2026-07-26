@@ -11,12 +11,13 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sse_starlette.sse import EventSourceResponse
 
-from src.config import settings
 from src.core.llm_quality import compact_text
 from src.core.llm_router import (
+    ainvoke_routine_checked,
     create_pro_llm,
     create_routine_llm,
-    create_structured_routine_llm,
+    require_json_array,
+    require_json_object,
 )
 from src.database import get_db
 from src.deps import get_current_user
@@ -260,14 +261,11 @@ def _cosine_sim(a: list[float], b: list[float]) -> float:
 
 async def _get_embedding(text: str) -> list[float] | None:
     try:
-        from openai import AsyncOpenAI
-        client = AsyncOpenAI(
-            api_key=settings.smart_api_key,
-            base_url=settings.smart_base_url or None,
-        )
-        resp = await client.embeddings.create(model="text-embedding-3-small", input=text)
-        return resp.data[0].embedding
-    except Exception:
+        from src.core.embedding import embed_text
+
+        return await embed_text(text)
+    except Exception as exc:
+        logger.warning("任务知识匹配的语义向量生成失败，降级为关键词检索: %s", type(exc).__name__)
         return None
 
 
@@ -909,12 +907,13 @@ async def generate_macro_plan(
         "}"
     )
 
-    llm = create_structured_routine_llm(
+    result = await ainvoke_routine_checked(
+        [HumanMessage(content=prompt)],
+        validator=require_json_object,
         max_tokens=2048,
         temperature=0.3,
+        model_kwargs={"response_format": {"type": "json_object"}},
     )
-
-    result = await llm.ainvoke([HumanMessage(content=prompt)])
     raw = result.content.strip()
 
     plan_data: dict = {}
@@ -1365,7 +1364,6 @@ async def verify_start(
     if not task:
         raise HTTPException(status_code=404, detail="任务不存在")
 
-    llm = create_structured_routine_llm(max_tokens=500)
     prompt = (
         f"学习者刚完成了任务「{task.title}」。\n\n"
         "请生成一道深度检验理解的题目，以及该题目的参考答案要点。\n"
@@ -1375,7 +1373,12 @@ async def verify_start(
         "严格按以下JSON格式输出，不加任何额外内容：\n"
         '{"question": "问题内容", "answer_hint": "要点1\\n要点2\\n要点3"}'
     )
-    result = await llm.ainvoke([HumanMessage(content=prompt)])
+    result = await ainvoke_routine_checked(
+        [HumanMessage(content=prompt)],
+        validator=require_json_object,
+        max_tokens=500,
+        model_kwargs={"response_format": {"type": "json_object"}},
+    )
     raw = result.content.strip()
     try:
         start, end = raw.find("{"), raw.rfind("}") + 1
@@ -1490,8 +1493,6 @@ async def generate_daily_tasks(
     week_ago = (date.today() - timedelta(days=7)).isoformat()
 
     # 路由器内部负责本地优先与 Flash 自动回退。
-    _llm_candidates = [create_routine_llm(temperature=0.3)]
-
     result: list[GoalDailyPlan] = []
 
     for goal in goals:
@@ -1585,15 +1586,17 @@ async def generate_daily_tasks(
         )
 
         suggestions = []
-        for _llm in _llm_candidates:
-            try:
-                res = await _llm.ainvoke([HumanMessage(content=prompt)])
-                raw = res.content.strip()
-                start, end = raw.find("["), raw.rfind("]") + 1
-                suggestions = [DailyTaskSuggestion(**s) for s in json.loads(raw[start:end])]
-                break
-            except Exception:
-                continue
+        try:
+            res = await ainvoke_routine_checked(
+                [HumanMessage(content=prompt)],
+                validator=require_json_array,
+                temperature=0.3,
+            )
+            raw = res.content.strip()
+            start, end = raw.find("["), raw.rfind("]") + 1
+            suggestions = [DailyTaskSuggestion(**s) for s in json.loads(raw[start:end])]
+        except Exception:
+            logger.exception("每日任务模型调用失败 goal_id=%s", goal.id)
 
         result.append(GoalDailyPlan(
             goal_id=goal.id,

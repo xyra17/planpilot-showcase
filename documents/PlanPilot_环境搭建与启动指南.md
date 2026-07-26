@@ -235,6 +235,16 @@ python -m mlx_lm server \
 模型路由和后续微调方案见
 [`技术规格说明书/本地模型路由与微调路线.md`](技术规格说明书/本地模型路由与微调路线.md)。
 
+如需切换 DeepSeek、其他 OpenAI-compatible 服务或纯本地模式，建议使用：
+
+```bash
+cd backend
+python scripts/configure_models.py
+```
+
+详细说明见
+[`运维/PlanPilot_模型供应商切换说明.md`](运维/PlanPilot_模型供应商切换说明.md)。
+
 macOS 推荐安装为登录后台服务：
 
 ```bash

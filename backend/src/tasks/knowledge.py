@@ -232,19 +232,13 @@ async def _process(item_id: str) -> None:
             await db.commit()
 
             clients = []
-            if settings.embedding_api_key and settings.embedding_base_url:
+            if settings.embedding_base_url:
                 clients.append(
                     AsyncOpenAI(
-                        api_key=settings.embedding_api_key,
+                        api_key=settings.embedding_api_key or "local",
                         base_url=settings.embedding_base_url,
-                    )
-                )
-            elif settings.openai_base_url:
-                # Backwards compatibility for the previous shared OpenAI endpoint.
-                clients.append(
-                    AsyncOpenAI(
-                        api_key=settings.openai_api_key or "local",
-                        base_url=settings.openai_base_url,
+                        timeout=settings.embedding_timeout_seconds,
+                        max_retries=settings.embedding_max_retries,
                     )
                 )
             if not clients:

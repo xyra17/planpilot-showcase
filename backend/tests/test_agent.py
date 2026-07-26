@@ -46,7 +46,10 @@ async def test_verify_start(client: AsyncClient, auth: dict, goal_id: str):
     task_id = r_task.json()["id"]
 
     mock = _mock_llm("请用自己的话解释 Python 函数的作用是什么？")
-    with patch("src.api.agent.create_structured_routine_llm", return_value=mock):
+    with patch(
+        "src.api.agent.ainvoke_routine_checked",
+        new=AsyncMock(return_value=await mock.ainvoke([])),
+    ):
         r = await client.post(
             "/api/v1/agent/verify",
             json={"goal_id": goal_id, "task_id": task_id},
@@ -60,7 +63,10 @@ async def test_verify_start(client: AsyncClient, auth: dict, goal_id: str):
 
 async def test_verify_task_not_found(client: AsyncClient, auth: dict, goal_id: str):
     mock = _mock_llm("任意问题")
-    with patch("src.api.agent.create_structured_routine_llm", return_value=mock):
+    with patch(
+        "src.api.agent.ainvoke_routine_checked",
+        new=AsyncMock(return_value=await mock.ainvoke([])),
+    ):
         r = await client.post(
             "/api/v1/agent/verify",
             json={"goal_id": goal_id, "task_id": "nonexistent"},
@@ -80,7 +86,10 @@ async def test_verify_answer_pass(client: AsyncClient, auth: dict, goal_id: str)
 
     # 先生成问题（存入缓存）
     q_mock = _mock_llm("请解释 Python 类的概念")
-    with patch("src.api.agent.create_structured_routine_llm", return_value=q_mock) as llm_factory:
+    with patch(
+        "src.api.agent.ainvoke_routine_checked",
+        new=AsyncMock(return_value=await q_mock.ainvoke([])),
+    ) as llm_factory:
         await client.post(
             "/api/v1/agent/verify",
             json={"goal_id": goal_id, "task_id": task_id},
@@ -114,7 +123,10 @@ async def test_verify_answer_fail_with_suggestion(client: AsyncClient, auth: dic
     task_id = r_task.json()["id"]
 
     q_mock = _mock_llm("解释装饰器的工作原理")
-    with patch("src.api.agent.create_structured_routine_llm", return_value=q_mock):
+    with patch(
+        "src.api.agent.ainvoke_routine_checked",
+        new=AsyncMock(return_value=await q_mock.ainvoke([])),
+    ):
         await client.post(
             "/api/v1/agent/verify",
             json={"goal_id": goal_id, "task_id": task_id},

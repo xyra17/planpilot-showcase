@@ -208,24 +208,10 @@ _embed_clients: list | None = None
 def _get_embed_clients() -> list:
     global _embed_clients
     if _embed_clients is None:
-        from openai import AsyncOpenAI
+        from src.core.embedding import get_embedding_client
 
-        from src.config import settings
-        _embed_clients = []
-        if settings.embedding_api_key and settings.embedding_base_url:
-            _embed_clients.append(
-                AsyncOpenAI(
-                    api_key=settings.embedding_api_key,
-                    base_url=settings.embedding_base_url,
-                )
-            )
-        elif settings.openai_base_url:
-            _embed_clients.append(
-                AsyncOpenAI(
-                    api_key=settings.openai_api_key or "local",
-                    base_url=settings.openai_base_url,
-                )
-            )
+        client = get_embedding_client()
+        _embed_clients = [client] if client is not None else []
     return _embed_clients
 
 

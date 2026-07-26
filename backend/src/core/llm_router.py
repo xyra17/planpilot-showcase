@@ -4,6 +4,8 @@
 复杂重规划与最终审核显式使用 DeepSeek Pro。
 """
 
+import asyncio
+import json
 import logging
 import threading
 import time
@@ -13,6 +15,7 @@ from typing import Any
 from uuid import UUID
 
 from langchain_core.callbacks import BaseCallbackHandler
+from langchain_core.runnables import RunnableLambda
 from langchain_openai import ChatOpenAI
 
 from src.config import settings
@@ -85,6 +88,10 @@ class ModelMetrics:
             self._counts[f"{route}.{outcome}"] += 1
             self._latency_total_ms[route] += elapsed_ms
 
+    def record_quality_failure(self, route: str) -> None:
+        with self._lock:
+            self._counts[f"{route}.quality_failure"] += 1
+
     def snapshot(self) -> dict[str, Any]:
         with self._lock:
             routes: dict[str, Any] = {}
@@ -96,6 +103,7 @@ class ModelMetrics:
                     "requests": total,
                     "successes": success,
                     "failures": failure,
+                    "quality_failures": self._counts[f"{route}.quality_failure"],
                     "average_latency_ms": (
                         round(self._latency_total_ms[route] / total, 1) if total else None
                     ),
@@ -110,6 +118,7 @@ class ModelMetrics:
 
 local_circuit = LocalModelCircuitBreaker()
 model_metrics = ModelMetrics()
+_local_semaphore = asyncio.Semaphore(settings.local_model_max_concurrency)
 
 
 class _RouteMetricsCallback(BaseCallbackHandler):
@@ -179,19 +188,48 @@ def _flash_llm(**kwargs: Any) -> ChatOpenAI:
         model=settings.smart_model_name,
         api_key=settings.smart_api_key,
         base_url=settings.smart_base_url or None,
+        timeout=settings.cloud_routine_timeout_seconds,
+        max_retries=settings.cloud_model_max_retries,
         callbacks=[_RouteMetricsCallback("flash")],
         **kwargs,
     )
 
 
+def _limit_local_concurrency(runnable: Any) -> Any:
+    """限制共享 MLX 服务并发；排队超时会作为异常触发云端回退。"""
+
+    def invoke_sync(value: Any, config: Any = None) -> Any:
+        return runnable.invoke(value, config=config)
+
+    async def invoke_async(value: Any, config: Any = None) -> Any:
+        try:
+            await asyncio.wait_for(
+                _local_semaphore.acquire(),
+                timeout=settings.local_model_queue_timeout_seconds,
+            )
+        except TimeoutError:
+            logger.warning(
+                "llm_local_queue_timeout timeout_seconds=%.1f",
+                settings.local_model_queue_timeout_seconds,
+            )
+            raise
+        try:
+            return await runnable.ainvoke(value, config=config)
+        finally:
+            _local_semaphore.release()
+
+    return RunnableLambda(invoke_sync, afunc=invoke_async)
+
+
 def create_routine_llm(*, tools: Sequence[Any] | None = None, **kwargs: Any) -> Any:
     """创建“本地优先、Flash 回退”的日常任务模型。"""
     candidates: list[Any] = []
-    if (
+    local_added = (
         settings.local_model_enabled
         and settings.openai_base_url
         and local_circuit.allow_request()
-    ):
+    )
+    if local_added:
         candidates.append(_local_llm(**kwargs))
     if settings.smart_api_key and settings.smart_model_name:
         candidates.append(_flash_llm(**kwargs))
@@ -200,6 +238,8 @@ def create_routine_llm(*, tools: Sequence[Any] | None = None, **kwargs: Any) -> 
 
     if tools:
         candidates = [candidate.bind_tools(tools) for candidate in candidates]
+    if local_added:
+        candidates[0] = _limit_local_concurrency(candidates[0])
 
     primary, *fallbacks = candidates
     return primary.with_fallbacks(fallbacks) if fallbacks else primary
@@ -212,6 +252,60 @@ def create_structured_routine_llm(**kwargs: Any) -> Any:
     return create_routine_llm(model_kwargs=model_kwargs, **kwargs)
 
 
+def _json_payload(content: str, opening: str, closing: str) -> Any:
+    start = content.find(opening)
+    end = content.rfind(closing) + 1
+    if start < 0 or end <= start:
+        raise ValueError("模型输出不包含完整 JSON")
+    return json.loads(content[start:end])
+
+
+def require_json_object(content: str) -> None:
+    value = _json_payload(content, "{", "}")
+    if not isinstance(value, dict) or not value:
+        raise ValueError("模型输出不是非空 JSON 对象")
+
+
+def require_json_array(content: str) -> None:
+    value = _json_payload(content, "[", "]")
+    if not isinstance(value, list):
+        raise ValueError("模型输出不是 JSON 数组")
+
+
+async def ainvoke_routine_checked(
+    messages: Any,
+    *,
+    validator: Any,
+    tools: Sequence[Any] | None = None,
+    **kwargs: Any,
+) -> Any:
+    """调用日常路由，并在本地输出不满足契约时显式改用云端模型。"""
+    routed = create_routine_llm(tools=tools, **kwargs)
+    response = await routed.ainvoke(messages)
+    try:
+        validator(response.content)
+        return response
+    except Exception:
+        used_model = str((response.response_metadata or {}).get("model_name", ""))
+        used_local = bool(settings.openai_base_url) and used_model != settings.smart_model_name
+        route = "local" if used_local else "flash"
+        model_metrics.record_quality_failure(route)
+        logger.warning(
+            "llm_quality_failure route=%s model=%s",
+            route,
+            used_model or "unknown",
+        )
+        if not used_local or not settings.smart_api_key or not settings.smart_model_name:
+            raise
+
+    cloud = _flash_llm(**kwargs)
+    if tools:
+        cloud = cloud.bind_tools(tools)
+    response = await cloud.ainvoke(messages)
+    validator(response.content)
+    return response
+
+
 def create_pro_llm(**kwargs: Any) -> ChatOpenAI:
     """创建仅用于复杂重规划和最终质量审核的 DeepSeek Pro。"""
     if not settings.smart_api_key or not settings.smart_pro_model_name:
@@ -220,6 +314,8 @@ def create_pro_llm(**kwargs: Any) -> ChatOpenAI:
         model=settings.smart_pro_model_name,
         api_key=settings.smart_api_key,
         base_url=settings.smart_base_url or None,
+        timeout=settings.cloud_pro_timeout_seconds,
+        max_retries=settings.cloud_model_max_retries,
         callbacks=[_RouteMetricsCallback("pro")],
         **kwargs,
     )
@@ -229,6 +325,9 @@ def get_llm_runtime_status() -> dict[str, Any]:
     return {
         "local_enabled": settings.local_model_enabled,
         "local_base_url_configured": bool(settings.openai_base_url),
+        "local_model": settings.model_name,
+        "cloud_routine_model": settings.smart_model_name,
+        "cloud_pro_model": settings.smart_pro_model_name,
         "circuit": local_circuit.snapshot(),
         "metrics": model_metrics.snapshot(),
     }

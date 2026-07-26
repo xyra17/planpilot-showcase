@@ -50,7 +50,7 @@ async def lifespan(app: FastAPI):
     await get_agent()
 
     # 本地模型热身：若配置了本地推理端点，提前触发模型加载以消除首次请求的冷启动延迟
-    if settings.openai_base_url:
+    if settings.local_model_enabled and settings.openai_base_url:
         from openai import AsyncOpenAI
         try:
             local_client = AsyncOpenAI(
@@ -61,6 +61,7 @@ async def lifespan(app: FastAPI):
                 model=settings.model_name,
                 messages=[{"role": "user", "content": "hi"}],
                 max_tokens=1,
+                extra_body={"chat_template_kwargs": {"enable_thinking": False}},
             )
             logger.info("本地模型热身完成 (base_url=%s)", settings.openai_base_url)
         except Exception as e:
@@ -108,19 +109,60 @@ async def health() -> dict[str, str]:
 async def ai_health() -> dict:
     local_reachable = False
     local_error: str | None = None
+    local_models: list[str] = []
     if settings.local_model_enabled and settings.openai_base_url:
         try:
             async with httpx.AsyncClient(timeout=2.0) as client:
                 response = await client.get(f"{settings.openai_base_url.rstrip('/')}/models")
                 response.raise_for_status()
+                payload = response.json()
+                local_models = [
+                    row.get("id", "")
+                    for row in payload.get("data", [])
+                    if isinstance(row, dict) and row.get("id")
+                ]
             local_reachable = True
         except Exception as exc:
             local_error = type(exc).__name__
+
+    embedding_reachable = False
+    embedding_error: str | None = None
+    embedding_models: list[str] = []
+    if settings.embedding_base_url:
+        try:
+            async with httpx.AsyncClient(timeout=2.0) as client:
+                response = await client.get(
+                    f"{settings.embedding_base_url.rstrip('/')}/models"
+                )
+                response.raise_for_status()
+                payload = response.json()
+                embedding_models = [
+                    row.get("id", "")
+                    for row in payload.get("data", [])
+                    if isinstance(row, dict) and row.get("id")
+                ]
+            embedding_reachable = True
+        except Exception as exc:
+            embedding_error = type(exc).__name__
 
     return {
         **get_llm_runtime_status(),
         "local_reachable": local_reachable,
         "local_error_type": local_error,
+        "local_configured_model": settings.model_name,
+        "local_advertised_models": local_models,
+        "local_model_id_exact_match": settings.model_name in local_models,
+        "embedding_configured": bool(settings.embedding_base_url),
+        "embedding_reachable": embedding_reachable,
+        "embedding_error_type": embedding_error,
+        "embedding_configured_model": settings.embedding_model_name,
+        "embedding_advertised_models": embedding_models,
         "flash_configured": bool(settings.smart_api_key and settings.smart_model_name),
         "pro_configured": bool(settings.smart_api_key and settings.smart_pro_model_name),
+        "cloud_routine_configured": bool(
+            settings.smart_api_key and settings.smart_model_name
+        ),
+        "cloud_pro_configured": bool(
+            settings.smart_api_key and settings.smart_pro_model_name
+        ),
     }

@@ -1,6 +1,9 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from src.core.llm_router import (
+    ainvoke_routine_checked,
     create_pro_llm,
     create_routine_llm,
     create_structured_routine_llm,
@@ -16,11 +19,15 @@ def setup_function():
 
 def test_routine_route_prefers_local_and_falls_back_to_flash():
     local = MagicMock()
+    limited = MagicMock()
     routed = MagicMock()
-    local.with_fallbacks.return_value = routed
+    limited.with_fallbacks.return_value = routed
     flash = MagicMock()
 
-    with patch("src.core.llm_router.ChatOpenAI", side_effect=[local, flash]) as factory:
+    with (
+        patch("src.core.llm_router.ChatOpenAI", side_effect=[local, flash]) as factory,
+        patch("src.core.llm_router._limit_local_concurrency", return_value=limited),
+    ):
         result = create_routine_llm(max_tokens=123)
 
     assert result is routed
@@ -30,7 +37,8 @@ def test_routine_route_prefers_local_and_falls_back_to_flash():
         "chat_template_kwargs": {"enable_thinking": False}
     }
     assert factory.call_args_list[1].kwargs["model"] == "deepseek-v4-flash"
-    local.with_fallbacks.assert_called_once_with([flash])
+    assert factory.call_args_list[1].kwargs["max_retries"] == 0
+    limited.with_fallbacks.assert_called_once_with([flash])
 
 
 def test_routine_route_binds_tools_before_adding_fallback():
@@ -40,14 +48,18 @@ def test_routine_route_binds_tools_before_adding_fallback():
     flash = MagicMock()
     flash_bound = MagicMock()
     flash.bind_tools.return_value = flash_bound
+    limited = MagicMock()
     tools = [MagicMock()]
 
-    with patch("src.core.llm_router.ChatOpenAI", side_effect=[local, flash]):
+    with (
+        patch("src.core.llm_router.ChatOpenAI", side_effect=[local, flash]),
+        patch("src.core.llm_router._limit_local_concurrency", return_value=limited),
+    ):
         create_routine_llm(tools=tools)
 
     local.bind_tools.assert_called_once_with(tools)
     flash.bind_tools.assert_called_once_with(tools)
-    local_bound.with_fallbacks.assert_called_once_with([flash_bound])
+    limited.with_fallbacks.assert_called_once_with([flash_bound])
 
 
 def test_pro_route_never_uses_local_model():
@@ -57,6 +69,7 @@ def test_pro_route_never_uses_local_model():
 
     assert result is pro
     assert factory.call_args.kwargs["model"] == "deepseek-v4-pro"
+    assert factory.call_args.kwargs["max_retries"] == 0
 
 
 def test_open_circuit_skips_local_model():
@@ -81,6 +94,7 @@ def test_metrics_do_not_contain_prompt_or_response_content():
         "requests": 1,
         "successes": 1,
         "failures": 0,
+        "quality_failures": 0,
         "average_latency_ms": 125.0,
     }
     assert "prompt" not in str(snapshot).lower()
@@ -96,3 +110,31 @@ def test_structured_route_enforces_json_object():
     assert factory.call_args.kwargs["model_kwargs"]["response_format"] == {
         "type": "json_object"
     }
+
+
+@pytest.mark.asyncio
+async def test_quality_failure_retries_with_cloud_model():
+    local_response = MagicMock(
+        content="not json",
+        response_metadata={"model_name": "local-qwen"},
+    )
+    cloud_response = MagicMock(
+        content='{"ok": true}',
+        response_metadata={"model_name": "deepseek-v4-flash"},
+    )
+    routed = MagicMock()
+    routed.ainvoke = AsyncMock(return_value=local_response)
+    cloud = MagicMock()
+    cloud.ainvoke = AsyncMock(return_value=cloud_response)
+
+    with (
+        patch("src.core.llm_router.create_routine_llm", return_value=routed),
+        patch("src.core.llm_router._flash_llm", return_value=cloud),
+    ):
+        result = await ainvoke_routine_checked(
+            ["message"],
+            validator=lambda content: __import__("json").loads(content),
+        )
+
+    assert result is cloud_response
+    cloud.ainvoke.assert_awaited_once()

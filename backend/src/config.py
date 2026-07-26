@@ -14,19 +14,26 @@ class Settings(BaseSettings):
     access_token_expire_days: int = 7
     openai_api_key: str = ""
     openai_base_url: str = ""
-    model_name: str = "deepseek-chat"
+    model_name: str = ""
     local_model_enabled: bool = True
     local_model_timeout_seconds: float = 30.0
     local_model_failure_threshold: int = 2
     local_model_circuit_cooldown_seconds: float = 60.0
+    local_model_max_concurrency: int = 1
+    local_model_queue_timeout_seconds: float = 2.0
     smart_api_key: str = ""
     smart_base_url: str = ""
     smart_model_name: str = "deepseek-v4-flash"
     smart_pro_model_name: str = "deepseek-v4-pro"
+    cloud_routine_timeout_seconds: float = 60.0
+    cloud_pro_timeout_seconds: float = 300.0
+    cloud_model_max_retries: int = 0
     embedding_api_key: str = ""
     embedding_base_url: str = ""
     embedding_model_name: str = "qwen3-embedding-0.6b"
     embedding_dimensions: int = 1024
+    embedding_timeout_seconds: float = 30.0
+    embedding_max_retries: int = 1
 
     redis_url: str = "redis://localhost:6379/0"
     tavily_api_key: str = ""
@@ -58,6 +65,8 @@ class Settings(BaseSettings):
             raise ValueError(
                 "EMBEDDING_DIMENSIONS 必须为 1024，与数据库 vector(1024) 保持一致"
             )
+        if self.local_model_max_concurrency < 1:
+            raise ValueError("LOCAL_MODEL_MAX_CONCURRENCY 必须至少为 1")
         return self
 
 
