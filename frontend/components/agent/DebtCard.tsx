@@ -59,10 +59,10 @@ export function DebtCard({ goalId }: { goalId: string }) {
   if (!debts.length) return null;
 
   return (
-    <div className="bg-white rounded-2xl border border-amber-100 overflow-hidden">
-      <div className="px-4 py-3 border-b border-amber-50 flex items-center gap-2">
-        <AlertTriangle size={14} className="text-amber-500 flex-shrink-0" />
-        <span className="text-xs font-semibold text-amber-700">学习债务 ({debts.length})</span>
+    <div className="debt-card bg-white rounded-2xl border border-amber-100 overflow-hidden">
+      <div className="debt-card-header px-4 py-3 border-b border-amber-50 flex items-center gap-2">
+        <AlertTriangle size={14} className="debt-card-icon text-amber-500 flex-shrink-0" />
+        <span className="debt-card-title text-xs font-semibold text-amber-700">学习债务 ({debts.length})</span>
       </div>
       <div className="divide-y divide-gray-50">
         {debts.map((d) => (
@@ -85,7 +85,7 @@ export function DebtCard({ goalId }: { goalId: string }) {
             <button
               onClick={() => resolve(d.id)}
               disabled={resolving === d.id}
-              className="flex-shrink-0 flex items-center gap-1 text-[10px] font-medium px-2 py-1 rounded-lg border border-gray-200 text-gray-500 hover:border-green-300 hover:text-green-600 transition disabled:opacity-40"
+              className="debt-resolve flex-shrink-0 flex items-center gap-1 text-[10px] font-medium px-2 py-1 rounded-lg border border-gray-200 text-gray-500 transition disabled:opacity-40"
             >
               {resolving === d.id
                 ? <Loader2 size={10} className="animate-spin" />

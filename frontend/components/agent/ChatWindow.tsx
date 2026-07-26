@@ -210,7 +210,7 @@ export function ChatWindow({ goalId, className }: { goalId?: string; className?:
                 <div className="opacity-0 group-hover/msg:opacity-100 transition flex justify-end mt-1.5 -mb-0.5">
                   <button
                     onClick={() => saveAiNote(msg.content)}
-                    className="text-[10px] text-gray-400 hover:text-blue-500 flex items-center gap-1 px-2 py-0.5 rounded hover:bg-white/60 transition"
+                    className="ai-save-note text-[10px] text-gray-400 flex items-center gap-1 px-2 py-0.5 rounded hover:bg-white/60 transition"
                   >
                     <Bookmark size={10} />
                     记笔记
@@ -219,8 +219,8 @@ export function ChatWindow({ goalId, className }: { goalId?: string; className?:
               )}
               {msg.structuredOutput && <PlanCard plan={msg.structuredOutput} />}
               {msg.confirmationRequired && (
-                <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-xl">
-                  <p className="text-xs font-medium text-amber-800 mb-2">
+                <div className="ai-confirm-card mt-3 p-3 bg-amber-50 border border-amber-200 rounded-xl">
+                  <p className="ai-confirm-text text-xs font-medium text-amber-800 mb-2">
                     {(msg.confirmationRequired as { message?: string }).message ?? "需要您确认"}
                   </p>
                   <div className="flex gap-2">
@@ -256,9 +256,9 @@ export function ChatWindow({ goalId, className }: { goalId?: string; className?:
 
       {/* 打卡后笔记提示 */}
       {checkinSaved && !showNotePrompt && (
-        <div className="shrink-0 mx-4 mb-2 flex items-center gap-3 bg-green-50 border border-green-100 rounded-xl px-4 py-3">
-          <BookOpen size={16} className="text-green-500 flex-shrink-0" />
-          <p className="text-sm text-green-700 flex-1">
+        <div className="ai-success-card shrink-0 mx-4 mb-2 flex items-center gap-3 bg-green-50 border border-green-100 rounded-xl px-4 py-3">
+          <BookOpen size={16} className="ai-success-icon text-green-500 flex-shrink-0" />
+          <p className="ai-success-text text-sm text-green-700 flex-1">
             打卡成功！要记录一下今天的学习收获吗？
           </p>
           <button
@@ -276,7 +276,7 @@ export function ChatWindow({ goalId, className }: { goalId?: string; className?:
 
       {/* 笔记编辑弹层 */}
       {showNotePrompt && (
-        <div className="shrink-0 mx-4 mb-2 border border-blue-100 bg-blue-50/30 rounded-xl overflow-hidden">
+        <div className="ai-note-prompt shrink-0 mx-4 mb-2 border border-blue-100 bg-blue-50/30 rounded-xl overflow-hidden">
           <div className="flex items-center justify-between px-4 pt-3 pb-1">
             <span className="text-xs font-medium text-gray-500">记录今日收获</span>
             <button onClick={() => { setShowNotePrompt(false); setCheckinSaved(null); }}
@@ -287,7 +287,7 @@ export function ChatWindow({ goalId, className }: { goalId?: string; className?:
             onChange={setNoteContent}
             placeholder="今天学了什么？有什么收获或疑问？"
             showToolbar={false}
-            className="border-0 border-t border-blue-100 rounded-none"
+            className="ai-note-editor border-0 border-t border-blue-100 rounded-none"
           />
           <div className="flex justify-end gap-2 px-4 pb-3 pt-1">
             <button onClick={() => { setShowNotePrompt(false); setCheckinSaved(null); }}
@@ -343,7 +343,7 @@ export function ChatWindow({ goalId, className }: { goalId?: string; className?:
             placeholder="输入消息，Enter 发送，Shift+Enter 换行"
             rows={1}
             disabled={isStreaming}
-            className="flex-1 rounded-xl border border-gray-200 px-3 py-2.5 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-300 disabled:opacity-50 transition"
+            className="ai-chat-input flex-1 rounded-xl border border-gray-200 px-3 py-2.5 text-sm resize-none focus:outline-none focus:ring-2 disabled:opacity-50 transition"
             style={{ maxHeight: 128, overflowY: "auto" }}
           />
           {isStreaming ? (

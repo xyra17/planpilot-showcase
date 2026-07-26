@@ -1218,6 +1218,51 @@ html {
   color:var(--text-3) !important;
   background:color-mix(in srgb,var(--surface) 78%,var(--accent-light));
 }
+[data-theme="journal"] .ai-save-note:hover {
+  color:var(--accent) !important;
+}
+[data-theme="journal"] .ai-confirm-card {
+  border-color:color-mix(in srgb,var(--warn-text) 28%,transparent) !important;
+  background:var(--warn-bg) !important;
+}
+[data-theme="journal"] .ai-confirm-text {
+  color:var(--warn-text) !important;
+}
+[data-theme="journal"] .ai-success-card {
+  border-color:color-mix(in srgb,var(--ok-text) 25%,transparent) !important;
+  background:var(--ok-bg) !important;
+}
+[data-theme="journal"] .ai-success-icon,
+[data-theme="journal"] .ai-success-text {
+  color:var(--ok-text) !important;
+}
+[data-theme="journal"] .ai-note-prompt {
+  border-color:color-mix(in srgb,var(--accent) 18%,transparent) !important;
+  background:color-mix(in srgb,var(--surface) 82%,var(--accent-light)) !important;
+}
+[data-theme="journal"] .ai-note-editor {
+  border-color:color-mix(in srgb,var(--accent) 15%,transparent) !important;
+}
+[data-theme="journal"] .ai-chat-input:focus {
+  --tw-ring-color:color-mix(in srgb,var(--accent) 30%,transparent) !important;
+  border-color:color-mix(in srgb,var(--accent) 48%,var(--border)) !important;
+}
+[data-theme="journal"] .debt-card,
+[data-theme="journal"] .debt-card-header {
+  border-color:color-mix(in srgb,var(--warn-text) 22%,transparent) !important;
+}
+[data-theme="journal"] .debt-card {
+  background:color-mix(in srgb,var(--surface) 88%,var(--warn-bg)) !important;
+}
+[data-theme="journal"] .debt-card-icon,
+[data-theme="journal"] .debt-card-title {
+  color:var(--warn-text) !important;
+}
+[data-theme="journal"] .debt-resolve:hover {
+  color:var(--ok-text) !important;
+  border-color:color-mix(in srgb,var(--ok-text) 38%,var(--border)) !important;
+  background:var(--ok-bg) !important;
+}
 
 /* 手账纸稿：弹窗与表单使用叠纸布局 */
 [data-theme="journal"] .calm-app .fixed.inset-0[class*="bg-black"],

@@ -733,7 +733,7 @@ export default function GoalDetailPage({ params }: { params: { id: string } }) {
   const [rescheduleResult, setRescheduleResult] = useState<{ estimatedDate: string; daysSaved: number } | null>(null);
 
   useEffect(() => {
-    if (window.matchMedia("(max-width: 768px)").matches) setChatCollapsed(true);
+    if (window.matchMedia("(max-width: 980px)").matches) setChatCollapsed(true);
   }, []);
 
   const [sidebarWidth, setSidebarWidth] = useState(() =>
