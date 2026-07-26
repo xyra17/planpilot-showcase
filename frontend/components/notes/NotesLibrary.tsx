@@ -42,22 +42,26 @@ function relativeTime(iso: string) {
 export default function NotesLibrary({
   createSignal = 0,
   onCreateHandled,
+  initialGoalId = "",
 }: {
   createSignal?: number;
   onCreateHandled?: () => void;
+  initialGoalId?: string;
 }) {
   const [notes, setNotes] = useState<NoteWithAttachments[]>([]);
   const [query, setQuery] = useState("");
+  const [dateFilter, setDateFilter] = useState("");
   const [editing, setEditing] = useState<NoteWithAttachments | null>(null);
   const [isNewDraft, setIsNewDraft] = useState(false);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [goalId, setGoalId] = useState("");
+  const [noteDate, setNoteDate] = useState("");
   const [savedSnapshot, setSavedSnapshot] = useState("");
   const [saving, setSaving] = useState(false);
   const [menuId, setMenuId] = useState<string | null>(null);
   const { goals, fetchGoals } = useGoalStore();
-  const currentSnapshot = JSON.stringify({ title, content, goalId });
+  const currentSnapshot = JSON.stringify({ title, content, goalId, noteDate });
   const hasUnsavedChanges = Boolean(editing) && currentSnapshot !== savedSnapshot;
 
   useEffect(() => { fetchGoals(); }, [fetchGoals]);
@@ -75,27 +79,32 @@ export default function NotesLibrary({
     const normalized = query.trim().toLowerCase();
     return notes.filter((note) => {
       if (!allowed.has(note.noteType)) return false;
+      if (dateFilter && note.date !== dateFilter) return false;
       if (!normalized) return true;
       return `${note.title} ${stripHtml(note.content)} ${note.goalTitle}`
         .toLowerCase()
         .includes(normalized);
     });
-  }, [notes, query]);
+  }, [notes, query, dateFilter]);
 
   const openNew = useCallback(async () => {
+    const today = new Date().toLocaleDateString("sv-SE");
     const draft = await api.post<NoteWithAttachments>("/api/v1/knowledge/notes", {
       title: "",
       content: "",
       noteType: "flash_card",
+      noteDate: today,
+      goalId: initialGoalId || null,
     }).catch(() => null);
     if (!draft) return;
     setTitle("");
     setContent("");
-    setGoalId("");
-    setSavedSnapshot(JSON.stringify({ title: "", content: "", goalId: "" }));
+    setGoalId(initialGoalId);
+    setNoteDate(today);
+    setSavedSnapshot(JSON.stringify({ title: "", content: "", goalId: initialGoalId, noteDate: today }));
     setIsNewDraft(true);
     setEditing(draft);
-  }, []);
+  }, [initialGoalId]);
 
   useEffect(() => {
     if (createSignal <= 0) return;
@@ -107,10 +116,12 @@ export default function NotesLibrary({
     setTitle(note.title || "");
     setContent(note.content);
     setGoalId(note.goalId || "");
+    setNoteDate(note.date || new Date(note.createdAt).toLocaleDateString("sv-SE"));
     setSavedSnapshot(JSON.stringify({
       title: note.title || "",
       content: note.content,
       goalId: note.goalId || "",
+      noteDate: note.date || new Date(note.createdAt).toLocaleDateString("sv-SE"),
     }));
     setIsNewDraft(false);
   };
@@ -142,7 +153,7 @@ export default function NotesLibrary({
     try {
       const updated = await api.patch<NoteWithAttachments>(
         `/api/v1/knowledge/notes/${editing.id}`,
-        { title, content, goalId }
+        { title, content, goalId, noteDate }
       );
       setNotes((current) => {
         const exists = current.some((note) => note.id === updated.id);
@@ -190,7 +201,19 @@ export default function NotesLibrary({
             沉淀可以长期复用的概念、方法与经验
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <input
+            type="date"
+            value={dateFilter}
+            onChange={(event) => setDateFilter(event.target.value)}
+            aria-label="按记录日期筛选"
+            className="rounded-xl border border-gray-200 px-3 py-2 text-sm text-gray-600 outline-none transition focus:border-gray-300"
+          />
+          {dateFilter && (
+            <button onClick={() => setDateFilter("")} className="text-xs text-gray-400 hover:text-gray-600">
+              清除日期
+            </button>
+          )}
           <div className="relative">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
@@ -285,7 +308,9 @@ export default function NotesLibrary({
                 </button>
                 <div className="mt-4 flex items-center justify-between gap-2 border-t border-gray-50 pt-3 text-[11px] text-gray-400">
                   <span className="truncate">{note.goalTitle || "未关联目标"}</span>
-                  <span className="flex-shrink-0">{relativeTime(note.updatedAt || note.savedAt)}</span>
+                  <span className="flex-shrink-0">
+                    {note.date || "未设置日期"} · {relativeTime(note.updatedAt || note.savedAt)}
+                  </span>
                 </div>
               </article>
             );
@@ -312,6 +337,13 @@ export default function NotesLibrary({
                 className="mb-3 border-0 bg-transparent text-xl font-semibold text-gray-900 outline-none placeholder:text-gray-300"
               />
               <div className="mb-3 flex items-center gap-2 text-xs text-gray-400">
+                <span>日期</span>
+                <input
+                  type="date"
+                  value={noteDate}
+                  onChange={(event) => setNoteDate(event.target.value)}
+                  className="rounded-lg border border-gray-100 bg-white px-2 py-1.5 text-xs text-gray-600 outline-none"
+                />
                 <span>目标</span>
                 <select
                   value={goalId}

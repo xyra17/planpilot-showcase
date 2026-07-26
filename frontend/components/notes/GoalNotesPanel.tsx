@@ -1,137 +1,103 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import { BookOpen, CalendarDays, ExternalLink, Plus } from "lucide-react";
 import { api } from "@/lib/api";
-import TiptapEditor from "./TiptapEditor";
 import type { KnowledgeNote } from "@/lib/knowledge-context";
 
 interface GoalNotesPanelProps {
   goalId: string;
 }
 
-function NoteItem({ note, onDelete, onUpdate }: {
-  note: KnowledgeNote;
-  onDelete: (id: string) => void;
-  onUpdate: (id: string, content: string) => void;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [content, setContent] = useState(note.content);
-
-  return (
-    <div className="group bg-white border border-gray-100 rounded-xl overflow-hidden mb-3 hover:shadow-sm transition">
-      <div className="flex items-center justify-between px-4 pt-3 pb-1">
-        <span className="text-xs text-gray-400">{note.date}</span>
-        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition">
-          <button onClick={() => setEditing((v) => !v)} className="text-xs px-2 py-0.5 rounded hover:bg-gray-100 text-gray-400">
-            {editing ? "收起" : "编辑"}
-          </button>
-          <button onClick={() => onDelete(note.id)} className="p-1 rounded hover:bg-red-50 text-gray-400 hover:text-red-500">
-            <Trash2 size={11} />
-          </button>
-        </div>
-      </div>
-      {editing ? (
-        <TiptapEditor
-          content={content}
-          onChange={setContent}
-          onSave={(html) => onUpdate(note.id, html)}
-          showToolbar
-          className="border-0 border-t border-gray-100 rounded-none"
-        />
-      ) : (
-        <div
-          className="px-4 pb-3 prose prose-sm max-w-none text-gray-700 cursor-pointer"
-          dangerouslySetInnerHTML={{ __html: note.content }}
-          onClick={() => setEditing(true)}
-        />
-      )}
-    </div>
-  );
+function stripHtml(html: string) {
+  return html
+    .replace(/<br\s*\/?>/gi, " ")
+    .replace(/<\/p>/gi, " ")
+    .replace(/<[^>]*>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 export default function GoalNotesPanel({ goalId }: GoalNotesPanelProps) {
   const [notes, setNotes] = useState<KnowledgeNote[]>([]);
-  const [showNew, setShowNew] = useState(false);
-  const [newContent, setNewContent] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
+    setLoading(true);
     const data = await api.get<KnowledgeNote[]>(
-      `/api/v1/knowledge/notes?goal_id=${goalId}&note_type=flash_card`
+      `/api/v1/knowledge/notes?goal_id=${goalId}`
     ).catch(() => []);
-    setNotes(data);
+    setNotes(data.filter((note) => ["daily_log", "flash_card"].includes(note.noteType)));
+    setLoading(false);
   }, [goalId]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { void load(); }, [load]);
 
-  const handleCreate = async () => {
-    if (!newContent || newContent === "<p></p>") return;
-    setSaving(true);
-    const note = await api.post<KnowledgeNote>("/api/v1/knowledge/notes", {
-      goalId,
-      content: newContent,
-      noteType: "flash_card",
-    }).catch(() => null);
-    if (note) {
-      setNotes((prev) => [note, ...prev]);
-      setNewContent("");
-      setShowNew(false);
-    }
-    setSaving(false);
-  };
-
-  const handleDelete = async (id: string) => {
-    setNotes((prev) => prev.filter((n) => n.id !== id));
-    await api.del(`/api/v1/knowledge/${id}`).catch(() => {});
-  };
-
-  const handleUpdate = async (id: string, content: string) => {
-    setNotes((prev) => prev.map((n) => n.id === id ? { ...n, content } : n));
-    await api.patch(`/api/v1/knowledge/notes/${id}`, { content }).catch(() => {});
-  };
+  const studyNotes = notes.filter((note) => note.noteType === "daily_log");
+  const studyLogs = notes.filter((note) => note.noteType === "flash_card");
 
   return (
-    <div className="px-4 py-4">
-      {/* 新建区 */}
-      {showNew ? (
-        <div className="mb-4 border border-blue-100 rounded-xl overflow-hidden bg-blue-50/30">
-          <TiptapEditor
-            content={newContent}
-            onChange={setNewContent}
-            placeholder="记录学习心得、疑问、关键点…"
-            showToolbar
-          />
-          <div className="flex justify-end gap-2 px-4 pb-3 pt-1">
-            <button onClick={() => setShowNew(false)} className="text-xs px-3 py-1.5 rounded-lg text-gray-500 hover:bg-gray-100">
-              取消
-            </button>
-            <button
-              onClick={handleCreate}
-              disabled={saving || !newContent || newContent === "<p></p>"}
-              className="text-xs px-3 py-1.5 rounded-lg text-white disabled:opacity-40 transition"
-              style={{ background: "var(--accent)" }}
-            >
-              {saving ? "保存中…" : "保存"}
-            </button>
-          </div>
+    <div className="space-y-4 px-4 py-4">
+      <div className="flex flex-wrap gap-2">
+        <Link
+          href={`/dashboard/notes?tab=log&goalId=${goalId}&create=1`}
+          className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs font-medium text-white transition hover:opacity-90"
+          style={{ backgroundColor: "var(--accent)" }}
+        >
+          <Plus size={13} />新建学习笔记
+        </Link>
+        <Link
+          href={`/dashboard/notes?tab=card&goalId=${goalId}&create=1`}
+          className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-gray-200 px-3 py-2 text-xs font-medium text-gray-600 transition hover:bg-gray-50"
+        >
+          <Plus size={13} />新建学习日志
+        </Link>
+      </div>
+
+      {loading ? (
+        <p className="py-8 text-center text-xs text-gray-400">正在加载相关笔记…</p>
+      ) : notes.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-gray-200 py-8 text-center">
+          <p className="text-xs text-gray-400">这个目标还没有相关笔记</p>
         </div>
       ) : (
-        <button
-          onClick={() => setShowNew(true)}
-          className="w-full mb-4 flex items-center justify-center gap-2 py-2.5 border border-dashed border-gray-200 rounded-xl text-sm text-gray-400 hover:border-blue-300 hover:text-blue-500 transition"
-        >
-          <Plus size={14} />新建笔记
-        </button>
-      )}
-
-      {/* 笔记列表 */}
-      {notes.length === 0 && !showNew ? (
-        <p className="text-xs text-gray-400 text-center py-8">还没有笔记，点上方按钮开始记录</p>
-      ) : (
-        notes.map((note) => (
-          <NoteItem key={note.id} note={note} onDelete={handleDelete} onUpdate={handleUpdate} />
-        ))
+        <div className="space-y-5">
+          {([
+            { label: "学习笔记", icon: CalendarDays, tab: "log", items: studyNotes },
+            { label: "学习日志", icon: BookOpen, tab: "card", items: studyLogs },
+          ] as const).map((group) => (
+            <section key={group.tab}>
+              <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-gray-500">
+                <group.icon size={13} style={{ color: "var(--accent)" }} />
+                {group.label}
+                <span className="text-gray-300">{group.items.length}</span>
+              </div>
+              {group.items.length === 0 ? (
+                <p className="rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-400">暂无内容</p>
+              ) : (
+                <div className="space-y-2">
+                  {group.items.slice(0, 5).map((note) => (
+                    <Link
+                      key={note.id}
+                      href={`/dashboard/notes?tab=${group.tab}&goalId=${goalId}`}
+                      className="block rounded-xl border border-gray-100 bg-white px-3 py-2.5 transition hover:border-gray-200 hover:shadow-sm"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="line-clamp-2 text-xs leading-5 text-gray-700">
+                          {note.title || stripHtml(note.content) || "无标题"}
+                        </p>
+                        <ExternalLink size={11} className="mt-1 flex-shrink-0 text-gray-300" />
+                      </div>
+                      <p className="mt-1 text-[10px] text-gray-400">{note.date}</p>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </section>
+          ))}
+        </div>
       )}
     </div>
   );

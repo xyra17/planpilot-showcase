@@ -40,10 +40,18 @@ function NotesContent() {
 
   const raw = searchParams.get("tab");
   const tab: Tab = raw && VALID_TABS.has(raw as Tab) ? raw as Tab : "log";
+  const initialGoalId = searchParams.get("goalId") || undefined;
+  const createRequested = searchParams.get("create") === "1";
 
   function setTab(nextTab: Tab) {
     const params = new URLSearchParams(searchParams.toString());
     params.set("tab", nextTab);
+    router.replace(`/dashboard/notes?${params.toString()}`);
+  }
+
+  function clearCreateRequest() {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("create");
     router.replace(`/dashboard/notes?${params.toString()}`);
   }
 
@@ -79,10 +87,18 @@ function NotesContent() {
 
       <main className="flex-1 min-h-0 overflow-hidden p-6">
         {tab === "log" && (
-          <DailyJournal />
+          <DailyJournal
+            initialGoalId={initialGoalId}
+            createSignal={createRequested ? 1 : 0}
+            onCreateHandled={clearCreateRequest}
+          />
         )}
         {tab === "card" && (
-          <NotesLibrary />
+          <NotesLibrary
+            initialGoalId={initialGoalId}
+            createSignal={createRequested ? 1 : 0}
+            onCreateHandled={clearCreateRequest}
+          />
         )}
       </main>
     </div>

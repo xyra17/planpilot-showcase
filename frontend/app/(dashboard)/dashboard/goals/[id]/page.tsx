@@ -768,7 +768,7 @@ export default function GoalDetailPage({ params }: { params: { id: string } }) {
                       ? <><div className="w-4 h-4 rounded-full flex items-center justify-center" style={{ backgroundColor: "var(--accent)" }}><CheckCircle2 size={9} className="text-white" /></div>今日任务</>
                       : t === "calendar"
                       ? <><div className="w-4 h-4 rounded-full flex items-center justify-center" style={{ backgroundColor: "var(--accent)" }}><Calendar size={9} className="text-white" /></div>任务日历</>
-                      : <><div className="w-4 h-4 rounded-full flex items-center justify-center" style={{ backgroundColor: "var(--accent)" }}><FileText size={9} className="text-white" /></div>笔记</>
+                      : <><div className="w-4 h-4 rounded-full flex items-center justify-center" style={{ backgroundColor: "var(--accent)" }}><FileText size={9} className="text-white" /></div>相关笔记</>
                     }
                   </button>
                 ))}

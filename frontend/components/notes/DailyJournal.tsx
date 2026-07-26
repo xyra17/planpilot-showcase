@@ -173,9 +173,11 @@ function FileAttachmentZone({ noteId, attachmentIds, pendingFiles, onAddFiles, o
 export default function DailyJournal({
   createSignal = 0,
   onCreateHandled,
+  initialGoalId,
 }: {
   createSignal?: number;
   onCreateHandled?: () => void;
+  initialGoalId?: string;
 }) {
   const todayDate = new Date();
   const today = toDateStr(todayDate);
@@ -288,13 +290,14 @@ export default function DailyJournal({
   const startNew = async () => {
     setDraftTitle("");
     setDraftContent("");
-    setDraftGoalId(null);
+    setDraftGoalId(initialGoalId ?? null);
     setDraftTaskId(null);
     setPendingFiles([]);
     const draft = await api.post<StudyNote>("/api/v1/knowledge/notes", {
       content: "",
       noteType: "daily_log",
       noteDate: selectedDate,
+      goalId: initialGoalId ?? null,
     });
     setSaveStatus("saved");
     setIsNewDraft(true);
