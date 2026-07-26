@@ -318,7 +318,7 @@ function GoalTasksWorkspace({
                 style={active ? { color: "var(--accent)" } : {}}
               >
                 <Icon size={13} />
-                {item === "today" ? "今日" : "日历"}
+                {item === "today" ? "今日任务" : "历史任务"}
               </button>
             );
           })}
