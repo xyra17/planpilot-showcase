@@ -290,3 +290,63 @@ async def test_deleted_task_keeps_note_snapshot(
     assert note["taskId"] is None
     assert note["taskTitle"] == "稍后会删除的任务"
     assert note["taskAvailable"] is False
+
+
+# ── 11. 快速记录可创建，并可转换为用户维护的其他笔记类型 ────────────────
+
+async def test_quick_note_creation_and_conversion(
+    client: AsyncClient, auth_headers: dict
+):
+    create_response = await client.post(
+        "/api/v1/knowledge/notes",
+        json={
+            "title": "稍后整理",
+            "content": "<p>一条快速记录</p>",
+            "noteType": "quick_note",
+        },
+        headers=auth_headers,
+    )
+    assert create_response.status_code == 201, create_response.text
+    note_id = create_response.json()["id"]
+    assert create_response.json()["noteType"] == "quick_note"
+
+    card_response = await client.patch(
+        f"/api/v1/knowledge/notes/{note_id}",
+        json={"noteType": "flash_card"},
+        headers=auth_headers,
+    )
+    assert card_response.status_code == 200, card_response.text
+    assert card_response.json()["noteType"] == "flash_card"
+
+    log_response = await client.patch(
+        f"/api/v1/knowledge/notes/{note_id}",
+        json={"noteType": "daily_log", "noteDate": "2026-07-26"},
+        headers=auth_headers,
+    )
+    assert log_response.status_code == 200, log_response.text
+    assert log_response.json()["noteType"] == "daily_log"
+    assert log_response.json()["date"] == "2026-07-26"
+
+
+# ── 12. 系统摘录不能被转换，避免破坏来源语义 ────────────────────────────
+
+async def test_system_note_type_cannot_be_converted(
+    client: AsyncClient, auth_headers: dict
+):
+    create_response = await client.post(
+        "/api/v1/knowledge/notes",
+        json={
+            "content": "AI 对话保存内容",
+            "noteType": "chat_note",
+        },
+        headers=auth_headers,
+    )
+    assert create_response.status_code == 201, create_response.text
+    note_id = create_response.json()["id"]
+
+    convert_response = await client.patch(
+        f"/api/v1/knowledge/notes/{note_id}",
+        json={"noteType": "quick_note"},
+        headers=auth_headers,
+    )
+    assert convert_response.status_code == 422

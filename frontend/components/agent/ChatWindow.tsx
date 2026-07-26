@@ -127,7 +127,7 @@ export function ChatWindow({ goalId, className }: { goalId?: string; className?:
     await api.post("/api/v1/knowledge/notes", {
       goalId: goalId ?? null,
       content: `<p>${text.replace(/\n\n+/g, "</p><p>").replace(/\n/g, "<br>")}</p>`,
-      noteType: "flash_card",
+      noteType: "quick_note",
       title: text.slice(0, 60),
     }).catch(() => null);
   }, [goalId]);
@@ -289,7 +289,7 @@ export function ChatWindow({ goalId, className }: { goalId?: string; className?:
                 await api.post<KnowledgeNote>("/api/v1/knowledge/notes", {
                   goalId: checkinSaved?.goalId ?? goalId ?? null,
                   content: noteContent,
-                  noteType: "flash_card",
+                  noteType: "quick_note",
                   title: `打卡收获 ${new Date().toLocaleDateString("zh-CN")}`,
                 }).catch(() => null);
                 setNoteSaving(false);

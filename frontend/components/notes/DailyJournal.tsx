@@ -170,7 +170,13 @@ function FileAttachmentZone({ noteId, attachmentIds, pendingFiles, onAddFiles, o
   );
 }
 
-export default function DailyJournal() {
+export default function DailyJournal({
+  createSignal = 0,
+  onCreateHandled,
+}: {
+  createSignal?: number;
+  onCreateHandled?: () => void;
+}) {
   const todayDate = new Date();
   const today = toDateStr(todayDate);
   const [selectedDate, setSelectedDate] = useState(today);
@@ -294,6 +300,14 @@ export default function DailyJournal() {
     setIsNewDraft(true);
     setEditing({ ...draft, attachmentIds: [] });
   };
+
+  useEffect(() => {
+    if (createSignal <= 0) return;
+    if (!editing) void startNew().finally(onCreateHandled);
+    else onCreateHandled?.();
+    // createSignal is an explicit command from the notes center.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [createSignal]);
 
   const startEdit = (note: StudyNote) => {
     setDraftTitle(note.title ?? "");

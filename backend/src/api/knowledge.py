@@ -1,6 +1,7 @@
 import os
 import uuid
 from datetime import UTC, datetime
+from typing import Literal
 from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
@@ -96,7 +97,8 @@ class ReindexResult(BaseModel):
     item_ids: list[str]
 
 
-_NOTE_TYPES = {"chat_note", "daily_log", "flash_card", "task_note"}
+NoteType = Literal["chat_note", "daily_log", "flash_card", "task_note", "quick_note"]
+_NOTE_TYPES = {"chat_note", "daily_log", "flash_card", "task_note", "quick_note"}
 
 
 class NoteOut(BaseModel):
@@ -121,7 +123,7 @@ class NoteCreate(BaseModel):
     taskId: str | None = None
     title: str | None = None
     content: str = ""
-    noteType: str = "flash_card"
+    noteType: NoteType = "flash_card"
     kb_id: str | None = None
     noteDate: str | None = None
 
@@ -142,6 +144,19 @@ class NoteUpdate(BaseModel):
     content: str | None = None
     goalId: str | None = None
     taskId: str | None = None
+    noteType: NoteType | None = None
+    noteDate: str | None = None
+
+    @field_validator("noteDate")
+    @classmethod
+    def validate_note_date(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        try:
+            datetime.strptime(v, "%Y-%m-%d")
+        except ValueError:
+            raise ValueError("noteDate must be in YYYY-MM-DD format")
+        return v
 
 
 # ── Helpers ───────────────────────────────────────────────────
@@ -1071,6 +1086,16 @@ async def update_note(
             item.goal_id = item.goal_id or task.goal_id
             item.task_id = task.id
             item.task_title_snapshot = task.title
+    if body.noteType is not None:
+        # 对话摘录与任务笔记由对应业务流程维护，不允许在笔记中心改写其语义。
+        if (
+            item.source_type in {"chat_note", "task_note"}
+            or body.noteType in {"chat_note", "task_note"}
+        ):
+            raise HTTPException(422, "系统生成的笔记类型不能转换")
+        item.source_type = body.noteType
+    if "noteDate" in body.model_fields_set:
+        item.note_date = body.noteDate
     await db.commit()
     await db.refresh(item)
     task_title = ""
