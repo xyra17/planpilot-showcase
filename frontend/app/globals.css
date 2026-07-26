@@ -1305,18 +1305,18 @@ html {
   color:var(--accent);
 }
 [data-theme="journal"] .plan-mastery-feedback {
-  color:var(--ok-text) !important;
-  border-color:color-mix(in srgb,var(--ok-text) 28%,transparent) !important;
-  background:var(--ok-bg) !important;
+  color:var(--accent) !important;
+  border-color:color-mix(in srgb,var(--accent) 28%,transparent) !important;
+  background:color-mix(in srgb,var(--surface) 70%,var(--accent-light)) !important;
 }
 [data-theme="journal"] .plan-phase-title.is-complete {
-  color:var(--ok-text) !important;
+  color:var(--accent) !important;
 }
 [data-theme="journal"] .plan-task-number.is-mastered,
 [data-theme="journal"] .plan-mastery-button.is-mastered {
-  color:var(--ok-text) !important;
-  border-color:color-mix(in srgb,var(--ok-text) 32%,transparent) !important;
-  background:var(--ok-bg) !important;
+  color:var(--accent) !important;
+  border-color:color-mix(in srgb,var(--accent) 32%,transparent) !important;
+  background:color-mix(in srgb,var(--surface) 68%,var(--accent-light)) !important;
 }
 [data-theme="journal"] .plan-mastery-button {
   color:var(--text-3) !important;

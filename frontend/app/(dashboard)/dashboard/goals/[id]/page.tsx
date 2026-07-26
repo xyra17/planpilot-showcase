@@ -667,16 +667,6 @@ function PlanOverview({ goalId, deadline, refreshKey, hideRegenerate, dailyHours
     }
   }
 
-  async function toggleTaskDone(taskId: string, currentDone: boolean) {
-    setTaskOverrides((prev) => ({ ...prev, [taskId]: { ...prev[taskId], status: currentDone ? "pending" : "completed" } }));
-    try {
-      await api.patch(`/api/v1/tasks/${taskId}`, { done: !currentDone });
-      refreshTasksContext();
-    } catch {
-      setTaskOverrides((prev) => { const n = { ...prev }; delete n[taskId]; return n; });
-    }
-  }
-
   async function toggleMastery(taskId: string, currentLevel: string) {
     const mastering = !["L3", "L4"].includes(currentLevel);
     const nextMastery = mastering ? "L3" : "L1";
@@ -759,10 +749,17 @@ function PlanOverview({ goalId, deadline, refreshKey, hideRegenerate, dailyHours
       )}
       <div className="plan-mastery-help flex items-start gap-1.5 rounded-lg border border-gray-100 bg-gray-50 px-2.5 py-2 text-[11px] leading-relaxed text-gray-500">
         <Info size={12} className="mt-0.5 flex-shrink-0" />
-        <span><strong>完成</strong>表示已经执行任务；<strong>掌握</strong>表示已经能够独立完成，并计入总体进度。</span>
+        <span><strong>完成</strong>记录任务是否执行；<strong>掌握</strong>记录学习结果（L3/L4），与每日打卡和 AI 验收使用同一状态。上方进度仅统计已掌握任务。</span>
       </div>
       {masteryHint && (
-        <div className="plan-mastery-feedback text-xs text-green-700 bg-green-50 border border-green-100 rounded-lg px-3 py-2">
+        <div
+          className="plan-mastery-feedback rounded-lg border px-3 py-2 text-xs"
+          style={{
+            color: "var(--accent)",
+            borderColor: "color-mix(in srgb, var(--accent) 26%, transparent)",
+            backgroundColor: "var(--accent-light)",
+          }}
+        >
           {masteryHint}
         </div>
       )}
@@ -791,7 +788,10 @@ function PlanOverview({ goalId, deadline, refreshKey, hideRegenerate, dailyHours
                 className="w-full flex items-center gap-2 px-2.5 py-2 bg-gray-50 hover:bg-gray-100 transition text-left"
               >
                 {isExpanded ? <ChevronDown size={12} className="text-gray-400 flex-shrink-0" /> : <ChevronRight size={12} className="text-gray-400 flex-shrink-0" />}
-                <span className={cn("plan-phase-title text-xs font-medium flex-1 truncate", isComplete ? "is-complete text-green-600" : "text-gray-700")}>
+                <span
+                  className={cn("plan-phase-title flex-1 truncate text-xs font-medium", isComplete ? "is-complete" : "text-gray-700")}
+                  style={isComplete ? { color: "var(--accent)" } : {}}
+                >
                   {isComplete ? "✓ " : ""}{phase.name}
                 </span>
                 {phaseRange && (
@@ -807,7 +807,7 @@ function PlanOverview({ goalId, deadline, refreshKey, hideRegenerate, dailyHours
 
               {/* 进度条 */}
               <div className="plan-phase-progress-track h-1 bg-gray-200">
-                <div className="h-1 transition-all" style={{ width: `${phasePct}%`, backgroundColor: isComplete ? "var(--ok-text)" : "var(--accent)" }} />
+                <div className="h-1 transition-all" style={{ width: `${phasePct}%`, backgroundColor: "var(--accent)" }} />
               </div>
 
               {/* 阶段焦点 + 任务列表 */}
@@ -828,21 +828,31 @@ function PlanOverview({ goalId, deadline, refreshKey, hideRegenerate, dailyHours
                     const dn = task.scheduled_date ? dayMap.get(task.scheduled_date) : undefined;
                     return (
                       <div key={task.id} className="flex items-center gap-2 px-3 py-2 border-t border-gray-50 hover:bg-gray-50 transition group">
-                        {/* 任务序号方框 */}
-                        <button
-                          onClick={() => toggleTaskDone(task.id, isDone)}
+                        {/* 任务序号仅用于定位，不承担状态切换 */}
+                        <span
+                          title={isDone ? "任务已完成" : "任务序号"}
                           className={cn(
-                            "plan-task-number flex-shrink-0 w-5 h-5 rounded text-[10px] font-semibold flex items-center justify-center border transition",
+                            "plan-task-number flex h-5 w-5 flex-shrink-0 cursor-default items-center justify-center rounded border text-[10px] font-semibold",
                             isMastered
-                              ? "is-mastered bg-green-50 border-green-300 text-green-600"
+                              ? "is-mastered"
                               : isDone
-                              ? "text-white border-transparent"
-                              : "border-gray-200 text-gray-400 hover:border-gray-400"
+                              ? "border-transparent text-white"
+                              : "border-gray-200 text-gray-400"
                           )}
-                          style={isDone && !isMastered ? { backgroundColor: "var(--accent)" } : {}}
+                          style={
+                            isMastered
+                              ? {
+                                  color: "var(--accent)",
+                                  borderColor: "color-mix(in srgb, var(--accent) 30%, transparent)",
+                                  backgroundColor: "var(--accent-light)",
+                                }
+                              : isDone
+                                ? { backgroundColor: "var(--accent)" }
+                                : {}
+                          }
                         >
                           {ti + 1}
-                        </button>
+                        </span>
 
                         {dn != null && !isMastered && (
                           <span
@@ -871,9 +881,14 @@ function PlanOverview({ goalId, deadline, refreshKey, hideRegenerate, dailyHours
                           className={cn(
                             "plan-mastery-button flex-shrink-0 text-[11px] px-2 py-1 rounded-md border transition",
                             isMastered
-                              ? "is-mastered bg-green-50 border-green-200 text-green-600"
+                              ? "is-mastered"
                               : "border-gray-200 text-gray-400"
                           )}
+                          style={isMastered ? {
+                            color: "var(--accent)",
+                            borderColor: "color-mix(in srgb, var(--accent) 30%, transparent)",
+                            backgroundColor: "var(--accent-light)",
+                          } : {}}
                         >
                           {isMastered ? "已掌握" : "标记掌握"}
                         </button>
