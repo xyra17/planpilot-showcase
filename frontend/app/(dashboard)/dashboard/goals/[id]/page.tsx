@@ -295,9 +295,9 @@ function GoalTasksWorkspace({
 
   return (
     <div className="px-4 py-4">
-      <div className="mb-4 flex items-center justify-between gap-3">
+      <div className="goal-task-toolbar mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-gray-100 pb-2">
         <div
-          className="inline-flex rounded-xl border border-gray-100 bg-gray-50 p-1"
+          className="goal-task-view-tabs inline-flex items-center gap-4"
           role="tablist"
           aria-label="任务查看方式"
         >
@@ -312,8 +312,8 @@ function GoalTasksWorkspace({
                 aria-selected={active}
                 onClick={() => setView(item)}
                 className={cn(
-                  "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition",
-                  active ? "bg-white shadow-sm" : "text-gray-400 hover:text-gray-600"
+                  "goal-task-view-tab relative flex items-center gap-1.5 px-0.5 py-1 text-xs font-medium transition",
+                  active ? "is-active" : "text-gray-400 hover:text-gray-600"
                 )}
                 style={active ? { color: "var(--accent)" } : {}}
               >
@@ -323,15 +323,29 @@ function GoalTasksWorkspace({
             );
           })}
         </div>
-        {view === "calendar" && selectedDate !== TODAY && (
-          <button
-            type="button"
-            onClick={() => onSelectDate(TODAY)}
-            className="text-xs text-gray-400 transition hover:text-gray-600"
-          >
-            回到今天
-          </button>
-        )}
+        {view === "today" ? (
+          <div className="flex items-center gap-3">
+            <span className="text-[11px] text-gray-400">{doneTasks}/{todayTasks.length} 已完成</span>
+            <div className="relative">
+              <Search size={11} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-300" />
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="搜索任务…"
+                aria-label="搜索今日任务"
+                className="goal-task-search w-28 rounded-lg border border-gray-100 bg-transparent py-1 pl-6 pr-2 text-[11px] outline-none"
+              />
+            </div>
+          </div>
+        ) : selectedDate !== TODAY ? (
+            <button
+              type="button"
+              onClick={() => onSelectDate(TODAY)}
+              className="text-xs text-gray-400 transition hover:text-gray-600"
+            >
+              回到今天
+            </button>
+        ) : null}
       </div>
 
       {view === "today" ? (
@@ -344,20 +358,6 @@ function GoalTasksWorkspace({
               </Link>
             </div>
           )}
-          <div className="mb-2 flex items-center justify-between">
-            <span className="text-xs text-gray-400">{doneTasks}/{todayTasks.length} 已完成</span>
-            <div className="relative">
-              <Search size={10} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-300" />
-              <input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="搜索任务…"
-                aria-label="搜索今日任务"
-                className="w-28 rounded-lg border border-gray-100 bg-gray-50 py-1 pl-6 pr-2 text-xs outline-none"
-              />
-            </div>
-          </div>
-
           {filteredToday.length === 0 && (
             <p className="py-4 text-center text-xs text-gray-400">
               {search.trim() ? "没有匹配的任务" : "暂无今日任务"}

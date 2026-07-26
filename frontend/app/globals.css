@@ -1218,6 +1218,37 @@ html {
   color:var(--text-3) !important;
   background:color-mix(in srgb,var(--surface) 78%,var(--accent-light));
 }
+[data-theme="journal"] .goal-task-toolbar {
+  border-bottom:1px dashed color-mix(in srgb,var(--text-1) 17%,transparent) !important;
+}
+[data-theme="journal"] .goal-task-view-tab {
+  color:var(--text-3) !important;
+  background:transparent !important;
+  box-shadow:none !important;
+}
+[data-theme="journal"] .goal-task-view-tab.is-active {
+  color:var(--accent) !important;
+}
+[data-theme="journal"] .goal-task-view-tab.is-active::after {
+  position:absolute;
+  right:2px;
+  bottom:-9px;
+  left:2px;
+  height:2px;
+  border-radius:50%;
+  background:var(--accent);
+  content:"";
+  transform:rotate(-1deg);
+}
+[data-theme="journal"] .goal-task-search {
+  color:var(--text-2);
+  border-color:color-mix(in srgb,var(--text-1) 18%,transparent) !important;
+  background:color-mix(in srgb,var(--surface) 84%,var(--accent-light)) !important;
+}
+[data-theme="journal"] .goal-task-search:focus {
+  border-color:color-mix(in srgb,var(--accent) 45%,var(--border)) !important;
+  box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 10%,transparent);
+}
 [data-theme="journal"] .goal-metric-icon {
   color:var(--accent) !important;
   border:1px dashed color-mix(in srgb,var(--accent) 34%,transparent);
