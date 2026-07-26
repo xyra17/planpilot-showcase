@@ -36,8 +36,18 @@ export default function GoalNotesPanel({ goalId }: GoalNotesPanelProps) {
 
   useEffect(() => { void load(); }, [load]);
 
-  const studyNotes = notes.filter((note) => note.noteType === "daily_log");
-  const studyLogs = notes.filter((note) => note.noteType === "flash_card");
+  const byRecordDateDesc = (a: KnowledgeNote, b: KnowledgeNote) => {
+    const aDate = Date.parse(`${a.date || "1970-01-01"}T00:00:00`) || Date.parse(a.updatedAt || a.createdAt);
+    const bDate = Date.parse(`${b.date || "1970-01-01"}T00:00:00`) || Date.parse(b.updatedAt || b.createdAt);
+    if (aDate !== bDate) return bDate - aDate;
+    return Date.parse(b.updatedAt || b.createdAt) - Date.parse(a.updatedAt || a.createdAt);
+  };
+  const studyNotes = notes
+    .filter((note) => note.noteType === "daily_log")
+    .sort(byRecordDateDesc);
+  const studyLogs = notes
+    .filter((note) => note.noteType === "flash_card")
+    .sort(byRecordDateDesc);
 
   return (
     <div className="space-y-4 px-4 py-4">
@@ -101,8 +111,11 @@ export default function GoalNotesPanel({ goalId }: GoalNotesPanelProps) {
               {group.items.length === 0 ? (
                 <p className="rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-400">暂无内容</p>
               ) : (
-                <div className="space-y-2">
-                  {group.items.slice(0, 5).map((note) => (
+                <div
+                  className="max-h-64 space-y-2 overflow-y-auto pr-1"
+                  aria-label={`${group.label}，按记录日期从新到旧排列`}
+                >
+                  {group.items.map((note) => (
                     <Link
                       key={note.id}
                       href={`/dashboard/notes?tab=${group.tab}&goalId=${goalId}`}
