@@ -1,6 +1,9 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Send, Square, Loader2, Zap, BookOpen, X, Bookmark } from "lucide-react";
+import {
+  Send, Square, Loader2, Zap, BookOpen, X, Bookmark,
+  ListTodo, CheckCircle2, BarChart3, Target, RefreshCw, Search,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useChatStore, type ReplanOptions } from "@/lib/stores/chatStore";
 import { PlanCard } from "./PlanCard";
@@ -16,12 +19,12 @@ const TOOL_LABELS: Record<string, string> = {
 };
 
 const QUICK_ACTIONS = [
-  { label: "今天学什么",   text: "今天我应该学什么？",                    emoji: "📝" },
-  { label: "今日打卡",     text: "我要今日打卡",                          emoji: "✅" },
-  { label: "分析进度",     text: "帮我分析一下我的学习进度",              emoji: "📊" },
-  { label: "出题考我",     text: "验收一下我的掌握情况，出题考我",        emoji: "🎯" },
-  { label: "帮我重规划",   text: "我跟不上了，帮我重规划一下",            emoji: "🔄" },
-  { label: "搜索学习资料", text: "帮我搜索相关学习资料",                  emoji: "🔍" },
+  { label: "今天学什么",   text: "今天我应该学什么？",                    icon: ListTodo },
+  { label: "今日打卡",     text: "我要今日打卡",                          icon: CheckCircle2 },
+  { label: "分析进度",     text: "帮我分析一下我的学习进度",              icon: BarChart3 },
+  { label: "出题考我",     text: "验收一下我的掌握情况，出题考我",        icon: Target },
+  { label: "帮我重规划",   text: "我跟不上了，帮我重规划一下",            icon: RefreshCw },
+  { label: "搜索学习资料", text: "帮我搜索相关学习资料",                  icon: Search },
 ] as const;
 
 export function ChatWindow({ goalId, className }: { goalId?: string; className?: string }) {
@@ -171,13 +174,23 @@ export function ChatWindow({ goalId, className }: { goalId?: string; className?:
               <div className="flex-1 h-px bg-gray-200" />
             </div>
             <div className="grid grid-cols-3 gap-2 w-full max-w-xs">
-              {QUICK_ACTIONS.map((action) => (
-                <div key={action.label}
-                  className="flex flex-col items-center gap-1 px-2 py-2.5 rounded-xl bg-gray-50 border border-gray-100">
-                  <span className="text-base">{action.emoji}</span>
+              {QUICK_ACTIONS.map((action) => {
+                const ActionIcon = action.icon;
+                return (
+                <button
+                  key={action.label}
+                  type="button"
+                  onClick={() => sendMessage(action.text)}
+                  disabled={isStreaming}
+                  className="ai-quick-action flex flex-col items-center gap-1.5 rounded-xl border border-gray-100 bg-gray-50 px-2 py-2.5 transition hover:-translate-y-0.5 hover:border-gray-200 disabled:opacity-40"
+                >
+                  <span className="ai-quick-icon flex h-6 w-6 items-center justify-center rounded-lg" style={{ backgroundColor: "var(--accent-light)", color: "var(--accent)" }}>
+                    <ActionIcon size={15} strokeWidth={1.8} />
+                  </span>
                   <span className="text-[10px] text-gray-500 leading-tight text-center">{action.label}</span>
-                </div>
-              ))}
+                </button>
+                );
+              })}
             </div>
           </div>
         )}

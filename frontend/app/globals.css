@@ -794,6 +794,26 @@ html {
 [data-theme="journal"] .calm-sidebar a:nth-of-type(even) svg {
   transform:rotate(.8deg);
 }
+[data-theme="journal"] .ai-quick-action {
+  border:1px solid color-mix(in srgb,var(--text-1) 30%,transparent) !important;
+  border-radius:12px 9px 13px 10px !important;
+  background:color-mix(in srgb,var(--surface) 94%,var(--accent-light)) !important;
+  box-shadow:1px 2px 0 color-mix(in srgb,var(--text-1) 13%,transparent);
+}
+[data-theme="journal"] .ai-quick-action:nth-child(even) {
+  transform:rotate(.35deg);
+}
+[data-theme="journal"] .ai-quick-action:hover {
+  color:var(--accent);
+  border-color:color-mix(in srgb,var(--accent) 55%,var(--text-1)) !important;
+  background:color-mix(in srgb,var(--surface) 88%,var(--accent-light)) !important;
+  box-shadow:2px 3px 0 color-mix(in srgb,var(--text-1) 15%,transparent);
+}
+[data-theme="journal"] .ai-quick-icon {
+  border:1px dashed color-mix(in srgb,var(--accent) 48%,transparent);
+  border-radius:8px 6px 9px 7px !important;
+  background:color-mix(in srgb,var(--surface) 68%,var(--accent-light)) !important;
+}
 
 /* 手账纸稿：弹窗与表单使用叠纸布局 */
 [data-theme="journal"] .calm-app .fixed.inset-0[class*="bg-black"],

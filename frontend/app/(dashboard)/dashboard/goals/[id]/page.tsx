@@ -264,6 +264,140 @@ function DayTaskList({
   );
 }
 
+// ── 任务工作区：同一组件内切换今日清单与日历 ────────────────
+function GoalTasksWorkspace({
+  goal,
+  tasks,
+  selectedDate,
+  onSelectDate,
+  onToggleTask,
+  onVerify,
+}: {
+  goal: Goal;
+  tasks: Task[];
+  selectedDate: string;
+  onSelectDate: (date: string) => void;
+  onToggleTask: (taskId: string) => void;
+  onVerify: (task: Task) => void;
+}) {
+  const [view, setView] = useState<"today" | "calendar">("today");
+  const [search, setSearch] = useState("");
+  const todayTasks = tasks.filter((task) => task.date === TODAY);
+  const doneTasks = todayTasks.filter((task) => task.done).length;
+  const filteredToday = todayTasks.filter((task) =>
+    task.title.toLowerCase().includes(search.trim().toLowerCase())
+  );
+  const tasksByDate = tasks.reduce<Record<string, Task[]>>((acc, task) => {
+    if (!acc[task.date]) acc[task.date] = [];
+    acc[task.date].push(task);
+    return acc;
+  }, {});
+
+  return (
+    <div className="px-4 py-4">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div
+          className="inline-flex rounded-xl border border-gray-100 bg-gray-50 p-1"
+          role="tablist"
+          aria-label="任务查看方式"
+        >
+          {(["today", "calendar"] as const).map((item) => {
+            const active = view === item;
+            const Icon = item === "today" ? CheckCircle2 : Calendar;
+            return (
+              <button
+                key={item}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => setView(item)}
+                className={cn(
+                  "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition",
+                  active ? "bg-white shadow-sm" : "text-gray-400 hover:text-gray-600"
+                )}
+                style={active ? { color: "var(--accent)" } : {}}
+              >
+                <Icon size={13} />
+                {item === "today" ? "今日" : "日历"}
+              </button>
+            );
+          })}
+        </div>
+        {view === "calendar" && selectedDate !== TODAY && (
+          <button
+            type="button"
+            onClick={() => onSelectDate(TODAY)}
+            className="text-xs text-gray-400 transition hover:text-gray-600"
+          >
+            回到今天
+          </button>
+        )}
+      </div>
+
+      {view === "today" ? (
+        <div className="space-y-1">
+          {goal.kb_id && (
+            <div className="mb-3 flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 px-3 py-2">
+              <span className="text-xs text-gray-500">已关联知识库</span>
+              <Link href="/dashboard/knowledge" className="text-xs font-medium underline transition" style={{ color: "var(--accent)" }}>
+                上传文件 →
+              </Link>
+            </div>
+          )}
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-xs text-gray-400">{doneTasks}/{todayTasks.length} 已完成</span>
+            <div className="relative">
+              <Search size={10} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-300" />
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="搜索任务…"
+                aria-label="搜索今日任务"
+                className="w-28 rounded-lg border border-gray-100 bg-gray-50 py-1 pl-6 pr-2 text-xs outline-none"
+              />
+            </div>
+          </div>
+
+          {filteredToday.length === 0 && (
+            <p className="py-4 text-center text-xs text-gray-400">
+              {search.trim() ? "没有匹配的任务" : "暂无今日任务"}
+            </p>
+          )}
+          {filteredToday.map((task) => (
+            <div key={task.id} className="group flex items-center gap-2 rounded-xl p-2 transition hover:bg-gray-50">
+              <button type="button" onClick={() => onToggleTask(task.id)} className="mt-0.5 flex-shrink-0" aria-label={task.done ? "标记为未完成" : "标记为已完成"}>
+                {task.done
+                  ? <CheckCircle2 size={15} style={{ color: "var(--accent)" }} />
+                  : <Circle size={15} className="flex-shrink-0 text-gray-300 transition group-hover:text-gray-400" />}
+              </button>
+              <div className="min-w-0 flex-1">
+                <p className={cn("text-xs leading-snug", task.done ? "text-gray-400 line-through" : "text-gray-700")}>{task.title}</p>
+                {task.description && <p className="mt-0.5 text-xs leading-snug text-gray-400">{task.description}</p>}
+                <span className="mt-0.5 flex items-center gap-1 text-xs text-gray-400"><Clock size={10} />{task.estimatedMinutes} 分钟</span>
+              </div>
+              {task.done && (
+                <button
+                  type="button"
+                  onClick={() => onVerify(task)}
+                  className="shrink-0 rounded-lg px-2 py-0.5 text-xs text-white transition"
+                  style={{ backgroundColor: "var(--accent)" }}
+                >
+                  验收
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <>
+          <MiniCalendar tasksByDate={tasksByDate} selectedDate={selectedDate} onSelect={onSelectDate} />
+          <DayTaskList tasks={tasks} selectedDate={selectedDate} goalId={goal.id} goalTitle={goal.title} />
+        </>
+      )}
+    </div>
+  );
+}
+
 interface PlanTask {
   id: string;
   title: string;
@@ -578,18 +712,15 @@ export default function GoalDetailPage({ params }: { params: { id: string } }) {
 
   const { tasks, toggleTask } = useTasks();
   const goalTasks = goal ? tasks.filter((t) => t.goalId === goal.id) : [];
-  const todayTasks = goalTasks.filter((t) => t.date === TODAY);
-  const doneTasks = todayTasks.filter((t) => t.done).length;
 
   const handleToggleTask = async (taskId: string) => {
     await toggleTask(taskId);
     setProgressRefreshKey(prev => prev + 1);
   };
 
-  const [tab, setTab] = useState<"today" | "calendar" | "notes">("today");
+  const [tab, setTab] = useState<"tasks" | "notes">("tasks");
   const [rightTab, setRightTab] = useState<"plan" | "chat">("chat");
   const [selectedDate, setSelectedDate] = useState(TODAY);
-  const [search, setSearch] = useState("");
   const [verifyTask, setVerifyTask] = useState<{ taskId: string; taskTitle: string } | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [chatCollapsed, setChatCollapsed] = useState(false);
@@ -656,14 +787,6 @@ export default function GoalDetailPage({ params }: { params: { id: string } }) {
       setPlanRegenerating(false);
     }
   }
-
-  const tasksByDate = goalTasks.reduce<Record<string, Task[]>>((acc, t) => {
-    if (!acc[t.date]) acc[t.date] = [];
-    acc[t.date].push(t);
-    return acc;
-  }, {});
-
-  const filteredToday = todayTasks.filter((t) => t.title.toLowerCase().includes(search.toLowerCase()));
 
   if (loading) {
     return (
@@ -760,18 +883,16 @@ export default function GoalDetailPage({ params }: { params: { id: string } }) {
                 )}
               </div>
 
-              {/* Tab 切换：今日任务 / 任务日历（与右侧面板对齐） */}
+              {/* 顶层只区分任务与笔记；今日/日历在任务组件内部切换 */}
               <div className="flex items-center border-b border-gray-100 flex-shrink-0">
-                {(["today", "calendar", "notes"] as const).map((t) => (
+                {(["tasks", "notes"] as const).map((t) => (
                   <button key={t} onClick={() => setTab(t)}
                     className={cn("flex-1 py-3 text-sm font-semibold transition flex items-center justify-center gap-1.5",
                       tab === t ? "border-b-2 text-gray-900" : "text-gray-400 hover:text-gray-600"
                     )}
                     style={tab === t ? { borderColor: "var(--accent)", color: "var(--accent)" } : {}}>
-                    {t === "today"
-                      ? <><div className="w-4 h-4 rounded-full flex items-center justify-center" style={{ backgroundColor: "var(--accent)" }}><CheckCircle2 size={9} className="text-white" /></div>今日任务</>
-                      : t === "calendar"
-                      ? <><div className="w-4 h-4 rounded-full flex items-center justify-center" style={{ backgroundColor: "var(--accent)" }}><Calendar size={9} className="text-white" /></div>任务日历</>
+                    {t === "tasks"
+                      ? <><div className="w-4 h-4 rounded-full flex items-center justify-center" style={{ backgroundColor: "var(--accent)" }}><CheckCircle2 size={9} className="text-white" /></div>任务</>
                       : <><div className="w-4 h-4 rounded-full flex items-center justify-center" style={{ backgroundColor: "var(--accent)" }}><FileText size={9} className="text-white" /></div>相关笔记</>
                     }
                   </button>
@@ -780,60 +901,15 @@ export default function GoalDetailPage({ params }: { params: { id: string } }) {
 
               {/* Tab 内容 */}
               <div className="flex-1 overflow-y-auto">
-                {tab === "today" && (
-                  <div className="px-4 py-4 space-y-1">
-                    {/* KB 关联提示 */}
-                    {goal.kb_id && (
-                      <div className="mb-3 px-3 py-2 bg-blue-50 border border-blue-100 rounded-xl flex items-center justify-between">
-                        <span className="text-xs text-blue-600">已关联知识库</span>
-                        <Link href="/dashboard/knowledge" className="text-xs text-blue-700 font-medium underline hover:text-blue-900 transition">
-                          上传文件 →
-                        </Link>
-                      </div>
-                    )}
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs text-gray-400">{doneTasks}/{todayTasks.length} 已完成</span>
-                      <div className="relative">
-                        <Search size={10} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-300" />
-                        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="搜索任务…"
-                          className="pl-6 pr-2 py-1 text-xs bg-gray-50 border border-gray-100 rounded-lg outline-none w-28" />
-                      </div>
-                    </div>
-
-                    {filteredToday.length === 0 && <p className="text-xs text-gray-400 text-center py-4">暂无今日任务</p>}
-                    {filteredToday.map((task) => (
-                      <div key={task.id} className="flex items-center gap-2 p-2 rounded-xl hover:bg-gray-50 transition group">
-                        <button onClick={() => handleToggleTask(task.id)} className="flex-shrink-0 mt-0.5">
-                          {task.done
-                            ? <CheckCircle2 size={15} style={{ color: "var(--accent)" }} />
-                            : <Circle size={15} className="text-gray-300 flex-shrink-0 group-hover:text-gray-400 transition" />}
-                        </button>
-                        <div className="flex-1 min-w-0">
-                          <p className={cn("text-xs leading-snug", task.done ? "line-through text-gray-400" : "text-gray-700")}>{task.title}</p>
-                          {task.description && (
-                            <p className="text-xs text-gray-400 mt-0.5 leading-snug">{task.description}</p>
-                          )}
-                          <span className="text-xs text-gray-400 flex items-center gap-1 mt-0.5"><Clock size={10} />{task.estimatedMinutes} 分钟</span>
-                        </div>
-                        {task.done && (
-                          <button
-                            onClick={() => setVerifyTask({ taskId: task.id, taskTitle: task.title })}
-                            className="shrink-0 text-xs px-2 py-0.5 rounded-lg text-white transition"
-                            style={{ backgroundColor: "var(--accent)" }}
-                          >
-                            验收
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {tab === "calendar" && (
-                  <div className="px-4 py-4">
-                    <MiniCalendar tasksByDate={tasksByDate} selectedDate={selectedDate} onSelect={setSelectedDate} />
-                    <DayTaskList tasks={tasks} selectedDate={selectedDate} goalId={goal.id} goalTitle={goal.title} />
-                  </div>
+                {tab === "tasks" && (
+                  <GoalTasksWorkspace
+                    goal={goal}
+                    tasks={goalTasks}
+                    selectedDate={selectedDate}
+                    onSelectDate={setSelectedDate}
+                    onToggleTask={handleToggleTask}
+                    onVerify={(task) => setVerifyTask({ taskId: task.id, taskTitle: task.title })}
+                  />
                 )}
 
                 {tab === "notes" && <GoalNotesPanel goalId={goal.id} />}
