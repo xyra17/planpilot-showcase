@@ -68,7 +68,7 @@ function NotesContent() {
         className="flex flex-shrink-0 items-end justify-between gap-4 border-b-2 border-gray-200 bg-white px-6 pt-4"
         style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}
       >
-        <div className="flex min-w-0 items-center gap-1 overflow-x-auto">
+        <div className="flex min-w-0 items-center gap-1">
           {(Object.keys(TAB_META) as Tab[]).map((item) => {
             const meta = TAB_META[item];
             return (
