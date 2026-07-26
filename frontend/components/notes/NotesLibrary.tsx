@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Bot, CalendarDays, FileText, Lightbulb, MoreHorizontal,
+  CalendarDays, FileText, Lightbulb, MoreHorizontal,
   Pencil, Plus, Search, Trash2, X,
 } from "lucide-react";
 import { api } from "@/lib/api";
@@ -15,7 +15,6 @@ type NoteWithAttachments = KnowledgeNote & { attachmentIds?: string[] };
 
 const TYPE_META: Record<string, { label: string; icon: React.ReactNode; cls: string }> = {
   quick_note: { label: "快速记录", icon: <Lightbulb size={11} />, cls: "bg-amber-50 text-amber-700" },
-  chat_note: { label: "AI 摘录", icon: <Bot size={11} />, cls: "bg-violet-50 text-violet-700" },
   daily_log: { label: "学习日志", icon: <CalendarDays size={11} />, cls: "bg-blue-50 text-blue-700" },
   flash_card: { label: "知识卡片", icon: <FileText size={11} />, cls: "bg-emerald-50 text-emerald-700" },
   task_note: { label: "任务笔记", icon: <FileText size={11} />, cls: "bg-gray-100 text-gray-600" },
@@ -78,8 +77,8 @@ export default function NotesLibrary({
   useEffect(() => { load(); }, [load]);
 
   const visibleNotes = useMemo(() => {
-    // 历史快速记录和 AI 摘录继续在知识卡片页可见，避免旧数据失去入口。
-    const allowed = new Set(["flash_card", "quick_note", "chat_note", "task_note"]);
+    // 用户笔记独立于知识库；AI 对话摘录只在知识库中展示。
+    const allowed = new Set(["flash_card", "quick_note", "task_note"]);
     const normalized = query.trim().toLowerCase();
     return notes.filter((note) => {
       if (!allowed.has(note.noteType)) return false;
