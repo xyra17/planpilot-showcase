@@ -382,7 +382,7 @@ export default function DailyJournal() {
                 onClick={() => setSidebarOpen(false)}
                 title="收起日期导航"
                 aria-label="收起日期导航"
-                className="absolute right-2 top-2 h-8 w-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition"
+                className="absolute right-2 top-0.5 h-8 w-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition"
               >
                 <ChevronLeft size={14} />
               </button>
@@ -538,12 +538,56 @@ export default function DailyJournal() {
           </>
         ) : (
           <div className="flex flex-col flex-1 min-h-0">
-            <div className="h-9 flex items-center gap-2 mb-3 flex-shrink-0">
-              <button onClick={handleCancel} className="flex items-center gap-1 text-sm text-gray-400 hover:text-gray-700 transition">
-                <ChevronLeft size={14} />返回
-              </button>
-              <span className="text-sm text-gray-300">/</span>
-              <span className="text-sm text-gray-500">{isNewDraft ? "新建学习记录" : "编辑"}</span>
+            <div className="h-9 flex items-center justify-between gap-4 mb-3 flex-shrink-0">
+              <div className="flex items-center gap-2 min-w-0">
+                <button onClick={handleCancel} className="flex items-center gap-1 text-sm text-gray-400 hover:text-gray-700 transition">
+                  <ChevronLeft size={14} />返回
+                </button>
+                <span className="text-sm text-gray-300">/</span>
+                <span className="text-sm text-gray-500 whitespace-nowrap">{isNewDraft ? "新建学习记录" : "编辑"}</span>
+              </div>
+              <div className="flex items-center justify-end gap-2 min-w-0">
+                <Target size={13} className="text-gray-400 flex-shrink-0" />
+                <span className="text-xs text-gray-400 shrink-0">目标</span>
+                {activeGoals.length > 0 ? (
+                  <select
+                    value={draftGoalId ?? ""}
+                    onChange={(e) => {
+                      setDraftGoalId(e.target.value || null);
+                      setDraftTaskId(null);
+                      setSaveStatus("dirty");
+                    }}
+                    className="max-w-[220px] text-xs text-gray-700 border border-gray-100 rounded-lg px-2 py-1.5 focus:outline-none bg-white"
+                  >
+                    <option value="">不关联目标</option>
+                    {activeGoals.map((g) => (
+                      <option key={g.id} value={g.id}>{g.title}</option>
+                    ))}
+                  </select>
+                ) : <span className="text-xs text-gray-400 whitespace-nowrap">暂无进行中的目标</span>}
+                {draftGoalId && (
+                  <>
+                    <span className="mx-1 h-4 w-px bg-gray-200 flex-shrink-0" />
+                    <ListChecks size={13} className="text-gray-400 flex-shrink-0" />
+                    <span className="text-xs text-gray-400 shrink-0">任务</span>
+                    <select
+                      value={draftTaskId ?? ""}
+                      onChange={(e) => {
+                        setDraftTaskId(e.target.value || null);
+                        setSaveStatus("dirty");
+                      }}
+                      className="max-w-[280px] text-xs text-gray-700 border border-gray-100 rounded-lg px-2 py-1.5 focus:outline-none bg-white"
+                    >
+                      <option value="">不关联具体任务</option>
+                      {goalTasks.map((task) => (
+                        <option key={task.id} value={task.id}>
+                          {task.title}{task.date ? ` · ${task.date}` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </>
+                )}
+              </div>
             </div>
             <input
               value={draftTitle}
@@ -551,48 +595,6 @@ export default function DailyJournal() {
               placeholder="无标题"
               className="w-full text-2xl font-bold text-gray-900 border-0 px-1 py-1 mb-2 focus:outline-none placeholder:text-gray-300 flex-shrink-0 bg-transparent"
             />
-            <div className="flex items-center gap-2 mb-3 flex-wrap flex-shrink-0 rounded-xl border border-gray-100 bg-gray-50/70 px-3 py-2">
-              <Target size={13} className="text-gray-400" />
-              <span className="text-xs text-gray-400 shrink-0">目标</span>
-              {activeGoals.length > 0 ? (
-                <select
-                  value={draftGoalId ?? ""}
-                  onChange={(e) => {
-                    setDraftGoalId(e.target.value || null);
-                    setDraftTaskId(null);
-                    setSaveStatus("dirty");
-                  }}
-                  className="max-w-[220px] text-xs text-gray-700 border-0 rounded-lg px-2 py-1 focus:outline-none bg-white shadow-sm"
-                >
-                  <option value="">不关联目标</option>
-                  {activeGoals.map((g) => (
-                    <option key={g.id} value={g.id}>{g.title}</option>
-                  ))}
-                </select>
-              ) : <span className="text-xs text-gray-400">暂无进行中的目标</span>}
-              {draftGoalId && (
-                <>
-                  <span className="mx-1 h-4 w-px bg-gray-200" />
-                  <ListChecks size={13} className="text-gray-400" />
-                  <span className="text-xs text-gray-400 shrink-0">任务</span>
-                  <select
-                    value={draftTaskId ?? ""}
-                    onChange={(e) => {
-                      setDraftTaskId(e.target.value || null);
-                      setSaveStatus("dirty");
-                    }}
-                    className="max-w-[280px] text-xs text-gray-700 border-0 rounded-lg px-2 py-1 focus:outline-none bg-white shadow-sm"
-                  >
-                    <option value="">不关联具体任务</option>
-                    {goalTasks.map((task) => (
-                      <option key={task.id} value={task.id}>
-                        {task.title}{task.date ? ` · ${task.date}` : ""}
-                      </option>
-                    ))}
-                  </select>
-                </>
-              )}
-            </div>
             <TiptapEditor
               key={editing?.id ?? "new"}
               content={draftContent}
