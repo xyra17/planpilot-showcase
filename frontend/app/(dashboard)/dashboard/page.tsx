@@ -159,7 +159,7 @@ function StudyCalendar({ data }: { data: { date: string; minutes: number }[] }) 
   // Monday-based offset: Mon=0 … Sun=6
   const firstDowMon = (new Date(year, month, 1).getDay() + 6) % 7;
 
-  // 标准月历：7 个星期列 × 最多 6 行，完整保留月初和月末日期
+  // 42 cells = 6 week-columns × 7 day-rows, addressed as cells[col*7 + row]
   const cells = Array.from({ length: 42 }, (_, i) => {
     const day = i - firstDowMon + 1;
     if (day < 1 || day > daysInMonth) return null;
@@ -190,42 +190,41 @@ function StudyCalendar({ data }: { data: { date: string; minutes: number }[] }) 
         <div className="flex-1" />
       </div>
 
-      <div>
-        <div className="mb-1.5 grid grid-cols-7 gap-1.5">
-          {WEEK_ROW_LABELS.map((label) => (
-            <div key={label} className="text-center text-[10px] text-gray-400">
-              {label.replace("星期", "周")}
-            </div>
+      <div className="flex">
+        {/* 行标签：星期X */}
+        <div className="flex flex-col gap-[4px] flex-shrink-0 mr-10">
+          {WEEK_ROW_LABELS.map((d) => (
+            <div key={d} style={{ width: 40, height: 14, lineHeight: "14px", fontSize: 11 }}
+              className="text-gray-400 text-right leading-none">{d}</div>
           ))}
         </div>
-        <div className="grid grid-cols-7 gap-1.5">
-          {cells.map((cell, index) => {
-            const mins = cell?.minutes ?? 0;
-            const day = cell ? Number(cell.dateStr.slice(-2)) : null;
-            return (
-              <div
-                key={cell?.dateStr ?? `empty-${index}`}
-                title={cell ? `${cell.dateStr} · ${mins} 分钟` : ""}
-                className={cn(
-                  "relative flex h-8 min-w-0 items-center justify-center rounded-md text-[10px] transition",
-                  cell ? "text-gray-600" : "pointer-events-none"
-                )}
-                style={cell ? {
-                  backgroundColor: heatColor(mins),
-                  outline: cell.isToday ? "1.5px solid var(--accent)" : undefined,
-                  outlineOffset: cell.isToday ? 1 : undefined,
-                  color: mins >= 60 ? "white" : undefined,
-                } : undefined}
-              >
-                {day}
-                {cell?.isToday && (
-                  <span className="absolute bottom-0.5 right-1 text-[7px] font-semibold" style={{ color: mins >= 60 ? "white" : "var(--accent)" }}>
-                    今
-                  </span>
-                )}
-              </div>
-            );
-          })}
+        {/* 6 周列，flex-1 撑满宽度 */}
+        <div className="flex flex-1 gap-3">
+        {Array.from({ length: 6 }, (_, wi) => (
+          <div key={wi} className="flex-1 flex flex-col gap-[4px]">
+            {Array.from({ length: 7 }, (_, di) => {
+              const cell = cells[wi * 7 + di];
+              const mins = cell?.minutes ?? 0;
+              return (
+                <div key={di} className="flex items-center gap-[4px]"
+                  title={cell ? `${cell.dateStr}  ${mins}分钟` : ""}>
+                  <div className="flex-shrink-0 rounded-[3px]"
+                    style={{
+                      width: 28, height: 14,
+                      backgroundColor: cell ? heatColor(mins) : "transparent",
+                      outline: cell?.isToday ? "1.5px solid var(--accent)" : undefined,
+                      outlineOffset: cell?.isToday ? 1 : undefined,
+                    }} />
+                  {cell && mins > 0 && (
+                    <span className="text-[9px] text-gray-400 leading-none truncate">
+                      {mins >= 60 ? `${(mins / 60).toFixed(1)}h` : `${mins}m`}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ))}
         </div>
       </div>
 
