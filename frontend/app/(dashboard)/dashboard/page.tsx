@@ -391,7 +391,7 @@ function TodayTasksPanel() {
             )}
             {!isLoading && !error && filtered.length === 0 && <p className="text-xs text-gray-400 text-center py-6">暂无今日任务</p>}
             {filtered.map((task) => (
-              <div key={task.id} className="group flex items-start gap-2 px-2 py-2 rounded-xl hover:bg-gray-50 transition">
+              <div key={task.id} className="today-task-item group flex items-start gap-2 border border-transparent px-2 py-2 rounded-xl hover:bg-gray-50 transition">
                 <button onClick={() => toggleTask(task.id)} className="mt-0.5 flex-shrink-0">
                   {task.done
                     ? <CheckCircle2 size={15} style={{ color: "var(--accent)" }} />
