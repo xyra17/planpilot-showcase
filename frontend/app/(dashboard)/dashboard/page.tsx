@@ -871,7 +871,7 @@ function DailySchedulePanel() {
                           <div key={key} className="flex items-center justify-between">
                             <span className="text-[10px] text-gray-500">{label} {start}</span>
                             <div className="flex items-center gap-1">
-                              <button onClick={() => updateSlotHour(key, Math.max(0.5, +(slotHours[key] - 0.5).toFixed(1)))}
+                              <button onClick={() => updateSlotHour(key, Math.max(0, +(slotHours[key] - 0.5).toFixed(1)))}
                                 className="w-5 h-5 rounded flex items-center justify-center text-gray-400 hover:bg-gray-100">−</button>
                               <span className="text-[10px] text-gray-700 w-6 text-center">{slotHours[key]}h</span>
                               <button onClick={() => updateSlotHour(key, Math.min(8, +(slotHours[key] + 0.5).toFixed(1)))}
