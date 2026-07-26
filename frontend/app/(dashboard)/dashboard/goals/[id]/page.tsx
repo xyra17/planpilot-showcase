@@ -831,25 +831,7 @@ function PlanOverview({ goalId, deadline, refreshKey, hideRegenerate, dailyHours
                         {/* 任务序号仅用于定位，不承担状态切换 */}
                         <span
                           title={isDone ? "任务已完成" : "任务序号"}
-                          className={cn(
-                            "plan-task-number flex h-5 w-5 flex-shrink-0 cursor-default items-center justify-center rounded border text-[10px] font-semibold",
-                            isMastered
-                              ? "is-mastered"
-                              : isDone
-                              ? "border-transparent text-white"
-                              : "border-gray-200 text-gray-400"
-                          )}
-                          style={
-                            isMastered
-                              ? {
-                                  color: "var(--accent)",
-                                  borderColor: "color-mix(in srgb, var(--accent) 30%, transparent)",
-                                  backgroundColor: "var(--accent-light)",
-                                }
-                              : isDone
-                                ? { backgroundColor: "var(--accent)" }
-                                : {}
-                          }
+                          className="plan-task-number flex h-5 w-5 flex-shrink-0 cursor-default items-center justify-center rounded border border-gray-200 text-[10px] font-semibold text-gray-400"
                         >
                           {ti + 1}
                         </span>

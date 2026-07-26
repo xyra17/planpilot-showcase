@@ -1312,7 +1312,6 @@ html {
 [data-theme="journal"] .plan-phase-title.is-complete {
   color:var(--accent) !important;
 }
-[data-theme="journal"] .plan-task-number.is-mastered,
 [data-theme="journal"] .plan-mastery-button.is-mastered {
   color:var(--accent) !important;
   border-color:color-mix(in srgb,var(--accent) 32%,transparent) !important;
