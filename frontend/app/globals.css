@@ -843,12 +843,28 @@ html {
 [data-theme="journal"] .calm-app button {
   border-radius:9px 7px 10px 6px;
 }
-[data-theme="journal"] .calm-app button[class*="bg-indigo"],
-[data-theme="journal"] .calm-app button[class*="bg-blue"],
-[data-theme="journal"] .calm-app button[class*="bg-purple"] {
+[data-theme="journal"] .calm-app button[class~="bg-indigo-600"],
+[data-theme="journal"] .calm-app button[class~="bg-blue-600"],
+[data-theme="journal"] .calm-app button[class~="bg-purple-600"] {
   color:var(--surface) !important;
   background-color:var(--accent-dark) !important;
   box-shadow:2px 2px 0 color-mix(in srgb,var(--text-1) 20%,transparent);
+}
+[data-theme="journal"] .goal-card-action {
+  color:var(--text-3) !important;
+  background:transparent !important;
+  border:1px solid transparent;
+  box-shadow:none !important;
+}
+[data-theme="journal"] .goal-card-action:hover {
+  color:var(--accent) !important;
+  border-color:color-mix(in srgb,var(--accent) 24%,transparent);
+  background:color-mix(in srgb,var(--accent-light) 58%,var(--surface)) !important;
+}
+[data-theme="journal"] .goal-card-delete:hover {
+  color:#B85C52 !important;
+  border-color:color-mix(in srgb,#B85C52 24%,transparent);
+  background:color-mix(in srgb,#B85C52 8%,var(--surface)) !important;
 }
 [data-theme="journal"] .calm-app [class*="rounded-full"] {
   border-color:color-mix(in srgb,var(--text-1) 22%,transparent);

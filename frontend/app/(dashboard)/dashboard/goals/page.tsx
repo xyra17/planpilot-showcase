@@ -177,7 +177,7 @@ export default function GoalsPage() {
                     e.stopPropagation();
                     router.push(`/dashboard/goals/${goal.id}/edit`);
                   }}
-                  className="p-1.5 rounded-lg text-gray-300 hover:text-blue-600 hover:bg-blue-50 transition"
+                  className="goal-card-action goal-card-edit flex h-8 w-8 items-center justify-center rounded-lg text-gray-300 transition hover:bg-blue-50 hover:text-blue-600"
                   title="编辑"
                 >
                   <Pencil size={14} />
@@ -186,7 +186,7 @@ export default function GoalsPage() {
                   type="button"
                   onClick={(e) => handleDelete(e, goal.id)}
                   disabled={deletingId === goal.id}
-                  className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition disabled:opacity-50"
+                  className="goal-card-action goal-card-delete flex h-8 w-8 items-center justify-center rounded-lg text-gray-300 transition hover:bg-red-50 hover:text-red-500 disabled:opacity-50"
                   title="删除"
                 >
                   <Trash2 size={14} />

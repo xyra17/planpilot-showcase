@@ -447,7 +447,7 @@ export default function DailyJournal({
                     className="px-2.5 py-0.5 rounded-md text-sm font-medium transition"
                     style={navTab === t ? { background: "var(--accent-light)", color: "var(--accent)" } : { color: "#9ca3af" }}
                   >
-                    {t === "week" ? "周期" : "月历"}
+                    {t === "week" ? "周历" : "月历"}
                   </button>
                 ))}
               </div>
@@ -469,7 +469,11 @@ export default function DailyJournal({
                         <button
                           key={ds}
                           onClick={() => handleSelectDate(ds)}
-                          className="w-full flex items-center justify-between px-2 py-1 rounded-xl transition hover:bg-gray-50"
+                          className="w-full flex items-center justify-between border px-2 py-1 rounded-xl transition hover:bg-gray-50"
+                          style={isToday ? {
+                            backgroundColor: "color-mix(in srgb, var(--accent-light) 72%, var(--surface))",
+                            borderColor: "color-mix(in srgb, var(--accent) 24%, transparent)",
+                          } : { borderColor: "transparent" }}
                         >
                           <span className="text-[13px] font-medium" style={{ color: isSelected || isToday ? "var(--accent)" : "#9ca3af" }}>
                             {d.toLocaleDateString("zh-CN", { weekday: "short" })}
@@ -477,8 +481,17 @@ export default function DailyJournal({
                           <span className="text-[13px] tabular-nums" style={{ color: isSelected || isToday ? "var(--accent)" : "#4b5563" }}>
                             {d.getMonth() + 1}月{d.getDate()}日
                           </span>
-                          <span className="w-2 h-2 rounded-full flex-shrink-0"
-                            style={{ background: isSelected ? "var(--accent)" : isToday ? "var(--accent-light)" : "transparent" }} />
+                          {isToday ? (
+                            <span
+                              className="flex-shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-semibold"
+                              style={{ backgroundColor: "var(--accent)", color: "var(--surface)" }}
+                            >
+                              今天
+                            </span>
+                          ) : (
+                            <span className="h-2 w-2 flex-shrink-0 rounded-full"
+                              style={{ background: isSelected ? "var(--accent)" : "transparent" }} />
+                          )}
                         </button>
                       );
                     })}
