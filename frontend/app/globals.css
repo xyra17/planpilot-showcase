@@ -805,14 +805,44 @@ html {
 [data-theme="journal"] .calm-app .shadow-2xl {
   position:relative;
   background-image:
-    repeating-linear-gradient(0deg,transparent 0 29px,color-mix(in srgb,var(--text-1) 5%,transparent) 29px 30px);
+    radial-gradient(circle at 18% 24%,color-mix(in srgb,var(--text-1) 3.5%,transparent) 0 1px,transparent 1.4px),
+    repeating-linear-gradient(2deg,color-mix(in srgb,white 4%,transparent) 0 1px,transparent 1px 6px);
 }
 [data-theme="journal"] .calm-app .fixed.inset-0 > .shadow-xl,
 [data-theme="journal"] .calm-app .fixed.inset-0 > .shadow-2xl {
-  width:min(100%,42rem);
-  max-height:min(88vh,52rem);
-  overflow-y:auto;
-  padding-block:clamp(1rem,2.5vw,1.5rem);
+  isolation:isolate;
+}
+[data-theme="journal"] .calm-app .fixed.inset-0 > .shadow-xl::after,
+[data-theme="journal"] .calm-app .fixed.inset-0 > .shadow-2xl::after {
+  inset:1px;
+  opacity:.5;
+}
+[data-theme="journal"] .calm-app .fixed.inset-0 > .shadow-xl::before,
+[data-theme="journal"] .calm-app .fixed.inset-0 > .shadow-2xl::before {
+  content:"";
+  position:absolute;
+  z-index:4;
+  pointer-events:none;
+  top:5px;
+  left:50%;
+  width:68px;
+  height:14px;
+  background:color-mix(in srgb,var(--journal-tape) 54%,transparent);
+  border-inline:1px solid color-mix(in srgb,var(--text-1) 9%,transparent);
+  box-shadow:0 1px 1px color-mix(in srgb,var(--text-1) 7%,transparent);
+  transform:translateX(-50%) rotate(-1.5deg);
+}
+[data-theme="journal"] .calm-app .fixed.inset-0 > .shadow-xl > [class*="border-b"],
+[data-theme="journal"] .calm-app .fixed.inset-0 > .shadow-2xl > [class*="border-b"],
+[data-theme="journal"] .calm-app .fixed.inset-0 > .shadow-xl > [class*="border-t"],
+[data-theme="journal"] .calm-app .fixed.inset-0 > .shadow-2xl > [class*="border-t"] {
+  border-color:color-mix(in srgb,var(--text-1) 18%,transparent) !important;
+  border-style:dashed;
+}
+[data-theme="journal"] .calm-app .fixed.inset-0 > .shadow-xl button[aria-label*="关闭"],
+[data-theme="journal"] .calm-app .fixed.inset-0 > .shadow-2xl button[aria-label*="关闭"] {
+  border:1px solid color-mix(in srgb,var(--text-1) 14%,transparent);
+  background:color-mix(in srgb,var(--surface) 82%,var(--accent-light)) !important;
 }
 [data-theme="journal"] .calm-app .fixed.right-0.shadow-2xl {
   width:min(27rem,100vw) !important;
