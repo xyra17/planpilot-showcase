@@ -971,7 +971,7 @@ function DailySchedulePanel() {
 
           {/* 列表视图 */}
           {viewMode === "list" && (
-            <div className="h-44 overflow-y-scroll space-y-1.5 pr-1">
+            <div className="daily-plan-scroll h-44 space-y-1.5 overflow-x-hidden overflow-y-scroll pr-2">
               {blocks.length === 0 && (
                 <div className="py-8 text-center text-xs text-gray-400">
                   {latePlanMsg ? "今天已经很晚了，好好休息 💤 明天继续加油吧！" : "点击「AI 智能规划」生成今日时间规划"}
@@ -1510,7 +1510,7 @@ export default function DashboardPage() {
               全部 <ArrowRight size={11} />
             </Link>
           </div>
-          <div className="space-y-3 flex-1 overflow-y-auto min-h-0">
+          <div className="goal-progress-scroll min-h-0 flex-1 space-y-3 overflow-x-hidden overflow-y-auto pr-2">
             {goals.length === 0 && (
               <p className="text-xs text-gray-400 text-center py-6">暂无目标，去创建一个吧</p>
             )}
@@ -1523,7 +1523,7 @@ export default function DashboardPage() {
               const deadlineStr = `${deadlineDate.getMonth() + 1}月${deadlineDate.getDate()}日`;
               return (
                 <Link key={goal.id} href={`/dashboard/goals/${goal.id}`}
-                  className="group block rounded-xl px-2.5 py-2 hover:bg-gray-50 transition -mx-1">
+                  className="goal-progress-item group block w-full rounded-xl border border-transparent px-2.5 py-2 transition">
                   <div className="flex items-center justify-between mb-1.5">
                     <span className="text-sm text-gray-700 truncate flex-1 mr-2">{goal.title}</span>
                     <span className="relative flex-shrink-0 h-4 flex items-center">
