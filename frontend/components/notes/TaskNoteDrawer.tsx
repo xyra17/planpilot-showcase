@@ -58,7 +58,7 @@ export default function TaskNoteDrawer({ task, onClose }: TaskNoteDrawerProps) {
       <div className="fixed inset-0 z-40 bg-black/10" onClick={onClose} />
 
       {/* 抽屉 */}
-      <div className="fixed right-0 top-0 bottom-0 z-50 w-[420px] bg-white shadow-2xl flex flex-col">
+      <div role="dialog" aria-modal="true" aria-label="任务笔记" className="fixed right-0 top-0 bottom-0 z-50 w-[420px] bg-white shadow-2xl flex flex-col">
         {/* 头部 */}
         <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-100">
           <div className="flex-1 min-w-0">

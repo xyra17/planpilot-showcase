@@ -52,7 +52,7 @@ export default function KBCreateDrawer({ open, onClose, onConfirm }: KBCreateDra
     <>
       <div className="fixed inset-0 bg-black/20 z-40" onClick={handleClose} />
 
-      <div className="fixed top-0 right-0 h-full w-96 bg-white shadow-2xl z-50 flex flex-col">
+      <div role="dialog" aria-modal="true" aria-label="新建知识库" className="fixed top-0 right-0 h-full w-96 bg-white shadow-2xl z-50 flex flex-col">
         {/* 头部 */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <div className="flex items-center gap-2">

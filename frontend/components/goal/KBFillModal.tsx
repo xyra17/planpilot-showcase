@@ -80,7 +80,7 @@ export default function KBFillModal({ open, kbId, goalId, kbName, onDone }: KBFi
 
   return (
     <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col max-h-[85vh]">
+      <div role="dialog" aria-modal="true" aria-label="向知识库添加内容" className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col max-h-[85vh]">
         {/* 头部 */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <div>

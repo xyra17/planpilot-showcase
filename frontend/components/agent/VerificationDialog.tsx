@@ -123,7 +123,7 @@ export function VerificationDialog({ goalId, taskId, taskTitle, onClose, onPasse
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl flex flex-col max-h-[85vh]">
+      <div role="dialog" aria-modal="true" aria-label="学习验收" className="w-full max-w-md bg-white rounded-2xl shadow-2xl flex flex-col max-h-[85vh]">
         {/* 头部 */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <div>

@@ -116,7 +116,7 @@ function QuickNewCard({ onAdd, onClose }: { onAdd: (content: string, title: stri
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/30" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 mb-6 sm:mb-0 overflow-hidden"
+      <div role="dialog" aria-modal="true" aria-label="新建备忘录" className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 mb-6 sm:mb-0 overflow-hidden"
         onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-4 pt-4 pb-2">
           <span className="text-sm font-medium text-gray-700">新建备忘录</span>

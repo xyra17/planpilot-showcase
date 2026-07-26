@@ -813,7 +813,7 @@ function DailySchedulePanel() {
   const selectedBlock = blocks.find((b) => b.id === selectedId);
 
   return (
-    <div className="bg-gray-50 rounded-2xl shadow-sm border border-gray-100 p-5">
+    <div className="journal-card bg-gray-50 rounded-2xl shadow-sm border border-gray-100 p-5">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
@@ -1451,7 +1451,7 @@ export default function DashboardPage() {
 
       {/* ── 学习时长趋势 + 热力图 ── */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        <div className="bg-gray-50 rounded-2xl shadow-sm border border-gray-100 p-5">
+        <div className="journal-card bg-gray-50 rounded-2xl shadow-sm border border-gray-100 p-5">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "var(--accent-light)" }}>
@@ -1488,7 +1488,7 @@ export default function DashboardPage() {
           <div className="mt-4"><StudyLineChart data={periodData[period]} /></div>
         </div>
 
-        <div className="bg-gray-50 rounded-2xl shadow-sm border border-gray-100 p-5">
+        <div className="journal-card bg-gray-50 rounded-2xl shadow-sm border border-gray-100 p-5">
           <StudyCalendar data={heatmapData} />
         </div>
       </div>
@@ -1499,7 +1499,7 @@ export default function DashboardPage() {
         <TodayTasksPanel />
 
         {/* 目标进度 */}
-        <div className="bg-gray-50 rounded-2xl shadow-sm border border-gray-100 p-5 flex flex-col h-[360px]">
+        <div className="journal-card bg-gray-50 rounded-2xl shadow-sm border border-gray-100 p-5 flex flex-col h-[360px]">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "var(--accent-light)" }}>
