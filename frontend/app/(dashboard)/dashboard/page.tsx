@@ -292,7 +292,7 @@ function TodayTasksPanel() {
   }, [goals, newGoalId]);
 
   return (
-    <div className="bg-gray-50 rounded-2xl shadow-sm border border-gray-100 p-5 flex flex-col h-[360px]">
+    <div className="journal-receipt bg-gray-50 rounded-2xl shadow-sm border border-gray-100 p-5 flex flex-col h-[360px]">
       {/* 面板头 */}
       <div className="flex items-center justify-between mb-4 flex-shrink-0">
         <div className="flex items-center gap-2">

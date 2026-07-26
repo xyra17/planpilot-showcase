@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useTheme, type ThemeMode, type ColorScheme } from "@/lib/theme-context";
 import { useAuthStore } from "@/lib/stores/authStore";
 import { api } from "@/lib/api";
-import { Monitor, Moon, Eye, Pencil, Check, ChevronDown, ChevronRight, LogOut, X, Trash2 } from "lucide-react";
+import { Monitor, Moon, Eye, Pencil, NotebookPen, Check, ChevronDown, ChevronRight, LogOut, X, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const THEME_OPTIONS: { value: ThemeMode; label: string; desc: string; icon: React.ElementType; preview: string }[] = [
@@ -13,6 +13,7 @@ const THEME_OPTIONS: { value: ThemeMode; label: string; desc: string; icon: Reac
   { value: "dark",     label: "暗黑", desc: "深色背景，护眼减蓝光",     icon: Moon,    preview: "bg-slate-800 border-slate-600"  },
   { value: "eye-care", label: "护眼", desc: "暖黄纸质感，长时阅读友好", icon: Eye,     preview: "bg-amber-50 border-amber-200"   },
   { value: "sketch",   label: "手绘", desc: "草图风格，圆角变直角",     icon: Pencil,  preview: "bg-yellow-50 border-yellow-300" },
+  { value: "journal",  label: "手账纸稿", desc: "纸张、铅笔与便签质感", icon: NotebookPen, preview: "bg-[#f2eadb] border-[#9a8b75]" },
 ];
 
 type ColorGroup = { label: string; items: { value: ColorScheme; label: string; swatches: string[] }[] };
@@ -48,16 +49,6 @@ const COLOR_GROUPS: ColorGroup[] = [
       { value: "morandi-blue",       label: "莫兰迪蓝", swatches: ["#F2F6FB", "#EAF1F9", "#DCE8F6", "#1E5EA8"] },
       { value: "morandi-purple",     label: "莫兰迪紫", swatches: ["#F4F3FB", "#EDEBF7", "#E4E1F5", "#4B3F9E"] },
       { value: "silver",             label: "中性灰", swatches: ["#6E6E73", "#AEAEB2", "#E5E5EA", "#F5F5F7"] },
-    ],
-  },
-  {
-    label: "全局风格",
-    items: [
-      { value: "calm-amber",  label: "象牙海军蓝", swatches: ["#F7F1E7", "#273142", "#D18A4A", "#E8D8C1"] },
-      { value: "calm-pine",   label: "亚麻松墨",   swatches: ["#EEF0E8", "#2F3B35", "#B17B52", "#CBD5C8"] },
-      { value: "calm-mist",   label: "雾蓝珊瑚",   swatches: ["#EEF2F3", "#31414D", "#C96F5B", "#CAD7DB"] },
-      { value: "calm-terra",  label: "浅紫赭金",   swatches: ["#F3EFF3", "#40394B", "#B7853E", "#D9CFDD"] },
-      { value: "calm-sunset", label: "纸张石墨",   swatches: ["#F1EADF", "#3B3936", "#A56E46", "#D8CCBA"] },
     ],
   },
 ];

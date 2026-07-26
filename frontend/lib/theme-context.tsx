@@ -3,14 +3,13 @@
 import { createContext, useContext, useState, useEffect } from "react";
 import { useAuthStore } from "@/lib/stores/authStore";
 
-export type ThemeMode = "default" | "dark" | "eye-care" | "sketch";
+export type ThemeMode = "default" | "dark" | "eye-care" | "sketch" | "journal";
 
 export type ColorScheme =
   | "blue" | "indigo" | "violet" | "rose" | "amber" | "emerald" | "teal"
   | "rainbow"
   | "morandi-rose" | "morandi-sage" | "morandi-stone" | "morandi-terracotta" | "morandi-lavender"
-  | "silver" | "mint" | "morandi-blue" | "morandi-purple"
-  | "calm-amber" | "calm-pine" | "calm-mist" | "calm-terra" | "calm-sunset";
+  | "silver" | "mint" | "morandi-blue" | "morandi-purple";
 
 interface ThemeContextType {
   mode: ThemeMode;
@@ -46,11 +45,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   }
 
   function setColorScheme(c: ColorScheme) {
-    if (c.startsWith("calm-")) {
-      setModeState("default");
-      document.documentElement.setAttribute("data-theme", "default");
-      localStorage.setItem(modeKey, "default");
-    }
     setColorSchemeState(c);
     document.documentElement.setAttribute("data-color", c);
     localStorage.setItem(colorKey, c);
@@ -59,10 +53,16 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   // userId 变化时（登录/登出/切换账号）重新加载该用户的主题设置
   useEffect(() => {
     let savedMode = (localStorage.getItem(modeKey) as ThemeMode) || "default";
-    const savedColor = (localStorage.getItem(colorKey) as ColorScheme) || "indigo";
-    if (savedColor.startsWith("calm-")) savedMode = "default";
+    let savedColor = (localStorage.getItem(colorKey) as ColorScheme | string) || "indigo";
+    // 将已删除的全局配色平滑迁移到新的独立手账纸稿风格。
+    if (savedColor.startsWith("calm-")) {
+      savedMode = "journal";
+      savedColor = "indigo";
+      localStorage.setItem(modeKey, savedMode);
+      localStorage.setItem(colorKey, savedColor);
+    }
     setModeState(savedMode);
-    setColorSchemeState(savedColor);
+    setColorSchemeState(savedColor as ColorScheme);
     document.documentElement.setAttribute("data-theme", savedMode);
     document.documentElement.setAttribute("data-color", savedColor);
   }, [modeKey, colorKey]);
