@@ -238,10 +238,10 @@ export default function TiptapEditor({
     <div
       ref={editorWrapRef}
       style={style}
-      className={`flex flex-col border border-gray-200 rounded-lg overflow-hidden bg-white ${className}`}
+      className={`tiptap-editor flex flex-col border border-gray-200 rounded-lg overflow-hidden bg-white ${className}`}
     >
       {showToolbar && editor && <EditorToolbar editor={editor} noteId={noteId} />}
-      <EditorContent editor={editor} className="flex-1 min-h-0 overflow-y-auto overscroll-contain" />
+      <EditorContent editor={editor} className="tiptap-editor-scroll flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain" />
       {slashMenu && editor && (
         <SlashMenu
           editor={editor}

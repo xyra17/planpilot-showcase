@@ -62,7 +62,7 @@ export default function EditorToolbar({ editor, noteId }: EditorToolbarProps) {
   );
 
   return (
-    <div className="sticky top-0 z-10 flex items-center gap-0.5 overflow-x-auto border-b border-gray-100 bg-white/95 px-3 py-2 backdrop-blur">
+    <div className="editor-toolbar sticky top-0 z-10 flex items-center gap-0.5 overflow-x-auto overflow-y-hidden border-b border-gray-100 bg-white/95 px-3 py-2 backdrop-blur">
       {btn(false, () => editor.chain().focus().undo().run(), <Undo2 size={15} />, "撤销")}
       {btn(false, () => editor.chain().focus().redo().run(), <Redo2 size={15} />, "重做")}
       {divider("d1")}

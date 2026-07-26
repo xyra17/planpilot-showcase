@@ -648,7 +648,7 @@ export default function DailyJournal({
               value={draftTitle}
               onChange={(e) => { setDraftTitle(e.target.value); setSaveStatus("dirty"); }}
               placeholder="无标题"
-              className="w-full text-xl font-semibold text-gray-900 border-0 px-1 py-1 mb-2 focus:outline-none placeholder:text-gray-300 flex-shrink-0 bg-transparent"
+              className="note-title-input w-full text-xl font-semibold text-gray-900 border-0 px-1 py-1 mb-2 focus:outline-none placeholder:text-gray-300 flex-shrink-0 bg-transparent"
             />
             <TiptapEditor
               key={editing?.id ?? "new"}
