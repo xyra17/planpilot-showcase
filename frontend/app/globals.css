@@ -1295,6 +1295,40 @@ html {
 [data-theme="journal"] .plan-phase-progress-track {
   height:3px !important;
 }
+[data-theme="journal"] .plan-mastery-help {
+  color:var(--text-2) !important;
+  border:1px dashed color-mix(in srgb,var(--accent) 22%,transparent) !important;
+  background:color-mix(in srgb,var(--surface) 82%,var(--accent-light)) !important;
+}
+[data-theme="journal"] .plan-mastery-help svg,
+[data-theme="journal"] .plan-mastery-help strong {
+  color:var(--accent);
+}
+[data-theme="journal"] .plan-mastery-feedback {
+  color:var(--ok-text) !important;
+  border-color:color-mix(in srgb,var(--ok-text) 28%,transparent) !important;
+  background:var(--ok-bg) !important;
+}
+[data-theme="journal"] .plan-phase-title.is-complete {
+  color:var(--ok-text) !important;
+}
+[data-theme="journal"] .plan-task-number.is-mastered,
+[data-theme="journal"] .plan-mastery-button.is-mastered {
+  color:var(--ok-text) !important;
+  border-color:color-mix(in srgb,var(--ok-text) 32%,transparent) !important;
+  background:var(--ok-bg) !important;
+}
+[data-theme="journal"] .plan-mastery-button {
+  color:var(--text-3) !important;
+  border:1px dashed color-mix(in srgb,var(--text-1) 22%,transparent) !important;
+  border-radius:7px 5px 8px 6px !important;
+  background:color-mix(in srgb,var(--surface) 88%,var(--accent-light)) !important;
+}
+[data-theme="journal"] .plan-mastery-button:not(.is-mastered):hover {
+  color:var(--accent) !important;
+  border-color:color-mix(in srgb,var(--accent) 42%,transparent) !important;
+  background:color-mix(in srgb,var(--surface) 68%,var(--accent-light)) !important;
+}
 [data-theme="journal"] .goal-task-scroll,
 [data-theme="journal"] .goal-detail-scroll {
   scrollbar-color:color-mix(in srgb,var(--accent) 52%,var(--journal-scroll-thumb)) transparent;

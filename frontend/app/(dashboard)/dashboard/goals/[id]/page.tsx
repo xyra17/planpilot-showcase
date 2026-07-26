@@ -8,7 +8,7 @@ import {
   ArrowLeft, CheckCircle2, Circle, Clock,
   Bot, Plus, Trash2, Pencil, FileText,
   Check, X, Search, ChevronLeft, ChevronRight, ChevronDown, ChevronUp,
-  Loader2, BookOpen, Calendar, BarChart3,
+  Loader2, BookOpen, Calendar, BarChart3, Info,
 } from "lucide-react";
 import { useTasks, type Task, type Priority } from "@/lib/tasks-context";
 import { cn } from "@/lib/utils";
@@ -562,8 +562,12 @@ function PlanOverview({ goalId, deadline, refreshKey, hideRegenerate, dailyHours
           预计 {totalDays} 天（{fmtDate(firstDate)} - {fmtDate(lastDate)}）
         </p>
       )}
+      <div className="plan-mastery-help flex items-start gap-1.5 rounded-lg border border-gray-100 bg-gray-50 px-2.5 py-2 text-[11px] leading-relaxed text-gray-500">
+        <Info size={12} className="mt-0.5 flex-shrink-0" />
+        <span><strong>完成</strong>表示已经执行任务；<strong>掌握</strong>表示已经能够独立完成，并计入总体进度。</span>
+      </div>
       {masteryHint && (
-        <div className="text-xs text-green-700 bg-green-50 border border-green-100 rounded-lg px-3 py-2">
+        <div className="plan-mastery-feedback text-xs text-green-700 bg-green-50 border border-green-100 rounded-lg px-3 py-2">
           {masteryHint}
         </div>
       )}
@@ -592,7 +596,7 @@ function PlanOverview({ goalId, deadline, refreshKey, hideRegenerate, dailyHours
                 className="w-full flex items-center gap-2 px-2.5 py-2 bg-gray-50 hover:bg-gray-100 transition text-left"
               >
                 {isExpanded ? <ChevronDown size={12} className="text-gray-400 flex-shrink-0" /> : <ChevronRight size={12} className="text-gray-400 flex-shrink-0" />}
-                <span className={cn("text-xs font-medium flex-1 truncate", isComplete ? "text-green-600" : "text-gray-700")}>
+                <span className={cn("plan-phase-title text-xs font-medium flex-1 truncate", isComplete ? "is-complete text-green-600" : "text-gray-700")}>
                   {isComplete ? "✓ " : ""}{phase.name}
                 </span>
                 {phaseRange && (
@@ -633,9 +637,9 @@ function PlanOverview({ goalId, deadline, refreshKey, hideRegenerate, dailyHours
                         <button
                           onClick={() => toggleTaskDone(task.id, isDone)}
                           className={cn(
-                            "flex-shrink-0 w-5 h-5 rounded text-[10px] font-semibold flex items-center justify-center border transition",
+                            "plan-task-number flex-shrink-0 w-5 h-5 rounded text-[10px] font-semibold flex items-center justify-center border transition",
                             isMastered
-                              ? "bg-green-50 border-green-300 text-green-600"
+                              ? "is-mastered bg-green-50 border-green-300 text-green-600"
                               : isDone
                               ? "text-white border-transparent"
                               : "border-gray-200 text-gray-400 hover:border-gray-400"
@@ -667,14 +671,16 @@ function PlanOverview({ goalId, deadline, refreshKey, hideRegenerate, dailyHours
                         {/* 已掌握标记 */}
                         <button
                           onClick={() => toggleMastery(task.id, mastery)}
+                          title={isMastered ? "点击取消掌握状态" : "确认已能独立完成后标记掌握"}
+                          aria-label={isMastered ? `取消掌握：${task.title}` : `标记掌握：${task.title}`}
                           className={cn(
-                            "flex-shrink-0 text-xs px-1.5 py-0.5 rounded-md border transition",
+                            "plan-mastery-button flex-shrink-0 text-[11px] px-2 py-1 rounded-md border transition",
                             isMastered
-                              ? "bg-green-50 border-green-200 text-green-600"
-                              : "border-gray-200 text-gray-400 hover:border-green-200 hover:text-green-500 opacity-0 group-hover:opacity-100"
+                              ? "is-mastered bg-green-50 border-green-200 text-green-600"
+                              : "border-gray-200 text-gray-400"
                           )}
                         >
-                          {isMastered ? "已掌握" : "掌握？"}
+                          {isMastered ? "已掌握" : "标记掌握"}
                         </button>
                       </div>
                     );
