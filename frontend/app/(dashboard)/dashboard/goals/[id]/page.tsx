@@ -68,8 +68,8 @@ function MiniCalendar({
   while (cells.length % 7 !== 0) cells.push(null);
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-3">
+    <div className="mx-auto w-full max-w-[360px]">
+      <div className="mb-2 flex items-center justify-between">
         <button onClick={prevMonth} className="p-1 rounded-lg hover:bg-gray-100 text-gray-500 transition">
           <ChevronLeft size={14} />
         </button>
@@ -79,9 +79,9 @@ function MiniCalendar({
         </button>
       </div>
 
-      <div className="grid grid-cols-7 mb-1">
+      <div className="mb-0.5 grid grid-cols-7">
         {DAY_NAMES_SHORT.map((d) => (
-          <div key={d} className="text-center text-xs text-gray-300 py-0.5">{d}</div>
+          <div key={d} className="py-0.5 text-center text-[11px] text-gray-300">{d}</div>
         ))}
       </div>
 
@@ -96,7 +96,7 @@ function MiniCalendar({
           return (
             <button key={i} onClick={() => onSelect(dateStr)}
               className={cn(
-                "relative flex flex-col items-center justify-center h-8 rounded-lg text-xs transition",
+                "relative flex h-7 flex-col items-center justify-center rounded-lg text-[11px] transition",
                 isSelected ? "text-white font-semibold"
                 : isToday ? "font-bold text-gray-900 ring-1 ring-inset ring-gray-300"
                 : "text-gray-600 hover:bg-gray-100",
@@ -113,7 +113,7 @@ function MiniCalendar({
         })}
       </div>
 
-      <div className="flex items-center gap-3 mt-3 pt-2 border-t border-gray-50 text-xs text-gray-400">
+      <div className="mt-2 flex items-center justify-center gap-3 border-t border-gray-50 pt-2 text-[11px] text-gray-400">
         <span className="flex items-center gap-1">
           <span className="w-2 h-2 rounded-full inline-block" style={{ backgroundColor: "var(--accent)" }} /> 已完成
         </span>
