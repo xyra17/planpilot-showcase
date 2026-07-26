@@ -212,7 +212,7 @@ function StudyCalendar({ data }: { data: { date: string; minutes: number }[] }) 
                     style={{
                       width: 28, height: 14,
                       backgroundColor: cell ? heatColor(mins) : "transparent",
-                      outline: cell?.isToday ? "1.5px solid #2563eb" : undefined,
+                      outline: cell?.isToday ? "1.5px solid var(--accent)" : undefined,
                       outlineOffset: cell?.isToday ? 1 : undefined,
                     }} />
                   {cell && mins > 0 && (
@@ -1323,12 +1323,10 @@ export default function DashboardPage() {
     <div className="calm-dashboard p-5 sm:p-8 space-y-6">
       {/* ── 欢迎 + 统计条 ── */}
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-6">
-        <div className="pt-1">
-          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#9a8067]">Your learning rhythm</p>
-          <h1 className="text-[30px] font-medium tracking-[-0.035em] text-[#321c04]">
-            {getGreeting()}，{username}
-          </h1>
-          <p className="text-sm text-[#8b745e] mt-1.5">{TODAY} · 今天只专注真正重要的事</p>
+        <div>
+          <p className="calm-eyebrow hidden mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-400">Your learning rhythm</p>
+          <h1 className="calm-heading text-2xl font-bold text-gray-900">{getGreeting()}，{username} 👋</h1>
+          <p className="text-sm text-gray-500 mt-1">{TODAY} · 今日任务 {done}/{todayTasks.length}</p>
         </div>
         <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap sm:flex-nowrap sm:flex-shrink-0">
           {[
@@ -1336,9 +1334,9 @@ export default function DashboardPage() {
             { label: "进行目标", value: `${activeGoalsCount} 个`,          icon: TrendingUp   },
             { label: "今日完成", value: `${done}/${todayTasks.length}`,    icon: CheckCircle2 },
           ].map(({ label, value, icon: Icon }) => (
-            <div key={label} className="calm-stat rounded-2xl px-4 py-3 text-center min-w-[92px]">
-              <div className="w-7 h-7 rounded-full flex items-center justify-center mx-auto mb-1.5 bg-[#f0e4d5]">
-                <Icon size={14} className="text-[#72553b]" />
+            <div key={label} className="calm-stat rounded-2xl px-4 py-3 text-center min-w-[84px]">
+              <div className="calm-stat-icon w-7 h-7 rounded-xl flex items-center justify-center mx-auto mb-1.5" style={{ backgroundColor: "var(--accent-light)" }}>
+                <Icon size={14} style={{ color: "var(--accent)" }} />
               </div>
               <div className="text-sm font-bold text-gray-900 leading-tight">{value}</div>
               <div className="text-xs text-gray-400 mt-0.5">{label}</div>

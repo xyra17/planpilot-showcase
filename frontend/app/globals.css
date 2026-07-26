@@ -12,72 +12,10 @@ body {
   overflow-x: clip;
 }
 
-.calm-serif {
-  font-family: "Instrument Serif", Georgia, serif;
-}
-
-/* Calm 样板：先覆盖应用框架与首页，不改变功能页结构。 */
-.calm-app {
-  --calm-ink: #321c04;
-  --calm-muted: #806b57;
-  --calm-bg: #f3eee7;
-  --calm-surface: #fffaf4;
-  --calm-panel: #f8efe4;
-  --calm-line: rgba(82, 55, 28, 0.10);
-}
-
-.calm-sidebar {
-  background: #f1e3d2;
-  border: 1px solid rgba(82, 55, 28, 0.08);
-  box-shadow: 0 12px 35px rgba(72, 47, 22, 0.07);
-}
-
-.calm-main {
-  background:
-    radial-gradient(circle at 95% 0%, rgba(217, 196, 170, 0.22), transparent 28rem),
-    #fffaf4;
-  border: 1px solid rgba(82, 55, 28, 0.07);
-  box-shadow: 0 12px 40px rgba(72, 47, 22, 0.06);
-}
-
-.calm-dashboard .bg-gray-50 {
-  background-color: #f8f1e8 !important;
-}
-
-.calm-dashboard .border-gray-100 {
-  border-color: var(--calm-line) !important;
-}
-
-.calm-dashboard .text-gray-900,
-.calm-dashboard .text-gray-800 {
-  color: var(--calm-ink) !important;
-}
-
-.calm-dashboard .text-gray-700,
-.calm-dashboard .text-gray-600,
-.calm-dashboard .text-gray-500 {
-  color: var(--calm-muted) !important;
-}
-
-.calm-dashboard .rounded-2xl {
-  border-radius: 20px;
-}
-
-.calm-dashboard .shadow-sm {
-  box-shadow: 0 8px 26px rgba(72, 47, 22, 0.055) !important;
-}
-
-.calm-dashboard .brief-card {
-  background: linear-gradient(135deg, #321c04 0%, #624326 100%);
-  border-color: rgba(50, 28, 4, 0.45);
-  box-shadow: 0 16px 36px rgba(50, 28, 4, 0.16);
-}
-
 .calm-stat {
-  background: rgba(255, 250, 244, 0.78);
-  border: 1px solid var(--calm-line);
-  box-shadow: 0 8px 24px rgba(72, 47, 22, 0.05);
-  backdrop-filter: blur(8px);
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-sm);
 }
 
 /* ═══════════════════════════════════════════
@@ -184,6 +122,169 @@ body {
 
 /* ── Apple Silver ── */
 [data-color="silver"] { --accent:#6E6E73; --accent-dark:#48484A; --accent-light:#F5F5F7; --accent-muted:#E5E5EA; --brief-from:#3A3A3C; --brief-to:#6E6E73; --heat-1:#E5E5EA; --heat-2:#AEAEB2; --heat-3:#6E6E73; --heat-4:#48484A; }
+
+/* ── Calm 全局风格：配色与框架作为一个完整方案启用 ── */
+[data-color="calm-amber"] {
+  --accent:#B66F1E; --accent-dark:#75400F; --accent-light:#F8E9D2; --accent-muted:#E8C892;
+  --bg:#F3EADF; --surface:#FFF9F0; --border:#E7D7C2;
+  --text-1:#3E2916; --text-2:#755C45; --text-3:#A18A73;
+  --heat-0:#F0E7DC; --heat-1:#F4DDBA; --heat-2:#DEA860; --heat-3:#B66F1E; --heat-4:#75400F;
+  --brief-from:#75400F; --brief-to:#B66F1E;
+  --calm-sidebar:#EEDCC6; --calm-panel:#F8EFE4; --calm-glow:rgba(216,166,102,.20);
+}
+[data-color="calm-pine"] {
+  --accent:#5E7863; --accent-dark:#304936; --accent-light:#E8EFE6; --accent-muted:#B9C8B2;
+  --bg:#ECEBE2; --surface:#F8F7F0; --border:#D7D9CC;
+  --text-1:#26352A; --text-2:#5D6B60; --text-3:#8B978D;
+  --heat-0:#E6E8E0; --heat-1:#D2DFCF; --heat-2:#9DB29D; --heat-3:#66806B; --heat-4:#304936;
+  --brief-from:#304936; --brief-to:#66806B;
+  --calm-sidebar:#DEE3D8; --calm-panel:#EFF1E9; --calm-glow:rgba(132,158,132,.18);
+}
+[data-color="calm-mist"] {
+  --accent:#7C7065; --accent-dark:#4A433C; --accent-light:#ECE7E1; --accent-muted:#D3C8B8;
+  --bg:#EDE8E1; --surface:#F8F5F0; --border:#DCD4CA;
+  --text-1:#38332E; --text-2:#6F675F; --text-3:#999087;
+  --heat-0:#E7E2DC; --heat-1:#D8D0C7; --heat-2:#B3A89C; --heat-3:#8B8176; --heat-4:#514A43;
+  --brief-from:#514A43; --brief-to:#8B8176;
+  --calm-sidebar:#DED7CE; --calm-panel:#F0EBE5; --calm-glow:rgba(154,139,124,.16);
+}
+[data-color="calm-terra"] {
+  --accent:#A95F43; --accent-dark:#693A2B; --accent-light:#F3DFD2; --accent-muted:#D9AA8D;
+  --bg:#F0E3D4; --surface:#FBF4EA; --border:#E4CDBB;
+  --text-1:#4A2C23; --text-2:#79594B; --text-3:#A28272;
+  --heat-0:#EDE2D7; --heat-1:#E8CBB8; --heat-2:#CD8C6E; --heat-3:#A95F43; --heat-4:#693A2B;
+  --brief-from:#693A2B; --brief-to:#A95F43;
+  --calm-sidebar:#E8CDB7; --calm-panel:#F6E8DC; --calm-glow:rgba(190,112,78,.17);
+}
+[data-color="calm-sunset"] {
+  --accent:#BD7168; --accent-dark:#754843; --accent-light:#F8E4DE; --accent-muted:#EBC0B5;
+  --bg:#F3EAE3; --surface:#FFF8F2; --border:#EAD8CF;
+  --text-1:#493331; --text-2:#765D59; --text-3:#A28A85;
+  --heat-0:#EEE6E1; --heat-1:#F2D7CF; --heat-2:#DDA399; --heat-3:#BD7168; --heat-4:#754843;
+  --brief-from:#754843; --brief-to:#BD7168;
+  --calm-sidebar:#F0DCD2; --calm-panel:#FAECE6; --calm-glow:rgba(205,133,121,.17);
+}
+
+[data-color^="calm-"] .calm-app {
+  gap: .75rem;
+  padding: .75rem;
+  background: var(--bg) !important;
+  color: var(--text-1);
+}
+[data-color^="calm-"] .calm-sidebar {
+  border: 1px solid color-mix(in srgb, var(--accent-dark) 10%, transparent);
+  border-radius: 26px;
+  background: var(--calm-sidebar) !important;
+  box-shadow: 0 12px 35px color-mix(in srgb, var(--accent-dark) 9%, transparent);
+}
+[data-color^="calm-"] .calm-sidebar-header {
+  height: 68px;
+  border-bottom-color: transparent !important;
+}
+[data-color^="calm-"] .calm-brand-icon {
+  display: flex;
+}
+[data-color^="calm-"] .calm-serif {
+  font-family: "Instrument Serif", Georgia, serif;
+}
+[data-color^="calm-"] .calm-nav-item {
+  border-radius: 12px;
+  padding-top: .625rem;
+  padding-bottom: .625rem;
+}
+[data-color^="calm-"] .calm-user-area {
+  border-top-color: transparent !important;
+}
+[data-color^="calm-"] .calm-main {
+  border: 1px solid color-mix(in srgb, var(--accent-dark) 8%, transparent);
+  border-radius: 26px;
+  background:
+    radial-gradient(circle at 95% 0%, var(--calm-glow), transparent 28rem),
+    var(--surface) !important;
+  box-shadow: 0 12px 40px color-mix(in srgb, var(--accent-dark) 7%, transparent);
+}
+[data-color^="calm-"] .calm-brand-icon {
+  background: var(--surface);
+  color: var(--accent-dark);
+}
+[data-color^="calm-"] .calm-brand-text,
+[data-color^="calm-"] .calm-app .text-gray-900,
+[data-color^="calm-"] .calm-app .text-gray-800 {
+  color: var(--text-1) !important;
+}
+[data-color^="calm-"] .calm-app .text-gray-700,
+[data-color^="calm-"] .calm-app .text-gray-600,
+[data-color^="calm-"] .calm-app .text-gray-500 {
+  color: var(--text-2) !important;
+}
+[data-color^="calm-"] .calm-app .text-gray-400,
+[data-color^="calm-"] .calm-app .text-gray-300 {
+  color: var(--text-3) !important;
+}
+[data-color^="calm-"] .calm-app .bg-white {
+  background-color: var(--surface) !important;
+}
+[data-color^="calm-"] .calm-app .bg-gray-50 {
+  background-color: var(--calm-panel) !important;
+}
+[data-color^="calm-"] .calm-app .bg-gray-100 {
+  background-color: color-mix(in srgb, var(--accent-muted) 42%, var(--surface)) !important;
+}
+[data-color^="calm-"] .calm-app .border-gray-100,
+[data-color^="calm-"] .calm-app .border-gray-200 {
+  border-color: var(--border) !important;
+}
+[data-color^="calm-"] .calm-nav-active {
+  background: var(--accent-dark) !important;
+  color: var(--surface) !important;
+}
+[data-color^="calm-"] .calm-nav-idle {
+  color: var(--text-2) !important;
+}
+[data-color^="calm-"] .calm-nav-idle:hover,
+[data-color^="calm-"] .calm-collapse:hover {
+  background: color-mix(in srgb, var(--accent-muted) 52%, transparent) !important;
+  color: var(--text-1) !important;
+}
+[data-color^="calm-"] .calm-avatar {
+  background: var(--accent-dark) !important;
+  color: var(--surface) !important;
+}
+[data-color^="calm-"] .calm-eyebrow {
+  display: block;
+  color: var(--accent) !important;
+}
+[data-color^="calm-"] .calm-heading {
+  font-size: 30px;
+  font-weight: 500;
+  letter-spacing: -.035em;
+}
+[data-color^="calm-"] .calm-dashboard .rounded-2xl {
+  border-radius: 20px;
+}
+[data-color^="calm-"] .calm-dashboard .shadow-sm {
+  box-shadow: 0 8px 26px color-mix(in srgb, var(--accent-dark) 7%, transparent) !important;
+}
+[data-color^="calm-"] .calm-dashboard .brief-card {
+  background: linear-gradient(135deg, var(--brief-from), var(--brief-to));
+  border-color: var(--accent-dark);
+  box-shadow: 0 16px 36px color-mix(in srgb, var(--accent-dark) 20%, transparent);
+}
+[data-color^="calm-"] .calm-stat {
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  border-color: var(--border);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--accent-dark) 6%, transparent);
+  backdrop-filter: blur(8px);
+}
+[data-color^="calm-"] .calm-stat-icon {
+  border-radius: 999px;
+}
+[data-color^="calm-"] .calm-dashboard .chart-grid {
+  stroke: var(--border) !important;
+}
+[data-color^="calm-"] .calm-dashboard .chart-lbl {
+  fill: var(--text-3) !important;
+}
 
 /* ═══════════════════════════════════════════
    TAILWIND COLOR OVERRIDES (per scheme)

@@ -9,7 +9,8 @@ export type ColorScheme =
   | "blue" | "indigo" | "violet" | "rose" | "amber" | "emerald" | "teal"
   | "rainbow"
   | "morandi-rose" | "morandi-sage" | "morandi-stone" | "morandi-terracotta" | "morandi-lavender"
-  | "silver" | "mint" | "morandi-blue" | "morandi-purple";
+  | "silver" | "mint" | "morandi-blue" | "morandi-purple"
+  | "calm-amber" | "calm-pine" | "calm-mist" | "calm-terra" | "calm-sunset";
 
 interface ThemeContextType {
   mode: ThemeMode;
@@ -45,6 +46,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   }
 
   function setColorScheme(c: ColorScheme) {
+    if (c.startsWith("calm-")) {
+      setModeState("default");
+      document.documentElement.setAttribute("data-theme", "default");
+      localStorage.setItem(modeKey, "default");
+    }
     setColorSchemeState(c);
     document.documentElement.setAttribute("data-color", c);
     localStorage.setItem(colorKey, c);
@@ -52,8 +58,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   // userId 变化时（登录/登出/切换账号）重新加载该用户的主题设置
   useEffect(() => {
-    const savedMode = (localStorage.getItem(modeKey) as ThemeMode) || "default";
+    let savedMode = (localStorage.getItem(modeKey) as ThemeMode) || "default";
     const savedColor = (localStorage.getItem(colorKey) as ColorScheme) || "indigo";
+    if (savedColor.startsWith("calm-")) savedMode = "default";
     setModeState(savedMode);
     setColorSchemeState(savedColor);
     document.documentElement.setAttribute("data-theme", savedMode);

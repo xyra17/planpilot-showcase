@@ -15,6 +15,7 @@ const THEME_INIT_SCRIPT = `(function(){try{
   try{if(info)uid=JSON.parse(info).id||'guest';}catch(e){}
   var mode=localStorage.getItem('theme-mode-'+uid)||'default';
   var color=localStorage.getItem('theme-color-'+uid)||'indigo';
+  if(color.indexOf('calm-')===0)mode='default';
   document.documentElement.setAttribute('data-theme',mode);
   document.documentElement.setAttribute('data-color',color);
 }catch(e){}})();`;

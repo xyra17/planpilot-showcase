@@ -50,6 +50,16 @@ const COLOR_GROUPS: ColorGroup[] = [
       { value: "silver",             label: "中性灰", swatches: ["#6E6E73", "#AEAEB2", "#E5E5EA", "#F5F5F7"] },
     ],
   },
+  {
+    label: "Calm 全局风格",
+    items: [
+      { value: "calm-amber",  label: "琥珀秋日", swatches: ["#FFF9F0", "#E8C892", "#C78332", "#4A2C12"] },
+      { value: "calm-pine",   label: "静谧松林", swatches: ["#F6F4EC", "#B9C8B2", "#66806B", "#263C2D"] },
+      { value: "calm-mist",   label: "暖灰迷雾", swatches: ["#F5F0E8", "#D3C8B8", "#8B8176", "#38332E"] },
+      { value: "calm-terra",  label: "复古陶土", swatches: ["#FBF1E4", "#D9AA8D", "#A95F43", "#532F25"] },
+      { value: "calm-sunset", label: "夕阳奶霜", swatches: ["#FFF7F0", "#F1C5B7", "#C77D72", "#513331"] },
+    ],
+  },
 ];
 
 function CollapseSection({
