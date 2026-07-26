@@ -453,6 +453,14 @@ body {
   --brief-from:#E5CF9C; --brief-to:#D5B77D;
   --journal-tape:#C9AE78;
 }
+[data-theme="journal"][data-journal="night"] {
+  --accent:#D39A58; --accent-dark:#E7BE88; --accent-light:#493B2B; --accent-muted:#725A3D;
+  --bg:#211F1B; --surface:#302D27; --border:#716654;
+  --text-1:#F1E7D5; --text-2:#C9BDAA; --text-3:#A89A87;
+  --heat-0:#3A3731; --heat-1:#554B3B; --heat-2:#806849; --heat-3:#B27E45; --heat-4:#E0B170;
+  --brief-from:#4C402D; --brief-to:#644A2D;
+  --journal-tape:#786342;
+}
 [data-theme="journal"] body {
   color:var(--text-1);
   background-color:var(--bg);

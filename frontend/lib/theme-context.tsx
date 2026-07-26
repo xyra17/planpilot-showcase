@@ -4,7 +4,7 @@ import { createContext, useContext, useState, useEffect } from "react";
 import { useAuthStore } from "@/lib/stores/authStore";
 
 export type ThemeMode = "default" | "dark" | "eye-care" | "journal";
-export type JournalPalette = "wood" | "slate" | "newspaper";
+export type JournalPalette = "wood" | "slate" | "newspaper" | "night";
 
 export type ColorScheme =
   | "blue" | "indigo" | "violet" | "rose" | "amber" | "emerald" | "teal"
@@ -67,7 +67,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let savedMode = (localStorage.getItem(modeKey) as ThemeMode) || "default";
     let savedColor = (localStorage.getItem(colorKey) as ColorScheme | string) || "indigo";
-    const savedJournal = (localStorage.getItem(journalKey) as JournalPalette) || "wood";
+    const storedJournal = localStorage.getItem(journalKey);
+    const savedJournal: JournalPalette =
+      storedJournal === "slate" || storedJournal === "newspaper" || storedJournal === "night"
+        ? storedJournal
+        : "wood";
     if ((savedMode as string) === "sketch") {
       savedMode = "default";
       localStorage.setItem(modeKey, savedMode);
