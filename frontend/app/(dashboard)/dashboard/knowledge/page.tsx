@@ -6,7 +6,7 @@ import {
   Search, Upload, FileText, FileSpreadsheet, Trash2,
   BookOpen, MessageSquare, Target, LayoutGrid, List,
   Plus, X, FolderOpen, Check, Link2,
-  ChevronDown, Pencil,
+  ChevronDown, ChevronLeft, ChevronRight, Pencil,
 } from "lucide-react";
 import { useGoalStore } from "@/lib/stores/goalStore";
 import { useKnowledge } from "@/lib/knowledge-context";
@@ -80,6 +80,7 @@ export default function KnowledgePage() {
   const [files,      setFiles]      = useState<KnowledgeFile[]>(INITIAL_FILES);
   const [kbs,        setKbs]        = useState<KnowledgeBase[]>(INITIAL_KBS);
   const [filesView,  setFilesView]  = useState<"grid" | "list">("list");
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   // 新建知识库
   const [newKbOpen,  setNewKbOpen]  = useState(false);
@@ -276,21 +277,47 @@ export default function KnowledgePage() {
   }
 
   return (
-    <div className="flex h-full overflow-hidden">
-      {/* ── 左侧导航 ── */}
-      <aside className="w-56 flex-shrink-0 bg-gray-50 border-r border-gray-100 flex flex-col pt-5 pb-4 px-3 overflow-y-auto">
-        {/* 全部 */}
-        <button
-          onClick={() => setF("all", "")}
-          className={cn(
-            "flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium transition w-full mb-3",
-            filter.type === "all" ? "text-white" : "text-gray-500 hover:bg-gray-50",
-          )}
-          style={filter.type === "all" ? { backgroundColor: "var(--accent)" } : {}}
+    <div className="flex h-full flex-col overflow-hidden bg-white">
+      <header
+        className="flex flex-shrink-0 items-end border-b-2 border-gray-200 bg-white px-6 pt-4"
+        style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}
+      >
+        <div
+          className="-mb-px flex items-center gap-2 whitespace-nowrap border-b-[3px] px-5 py-3 text-base font-semibold"
+          style={{ borderColor: "var(--accent)", color: "var(--accent)" }}
         >
-          <BookOpen size={14} className="flex-shrink-0" />
-          全部资料
-        </button>
+          <BookOpen size={17} />
+          知识库
+        </div>
+      </header>
+
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+      {/* ── 左侧导航 ── */}
+      <div className={`flex-shrink-0 transition-all duration-200 ${sidebarOpen ? "w-56" : "w-10"}`}>
+      {sidebarOpen ? (
+      <aside className="h-full bg-gray-50 border-r border-gray-100 flex flex-col pt-5 pb-4 px-3 overflow-y-auto">
+        {/* 全部 */}
+        <div className="mb-3 flex items-center gap-1">
+          <button
+            onClick={() => setF("all", "")}
+            className={cn(
+              "flex min-w-0 flex-1 items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium transition",
+              filter.type === "all" ? "text-white" : "text-gray-500 hover:bg-gray-100",
+            )}
+            style={filter.type === "all" ? { backgroundColor: "var(--accent)" } : {}}
+          >
+            <BookOpen size={14} className="flex-shrink-0" />
+            <span className="truncate">全部资料</span>
+          </button>
+          <button
+            onClick={() => setSidebarOpen(false)}
+            title="收起资料导航"
+            aria-label="收起资料导航"
+            className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
+          >
+            <ChevronLeft size={14} />
+          </button>
+        </div>
 
         {/* 待分类 */}
         <div className="px-3 mb-1.5 flex items-center justify-between">
@@ -377,13 +404,24 @@ export default function KnowledgePage() {
           })}
         </div>
       </aside>
+      ) : (
+        <button
+          onClick={() => setSidebarOpen(true)}
+          title="展开资料导航"
+          aria-label="展开资料导航"
+          className="mt-5 flex h-9 w-8 items-center justify-center rounded-lg text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
+        >
+          <ChevronRight size={14} />
+        </button>
+      )}
+      </div>
 
       {/* ── 主内容 ── */}
       <div className="flex-1 overflow-y-auto p-7">
         {/* 顶栏 */}
         <div className="flex items-center justify-between mb-7">
           <div>
-            <h1 className="text-xl font-bold text-gray-900">知识库</h1>
+            <h1 className="text-xl font-bold text-gray-900">学习资料</h1>
             <p className="text-xs text-gray-400 mt-0.5">{filterLabel()}</p>
           </div>
           <div className="flex items-center gap-3">
@@ -813,6 +851,7 @@ export default function KnowledgePage() {
             })())}</div>
           </section>
         )}
+      </div>
       </div>
 
       {/* ── 上传弹窗 ── */}

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Plus, Pencil, Target, Trash2 } from "lucide-react";
 import { useGoalStore } from "@/lib/stores/goalStore";
 import { useTasks } from "@/lib/tasks-context";
 import { api } from "@/lib/api";
@@ -81,39 +81,52 @@ export default function GoalsPage() {
   }
 
   return (
-    <div className="p-8">
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">我的目标</h1>
-          <p className="text-sm text-gray-500 mt-1">管理和追踪你的学习目标</p>
+    <div className="flex h-full flex-col bg-white">
+      <header
+        className="flex flex-shrink-0 items-end justify-between gap-4 border-b-2 border-gray-200 bg-white px-6 pt-4"
+        style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}
+      >
+        <div
+          className="-mb-px flex items-center gap-2 whitespace-nowrap border-b-[3px] px-5 py-3 text-base font-semibold"
+          style={{ borderColor: "var(--accent)", color: "var(--accent)" }}
+        >
+          <Target size={17} />
+          我的目标
         </div>
         <Link
           href="/dashboard/goals/new"
-          className="inline-flex items-center gap-2 bg-blue-600 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-blue-700 transition"
+          className="mb-2 inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white rounded-xl transition hover:opacity-90"
+          style={{ backgroundColor: "var(--accent)" }}
         >
           <Plus size={16} />
           新建目标
         </Link>
-      </div>
+      </header>
 
-      {deleteError && (
-        <div className="mb-4 text-sm text-red-600 bg-red-50 border border-red-100 px-4 py-2 rounded-lg">
-          {deleteError}
+      <main className="min-h-0 flex-1 overflow-y-auto p-6">
+        <div className="mb-6">
+          <h1 className="text-xl font-bold text-gray-900">目标总览</h1>
+          <p className="mt-1 text-sm text-gray-500">管理和追踪你的学习目标</p>
         </div>
-      )}
 
-      {isLoading && (
-        <div className="text-sm text-gray-400 py-12 text-center">加载中...</div>
-      )}
+        {deleteError && (
+          <div className="mb-4 text-sm text-red-600 bg-red-50 border border-red-100 px-4 py-2 rounded-lg">
+            {deleteError}
+          </div>
+        )}
 
-      {!isLoading && goals.length === 0 && (
-        <div className="text-center py-16 text-gray-400">
-          <p className="text-sm">还没有目标，点击右上角新建一个吧</p>
-        </div>
-      )}
+        {isLoading && (
+          <div className="text-sm text-gray-400 py-12 text-center">加载中...</div>
+        )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        {goals.map((goal) => (
+        {!isLoading && goals.length === 0 && (
+          <div className="text-center py-16 text-gray-400">
+            <p className="text-sm">还没有目标，点击右上角新建一个吧</p>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          {goals.map((goal) => (
           <div
             key={goal.id}
             onClick={() => router.push(`/dashboard/goals/${goal.id}`)}
@@ -169,8 +182,9 @@ export default function GoalsPage() {
               <span className="text-xs text-gray-400">截止 {goal.deadline}</span>
             </div>
           </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      </main>
     </div>
   );
 }
