@@ -316,7 +316,7 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          {mode === "journal" && (
+          <div className="journal-palette-section">
             <InnerCollapse
               title="手账配色"
               open={colorOpen}
@@ -361,61 +361,63 @@ export default function SettingsPage() {
                 })}
               </div>
             </InnerCollapse>
-          )}
+          </div>
 
           {/* 色彩方案（二级折叠） */}
-          {mode !== "journal" && <InnerCollapse
-            title="色彩方案"
-            open={colorOpen}
-            onToggle={() => setColorOpen((v) => !v)}
-          >
-            <div className="space-y-5 mt-1">
-              {COLOR_GROUPS.map((group) => (
-                <div key={group.label}>
-                  <p className="text-xs text-gray-400 mb-2 font-medium">{group.label}</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    {group.items.map((opt) => {
-                      const active = colorScheme === opt.value;
-                      const isRainbow = opt.value === "rainbow";
-                      return (
-                        <button
-                          key={opt.value}
-                          onClick={() => setColorScheme(opt.value)}
-                          className={cn(
-                            "flex items-center gap-3 p-3 rounded-xl border-2 text-left transition",
-                            active ? "border-blue-600 bg-blue-50" : "border-gray-100 bg-white hover:border-gray-200 hover:bg-gray-50"
-                          )}
-                        >
-                          {isRainbow ? (
-                            <div
-                              className="w-20 h-6 rounded-md flex-shrink-0"
-                              style={{ background: "linear-gradient(90deg,#f97316,#ec4899,#8b5cf6,#3b82f6)" }}
-                            />
-                          ) : (
-                            <div className="flex gap-0.5 flex-shrink-0">
-                              {opt.swatches.map((color) => (
-                                <div key={color} className="w-5 h-6 rounded-[4px]" style={{ backgroundColor: color }} />
-                              ))}
+          <div className="standard-color-section">
+            <InnerCollapse
+              title="色彩方案"
+              open={colorOpen}
+              onToggle={() => setColorOpen((v) => !v)}
+            >
+              <div className="space-y-5 mt-1">
+                {COLOR_GROUPS.map((group) => (
+                  <div key={group.label}>
+                    <p className="text-xs text-gray-400 mb-2 font-medium">{group.label}</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {group.items.map((opt) => {
+                        const active = colorScheme === opt.value;
+                        const isRainbow = opt.value === "rainbow";
+                        return (
+                          <button
+                            key={opt.value}
+                            onClick={() => setColorScheme(opt.value)}
+                            className={cn(
+                              "flex items-center gap-3 p-3 rounded-xl border-2 text-left transition",
+                              active ? "border-blue-600 bg-blue-50" : "border-gray-100 bg-white hover:border-gray-200 hover:bg-gray-50"
+                            )}
+                          >
+                            {isRainbow ? (
+                              <div
+                                className="w-20 h-6 rounded-md flex-shrink-0"
+                                style={{ background: "linear-gradient(90deg,#f97316,#ec4899,#8b5cf6,#3b82f6)" }}
+                              />
+                            ) : (
+                              <div className="flex gap-0.5 flex-shrink-0">
+                                {opt.swatches.map((color) => (
+                                  <div key={color} className="w-5 h-6 rounded-[4px]" style={{ backgroundColor: color }} />
+                                ))}
+                              </div>
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <div className={cn("text-sm font-medium truncate", active ? "text-blue-600" : "text-gray-800")}>
+                                {opt.label}
+                              </div>
                             </div>
-                          )}
-                          <div className="flex-1 min-w-0">
-                            <div className={cn("text-sm font-medium truncate", active ? "text-blue-600" : "text-gray-800")}>
-                              {opt.label}
-                            </div>
-                          </div>
-                          {active && (
-                            <div className="w-4 h-4 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0">
-                              <Check size={9} className="text-white" />
-                            </div>
-                          )}
-                        </button>
-                      );
-                    })}
+                            {active && (
+                              <div className="w-4 h-4 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0">
+                                <Check size={9} className="text-white" />
+                              </div>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          </InnerCollapse>}
+                ))}
+              </div>
+            </InnerCollapse>
+          </div>
         </CollapseSection>
 
         {/* ── 账号 ── */}
