@@ -205,30 +205,19 @@ function StudyCalendar({ data }: { data: { date: string; minutes: number }[] }) 
             {Array.from({ length: 7 }, (_, di) => {
               const cell = cells[wi * 7 + di];
               const mins = cell?.minutes ?? 0;
-              const day = cell ? Number(cell.dateStr.slice(-2)) : null;
               return (
                 <div key={di} className="flex items-center gap-[4px]"
                   title={cell ? `${cell.dateStr}  ${mins}分钟` : ""}>
                   <div className="flex-shrink-0 rounded-[3px]"
                     style={{
-                      width: 22, height: 14,
+                      width: 28, height: 14,
                       backgroundColor: cell ? heatColor(mins) : "transparent",
                       outline: cell?.isToday ? "1.5px solid var(--accent)" : undefined,
                       outlineOffset: cell?.isToday ? 1 : undefined,
                     }} />
-                  {cell && (
-                    <span className="flex min-w-0 items-baseline gap-0.5 whitespace-nowrap text-[9px] leading-none text-gray-400">
-                      <span
-                        className="font-medium tabular-nums"
-                        style={cell.isToday ? { color: "var(--accent)", fontWeight: 700 } : undefined}
-                      >
-                        {day}日
-                      </span>
-                      {mins > 0 && (
-                        <span className="text-[8px] opacity-75">
-                          {mins >= 60 ? `${(mins / 60).toFixed(1)}h` : `${mins}m`}
-                        </span>
-                      )}
+                  {cell && mins > 0 && (
+                    <span className="text-[9px] text-gray-400 leading-none truncate">
+                      {mins >= 60 ? `${(mins / 60).toFixed(1)}h` : `${mins}m`}
                     </span>
                   )}
                 </div>
