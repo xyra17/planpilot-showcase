@@ -2,9 +2,24 @@
 
 import { Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import { StickyNote, CalendarDays } from "lucide-react";
-import DailyJournal from "@/components/notes/DailyJournal";
-import FlashCardsWall from "@/components/notes/FlashCard";
+
+const DailyJournal = dynamic(
+  () => import("@/components/notes/DailyJournal"),
+  {
+    ssr: false,
+    loading: () => <NotesWorkspaceLoading />,
+  }
+);
+
+const FlashCardsWall = dynamic(
+  () => import("@/components/notes/FlashCard"),
+  {
+    ssr: false,
+    loading: () => <NotesWorkspaceLoading />,
+  }
+);
 
 type Tab = "card" | "log";
 
@@ -14,6 +29,14 @@ const TAB_META: Record<Tab, { label: string; icon: React.ReactNode }> = {
   card: { label: "知识笔记", icon: <StickyNote size={14} /> },
   log:  { label: "学习记录", icon: <CalendarDays size={14} /> },
 };
+
+function NotesWorkspaceLoading() {
+  return (
+    <div className="flex h-40 items-center justify-center text-sm text-gray-400">
+      正在加载笔记工作区…
+    </div>
+  );
+}
 
 function NotesContent() {
   const searchParams = useSearchParams();

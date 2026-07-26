@@ -61,10 +61,10 @@ function noteDisplayTitle(note: StudyNote) {
   return stripHtml(note.content).slice(0, 52) || "无标题";
 }
 
-function relativeTime(iso: string) {
+function relativeTime(iso: string, now: number) {
   const timestamp = Date.parse(iso);
   if (!Number.isFinite(timestamp)) return "";
-  const seconds = Math.max(0, Math.floor((Date.now() - timestamp) / 1000));
+  const seconds = Math.max(0, Math.floor((now - timestamp) / 1000));
   if (seconds < 60) return "刚刚";
   if (seconds < 3600) return `${Math.floor(seconds / 60)} 分钟前`;
   if (seconds < 86400) return `${Math.floor(seconds / 3600)} 小时前`;
@@ -189,6 +189,7 @@ export default function DailyJournal() {
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [saveStatus, setSaveStatus] = useState<"saved" | "dirty" | "saving" | "error">("saved");
   const [discardOpen, setDiscardOpen] = useState(false);
+  const [clock, setClock] = useState(() => Date.now());
   const pendingExitRef = useRef<null | (() => void | Promise<void>)>(null);
 
   const { goals, fetchGoals } = useGoalStore();
@@ -197,6 +198,11 @@ export default function DailyJournal() {
 
   const activeGoals = goals.filter((g) => g.status === "active");
   const hasUnsavedChanges = saveStatus === "dirty" || saveStatus === "error";
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setClock(Date.now()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     const warnBeforeUnload = (event: BeforeUnloadEvent) => {
@@ -525,7 +531,7 @@ export default function DailyJournal() {
                         className="flex items-center gap-1"
                         title={new Date(note.updatedAt || note.savedAt).toLocaleString("zh-CN")}
                       >
-                        <Clock3 size={11} />编辑于 {relativeTime(note.updatedAt || note.savedAt)}
+                        <Clock3 size={11} />编辑于 {relativeTime(note.updatedAt || note.savedAt, clock)}
                       </span>
                     </div>
                   </div>
