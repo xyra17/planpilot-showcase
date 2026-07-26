@@ -26,7 +26,7 @@ function Badge({ kind, label }: { kind: BadgeKind; label: string }) {
   const s = styles[kind];
   return (
     <span
-      className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium flex-shrink-0"
+      className={`goal-metric-badge goal-metric-badge-${kind} inline-flex min-w-[36px] items-center justify-center px-1.5 py-0.5 text-[10px] font-medium flex-shrink-0`}
       style={{ color: s.text, backgroundColor: s.bg }}
     >
       {label}

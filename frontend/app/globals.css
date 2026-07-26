@@ -1262,6 +1262,29 @@ html {
 [data-theme="journal"] .goal-metric-icon svg {
   color:var(--accent) !important;
 }
+[data-theme="journal"] .goal-metric-badge {
+  min-height:20px;
+  color:var(--text-2) !important;
+  border:1px dashed color-mix(in srgb,var(--text-1) 25%,transparent);
+  border-radius:7px 5px 8px 6px !important;
+  background:color-mix(in srgb,var(--surface) 76%,var(--accent-light)) !important;
+  box-shadow:1px 1px 0 color-mix(in srgb,var(--text-1) 7%,transparent);
+  letter-spacing:.02em;
+  transform:rotate(-.5deg);
+}
+[data-theme="journal"] .goal-metric-badge-ok {
+  color:var(--ok-text) !important;
+  border-color:color-mix(in srgb,var(--ok-text) 30%,transparent);
+  background:color-mix(in srgb,var(--surface) 60%,var(--ok-bg)) !important;
+}
+[data-theme="journal"] .goal-metric-badge-warn {
+  color:var(--warn-text) !important;
+  border-color:color-mix(in srgb,var(--warn-text) 30%,transparent);
+  background:color-mix(in srgb,var(--surface) 60%,var(--warn-bg)) !important;
+}
+[data-theme="journal"] .goal-metric-badge-neutral {
+  color:var(--accent) !important;
+}
 [data-theme="journal"] .plan-progress-track,
 [data-theme="journal"] .plan-phase-progress-track {
   overflow:hidden;
