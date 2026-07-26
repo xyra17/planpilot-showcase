@@ -280,8 +280,24 @@ function GoalTasksWorkspace({
   onToggleTask: (taskId: string) => void;
   onVerify: (task: Task) => void;
 }) {
+  const { addTask, updateTask, deleteTask } = useTasks();
   const [view, setView] = useState<"today" | "calendar">("today");
   const [search, setSearch] = useState("");
+  const [showAdd, setShowAdd] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
+  const [newMinutes, setNewMinutes] = useState(30);
+  const [newPriority, setNewPriority] = useState<Priority>("medium");
+  const [isCreating, setIsCreating] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editMinutes, setEditMinutes] = useState(30);
+  const [editPriority, setEditPriority] = useState<Priority>("medium");
+  const addRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (showAdd) addRef.current?.focus();
+  }, [showAdd]);
+
   const todayTasks = tasks.filter((task) => task.date === TODAY);
   const doneTasks = todayTasks.filter((task) => task.done).length;
   const filteredToday = todayTasks.filter((task) =>
@@ -292,6 +308,51 @@ function GoalTasksWorkspace({
     acc[task.date].push(task);
     return acc;
   }, {});
+
+  function cancelAdd() {
+    setShowAdd(false);
+    setNewTitle("");
+    setNewMinutes(30);
+    setNewPriority("medium");
+  }
+
+  async function submitAdd() {
+    const title = newTitle.trim();
+    if (!title || isCreating) return;
+    setIsCreating(true);
+    try {
+      await addTask({
+        title,
+        goalId: goal.id,
+        goalTitle: goal.title,
+        done: false,
+        estimatedMinutes: Math.min(480, Math.max(5, newMinutes || 30)),
+        date: TODAY,
+        priority: newPriority,
+      });
+      cancelAdd();
+    } finally {
+      setIsCreating(false);
+    }
+  }
+
+  function beginEdit(task: Task) {
+    setEditingId(task.id);
+    setEditTitle(task.title);
+    setEditMinutes(task.estimatedMinutes);
+    setEditPriority(task.priority ?? "medium");
+  }
+
+  async function saveEdit(taskId: string) {
+    const title = editTitle.trim();
+    if (!title) return;
+    setEditingId(null);
+    await updateTask(taskId, {
+      title,
+      estimatedMinutes: Math.min(480, Math.max(5, editMinutes || 30)),
+      priority: editPriority,
+    });
+  }
 
   return (
     <div className="px-4 py-4">
@@ -326,6 +387,19 @@ function GoalTasksWorkspace({
         {view === "today" ? (
           <div className="flex items-center gap-3">
             <span className="text-[11px] text-gray-400">{doneTasks}/{todayTasks.length} 已完成</span>
+            <button
+              type="button"
+              onClick={() => setShowAdd(true)}
+              className="goal-task-add-button flex items-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-medium transition"
+              style={{
+                color: "var(--accent)",
+                borderColor: "color-mix(in srgb, var(--accent) 28%, transparent)",
+                backgroundColor: "var(--accent-light)",
+              }}
+            >
+              <Plus size={11} />
+              新建任务
+            </button>
             <div className="relative">
               <Search size={11} className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-300" />
               <input
@@ -350,6 +424,65 @@ function GoalTasksWorkspace({
 
       {view === "today" ? (
         <div className="space-y-1">
+          {showAdd && (
+            <div className="goal-task-editor mb-2 rounded-xl border border-gray-100 px-3 py-2.5">
+              <input
+                ref={addRef}
+                value={newTitle}
+                onChange={(event) => setNewTitle(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") void submitAdd();
+                  if (event.key === "Escape") cancelAdd();
+                }}
+                placeholder={`为“${goal.title}”添加今日任务`}
+                aria-label="任务名称"
+                className="w-full bg-transparent text-[13px] font-medium text-gray-700 outline-none placeholder:text-gray-300"
+              />
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <label className="flex items-center gap-1 text-[11px] text-gray-400">
+                  <Clock size={11} />
+                  <input
+                    type="number"
+                    min={5}
+                    max={480}
+                    value={newMinutes}
+                    onChange={(event) => setNewMinutes(Number(event.target.value))}
+                    className="goal-task-minutes w-14 rounded-md border border-gray-100 bg-transparent px-1.5 py-1 text-center text-[11px] outline-none"
+                  />
+                  分钟
+                </label>
+                <div className="flex items-center gap-1" aria-label="任务优先级">
+                  {(["high", "medium", "low"] as Priority[]).map((priority) => (
+                    <button
+                      key={priority}
+                      type="button"
+                      onClick={() => setNewPriority(priority)}
+                      className={cn(
+                        "rounded-md px-1.5 py-0.5 text-[10px] transition",
+                        PRIORITY_CLS[priority][newPriority === priority ? "on" : "off"]
+                      )}
+                    >
+                      {PRIORITY_LABEL[priority]}
+                    </button>
+                  ))}
+                </div>
+                <div className="ml-auto flex items-center gap-1">
+                  <button type="button" onClick={cancelAdd} className="rounded-md px-2 py-1 text-[11px] text-gray-400 transition hover:bg-gray-100">
+                    取消
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void submitAdd()}
+                    disabled={!newTitle.trim() || isCreating}
+                    className="rounded-md px-2 py-1 text-[11px] font-medium text-white transition disabled:opacity-40"
+                    style={{ backgroundColor: "var(--accent)" }}
+                  >
+                    {isCreating ? "创建中…" : "创建"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
           {goal.kb_id && (
             <div className="mb-3 flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 px-3 py-2">
               <span className="text-xs text-gray-500">已关联知识库</span>
@@ -370,20 +503,82 @@ function GoalTasksWorkspace({
                   ? <CheckCircle2 size={15} style={{ color: "var(--accent)" }} />
                   : <Circle size={15} className="flex-shrink-0 text-gray-300 transition group-hover:text-gray-400" />}
               </button>
-              <div className="min-w-0 flex-1">
-                <p className={cn("text-[13px] font-medium leading-snug", task.done ? "text-gray-400 line-through" : "text-gray-700")}>{task.title}</p>
-                {task.description && <p className="mt-1 text-[11px] leading-relaxed text-gray-400">{task.description}</p>}
-                <span className="goal-task-meta mt-1.5 flex w-fit items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] text-gray-400"><Clock size={10} />{task.estimatedMinutes} 分钟</span>
-              </div>
-              {task.done && (
-                <button
-                  type="button"
-                  onClick={() => onVerify(task)}
-                  className="shrink-0 rounded-lg px-2 py-0.5 text-xs text-white transition"
-                  style={{ backgroundColor: "var(--accent)" }}
-                >
-                  验收
-                </button>
+              {editingId === task.id ? (
+                <div className="min-w-0 flex-1">
+                  <input
+                    value={editTitle}
+                    onChange={(event) => setEditTitle(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") void saveEdit(task.id);
+                      if (event.key === "Escape") setEditingId(null);
+                    }}
+                    aria-label="编辑任务名称"
+                    className="w-full rounded-lg border border-gray-100 bg-transparent px-2 py-1 text-[13px] font-medium text-gray-700 outline-none"
+                    autoFocus
+                  />
+                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                    <label className="flex items-center gap-1 text-[10px] text-gray-400">
+                      <Clock size={10} />
+                      <input
+                        type="number"
+                        min={5}
+                        max={480}
+                        value={editMinutes}
+                        onChange={(event) => setEditMinutes(Number(event.target.value))}
+                        className="goal-task-minutes w-12 rounded-md border border-gray-100 bg-transparent px-1 py-0.5 text-center outline-none"
+                      />
+                      分钟
+                    </label>
+                    {(["high", "medium", "low"] as Priority[]).map((priority) => (
+                      <button
+                        key={priority}
+                        type="button"
+                        onClick={() => setEditPriority(priority)}
+                        className={cn(
+                          "rounded-md px-1.5 py-0.5 text-[10px] transition",
+                          PRIORITY_CLS[priority][editPriority === priority ? "on" : "off"]
+                        )}
+                      >
+                        {PRIORITY_LABEL[priority]}
+                      </button>
+                    ))}
+                    <button type="button" onClick={() => void saveEdit(task.id)} className="ml-auto rounded-md p-1" style={{ color: "var(--accent)" }} aria-label="保存编辑">
+                      <Check size={12} />
+                    </button>
+                    <button type="button" onClick={() => setEditingId(null)} className="rounded-md p-1 text-gray-400" aria-label="取消编辑">
+                      <X size={12} />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="min-w-0 flex-1">
+                    <p className={cn("text-[13px] font-medium leading-snug", task.done ? "text-gray-400 line-through" : "text-gray-700")}>{task.title}</p>
+                    {task.description && <p className="mt-1 text-[11px] leading-relaxed text-gray-400">{task.description}</p>}
+                    <span className="goal-task-meta mt-1.5 flex w-fit items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] text-gray-400">
+                      <span className={cn("h-1.5 w-1.5 rounded-full", PRIORITY_DOT[task.priority ?? "medium"])} />
+                      <Clock size={10} />{task.estimatedMinutes} 分钟
+                    </span>
+                  </div>
+                  <div className="goal-task-actions flex shrink-0 items-center gap-0.5">
+                    {task.done && (
+                      <button
+                        type="button"
+                        onClick={() => onVerify(task)}
+                        className="mr-1 rounded-lg px-2 py-0.5 text-xs text-white transition"
+                        style={{ backgroundColor: "var(--accent)" }}
+                      >
+                        验收
+                      </button>
+                    )}
+                    <button type="button" onClick={() => beginEdit(task)} className="rounded-md p-1.5 text-gray-400 transition hover:bg-gray-100" aria-label={`编辑任务“${task.title}”`}>
+                      <Pencil size={12} />
+                    </button>
+                    <button type="button" onClick={() => void deleteTask(task.id)} className="rounded-md p-1.5 text-gray-400 transition hover:bg-red-50 hover:text-red-500" aria-label={`删除任务“${task.title}”`}>
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                </>
               )}
             </div>
           ))}
