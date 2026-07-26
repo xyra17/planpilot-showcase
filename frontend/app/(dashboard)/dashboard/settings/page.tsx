@@ -51,13 +51,13 @@ const COLOR_GROUPS: ColorGroup[] = [
     ],
   },
   {
-    label: "Calm 全局风格",
+    label: "全局风格",
     items: [
-      { value: "calm-amber",  label: "琥珀秋日", swatches: ["#FFF9F0", "#E8C892", "#C78332", "#4A2C12"] },
-      { value: "calm-pine",   label: "静谧松林", swatches: ["#F6F4EC", "#B9C8B2", "#66806B", "#263C2D"] },
-      { value: "calm-mist",   label: "暖灰迷雾", swatches: ["#F5F0E8", "#D3C8B8", "#8B8176", "#38332E"] },
-      { value: "calm-terra",  label: "复古陶土", swatches: ["#FBF1E4", "#D9AA8D", "#A95F43", "#532F25"] },
-      { value: "calm-sunset", label: "夕阳奶霜", swatches: ["#FFF7F0", "#F1C5B7", "#C77D72", "#513331"] },
+      { value: "calm-amber",  label: "奶油钴蓝", swatches: ["#FFF5DE", "#161A3D", "#3157D5", "#FFB84D"] },
+      { value: "calm-pine",   label: "薄荷酒红", swatches: ["#E8F3E8", "#3D1426", "#8F244B", "#5D9B76"] },
+      { value: "calm-mist",   label: "雾灰柠黄", swatches: ["#F1F0EB", "#25262B", "#D7F048", "#72747E"] },
+      { value: "calm-terra",  label: "砂岩群青", swatches: ["#F3E2C6", "#192B57", "#244FA3", "#D66B3D"] },
+      { value: "calm-sunset", label: "浅粉松绿", swatches: ["#F9E5E1", "#173D35", "#28705D", "#E47F70"] },
     ],
   },
 ];

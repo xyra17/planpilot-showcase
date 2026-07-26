@@ -49,7 +49,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <Sparkles size={14} />
                 </span>
                 <span className="calm-brand-text text-lg font-semibold tracking-[-0.03em] text-gray-900">
-                  Plan<span className="calm-serif font-normal italic">Pilot</span>
+                  PlanPilot
                 </span>
               </Link>
               <div className="ml-auto mr-1.5">
