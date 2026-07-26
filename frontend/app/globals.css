@@ -633,6 +633,20 @@ html {
 [data-theme="journal"] .calm-brand-text { font-size:22px; }
 [data-theme="journal"] .calm-dashboard h1 { font-size:31px; font-weight:400; }
 [data-theme="journal"] .calm-dashboard h2 { font-size:18px; font-weight:400; }
+[data-theme="journal"] .calm-dashboard .dashboard-module-title {
+  margin:0;
+  font-family:"Patrick Hand", "Kaiti SC", cursive;
+  font-size:18px !important;
+  font-weight:400 !important;
+  line-height:24px !important;
+  letter-spacing:.01em;
+}
+[data-theme="journal"] .calm-dashboard .dashboard-module-icon {
+  width:28px !important;
+  height:28px !important;
+  flex:0 0 28px;
+  border-radius:8px 6px 9px 7px !important;
+}
 [data-theme="journal"] .calm-eyebrow {
   display:block;
   color:var(--accent) !important;
