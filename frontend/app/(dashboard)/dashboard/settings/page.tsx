@@ -2,7 +2,9 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useTheme, type ThemeMode, type ColorScheme } from "@/lib/theme-context";
+import {
+  useTheme, type ThemeMode, type ColorScheme, type JournalPalette,
+} from "@/lib/theme-context";
 import { useAuthStore } from "@/lib/stores/authStore";
 import { api } from "@/lib/api";
 import { Monitor, Moon, Eye, Pencil, NotebookPen, Check, ChevronDown, ChevronRight, LogOut, X, Trash2 } from "lucide-react";
@@ -13,6 +15,14 @@ const THEME_OPTIONS: { value: ThemeMode; label: string; desc: string; icon: Reac
   { value: "dark",     label: "暗黑", desc: "深色背景，护眼减蓝光",     icon: Moon,    preview: "bg-slate-800 border-slate-600"  },
   { value: "eye-care", label: "护眼", desc: "暖黄纸质感，长时阅读友好", icon: Eye,     preview: "bg-amber-50 border-amber-200"   },
   { value: "journal",  label: "手账纸稿", desc: "纸张、铅笔与便签质感", icon: NotebookPen, preview: "bg-[#f2eadb] border-[#9a8b75]" },
+];
+
+const JOURNAL_PALETTES: {
+  value: JournalPalette; label: string; desc: string; swatches: string[];
+}[] = [
+  { value: "wood", label: "原木纸稿", desc: "米白纸 · 石墨 · 赭石", swatches: ["#F7F0E2", "#37342F", "#B57935"] },
+  { value: "slate", label: "青灰纸稿", desc: "灰白纸 · 深青墨 · 灰绿", swatches: ["#EEF1ED", "#29413F", "#66877A"] },
+  { value: "newspaper", label: "旧报纸稿", desc: "淡黄纸 · 炭黑墨 · 暗红", swatches: ["#F1E4C4", "#302E2A", "#8E453D"] },
 ];
 
 type ColorGroup = { label: string; items: { value: ColorScheme; label: string; swatches: string[] }[] };
@@ -95,7 +105,10 @@ function InnerCollapse({
 }
 
 export default function SettingsPage() {
-  const { mode, colorScheme, setMode, setColorScheme } = useTheme();
+  const {
+    mode, colorScheme, journalPalette,
+    setMode, setColorScheme, setJournalPalette,
+  } = useTheme();
   const { user, logout, updateUser, changePassword } = useAuthStore();
   const router = useRouter();
   const [personalOpen, setPersonalOpen] = useState(true);
@@ -303,8 +316,55 @@ export default function SettingsPage() {
             </div>
           </div>
 
+          {mode === "journal" && (
+            <InnerCollapse
+              title="手账配色"
+              open={colorOpen}
+              onToggle={() => setColorOpen((v) => !v)}
+            >
+              <div className="grid grid-cols-1 gap-2 pt-1">
+                {JOURNAL_PALETTES.map((palette) => {
+                  const active = journalPalette === palette.value;
+                  return (
+                    <button
+                      key={palette.value}
+                      onClick={() => setJournalPalette(palette.value)}
+                      className={cn(
+                        "flex items-center gap-3 rounded-xl border-2 p-3 text-left transition",
+                        active
+                          ? "border-blue-600 bg-blue-50"
+                          : "border-gray-100 bg-white hover:border-gray-200 hover:bg-gray-50"
+                      )}
+                    >
+                      <div className="flex flex-shrink-0 gap-1">
+                        {palette.swatches.map((color) => (
+                          <span
+                            key={color}
+                            className="h-8 w-7 rounded-md border border-black/5"
+                            style={{ backgroundColor: color }}
+                          />
+                        ))}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className={cn("text-sm font-medium", active ? "text-blue-600" : "text-gray-800")}>
+                          {palette.label}
+                        </p>
+                        <p className="mt-0.5 text-xs text-gray-400">{palette.desc}</p>
+                      </div>
+                      {active && (
+                        <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-blue-600">
+                          <Check size={11} className="text-white" />
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </InnerCollapse>
+          )}
+
           {/* 色彩方案（二级折叠） */}
-          <InnerCollapse
+          {mode !== "journal" && <InnerCollapse
             title="色彩方案"
             open={colorOpen}
             onToggle={() => setColorOpen((v) => !v)}
@@ -355,7 +415,7 @@ export default function SettingsPage() {
                 </div>
               ))}
             </div>
-          </InnerCollapse>
+          </InnerCollapse>}
         </CollapseSection>
 
         {/* ── 账号 ── */}
