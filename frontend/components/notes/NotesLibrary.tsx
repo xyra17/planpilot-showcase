@@ -198,7 +198,7 @@ export default function NotesLibrary({
             学习日志
           </h2>
           <p className="mt-0.5 text-xs text-gray-400">
-            沉淀可以长期复用的概念、方法与经验
+            按日期记录整体学习进展，可按需关联某个目标
           </p>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
@@ -344,7 +344,7 @@ export default function NotesLibrary({
                   onChange={(event) => setNoteDate(event.target.value)}
                   className="rounded-lg border border-gray-100 bg-white px-2 py-1.5 text-xs text-gray-600 outline-none"
                 />
-                <span>目标</span>
+                <span>目标（可选）</span>
                 <select
                   value={goalId}
                   onChange={(event) => setGoalId(event.target.value)}

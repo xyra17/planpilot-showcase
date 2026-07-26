@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { BookOpen, CalendarDays, ExternalLink, Plus } from "lucide-react";
+import { BookOpen, CalendarDays, ChevronDown, ExternalLink, Plus } from "lucide-react";
 import { api } from "@/lib/api";
 import type { KnowledgeNote } from "@/lib/knowledge-context";
 
@@ -23,6 +23,7 @@ function stripHtml(html: string) {
 export default function GoalNotesPanel({ goalId }: GoalNotesPanelProps) {
   const [notes, setNotes] = useState<KnowledgeNote[]>([]);
   const [loading, setLoading] = useState(true);
+  const [newMenuOpen, setNewMenuOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -40,20 +41,43 @@ export default function GoalNotesPanel({ goalId }: GoalNotesPanelProps) {
 
   return (
     <div className="space-y-4 px-4 py-4">
-      <div className="flex flex-wrap gap-2">
-        <Link
-          href={`/dashboard/notes?tab=log&goalId=${goalId}&create=1`}
-          className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs font-medium text-white transition hover:opacity-90"
-          style={{ backgroundColor: "var(--accent)" }}
-        >
-          <Plus size={13} />新建学习笔记
-        </Link>
-        <Link
-          href={`/dashboard/notes?tab=card&goalId=${goalId}&create=1`}
-          className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-gray-200 px-3 py-2 text-xs font-medium text-gray-600 transition hover:bg-gray-50"
-        >
-          <Plus size={13} />新建学习日志
-        </Link>
+      <div className="flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50 px-3 py-2">
+        <div className="flex min-w-0 items-center gap-3 text-xs text-gray-500">
+          <span className="inline-flex items-center gap-1">
+            <CalendarDays size={12} style={{ color: "var(--accent)" }} />
+            笔记 {studyNotes.length}
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <BookOpen size={12} style={{ color: "var(--accent)" }} />
+            日志 {studyLogs.length}
+          </span>
+        </div>
+        <div className="relative">
+          <button
+            onClick={() => setNewMenuOpen((open) => !open)}
+            aria-expanded={newMenuOpen}
+            className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium text-white transition hover:opacity-90"
+            style={{ backgroundColor: "var(--accent)" }}
+          >
+            <Plus size={12} />新建<ChevronDown size={11} />
+          </button>
+          {newMenuOpen && (
+            <div className="absolute right-0 top-9 z-20 w-40 overflow-hidden rounded-xl border border-gray-100 bg-white p-1.5 shadow-xl">
+              <Link
+                href={`/dashboard/notes?tab=log&goalId=${goalId}&create=1`}
+                className="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-gray-600 transition hover:bg-gray-50"
+              >
+                <CalendarDays size={13} />学习笔记
+              </Link>
+              <Link
+                href={`/dashboard/notes?tab=card&goalId=${goalId}&create=1`}
+                className="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-gray-600 transition hover:bg-gray-50"
+              >
+                <BookOpen size={13} />学习日志
+              </Link>
+            </div>
+          )}
+        </div>
       </div>
 
       {loading ? (
