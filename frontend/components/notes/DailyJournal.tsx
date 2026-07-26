@@ -377,18 +377,15 @@ export default function DailyJournal() {
       <div className={`flex-shrink-0 transition-all duration-200 ${sidebarOpen ? "w-[216px]" : "w-8"}`}>
         {sidebarOpen ? (
           <div className="flex flex-col gap-3">
-            <div className="h-9 flex items-center justify-between px-1 flex-shrink-0">
-              <span className="text-xs font-medium text-gray-400">日期导航</span>
+            <div className="select-none bg-white border border-gray-100 rounded-xl p-3 relative">
               <button
                 onClick={() => setSidebarOpen(false)}
                 title="收起日期导航"
                 aria-label="收起日期导航"
-                className="h-8 w-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition"
+                className="absolute right-2 top-2 h-8 w-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition"
               >
                 <ChevronLeft size={14} />
               </button>
-            </div>
-            <div className="select-none bg-white border border-gray-100 rounded-xl p-3 relative">
               <p className="text-xs font-medium text-gray-400 tracking-widest uppercase mb-1">
                 {new Date(selectedDate + "T00:00:00").toLocaleDateString("zh-CN", { weekday: "long" })}
               </p>
