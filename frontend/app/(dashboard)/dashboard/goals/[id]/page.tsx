@@ -737,7 +737,7 @@ export default function GoalDetailPage({ params }: { params: { id: string } }) {
   }, []);
 
   const [sidebarWidth, setSidebarWidth] = useState(() =>
-    typeof window !== "undefined" ? Math.round(window.innerWidth * 0.35) : 420
+    typeof window !== "undefined" ? Math.round(window.innerWidth * 0.4) : 480
   );
   const isDragging = useRef(false);
   const dragStartX = useRef(0);
@@ -808,34 +808,29 @@ export default function GoalDetailPage({ params }: { params: { id: string } }) {
   const daysLeft = computeDaysLeft(goal.deadline);
 
   return (
-    <div className="flex flex-col h-full overflow-hidden bg-gray-50">
+    <div className="goal-detail-page flex flex-col h-full overflow-hidden bg-gray-50">
       {/* 顶部返回栏 */}
-      <div className="flex items-center gap-3 px-6 py-3.5 bg-white border-b border-gray-100 flex-shrink-0">
+      <div className="goal-detail-header flex items-center gap-3 px-6 py-3 bg-white border-b border-gray-100 flex-shrink-0">
         <Link href="/dashboard/goals" className="text-gray-400 hover:text-gray-600 transition p-1 -ml-1 rounded-lg hover:bg-gray-100">
           <ArrowLeft size={18} />
         </Link>
         <span className="text-sm text-gray-400">/</span>
         <Link href="/dashboard/goals" className="text-sm font-medium text-gray-500 hover:text-gray-800 transition">我的目标</Link>
         <span className="text-sm text-gray-400">/</span>
-        <span className="text-sm font-semibold text-gray-900">{goal.title}</span>
+        <span className="min-w-0 text-sm font-semibold text-gray-900 truncate">{goal.title}</span>
+        <span className="hidden min-[900px]:inline text-xs text-gray-400 truncate">
+          截止 {goal.deadline} · {planTotalDays != null ? `计划 ${planTotalDays} 天` : `剩余 ${daysLeft} 天`} · 每日 {goal.daily_hours}h
+        </span>
         <span className="ml-auto text-xs font-medium px-2.5 py-1 rounded-full bg-blue-50 text-blue-600">
           {STATUS_LABEL[goal.status] ?? goal.status}
         </span>
-      </div>
-
-      {/* 目标标题居中显示 */}
-      <div className="flex-shrink-0 bg-white border-b border-gray-100 py-3 text-center px-6">
-        <p className="leading-snug">
-          <span className="text-base font-bold text-gray-900">{goal.title}</span>
-          <span className="text-xs text-gray-400 ml-1.5">（截止 {goal.deadline} · {planTotalDays != null ? `计划 ${planTotalDays} 天` : `剩余 ${daysLeft} 天`} · 每日 {goal.daily_hours}h）</span>
-        </p>
       </div>
 
       <div className="flex flex-1 overflow-hidden">
         {/* ── 左侧面板 ── */}
         <aside
           className={cn(
-            "bg-white border-r border-gray-100 flex flex-col",
+            "goal-detail-left bg-white border-r border-gray-100 flex flex-col",
             sidebarCollapsed ? "overflow-hidden items-center flex-shrink-0" : chatCollapsed ? "flex-1 overflow-hidden" : "flex-shrink-0 overflow-hidden"
           )}
           style={sidebarCollapsed ? { width: 40 } : chatCollapsed ? {} : { width: sidebarWidth }}
@@ -851,7 +846,7 @@ export default function GoalDetailPage({ params }: { params: { id: string } }) {
           ) : (
             <>
               {/* 数据指标 — 可折叠 */}
-              <div className="flex-shrink-0 border-b border-gray-100">
+              <div className="goal-detail-stats flex-shrink-0 border-b border-gray-100">
                 <div className="flex items-center">
                   <button
                     onClick={() => setStatsCollapsed((v) => !v)}
@@ -900,7 +895,7 @@ export default function GoalDetailPage({ params }: { params: { id: string } }) {
               </div>
 
               {/* Tab 内容 */}
-              <div className="flex-1 overflow-y-auto">
+              <div className="goal-detail-scroll flex-1 overflow-y-auto">
                 {tab === "tasks" && (
                   <GoalTasksWorkspace
                     goal={goal}
@@ -923,14 +918,14 @@ export default function GoalDetailPage({ params }: { params: { id: string } }) {
         {!sidebarCollapsed && !chatCollapsed && (
           <div
             onMouseDown={onDragStart}
-            className="w-1 flex-shrink-0 cursor-col-resize bg-gray-100 hover:bg-blue-300 transition-colors"
+            className="goal-detail-resizer w-1 flex-shrink-0 cursor-col-resize bg-gray-100 transition-colors"
             style={{ touchAction: "none" }}
           />
         )}
 
         {/* ── 右侧 AI 对话 ── */}
         <div className={cn(
-          "flex flex-col overflow-hidden",
+          "goal-detail-right flex flex-col overflow-hidden",
           chatCollapsed ? "flex-none items-center bg-white border-l border-gray-100" : "flex-1"
         )} style={chatCollapsed ? { width: 40 } : {}}>
           <div className={cn(

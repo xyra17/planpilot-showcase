@@ -159,7 +159,7 @@ export function ChatWindow({ goalId, className }: { goalId?: string; className?:
 
   return (
     <div className={cn("flex flex-col", className)}>
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
+      <div className="goal-detail-scroll flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-center py-12 select-none px-4">
             <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-3"
@@ -320,18 +320,20 @@ export function ChatWindow({ goalId, className }: { goalId?: string; className?:
       )}
 
       <div className="shrink-0 border-t border-gray-100">
-        <div className="flex flex-wrap gap-1.5 px-4 pt-2 justify-center">
-          {QUICK_ACTIONS.map((action) => (
-            <button
-              key={action.label}
-              onClick={() => sendMessage(action.text)}
-              disabled={isStreaming}
-              className="shrink-0 px-3 py-1 text-xs rounded-full border border-gray-200 text-gray-500 hover:border-gray-300 hover:text-gray-700 hover:bg-gray-50 transition disabled:opacity-40 whitespace-nowrap"
-            >
-              {action.label}
-            </button>
-          ))}
-        </div>
+        {messages.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 px-4 pt-2 justify-center">
+            {QUICK_ACTIONS.slice(0, 3).map((action) => (
+              <button
+                key={action.label}
+                onClick={() => sendMessage(action.text)}
+                disabled={isStreaming}
+                className="shrink-0 px-3 py-1 text-xs rounded-full border border-gray-200 text-gray-500 hover:border-gray-300 hover:text-gray-700 hover:bg-gray-50 transition disabled:opacity-40 whitespace-nowrap"
+              >
+                {action.label}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="flex gap-2 items-end px-4 pb-4 pt-2">
           <textarea
             ref={textareaRef}

@@ -1148,6 +1148,46 @@ html {
   background:color-mix(in srgb,var(--surface) 68%,var(--accent-light)) !important;
 }
 
+/* 目标详情：减少纸张套纸张的边框噪声，让任务与 AI 成为主视觉。 */
+[data-theme="journal"] .goal-detail-header {
+  min-height:50px;
+  background:color-mix(in srgb,var(--surface) 96%,var(--accent-light)) !important;
+  border-color:color-mix(in srgb,var(--text-1) 18%,transparent) !important;
+}
+[data-theme="journal"] .goal-detail-left,
+[data-theme="journal"] .goal-detail-right {
+  background:color-mix(in srgb,var(--surface) 98%,var(--bg)) !important;
+}
+[data-theme="journal"] .goal-detail-stats {
+  border-color:color-mix(in srgb,var(--text-1) 14%,transparent) !important;
+}
+[data-theme="journal"] .goal-detail-stats .grid > div {
+  border-color:color-mix(in srgb,var(--text-1) 16%,transparent) !important;
+  box-shadow:0 1px 0 color-mix(in srgb,var(--text-1) 8%,transparent) !important;
+  background:color-mix(in srgb,var(--surface) 96%,var(--accent-light)) !important;
+}
+[data-theme="journal"] .goal-detail-resizer {
+  width:3px !important;
+  background:color-mix(in srgb,var(--text-1) 12%,transparent) !important;
+}
+[data-theme="journal"] .goal-detail-resizer:hover {
+  background:color-mix(in srgb,var(--accent) 42%,transparent) !important;
+}
+[data-theme="journal"] .goal-detail-scroll {
+  scrollbar-color:var(--journal-scroll-thumb) transparent;
+}
+[data-theme="journal"] .goal-detail-scroll::-webkit-scrollbar {
+  width:6px;
+}
+[data-theme="journal"] .goal-detail-scroll::-webkit-scrollbar-track {
+  border:0;
+  background:transparent;
+}
+[data-theme="journal"] .goal-detail-scroll::-webkit-scrollbar-thumb {
+  border:1px solid transparent;
+  background-color:color-mix(in srgb,var(--journal-scroll-thumb) 72%,transparent);
+}
+
 /* 手账纸稿：弹窗与表单使用叠纸布局 */
 [data-theme="journal"] .calm-app .fixed.inset-0[class*="bg-black"],
 [data-theme="journal"] .calm-app .fixed.inset-0[class*="bg-gray-950"] {
