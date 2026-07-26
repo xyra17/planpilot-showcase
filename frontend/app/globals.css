@@ -51,6 +51,39 @@ body {
   --ok-bg:     #EEF4F1;
   --warn-text: #B07D4A;
   --warn-bg:   #F6F1EA;
+  /* ── 全局滚动条 ── */
+  --scrollbar-track: transparent;
+  --scrollbar-thumb: color-mix(in srgb, var(--accent) 28%, var(--border));
+  --scrollbar-thumb-hover: color-mix(in srgb, var(--accent) 52%, var(--border));
+}
+
+html {
+  scrollbar-color:var(--scrollbar-thumb) var(--scrollbar-track);
+  scrollbar-width:thin;
+}
+* {
+  scrollbar-color:var(--scrollbar-thumb) var(--scrollbar-track);
+  scrollbar-width:thin;
+}
+::-webkit-scrollbar {
+  width:8px;
+  height:8px;
+}
+::-webkit-scrollbar-track {
+  background:var(--scrollbar-track);
+}
+::-webkit-scrollbar-thumb {
+  min-height:28px;
+  border:2px solid transparent;
+  border-radius:999px;
+  background-color:var(--scrollbar-thumb);
+  background-clip:content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color:var(--scrollbar-thumb-hover);
+}
+::-webkit-scrollbar-corner {
+  background:transparent;
 }
 
 /* ── Brief card — 上深下浅，使用方案自身深色 ── */
@@ -328,12 +361,11 @@ body {
   --border-subtle: rgba(255,255,255,0.12);
   --ok-bg:#334155; --ok-text:#cbd5e1;
   --warn-bg:#2d3f56; --warn-text:#94a3b8;
+  --scrollbar-track:transparent;
+  --scrollbar-thumb:#475569;
+  --scrollbar-thumb-hover:#64748b;
 }
 [data-theme="dark"] body { background-color:#0f172a; color:#f1f5f9; }
-[data-theme="dark"] ::-webkit-scrollbar { width:6px; height:6px; }
-[data-theme="dark"] ::-webkit-scrollbar-track { background:#0f172a; }
-[data-theme="dark"] ::-webkit-scrollbar-thumb { background:#334155; border-radius:3px; }
-[data-theme="dark"] ::-webkit-scrollbar-thumb:hover { background:#475569; }
 [data-theme="dark"] .bg-white        { background-color:#1e293b !important; }
 [data-theme="dark"] .bg-gray-50      { background-color:#0f172a !important; }
 [data-theme="dark"] .bg-gray-100     { background-color:#2d3f56 !important; }
@@ -427,6 +459,9 @@ body {
   --heat-0:#E4DCCF; --heat-1:#DAC7A8; --heat-2:#BE9B66; --heat-3:#8A7556; --heat-4:#45413B;
   --brief-from:#F2E0B9; --brief-to:#E8C98E;
   --journal-tape:#DABE8E;
+  --scrollbar-track:transparent;
+  --scrollbar-thumb:color-mix(in srgb,var(--accent-muted) 38%,var(--border));
+  --scrollbar-thumb-hover:color-mix(in srgb,var(--accent) 48%,var(--border));
   --border-subtle:rgba(63,58,52,.24);
 }
 [data-theme="journal"][data-journal="wood"] {
