@@ -488,15 +488,15 @@ export default function DailyJournal({
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-white transition"
                 style={{ background: "var(--accent)" }}
               >
-                <Plus size={14} />新建学习记录
+                <Plus size={14} />新建学习笔记
               </button>
             </div>
             {loading ? (
               <div className="flex items-center justify-center h-32 text-gray-400 text-sm">加载中…</div>
             ) : notes.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-40 text-gray-300 text-sm gap-1">
-                <p>还没有学习记录</p>
-                <p>点击右上角「新建学习记录」开始写</p>
+                <p>还没有学习笔记</p>
+                <p>点击右上角「新建学习笔记」开始写</p>
               </div>
             ) : (
               <div className="flex flex-col gap-3 overflow-y-auto flex-1">
@@ -558,7 +558,7 @@ export default function DailyJournal({
                   <ChevronLeft size={14} />返回
                 </button>
                 <span className="text-sm text-gray-300">/</span>
-                <span className="text-sm text-gray-500 whitespace-nowrap">{isNewDraft ? "新建学习记录" : "编辑"}</span>
+                <span className="text-sm text-gray-500 whitespace-nowrap">{isNewDraft ? "新建学习笔记" : "编辑"}</span>
               </div>
               <div className="flex items-center justify-end gap-2 min-w-0">
                 <Target size={13} className="text-gray-400 flex-shrink-0" />

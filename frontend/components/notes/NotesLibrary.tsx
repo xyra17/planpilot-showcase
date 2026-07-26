@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  CalendarDays, FileText, Lightbulb, MoreHorizontal,
+  MoreHorizontal,
   Pencil, Plus, Search, Trash2, X,
 } from "lucide-react";
 import { api } from "@/lib/api";
@@ -12,13 +12,6 @@ import TiptapEditor from "./TiptapEditor";
 
 type EditableNoteType = "daily_log" | "flash_card";
 type NoteWithAttachments = KnowledgeNote & { attachmentIds?: string[] };
-
-const TYPE_META: Record<string, { label: string; icon: React.ReactNode; cls: string }> = {
-  quick_note: { label: "快速记录", icon: <Lightbulb size={11} />, cls: "bg-amber-50 text-amber-700" },
-  daily_log: { label: "学习日志", icon: <CalendarDays size={11} />, cls: "bg-blue-50 text-blue-700" },
-  flash_card: { label: "知识卡片", icon: <FileText size={11} />, cls: "bg-emerald-50 text-emerald-700" },
-  task_note: { label: "任务笔记", icon: <FileText size={11} />, cls: "bg-gray-100 text-gray-600" },
-};
 
 function stripHtml(html: string) {
   return html
@@ -191,20 +184,29 @@ export default function NotesLibrary({
       <div className="flex items-center justify-between gap-3 mb-5">
         <div>
           <h2 className="text-lg font-semibold text-gray-900">
-            知识卡片
+            学习日志
           </h2>
           <p className="mt-0.5 text-xs text-gray-400">
             沉淀可以长期复用的概念、方法与经验
           </p>
         </div>
-        <div className="relative">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="搜索笔记…"
-            className="w-60 rounded-xl border border-gray-200 py-2 pl-9 pr-3 text-sm outline-none transition focus:border-gray-300"
-          />
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="搜索日志…"
+              className="w-60 rounded-xl border border-gray-200 py-2 pl-9 pr-3 text-sm outline-none transition focus:border-gray-300"
+            />
+          </div>
+          <button
+            onClick={openNew}
+            className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium text-white transition hover:opacity-90"
+            style={{ background: "var(--accent)" }}
+          >
+            <Plus size={14} />新建日志
+          </button>
         </div>
       </div>
 
@@ -224,17 +226,13 @@ export default function NotesLibrary({
       ) : (
         <div className="grid flex-1 min-h-0 grid-cols-1 content-start gap-3 overflow-y-auto pr-1 md:grid-cols-2 xl:grid-cols-3">
           {visibleNotes.map((note) => {
-            const meta = TYPE_META[note.noteType] ?? TYPE_META.quick_note;
             const canConvert = !["chat_note", "task_note"].includes(note.noteType);
             return (
               <article
                 key={note.id}
                 className="group relative rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-gray-200 hover:shadow-md"
               >
-                <div className="mb-3 flex items-center justify-between gap-2">
-                  <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-medium ${meta.cls}`}>
-                    {meta.icon}{meta.label}
-                  </span>
+                <div className="mb-3 flex items-center justify-end">
                   <div className="relative flex items-center gap-1">
                     <button
                       onClick={() => openEdit(note)}
@@ -263,8 +261,8 @@ export default function NotesLibrary({
                       <div className="absolute right-0 top-8 z-20 w-36 overflow-hidden rounded-xl border border-gray-100 bg-white p-1 shadow-xl">
                         <p className="px-2 py-1 text-[10px] font-medium text-gray-400">转换为</p>
                         {([
-                          ["daily_log", "学习日志"],
-                          ["flash_card", "知识卡片"],
+                          ["daily_log", "学习笔记"],
+                          ["flash_card", "学习日志"],
                         ] as Array<[EditableNoteType, string]>).map(([type, label]) => (
                           <button
                             key={type}
@@ -297,10 +295,10 @@ export default function NotesLibrary({
 
       {editing && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/25 p-4 backdrop-blur-[1px]">
-          <div role="dialog" aria-modal="true" aria-label={isNewDraft ? "新建知识卡片" : "编辑知识卡片"} className="flex h-[min(760px,90vh)] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+          <div role="dialog" aria-modal="true" aria-label={isNewDraft ? "新建学习日志" : "编辑学习日志"} className="flex h-[min(760px,90vh)] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-gray-100 px-5 py-3">
               <span className="text-sm font-medium text-gray-600">
-                {isNewDraft ? "新建知识卡片" : "编辑笔记"}
+                {isNewDraft ? "新建学习日志" : "编辑学习日志"}
               </span>
               <button onClick={closeEditor} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100">
                 <X size={15} />

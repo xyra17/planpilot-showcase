@@ -1,10 +1,10 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import {
-  BookOpen, CalendarDays, ChevronDown, Plus,
+  BookOpen, CalendarDays,
 } from "lucide-react";
 
 const DailyJournal = dynamic(
@@ -22,8 +22,8 @@ type Tab = "card" | "log";
 const VALID_TABS = new Set<Tab>(["card", "log"]);
 
 const TAB_META: Record<Tab, { label: string; icon: React.ReactNode }> = {
-  card: { label: "知识卡片", icon: <BookOpen size={14} /> },
-  log: { label: "学习日志", icon: <CalendarDays size={14} /> },
+  log: { label: "学习笔记", icon: <CalendarDays size={14} /> },
+  card: { label: "学习日志", icon: <BookOpen size={14} /> },
 };
 
 function NotesWorkspaceLoading() {
@@ -37,29 +37,14 @@ function NotesWorkspaceLoading() {
 function NotesContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const [newMenuOpen, setNewMenuOpen] = useState(false);
-  const [createSignals, setCreateSignals] = useState<Record<Tab, number>>({
-    card: 0,
-    log: 0,
-  });
 
   const raw = searchParams.get("tab");
-  const tab: Tab = raw && VALID_TABS.has(raw as Tab) ? raw as Tab : "card";
+  const tab: Tab = raw && VALID_TABS.has(raw as Tab) ? raw as Tab : "log";
 
   function setTab(nextTab: Tab) {
     const params = new URLSearchParams(searchParams.toString());
     params.set("tab", nextTab);
     router.replace(`/dashboard/notes?${params.toString()}`);
-  }
-
-  function createNote(type: Tab) {
-    setTab(type);
-    setCreateSignals((current) => ({ ...current, [type]: current[type] + 1 }));
-    setNewMenuOpen(false);
-  }
-
-  function clearCreateSignal(type: Tab) {
-    setCreateSignals((current) => ({ ...current, [type]: 0 }));
   }
 
   return (
@@ -69,7 +54,7 @@ function NotesContent() {
         style={{ boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}
       >
         <div className="flex min-w-0 items-center gap-1">
-          {(Object.keys(TAB_META) as Tab[]).map((item) => {
+          {(["log", "card"] as Tab[]).map((item) => {
             const meta = TAB_META[item];
             return (
               <button
@@ -86,43 +71,14 @@ function NotesContent() {
             );
           })}
         </div>
-        <div className="relative mb-2 flex-shrink-0">
-          <button
-            onClick={() => setNewMenuOpen((open) => !open)}
-            className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium text-white transition hover:opacity-90"
-            style={{ background: "var(--accent)" }}
-          >
-            <Plus size={14} />新建笔记<ChevronDown size={13} />
-          </button>
-          {newMenuOpen && (
-            <div className="absolute right-0 top-11 z-40 w-48 overflow-hidden rounded-xl border border-gray-100 bg-white p-1.5 shadow-xl">
-              {(["card", "log"] as Tab[]).map((type) => (
-                <button
-                  key={type}
-                  onClick={() => createNote(type)}
-                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-gray-600 transition hover:bg-gray-50"
-                >
-                  {TAB_META[type].icon}
-                  <span>{TAB_META[type].label}</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
       </header>
 
       <main className="flex-1 min-h-0 overflow-hidden p-6">
         {tab === "log" && (
-          <DailyJournal
-            createSignal={createSignals.log}
-            onCreateHandled={() => clearCreateSignal("log")}
-          />
+          <DailyJournal />
         )}
         {tab === "card" && (
-          <NotesLibrary
-            createSignal={createSignals.card}
-            onCreateHandled={() => clearCreateSignal("card")}
-          />
+          <NotesLibrary />
         )}
       </main>
     </div>
