@@ -209,7 +209,7 @@ function DayTaskList({
         <p className="text-xs text-gray-400 py-3 text-center">当天暂无任务</p>
       )}
 
-      <div className="space-y-1 max-h-40 overflow-y-auto">
+      <div className="goal-task-scroll space-y-1 max-h-40 overflow-y-auto">
         {dayTasks.map((task) => (
           <div key={task.id} className="goal-task-item group flex items-start gap-2 px-2.5 py-2 rounded-xl transition">
             <button onClick={() => toggleTask(task.id)} className="mt-0.5 flex-shrink-0">
@@ -554,7 +554,7 @@ function PlanOverview({ goalId, deadline, refreshKey, hideRegenerate, dailyHours
         <span className="text-gray-500">总体进度 <span className="font-semibold text-gray-800">{pct}%</span></span>
         <span className="text-gray-400">{masteredCount}/{plan.total_tasks} 已掌握</span>
       </div>
-      <div className="w-full bg-gray-100 rounded-full h-1.5">
+      <div className="plan-progress-track w-full bg-gray-100 rounded-full h-1.5">
         <div className="h-1.5 rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: "var(--accent)" }} />
       </div>
       {totalDays > 0 && firstDate && lastDate && (
@@ -607,8 +607,8 @@ function PlanOverview({ goalId, deadline, refreshKey, hideRegenerate, dailyHours
               </button>
 
               {/* 进度条 */}
-              <div className="h-1 bg-gray-200">
-                <div className="h-1 transition-all" style={{ width: `${phasePct}%`, backgroundColor: isComplete ? "#22c55e" : "var(--accent)" }} />
+              <div className="plan-phase-progress-track h-1 bg-gray-200">
+                <div className="h-1 transition-all" style={{ width: `${phasePct}%`, backgroundColor: isComplete ? "var(--ok-text)" : "var(--accent)" }} />
               </div>
 
               {/* 阶段焦点 + 任务列表 */}
