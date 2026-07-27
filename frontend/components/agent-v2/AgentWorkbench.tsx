@@ -17,12 +17,14 @@ import {
   ShieldCheck,
   Sparkles,
   Square,
+  Trash2,
   X,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useGoalStore } from "@/lib/stores/goalStore";
 import { useToast } from "@/components/ui/Toast";
 import { useTasks } from "@/lib/tasks-context";
+import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
 
 type Operation = {
   entity_id: string;
@@ -80,6 +82,7 @@ const promptExamples = [
   "检查最近两周执行情况，把逾期任务重新安排到下周，修改前让我确认。",
   "创建两个任务“本周复习”，明天开始安排，修改前让我确认。",
   "把任务“章节练习”改到明天，修改前让我确认。",
+  "删除任务“章节练习”，执行前让我确认。",
 ];
 
 const statusLabel: Record<string, string> = {
@@ -245,6 +248,7 @@ export default function AgentWorkbench() {
   const { goals, fetchGoals } = useGoalStore();
   const { showToast } = useToast();
   const { refresh: refreshTasks } = useTasks();
+  const { confirmAction } = useConfirmDialog();
   const [request, setRequest] = useState(
     "检查我最近两周的执行情况，把落后的任务重新安排到下周。周三晚上不要排任务，修改前让我确认。"
   );
@@ -351,6 +355,31 @@ export default function AgentWorkbench() {
     }
   }
 
+  async function deleteHistory(item: AgentRun) {
+    const confirmed = await confirmAction({
+      title: "删除 Agent 历史任务",
+      description:
+        item.result?.undo_available && item.status === "completed"
+          ? "删除后会同时移除执行步骤、审计记录和撤销入口，且无法恢复。"
+          : "执行步骤和审计记录将一并删除，且无法恢复。",
+      confirmLabel: "删除记录",
+      tone: "danger",
+    });
+    if (!confirmed) return;
+    try {
+      await api.del(`/api/v2/agent/runs/${item.id}`);
+      const remaining = runs.filter((candidate) => candidate.id !== item.id);
+      setRuns(remaining);
+      if (selectedId === item.id) {
+        setRun(null);
+        setSelectedId(remaining[0]?.id ?? null);
+      }
+      showToast("Agent 历史任务已删除", "success");
+    } catch (error) {
+      showToast((error as Error).message, "error");
+    }
+  }
+
   return (
     <div className="grid h-full min-h-0 grid-cols-[280px_minmax(0,1fr)]">
       <aside className="border-r border-gray-200/80 bg-white/55 p-4">
@@ -373,10 +402,9 @@ export default function AgentWorkbench() {
             </p>
           )}
           {runs.map((item) => (
-            <button
+            <div
               key={item.id}
-              onClick={() => setSelectedId(item.id)}
-              className="w-full rounded-xl border p-3 text-left transition hover:-translate-y-px"
+              className="group flex items-start rounded-xl border transition hover:-translate-y-px"
               style={{
                 borderColor:
                   selectedId === item.id ? "var(--accent)" : "var(--border)",
@@ -384,12 +412,27 @@ export default function AgentWorkbench() {
                   selectedId === item.id ? "var(--accent-light)" : "var(--card)",
               }}
             >
-              <p className="line-clamp-2 text-sm font-medium">{item.request}</p>
-              <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
-                <span>{statusLabel[item.status] ?? item.status}</span>
-                <ChevronRight size={13} />
-              </div>
-            </button>
+              <button
+                onClick={() => setSelectedId(item.id)}
+                className="min-w-0 flex-1 p-3 text-left"
+              >
+                <p className="line-clamp-2 text-sm font-medium">{item.request}</p>
+                <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
+                  <span>{statusLabel[item.status] ?? item.status}</span>
+                  <ChevronRight size={13} />
+                </div>
+              </button>
+              {!["queued", "running", "executing"].includes(item.status) && (
+                <button
+                  onClick={() => deleteHistory(item)}
+                  className="mr-2 mt-2 rounded-lg p-1.5 text-gray-400 opacity-70 transition hover:bg-red-50 hover:text-red-600 group-hover:opacity-100"
+                  aria-label={`删除 Agent 历史任务：${item.request}`}
+                  title="删除历史任务"
+                >
+                  <Trash2 size={14} />
+                </button>
+              )}
+            </div>
           ))}
         </div>
       </aside>

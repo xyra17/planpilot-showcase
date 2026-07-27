@@ -502,6 +502,14 @@ async def cancel_run(db: AsyncSession, *, user_id: str, run_id: str) -> AgentRun
     return run
 
 
+async def delete_run(db: AsyncSession, *, user_id: str, run_id: str) -> None:
+    run = await _owned_run(db, user_id, run_id)
+    if run.status in {"queued", "running", "executing"}:
+        raise HTTPException(409, "执行中的 Agent 任务请先取消，再删除")
+    await db.delete(run)
+    await db.commit()
+
+
 async def pause_run(db: AsyncSession, *, user_id: str, run_id: str) -> AgentRun:
     run = await _owned_run(db, user_id, run_id)
     if run.status not in {"queued", "running", "executing", "waiting_approval"}:

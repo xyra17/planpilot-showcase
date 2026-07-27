@@ -145,7 +145,9 @@ async def test_agent_run_approval_apply_and_undo(client, auth, goal_id, db):
 
 
 @pytest.mark.asyncio
-async def test_agent_run_is_private_to_owner(client, auth, goal_id):
+async def test_agent_run_is_private_to_owner_and_deletable_when_stopped(
+    client, auth, goal_id, db
+):
     response = await client.post(
         "/api/v2/agent/runs",
         headers=auth,
@@ -165,6 +167,24 @@ async def test_agent_run_is_private_to_owner(client, auth, goal_id):
         f"/api/v2/agent/runs/{response.json()['id']}", headers=other_auth
     )
     assert hidden.status_code == 404
+    active_delete = await client.delete(
+        f"/api/v2/agent/runs/{response.json()['id']}", headers=auth
+    )
+    assert active_delete.status_code == 409
+    stored = (
+        await db.execute(
+            select(AgentRun).where(AgentRun.id == response.json()["id"])
+        )
+    ).scalar_one()
+    await advance_run(db, user_id=stored.user_id, run_id=stored.id)
+    deleted = await client.delete(
+        f"/api/v2/agent/runs/{response.json()['id']}", headers=auth
+    )
+    assert deleted.status_code == 204
+    missing = await client.get(
+        f"/api/v2/agent/runs/{response.json()['id']}", headers=auth
+    )
+    assert missing.status_code == 404
 
 
 @pytest.mark.asyncio

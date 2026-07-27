@@ -10,6 +10,7 @@ from src.core.agent_v2.orchestrator import (
     approve_run,
     cancel_run,
     create_run,
+    delete_run,
     edit_approval,
     pause_run,
     reject_run,
@@ -95,6 +96,15 @@ async def get_run(
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     return await run_detail(db, current_user.id, run_id)
+
+
+@router.delete("/runs/{run_id}", status_code=204)
+async def remove_run(
+    run_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    await delete_run(db, user_id=current_user.id, run_id=run_id)
 
 
 @router.post("/runs/{run_id}/approve")
