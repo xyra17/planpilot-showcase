@@ -385,20 +385,22 @@ export default function AgentWorkbench() {
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
       <header
-        className="flex flex-shrink-0 items-start gap-3 border-b px-6 py-5 lg:px-8"
+        className="flex flex-shrink-0 justify-center border-b px-6 py-5 lg:px-8"
         style={{ borderColor: "var(--border)", background: "var(--card)" }}
       >
-        <span
-          className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl text-white"
-          style={{ background: "var(--accent)" }}
-        >
-          <Sparkles size={19} />
-        </span>
-        <div>
-          <h1 className="text-xl font-semibold text-gray-900">Agent 工作台</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            主 Agent 负责审批与执行，从属 Agent 只进行分析和提出方案。
-          </p>
+        <div className="flex items-center justify-center gap-3">
+          <span
+            className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl text-white"
+            style={{ background: "var(--accent)" }}
+          >
+            <Sparkles size={19} />
+          </span>
+          <div className="text-center">
+            <h1 className="text-xl font-semibold text-gray-900">Agent 工作台</h1>
+            <p className="mt-1 text-sm text-gray-500">
+              主 Agent 负责审批与执行，从属 Agent 只进行分析和提出方案。
+            </p>
+          </div>
         </div>
       </header>
 
@@ -439,7 +441,7 @@ export default function AgentWorkbench() {
           {runs.map((item) => (
             <div
               key={item.id}
-              className="group flex items-start rounded-xl border transition hover:-translate-y-px"
+              className="group rounded-xl border transition hover:-translate-y-px"
               style={{
                 borderColor:
                   selectedId === item.id ? "var(--accent)" : "var(--border)",
@@ -449,24 +451,34 @@ export default function AgentWorkbench() {
             >
               <button
                 onClick={() => setSelectedId(item.id)}
-                className="min-w-0 flex-1 p-3 text-left"
+                className="w-full min-w-0 px-3 pb-2 pt-3 text-left"
               >
                 <p className="line-clamp-2 text-sm font-medium">{item.request}</p>
-                <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
-                  <span>{statusLabel[item.status] ?? item.status}</span>
-                  <ChevronRight size={13} />
-                </div>
               </button>
-              {!["queued", "running", "executing"].includes(item.status) && (
+              <div className="flex items-center justify-between gap-2 px-3 pb-2">
+                <span className="whitespace-nowrap text-xs text-gray-500">
+                  {statusLabel[item.status] ?? item.status}
+                </span>
+                <div className="flex items-center gap-0.5">
                 <button
-                  onClick={() => deleteHistory(item)}
-                  className="mr-2 mt-2 rounded-lg p-1.5 text-gray-400 opacity-70 transition hover:bg-red-50 hover:text-red-600 group-hover:opacity-100"
-                  aria-label={`删除 Agent 历史任务：${item.request}`}
-                  title="删除历史任务"
+                  onClick={() => setSelectedId(item.id)}
+                  className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 transition hover:bg-black/5 hover:text-gray-600"
+                  aria-label={`查看 Agent 历史任务：${item.request}`}
                 >
-                  <Trash2 size={14} />
+                  <ChevronRight size={13} />
                 </button>
-              )}
+                {!["queued", "running", "executing"].includes(item.status) && (
+                  <button
+                    onClick={() => deleteHistory(item)}
+                    className="flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 opacity-70 transition hover:bg-red-50 hover:text-red-600 group-hover:opacity-100"
+                    aria-label={`删除 Agent 历史任务：${item.request}`}
+                    title="删除历史任务"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                )}
+                </div>
+              </div>
             </div>
           ))}
         </div>
