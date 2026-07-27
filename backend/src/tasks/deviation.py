@@ -22,6 +22,7 @@ async def _main(user_id: str | None = None):
 
     from sqlalchemy import select
 
+    from src.core.replan_policy import should_suggest_replan
     from src.models import CheckinRecord, Goal, User
 
     four_days_ago = (date.today() - timedelta(days=4)).isoformat()
@@ -47,7 +48,13 @@ async def _main(user_id: str | None = None):
                 .limit(4)
             )).scalars().all()
 
-            if len(recent) >= 4 and all(r.completion_rate < 0.6 for r in recent):
+            rates_by_date = {record.date: record.completion_rate for record in recent}
+            work_schedule = (goal.meta or {}).get("work_schedule", "all")
+            if should_suggest_replan(
+                rates_by_date=rates_by_date,
+                end_date=date.today(),
+                work_schedule=work_schedule,
+            ):
                 meta = dict(goal.meta or {})
                 meta["replan_needed"] = True
                 goal.meta = meta

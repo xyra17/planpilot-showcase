@@ -145,6 +145,14 @@ function CheckinContent() {
               goalId={activeGoalId}
               goalTitle={activeGoal?.title}
               tasks={todayTasks}
+              onSuccess={() => fetchTodayTasks(activeGoalId)}
+              onReplanRequest={async () => {
+                if (!activeGoalId) return;
+                try {
+                  await api.post(`/api/v1/agent/reschedule/${activeGoalId}`, {});
+                  await fetchTodayTasks(activeGoalId);
+                } catch {}
+              }}
             />
           </div>
         </>

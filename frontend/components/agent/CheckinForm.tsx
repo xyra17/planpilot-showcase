@@ -11,6 +11,7 @@ interface Task {
   title: string;
   estimated_mins: number;
   status: string;
+  mastery_level?: string;
 }
 
 interface CheckinStats {
@@ -19,6 +20,7 @@ interface CheckinStats {
   partial: number;
   skipped: number;
   completion_rate: number;
+  mastery_rate: number;
   estimated_mins: number;
 }
 
@@ -27,6 +29,12 @@ interface CheckinResult {
   feedback: string;
   replan_triggered?: boolean;
   debt_added?: number;
+  tasks?: Array<{
+    task_id: string;
+    status: string;
+    mastery?: string | null;
+    note?: string | null;
+  }>;
 }
 
 interface CheckinFormProps {
@@ -35,6 +43,7 @@ interface CheckinFormProps {
   tasks?: Task[];
   onSuccess?: (result: CheckinResult) => void;
   onRateChange?: (rate: number) => void;
+  onReplanRequest?: () => void;
 }
 
 const MASTERY: { value: Mastery; label: string }[] = [
@@ -43,13 +52,46 @@ const MASTERY: { value: Mastery; label: string }[] = [
   { value: "L3", label: "完全掌握" },
 ];
 
-export function CheckinForm({ goalId, tasks = [], onSuccess, onRateChange }: CheckinFormProps) {
+function normalizeMastery(value?: string | null): Mastery {
+  if (value === "L2") return "L2";
+  if (value === "L3" || value === "L4") return "L3";
+  return "L1";
+}
+
+export function CheckinForm({ goalId, tasks = [], onSuccess, onRateChange, onReplanRequest }: CheckinFormProps) {
   const [taskMastery, setTaskMastery] = useState<Record<string, Mastery>>({});
   const [taskNotes, setTaskNotes]   = useState<Record<string, string>>({});
   const [expandedNote, setExpandedNote] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading]   = useState(true);
   const [result, setResult]         = useState<CheckinResult | null>(null);
   const [errorMsg, setErrorMsg]     = useState<string | null>(null);
+
+  useEffect(() => {
+    setIsLoading(true);
+    setResult(null);
+    api.get<CheckinResult | null>(`/api/v1/checkin/${goalId}/today`)
+      .then((r) => {
+        if (r) {
+          setTaskMastery(Object.fromEntries(
+            (r.tasks ?? []).map((task) => [task.task_id, normalizeMastery(task.mastery)])
+          ));
+          setTaskNotes(Object.fromEntries(
+            (r.tasks ?? []).map((task) => [task.task_id, task.note ?? ""])
+          ));
+          setResult(r);
+          return;
+        }
+        setTaskMastery(Object.fromEntries(
+          tasks.map((task) => [
+            task.id,
+            normalizeMastery(task.mastery_level),
+          ])
+        ));
+      })
+      .catch(() => {})
+      .finally(() => setIsLoading(false));
+  }, [goalId, tasks]);
 
   const computedRate = tasks.length === 0 ? 0 : (() => {
     const score = tasks.reduce((sum, t) => {
@@ -67,10 +109,10 @@ export function CheckinForm({ goalId, tasks = [], onSuccess, onRateChange }: Che
     try {
       const payload = {
         mode: "daily",
-        completion_rate: computedRate / 100,
         tasks: tasks.map((t) => ({
           task_id: t.id,
-          mastery: taskMastery[t.id] ?? "L1",
+          status: t.status,
+          mastery: taskMastery[t.id] ?? normalizeMastery(t.mastery_level),
           note: taskNotes[t.id] ?? "",
         })),
       };
@@ -84,13 +126,29 @@ export function CheckinForm({ goalId, tasks = [], onSuccess, onRateChange }: Che
     }
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center gap-1.5 py-8 text-xs text-gray-400">
+        <Loader2 size={13} className="animate-spin" />
+        加载今日打卡…
+      </div>
+    );
+  }
+
   if (result) {
-    const rate = Math.round(result.stats.completion_rate * 100);
+    const executionRate = Math.round(result.stats.completion_rate * 100);
+    const masteryRate = Math.round((result.stats.mastery_rate ?? 0) * 100);
     return (
       <div className="space-y-3">
-        <div className="p-3 rounded-xl border border-gray-100 bg-gray-50 text-center">
-          <p className="text-2xl font-bold mb-0.5" style={{ color: "var(--accent)" }}>{rate}%</p>
-          <p className="text-xs text-gray-400">今日完成率</p>
+        <div className="grid grid-cols-2 gap-2">
+          <div className="rounded-xl border border-gray-100 bg-gray-50 p-3 text-center">
+            <p className="mb-0.5 text-xl font-bold" style={{ color: "var(--accent)" }}>{executionRate}%</p>
+            <p className="text-xs text-gray-400">任务执行率</p>
+          </div>
+          <div className="rounded-xl border border-gray-100 bg-gray-50 p-3 text-center">
+            <p className="mb-0.5 text-xl font-bold" style={{ color: "var(--accent)" }}>{masteryRate}%</p>
+            <p className="text-xs text-gray-400">学习掌握度</p>
+          </div>
         </div>
         {result.stats.total > 0 && (
           <div className="flex gap-2 text-center text-xs">
@@ -117,8 +175,16 @@ export function CheckinForm({ goalId, tasks = [], onSuccess, onRateChange }: Che
           </div>
         )}
         {result.replan_triggered && (
-          <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-700">
-            检测到连续偏差，AI 正在生成重规划方案...
+          <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-700 space-y-2">
+            <p>连续三个计划学习日的任务执行率低于 60%，当前安排可能超过可执行能力。是否重新分配尚未完成的任务？</p>
+            {onReplanRequest && (
+              <button
+                onClick={onReplanRequest}
+                className="w-full py-1.5 rounded-lg border border-amber-300 bg-white text-amber-700 font-medium hover:bg-amber-50 transition"
+              >
+                重新分配未完成任务
+              </button>
+            )}
           </div>
         )}
         <button onClick={() => setResult(null)}

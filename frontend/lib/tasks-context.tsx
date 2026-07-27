@@ -15,6 +15,7 @@ export type Task = {
   estimatedMinutes: number;
   date: string; // YYYY-MM-DD
   priority: Priority;
+  masteryLevel?: string;
 };
 
 interface TasksCtx {

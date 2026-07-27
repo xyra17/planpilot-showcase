@@ -443,40 +443,8 @@ async def stream(
                         "goal_id": target_goal_id, "completion_rate": checkin_rate
                     })}
 
-                    # 连续 4 天完成率 < 60% 触发重规划
-                    recent = (await db.execute(
-                        select(CheckinRecord)
-                        .where(CheckinRecord.goal_id == target_goal_id)
-                        .order_by(CheckinRecord.date.desc())
-                        .limit(3)
-                    )).scalars().all()
-                    should_replan = (
-                        checkin_rate < 0.6
-                        and len(recent) >= 3
-                        and all(r.completion_rate < 0.6 for r in recent)
-                    )
-                    if should_replan:
-                        goal_obj = (await db.execute(
-                            select(Goal).where(Goal.id == target_goal_id)
-                        )).scalar_one_or_none()
-                        pending_obj = (await db.execute(
-                            select(Task)
-                            .where(Task.goal_id == target_goal_id, Task.status == "pending")
-                            .order_by(Task.scheduled_date)
-                        )).scalars().all()
-                        options = (
-                            await _generate_replan_options(goal_obj, list(pending_obj), list(recent))
-                            if goal_obj else None
-                        )
-                        if options:
-                            yield {"event": "replan_options", "data": json.dumps({
-                                "goal_id": target_goal_id,
-                                "option_a": options["option_a"],
-                                "option_b": options["option_b"],
-                            })}
-                        else:
-                            new_tasks = await _do_replan(db, current_user.id, target_goal_id)
-                            yield {"event": "replan_done", "data": json.dumps({"tasks": new_tasks})}
+                    # 自然语言打卡的比例来自模糊语义估算，仅用于记录和建议。
+                    # 重规划判定只使用结构化“今日打卡”的任务执行率。
 
             yield {"event": "done", "data": "{}"}
 
@@ -1630,7 +1598,7 @@ async def reschedule_goal(
         select(Task)
         .where(
             Task.goal_id == goal_id,
-            Task.mastery_level != "good",
+            Task.mastery_level.notin_(["L3", "L4"]),
             Task.status.in_(["pending", "partial"]),
         )
         .order_by(Task.scheduled_date, Task.created_at)

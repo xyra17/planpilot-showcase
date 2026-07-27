@@ -285,6 +285,12 @@ function TodayTasksPanel() {
   useEffect(() => { fetchGoals(); }, [fetchGoals]);
   const activeGoal = goals.find((g) => g.id === currentGoalId && g.status === "active")
     ?? goals.find((g) => g.status === "active") ?? null;
+  const activeGoalTodayTasks = useMemo(
+    () => activeGoal
+      ? tasks.filter((task) => task.date === TODAY && task.goalId === activeGoal.id)
+      : [],
+    [activeGoal, tasks]
+  );
 
   useEffect(() => {
     if (!newGoalId && goals.length > 0) setNewGoalId(goals[0].id);
@@ -323,7 +329,7 @@ function TodayTasksPanel() {
               style={{ color: "var(--accent)" }}
               title="自动计算"
             >
-              完成度：{checkinRate}%
+              掌握度：{checkinRate}%
             </span>
           )}
           <button onClick={() => { refresh(); setCheckinKey((k) => k + 1); }} className="flex items-center justify-center w-6 h-6 rounded-lg hover:bg-gray-100 text-gray-400 transition" title="刷新">
@@ -448,8 +454,22 @@ function TodayTasksPanel() {
               key={checkinKey}
               goalId={activeGoal.id}
               goalTitle={activeGoal.title}
-              tasks={todayTasks.map((t) => ({ id: t.id, title: t.title, estimated_mins: t.estimatedMinutes, status: t.done ? "completed" : "pending" }))}
+              tasks={activeGoalTodayTasks.map((t) => ({
+                id: t.id,
+                title: t.title,
+                estimated_mins: t.estimatedMinutes,
+                status: t.done ? "completed" : "pending",
+                mastery_level: t.masteryLevel,
+              }))}
               onRateChange={setCheckinRate}
+              onSuccess={() => refresh()}
+              onReplanRequest={async () => {
+                try {
+                  await api.post(`/api/v1/agent/reschedule/${activeGoal.id}`, {});
+                  refresh();
+                  setCheckinKey((key) => key + 1);
+                } catch {}
+              }}
             />
           ) : (
             <div className="py-10 text-center">

@@ -100,6 +100,14 @@ class Task(Base):
 
 class CheckinRecord(Base):
     __tablename__ = "checkin_records"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id",
+            "goal_id",
+            "date",
+            name="uq_checkin_user_goal_date",
+        ),
+    )
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=new_uuid)
     goal_id: Mapped[str] = mapped_column(String, ForeignKey("goals.id"), nullable=False, index=True)

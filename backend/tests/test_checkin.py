@@ -1,5 +1,10 @@
 
+from datetime import date, timedelta
+
 from httpx import AsyncClient
+from sqlalchemy import select
+
+from src.models import CheckinRecord, Goal
 
 
 async def test_checkin_quick_all_done(client: AsyncClient, auth: dict, goal_id: str):
@@ -66,14 +71,114 @@ async def test_checkin_unknown_goal(client: AsyncClient, auth: dict):
     assert r.status_code == 404
 
 
-async def test_checkin_replan_triggered(client: AsyncClient, auth: dict, goal_id: str):
-    # 连续提交3次低完成率，第3次应触发 replan
-    for _ in range(3):
-        r = await client.post(
-            f"/api/v1/checkin/{goal_id}",
-            json={"mode": "quick", "quick_status": "barely_done"},
-            headers=auth,
-        )
-        assert r.status_code == 200
-    # 最后一次应该触发重规划
-    assert r.json()["replan_triggered"] is True
+async def test_daily_checkin_is_persisted_and_updated(
+    client: AsyncClient, auth: dict, goal_id: str
+):
+    today = date.today().isoformat()
+    created = await client.post(
+        "/api/v1/tasks",
+        json={
+            "title": "今日学习任务",
+            "goalId": goal_id,
+            "done": False,
+            "estimatedMinutes": 30,
+            "date": today,
+        },
+        headers=auth,
+    )
+    task_id = created.json()["id"]
+
+    first = await client.post(
+        f"/api/v1/checkin/{goal_id}",
+        json={
+            "mode": "daily",
+            "tasks": [{
+                "task_id": task_id,
+                "status": "pending",
+                "mastery": "L2",
+                "note": "还需要复习",
+            }],
+        },
+        headers=auth,
+    )
+    assert first.status_code == 200
+    assert first.json()["stats"]["completion_rate"] == 0
+    assert first.json()["stats"]["mastery_rate"] == 0.5
+
+    second = await client.post(
+        f"/api/v1/checkin/{goal_id}",
+        json={
+            "mode": "daily",
+            "tasks": [{
+                "task_id": task_id,
+                "status": "completed",
+                "mastery": "L3",
+                "note": "已经掌握",
+            }],
+        },
+        headers=auth,
+    )
+    assert second.status_code == 200
+
+    loaded = await client.get(
+        f"/api/v1/checkin/{goal_id}/today",
+        headers=auth,
+    )
+    assert loaded.status_code == 200
+    data = loaded.json()
+    assert data["stats"]["completion_rate"] == 1
+    assert data["stats"]["mastery_rate"] == 1
+    assert data["tasks"] == [{
+        "task_id": task_id,
+        "status": "completed",
+        "mastery": "L3",
+        "actual_mins": None,
+        "note": "已经掌握",
+    }]
+
+
+async def test_replan_uses_three_distinct_study_days(
+    client: AsyncClient, auth: dict, goal_id: str, db
+):
+    goal = (await db.execute(
+        select(Goal).where(Goal.id == goal_id)
+    )).scalar_one()
+    today = date.today()
+    for offset in (2, 1):
+        db.add(CheckinRecord(
+            goal_id=goal_id,
+            user_id=goal.user_id,
+            date=(today - timedelta(days=offset)).isoformat(),
+            mode="daily",
+            completion_rate=0.25,
+            stats={"total_tasks": 1},
+            feedback="",
+        ))
+    await db.commit()
+
+    created = await client.post(
+        "/api/v1/tasks",
+        json={
+            "title": "未执行任务",
+            "goalId": goal_id,
+            "done": False,
+            "estimatedMinutes": 30,
+            "date": today.isoformat(),
+        },
+        headers=auth,
+    )
+    task_id = created.json()["id"]
+    current = await client.post(
+        f"/api/v1/checkin/{goal_id}",
+        json={
+            "mode": "daily",
+            "tasks": [{
+                "task_id": task_id,
+                "status": "pending",
+                "mastery": "L1",
+            }],
+        },
+        headers=auth,
+    )
+    assert current.status_code == 200
+    assert current.json()["replan_triggered"] is True

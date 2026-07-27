@@ -45,10 +45,11 @@ class TaskCheckin(BaseModel):
 
 ```python
 class CheckinResult(BaseModel):
-    stats: CheckinStats           # total/completed/partial/skipped/completion_rate/estimated_mins/actual_mins
+    stats: CheckinStats           # completion_rate 为执行率，mastery_rate 为掌握度
     feedback: str                 # AI 生成的当日反馈文本
     debt_added: int = 0           # 新增学习债务条数
-    replan_triggered: bool        # 是否触发重规划（连续 3 天完成率 <60%）
+    replan_triggered: bool        # 连续 3 个计划学习日执行率 <60%
+    tasks: list[TaskCheckin]      # 用于重新打开页面时回显逐项选择
 ```
 
 #### 四种打卡模式
@@ -60,10 +61,13 @@ class CheckinResult(BaseModel):
 前端：`CheckinForm`，用户对每个任务选择 L1/L2/L3 掌握度 + 可选备注。
 
 后端逻辑：
-- `completion_rate` 优先使用用户手动设置值（若有），否则根据 mastery 计算：`(L3数 + L2数×0.5) / 总数`
+- `completion_rate` 根据任务 `status` 计算，表示任务执行率；
+- `mastery_rate = (L3/L4数 + L2数×0.5) / 总数`，表示学习掌握度；
 - 将每个任务的 `mastery_level` 写入 `tasks` 表
-- L3/L4 → `status="completed"`；L2 → `status="partial"`；L1 → 保持 `status="pending"`
-- 生成反馈：「今日完成率 X%，完全掌握 Y 项，基本了解 Z 项，待加强 W 项。」
+- L3/L4 → `status="completed"`；L2/L1 不会把未完成任务误判为完成；
+- 生成反馈同时展示“任务执行率”和“学习掌握度”。
+- 同一用户、目标、日期只保留一条记录；重复提交执行更新，并完整保存/回显每项掌握度和备注。
+- 后端会校验任务属于当前目标，首页也只提交当前活动目标的今日任务，避免跨目标污染。
 
 ##### 2. **task_list 模式**（逐项勾选 done）——前端暂未实现独立入口
 
@@ -107,11 +111,18 @@ class CheckinResult(BaseModel):
 
 打卡提交后自动判断：
 ```python
-recent = db.query(CheckinRecord).filter(...).order_by(date.desc()).limit(3).all()
-replan = completion_rate < 0.6 and len(recent) >= 3 and all(r.completion_rate < 0.6 for r in recent)
+expected_dates = 最近三个符合 goal.work_schedule 的计划学习日
+replan = all(
+    当日存在打卡 and 当日任务执行率 < 0.6
+    for 当日 in expected_dates
+)
 ```
 
-若 `replan=True`，异步派发 Celery 任务：
+掌握度不参与触发判定。触发后只向用户提出建议，不自动修改计划；用户确认后调用
+`POST /api/v1/agent/reschedule/{goal_id}`，在现有截止日期、每日容量和
+`work_schedule` 约束下重新分配尚未完成的任务，不重新生成整份 AI 宏观计划。
+
+打卡保存后仍会异步派发 Celery 偏差检测：
 ```python
 from src.tasks.deviation import check_all_deviations
 check_all_deviations.apply_async(countdown=5)
@@ -214,9 +225,9 @@ ON CONFLICT (user_id, date) DO UPDATE SET
 **执行时间**：每天 0:05（凌晨）  
 **职责**：
 1. 查询所有活跃目标
-2. 对每个目标检查近 3 天打卡记录
-3. 若连续 3 天完成率 <60%，生成重规划方案（调用 `_generate_replan_options`）
-4. 通过 SSE/邮件通知用户
+2. 对每个目标读取近期结构化打卡记录，并按 `work_schedule` 还原最近三个计划学习日
+3. 若这三个学习日的任务执行率均低于 60%，将目标标记为 `replan_needed`
+4. 自然语言打卡和学习掌握度不参与自动判定，避免用模糊估算误触发计划变更
 
 ---
 

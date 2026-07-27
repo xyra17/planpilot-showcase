@@ -8,7 +8,7 @@ import {
   ArrowLeft, CheckCircle2, Circle, Clock,
   Bot, Plus, Trash2, Pencil, FileText,
   Check, X, Search, ChevronLeft, ChevronRight, ChevronDown, ChevronUp,
-  Loader2, BookOpen, Calendar, BarChart3, Info,
+  Loader2, BookOpen, Calendar, BarChart3,
 } from "lucide-react";
 import { useTasks, type Task, type Priority } from "@/lib/tasks-context";
 import { cn } from "@/lib/utils";
@@ -355,7 +355,7 @@ function GoalTasksWorkspace({
   }
 
   return (
-    <div className="px-4 py-4">
+    <div className="px-4 py-4 min-h-[260px]">
       <div className="goal-task-toolbar mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-gray-100 pb-2">
         <div
           className="goal-task-view-tabs inline-flex items-center gap-4"
@@ -626,21 +626,17 @@ function buildDayMapFromPlan(phases: MacroPlan["phases"]): Map<string, number> {
 }
 function dayLabel(n: number) { return `day${String(n).padStart(2, "0")}`; }
 
-function PlanOverview({ goalId, deadline, refreshKey, hideRegenerate, dailyHours, onPlanLoad }: { goalId: string; deadline: string; refreshKey?: number; hideRegenerate?: boolean; dailyHours?: number; onPlanLoad?: (totalDays: number) => void }) {
-  const { refresh: refreshTasksContext } = useTasks();
+function PlanOverview({ goalId, deadline, refreshKey, hideRegenerate, onPlanLoad }: { goalId: string; deadline: string; refreshKey?: number; hideRegenerate?: boolean; onPlanLoad?: (totalDays: number) => void }) {
   const [plan, setPlan] = useState<MacroPlan | null>(null);
   const [loading, setLoading] = useState(true);
   const [regenerating, setRegenerating] = useState(false);
   const [expandedPhases, setExpandedPhases] = useState<Set<number>>(new Set());
   const [taskOverrides, setTaskOverrides] = useState<Record<string, Partial<PlanTask>>>({});
-  const [masteryHint, setMasteryHint] = useState<string | null>(null);
-
   const fetchPlan = useCallback(async () => {
     try {
       const res = await api.get<{ plan: MacroPlan | null }>(`/api/v1/goals/${goalId}/plan`);
       setPlan(res.plan);
       setTaskOverrides({});
-      setMasteryHint(null);
       if (res.plan) {
         const dates = new Set<string>();
         for (const p of res.plan.phases) for (const t of (p.tasks ?? [])) if (t.scheduled_date) dates.add(t.scheduled_date);
@@ -664,37 +660,6 @@ function PlanOverview({ goalId, deadline, refreshKey, hideRegenerate, dailyHours
       // ignore
     } finally {
       setRegenerating(false);
-    }
-  }
-
-  async function toggleMastery(taskId: string, currentLevel: string) {
-    const mastering = !["L3", "L4"].includes(currentLevel);
-    const nextMastery = mastering ? "L3" : "L1";
-    setTaskOverrides((prev) => ({
-      ...prev,
-      [taskId]: { ...prev[taskId], mastery_level: nextMastery, ...(mastering ? { status: "completed" } : {}) },
-    }));
-    try {
-      await api.patch(`/api/v1/tasks/${taskId}`, { mastery_level: nextMastery, ...(mastering ? { done: true } : {}) });
-      if (mastering) refreshTasksContext();
-      if (mastering && plan && dailyHours) {
-        const allTasks = plan.phases.flatMap((p) => p.tasks ?? []);
-        const thisTask = allTasks.find((t) => t.id === taskId);
-        const freedMins = thisTask?.estimated_mins ?? 0;
-        const newMasteredMins = allTasks
-          .filter((t) => t.id === taskId || ["L3", "L4"].includes(taskOverrides[t.id]?.mastery_level ?? t.mastery_level))
-          .reduce((s, t) => s + t.estimated_mins, 0);
-        const savedDays = Math.floor(newMasteredMins / (dailyHours * 60));
-        if (savedDays > 0) {
-          setMasteryHint(`已掌握（节省 ${freedMins} 分钟），可考虑重新规划时间，预计可提前约 ${savedDays} 天完成`);
-        } else {
-          setMasteryHint(`已标记为已掌握，节省约 ${freedMins} 分钟`);
-        }
-      } else if (!mastering) {
-        setMasteryHint(null);
-      }
-    } catch {
-      setTaskOverrides((prev) => { const n = { ...prev }; delete n[taskId]; return n; });
     }
   }
 
@@ -746,22 +711,6 @@ function PlanOverview({ goalId, deadline, refreshKey, hideRegenerate, dailyHours
         <p className="text-xs text-gray-400">
           预计 {totalDays} 天（{fmtDate(firstDate)} - {fmtDate(lastDate)}）
         </p>
-      )}
-      <div className="plan-mastery-help flex items-start gap-1.5 rounded-lg border border-gray-100 bg-gray-50 px-2.5 py-2 text-[11px] leading-relaxed text-gray-500">
-        <Info size={12} className="mt-0.5 flex-shrink-0" />
-        <span><strong>完成</strong>记录任务是否执行；<strong>掌握</strong>记录学习结果（L3/L4），与每日打卡和 AI 验收使用同一状态。上方进度仅统计已掌握任务。</span>
-      </div>
-      {masteryHint && (
-        <div
-          className="plan-mastery-feedback rounded-lg border px-3 py-2 text-xs"
-          style={{
-            color: "var(--accent)",
-            borderColor: "color-mix(in srgb, var(--accent) 26%, transparent)",
-            backgroundColor: "var(--accent-light)",
-          }}
-        >
-          {masteryHint}
-        </div>
       )}
 
       {/* 阶段列表 */}
@@ -828,7 +777,7 @@ function PlanOverview({ goalId, deadline, refreshKey, hideRegenerate, dailyHours
                     const dn = task.scheduled_date ? dayMap.get(task.scheduled_date) : undefined;
                     return (
                       <div key={task.id} className="flex items-center gap-2 px-3 py-2 border-t border-gray-50 hover:bg-gray-50 transition group">
-                        {/* 任务序号仅用于定位，不承担状态切换 */}
+                        {/* 任务序号仅用于定位，不承担完成或掌握状态 */}
                         <span
                           title={isDone ? "任务已完成" : "任务序号"}
                           className="plan-task-number flex h-5 w-5 flex-shrink-0 cursor-default items-center justify-center rounded border border-gray-200 text-[10px] font-semibold text-gray-400"
@@ -846,7 +795,7 @@ function PlanOverview({ goalId, deadline, refreshKey, hideRegenerate, dailyHours
                         )}
 
                         {/* 任务标题 */}
-                        <span className={cn("flex-1 text-xs leading-snug truncate", isMastered ? "line-through text-gray-400" : isDone ? "text-gray-500" : "text-gray-700")}>
+                        <span className={cn("flex-1 text-xs leading-snug truncate", isMastered ? "line-through text-gray-400" : isDone ? "text-gray-400" : "text-gray-700")}>
                           {task.title}
                         </span>
 
@@ -855,25 +804,23 @@ function PlanOverview({ goalId, deadline, refreshKey, hideRegenerate, dailyHours
                           <Clock size={9} />{task.estimated_mins}min
                         </span>
 
-                        {/* 已掌握标记 */}
-                        <button
-                          onClick={() => toggleMastery(task.id, mastery)}
-                          title={isMastered ? "点击取消掌握状态" : "确认已能独立完成后标记掌握"}
-                          aria-label={isMastered ? `取消掌握：${task.title}` : `标记掌握：${task.title}`}
-                          className={cn(
-                            "plan-mastery-button flex-shrink-0 text-[11px] px-2 py-1 rounded-md border transition",
-                            isMastered
-                              ? "is-mastered"
-                              : "border-gray-200 text-gray-400"
-                          )}
-                          style={isMastered ? {
-                            color: "var(--accent)",
-                            borderColor: "color-mix(in srgb, var(--accent) 30%, transparent)",
-                            backgroundColor: "var(--accent-light)",
-                          } : {}}
-                        >
-                          {isMastered ? "已掌握" : "标记掌握"}
-                        </button>
+                        {/* 掌握度徽章（只读，来自打卡），unknown/L1 不显示 */}
+                        {["L2", "L3", "L4"].includes(mastery) && (
+                          <span
+                            className="flex-shrink-0 text-[11px] px-2 py-0.5 rounded-md border"
+                            style={["L3", "L4"].includes(mastery) ? {
+                              color: "var(--accent)",
+                              borderColor: "color-mix(in srgb, var(--accent) 30%, transparent)",
+                              backgroundColor: "var(--accent-light)",
+                            } : {
+                              color: "#6b7280",
+                              borderColor: "#e5e7eb",
+                              backgroundColor: "#f9fafb",
+                            }}
+                          >
+                            {["L3", "L4"].includes(mastery) ? "已掌握" : "了解"}
+                          </span>
+                        )}
                       </div>
                     );
                   })}
@@ -932,6 +879,18 @@ export default function GoalDetailPage({ params }: { params: { id: string } }) {
 
   useEffect(() => {
     if (window.matchMedia("(max-width: 980px)").matches) setChatCollapsed(true);
+  }, []);
+
+  // 从其他页面（打卡、首页任务完成）回来时刷新计划数据
+  useEffect(() => {
+    const handleVisible = () => {
+      if (document.visibilityState === "visible") {
+        setPlanRefreshKey((k) => k + 1);
+        setProgressRefreshKey((k) => k + 1);
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisible);
+    return () => document.removeEventListener("visibilitychange", handleVisible);
   }, []);
 
   const [sidebarWidth, setSidebarWidth] = useState(() =>
@@ -1175,7 +1134,7 @@ export default function GoalDetailPage({ params }: { params: { id: string } }) {
               {rightTab === "plan" && (
                 <div className="flex-1 flex flex-col overflow-hidden">
                   <div className="flex-1 overflow-y-auto px-5 py-4">
-                    <PlanOverview goalId={goal.id} deadline={goal.deadline} refreshKey={planRefreshKey} hideRegenerate dailyHours={goal.daily_hours} onPlanLoad={setPlanTotalDays} />
+                    <PlanOverview goalId={goal.id} deadline={goal.deadline} refreshKey={planRefreshKey} hideRegenerate onPlanLoad={setPlanTotalDays} />
                   </div>
                   <div className="flex-shrink-0 px-5 py-3 border-t border-gray-100">
                     <button
@@ -1227,7 +1186,7 @@ export default function GoalDetailPage({ params }: { params: { id: string } }) {
           goalId={goal.id}
           taskId={verifyTask.taskId}
           taskTitle={verifyTask.taskTitle}
-          onClose={() => setVerifyTask(null)}
+          onClose={() => { setVerifyTask(null); setPlanRefreshKey((k) => k + 1); setProgressRefreshKey((k) => k + 1); }}
         />
       )}
     </div>

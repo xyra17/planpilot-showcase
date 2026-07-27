@@ -23,6 +23,7 @@ class TaskOut(BaseModel):
     estimatedMinutes: int
     date: str
     priority: str
+    masteryLevel: str
 
 
 class TaskCreate(BaseModel):
@@ -56,6 +57,7 @@ def _out(task: Task, goal_title: str) -> TaskOut:
         estimatedMinutes=task.estimated_mins,
         date=task.scheduled_date,
         priority=task.priority,
+        masteryLevel=task.mastery_level,
     )
 
 
