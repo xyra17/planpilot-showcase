@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
-import { Home, Target, BookOpen, FileText, Settings, ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
+import { Home, Target, BookOpen, FileText, Settings, ChevronLeft, ChevronRight, Sparkles, Bot } from "lucide-react";
 import { useAuthStore } from "@/lib/stores/authStore";
 import { cn } from "@/lib/utils";
 import { NotificationBell } from "@/components/NotificationBell";
@@ -15,6 +15,7 @@ const navItems = [
   { href: "/dashboard/goals",     label: "我的目标", icon: Target  },
   { href: "/dashboard/knowledge", label: "知识库",  icon: BookOpen },
   { href: "/dashboard/notes",     label: "笔记",   icon: FileText },
+  { href: "/dashboard/agent",     label: "Agent 工作台", icon: Bot },
 ];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {

@@ -12,6 +12,7 @@ celery_app = Celery(
         "src.tasks.deviation",
         "src.tasks.reminders",
         "src.tasks.knowledge",
+        "src.tasks.agent_suggestions",
     ],
 )
 
@@ -39,6 +40,11 @@ celery_app.conf.beat_schedule = {
     "send-daily-reminders": {
         "task": "src.tasks.reminders.send_daily_reminders",
         "schedule": crontab(hour=23, minute=0),
+        "options": {"expires": 3600},
+    },
+    "generate-agent-suggestions": {
+        "task": "src.tasks.agent_suggestions.generate_agent_suggestions",
+        "schedule": crontab(hour=8, minute=0),
         "options": {"expires": 3600},
     },
 }

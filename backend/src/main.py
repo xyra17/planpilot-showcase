@@ -11,6 +11,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
 import src.api.agent as agent
+import src.api.agent_v2 as agent_v2
 import src.api.auth as auth
 import src.api.checkin as checkin
 import src.api.debt as debt
@@ -89,6 +90,7 @@ app.add_middleware(
 )
 
 app.include_router(agent.router)
+app.include_router(agent_v2.router)
 app.include_router(auth.router)
 app.include_router(goals.router)
 app.include_router(checkin.router)

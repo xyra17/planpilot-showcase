@@ -262,6 +262,91 @@ class LearningDebt(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 
+class AgentRun(Base):
+    __tablename__ = "agent_runs"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=new_uuid)
+    user_id: Mapped[str] = mapped_column(
+        String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    goal_id: Mapped[str | None] = mapped_column(
+        String, ForeignKey("goals.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    request_text: Mapped[str] = mapped_column(Text, nullable=False)
+    objective: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    plan: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
+    status: Mapped[str] = mapped_column(String, default="planning", index=True)
+    current_step: Mapped[int] = mapped_column(Integer, default=0)
+    step_budget: Mapped[int] = mapped_column(Integer, default=10)
+    token_budget: Mapped[int] = mapped_column(Integer, default=20000)
+    failure_count: Mapped[int] = mapped_column(Integer, default=0)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    result: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now()
+    )
+
+
+class AgentStep(Base):
+    __tablename__ = "agent_steps"
+    __table_args__ = (
+        UniqueConstraint("run_id", "step_index", name="uq_agent_step_run_index"),
+        UniqueConstraint("idempotency_key", name="uq_agent_step_idempotency_key"),
+    )
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=new_uuid)
+    run_id: Mapped[str] = mapped_column(
+        String, ForeignKey("agent_runs.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    step_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    agent_role: Mapped[str] = mapped_column(String, default="main")
+    tool_name: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String, default="pending", index=True)
+    risk: Mapped[str] = mapped_column(String, default="low")
+    requires_approval: Mapped[bool] = mapped_column(Boolean, default=False)
+    input_data: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    output_data: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    idempotency_key: Mapped[str | None] = mapped_column(String, nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class AgentApproval(Base):
+    __tablename__ = "agent_approvals"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=new_uuid)
+    run_id: Mapped[str] = mapped_column(
+        String, ForeignKey("agent_runs.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    step_id: Mapped[str] = mapped_column(
+        String, ForeignKey("agent_steps.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    status: Mapped[str] = mapped_column(String, default="pending", index=True)
+    change_set: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    change_hash: Mapped[str] = mapped_column(String, nullable=False)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class AgentAuditEvent(Base):
+    __tablename__ = "agent_audit_events"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=new_uuid)
+    run_id: Mapped[str] = mapped_column(
+        String, ForeignKey("agent_runs.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    step_id: Mapped[str | None] = mapped_column(
+        String, ForeignKey("agent_steps.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    event_type: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    actor: Mapped[str] = mapped_column(String, default="system")
+    detail: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
 class PasswordResetToken(Base):
     __tablename__ = "password_reset_tokens"
 
