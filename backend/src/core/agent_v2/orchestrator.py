@@ -4,11 +4,11 @@ import asyncio
 import hashlib
 import json
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Any
 
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.agent_v2.audit import record_event
@@ -63,7 +63,10 @@ def _step_payload(step: AgentStep, steps: list[AgentStep]) -> dict[str, Any]:
     outputs = {item.step_index: item.output_data for item in steps}
     if step.tool_name == "analytics.execution_summary":
         payload["context"] = outputs[0]
-    elif step.tool_name == "schedule.preview_reschedule":
+    elif step.tool_name in {
+        "schedule.preview_reschedule",
+        "tasks.preview_mutation",
+    }:
         payload["context"] = outputs[0]
         payload["analysis"] = outputs[1]
     elif step.tool_name == "plan.review":
@@ -83,6 +86,7 @@ async def create_run(
     step_budget: int,
     token_budget: int,
     registry: ToolRegistry | None = None,
+    auto_advance: bool = True,
 ) -> AgentRun:
     await assert_goal_access(db, user_id, goal_id)
     tools = registry or build_registry()
@@ -96,7 +100,7 @@ async def create_run(
         request_text=request,
         objective=objective,
         plan=[step.model_dump(mode="json") for step in plan],
-        status="running",
+        status="running" if auto_advance else "queued",
         step_budget=step_budget,
         token_budget=token_budget,
     )
@@ -130,8 +134,28 @@ async def create_run(
         detail={"request": request, "objective": objective},
     )
     await db.commit()
-    await advance_run(db, user_id=user_id, run_id=run.id, registry=tools)
+    if auto_advance:
+        await advance_run(db, user_id=user_id, run_id=run.id, registry=tools)
     return await _owned_run(db, user_id, run.id)
+
+
+async def claim_queued_run(
+    db: AsyncSession, *, user_id: str, run_id: str
+) -> bool:
+    claimed = (
+        await db.execute(
+            update(AgentRun)
+            .where(
+                AgentRun.id == run_id,
+                AgentRun.user_id == user_id,
+                AgentRun.status.in_(["queued", "running"]),
+            )
+            .values(status="executing", updated_at=utcnow())
+            .returning(AgentRun.id)
+        )
+    ).scalar_one_or_none()
+    await db.commit()
+    return claimed is not None
 
 
 async def advance_run(
@@ -147,6 +171,9 @@ async def advance_run(
         return run
     steps = await _steps(db, run.id)
     for step in steps:
+        run = await _owned_run(db, user_id, run.id)
+        if run.status == "paused":
+            return run
         if step.status in {"completed", "skipped"}:
             continue
         spec = tools.get(step.tool_name)
@@ -162,6 +189,11 @@ async def advance_run(
             ).scalar_one_or_none()
             if approval is None:
                 changes = payload.get("change_set", {})
+                if any(
+                    item.get("field") == "__delete__"
+                    for item in changes.get("operations", [])
+                ):
+                    step.risk = "high"
                 approval = AgentApproval(
                     id=str(uuid.uuid4()),
                     run_id=run.id,
@@ -299,6 +331,7 @@ async def approve_run(
     run_id: str,
     approval_id: str,
     expected_hash: str,
+    auto_advance: bool = True,
 ) -> AgentRun:
     run = await _owned_run(db, user_id, run_id)
     approval = (
@@ -330,7 +363,98 @@ async def approve_run(
         detail={"change_hash": approval.change_hash},
     )
     await db.commit()
-    return await advance_run(db, user_id=user_id, run_id=run.id)
+    if auto_advance:
+        return await advance_run(db, user_id=user_id, run_id=run.id)
+    run.status = "queued"
+    await db.commit()
+    return run
+
+
+async def edit_approval(
+    db: AsyncSession,
+    *,
+    user_id: str,
+    run_id: str,
+    approval_id: str,
+    change_set: ChangeSet,
+) -> AgentRun:
+    run = await _owned_run(db, user_id, run_id)
+    approval = (
+        await db.execute(
+            select(AgentApproval).where(
+                AgentApproval.id == approval_id,
+                AgentApproval.run_id == run.id,
+                AgentApproval.status == "pending",
+            )
+        )
+    ).scalar_one_or_none()
+    if not approval:
+        raise HTTPException(409, "审批已处理或不存在")
+    if len(change_set.operations) > 50:
+        raise HTTPException(400, "单次变更不能超过 50 项")
+    originals = {
+        (item["entity"], item["entity_id"], item["field"]): item
+        for item in approval.change_set.get("operations", [])
+    }
+    original_keys = set(originals)
+    edited_keys = {
+        (item.entity, item.entity_id, item.field) for item in change_set.operations
+    }
+    if not edited_keys.issubset(original_keys):
+        raise HTTPException(400, "只能编辑或移除原方案中的变更，不能新增未审查操作")
+    for item in change_set.operations:
+        original = originals[(item.entity, item.entity_id, item.field)]
+        if item.before != original.get("before"):
+            raise HTTPException(400, "不能修改并发校验所使用的原值")
+        if item.field == "__delete__" and item.model_dump() != original:
+            raise HTTPException(400, "删除操作只能保留或移除，不能修改内容")
+        if item.field == "__create__":
+            after = dict(item.after or {})
+            original_after = dict(original.get("after") or {})
+            if (
+                after.get("id") != original_after.get("id")
+                or after.get("goal_id") != original_after.get("goal_id")
+            ):
+                raise HTTPException(400, "不能修改新任务的身份或所属目标")
+            if not str(after.get("title", "")).strip():
+                raise HTTPException(400, "任务标题不能为空")
+            try:
+                date.fromisoformat(str(after.get("scheduled_date")))
+            except ValueError as exc:
+                raise HTTPException(400, "任务日期格式无效") from exc
+        if item.field == "scheduled_date":
+            try:
+                date.fromisoformat(str(item.after))
+            except ValueError as exc:
+                raise HTTPException(400, "任务日期格式无效") from exc
+    payload = change_set.model_dump()
+    approval.change_set = payload
+    approval.change_hash = change_hash(payload)
+    step = (
+        await db.execute(select(AgentStep).where(AgentStep.id == approval.step_id))
+    ).scalar_one()
+    source_step = (
+        await db.execute(
+            select(AgentStep).where(
+                AgentStep.run_id == run.id,
+                AgentStep.step_index == step.step_index - 2,
+            )
+        )
+    ).scalar_one_or_none()
+    if source_step:
+        source_step.output_data = payload
+    if any(item.field == "__delete__" for item in change_set.operations):
+        step.risk = "high"
+    record_event(
+        db,
+        run_id=run.id,
+        step_id=step.id,
+        event_type="approval.edited",
+        actor="user",
+        detail={"change_hash": approval.change_hash, "change_set": payload},
+    )
+    await db.commit()
+    return run
 
 
 async def reject_run(
@@ -380,7 +504,7 @@ async def cancel_run(db: AsyncSession, *, user_id: str, run_id: str) -> AgentRun
 
 async def pause_run(db: AsyncSession, *, user_id: str, run_id: str) -> AgentRun:
     run = await _owned_run(db, user_id, run_id)
-    if run.status not in {"running", "waiting_approval"}:
+    if run.status not in {"queued", "running", "executing", "waiting_approval"}:
         raise HTTPException(409, "当前状态不能暂停")
     run.objective = {**(run.objective or {}), "paused_from": run.status}
     run.status = "paused"
@@ -394,15 +518,15 @@ async def resume_run(db: AsyncSession, *, user_id: str, run_id: str) -> AgentRun
     if run.status != "paused":
         raise HTTPException(409, "只有已暂停任务可以继续")
     previous = (run.objective or {}).get("paused_from", "running")
-    run.status = previous if previous in {"running", "waiting_approval"} else "running"
+    run.status = previous if previous == "waiting_approval" else "queued"
     record_event(db, run_id=run.id, event_type="run.resumed", actor="user")
     await db.commit()
-    if run.status == "waiting_approval":
-        return run
-    return await advance_run(db, user_id=user_id, run_id=run.id)
+    return run
 
 
-async def retry_run(db: AsyncSession, *, user_id: str, run_id: str) -> AgentRun:
+async def retry_run(
+    db: AsyncSession, *, user_id: str, run_id: str, auto_advance: bool = True
+) -> AgentRun:
     run = await _owned_run(db, user_id, run_id)
     if run.status != "failed":
         raise HTTPException(409, "只有失败的任务可以重试")
@@ -418,11 +542,13 @@ async def retry_run(db: AsyncSession, *, user_id: str, run_id: str) -> AgentRun:
     if step:
         step.status = "pending"
         step.error = None
-    run.status = "running"
+    run.status = "running" if auto_advance else "queued"
     run.error = None
     record_event(db, run_id=run.id, event_type="run.retry_requested", actor="user")
     await db.commit()
-    return await advance_run(db, user_id=user_id, run_id=run.id)
+    if auto_advance:
+        return await advance_run(db, user_id=user_id, run_id=run.id)
+    return run
 
 
 async def undo_run(db: AsyncSession, *, user_id: str, run_id: str) -> AgentRun:

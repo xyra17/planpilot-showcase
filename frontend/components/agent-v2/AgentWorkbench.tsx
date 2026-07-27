@@ -13,6 +13,7 @@ import {
   Play,
   RefreshCw,
   RotateCcw,
+  Save,
   ShieldCheck,
   Sparkles,
   Square,
@@ -21,13 +22,14 @@ import {
 import { api } from "@/lib/api";
 import { useGoalStore } from "@/lib/stores/goalStore";
 import { useToast } from "@/components/ui/Toast";
+import { useTasks } from "@/lib/tasks-context";
 
 type Operation = {
   entity_id: string;
   label: string;
   field: string;
-  before: string;
-  after: string;
+  before: unknown;
+  after: unknown;
   reason: string;
 };
 
@@ -74,8 +76,16 @@ const roleLabel: Record<string, string> = {
   plan_reviewer: "计划审查 Agent",
 };
 
+const promptExamples = [
+  "检查最近两周执行情况，把逾期任务重新安排到下周，修改前让我确认。",
+  "创建两个任务“本周复习”，明天开始安排，修改前让我确认。",
+  "把任务“章节练习”改到明天，修改前让我确认。",
+];
+
 const statusLabel: Record<string, string> = {
   planning: "规划中",
+  queued: "已排队",
+  executing: "执行中",
   running: "执行中",
   waiting_approval: "等待确认",
   completed: "已完成",
@@ -96,9 +106,145 @@ function StepIcon({ status }: { status: string }) {
   return <Circle size={13} />;
 }
 
+function EditableChangeSet({
+  changeSet,
+  disabled,
+  onSave,
+}: {
+  changeSet: Approval["change_set"];
+  disabled: boolean;
+  onSave: (changeSet: Approval["change_set"]) => void;
+}) {
+  const [operations, setOperations] = useState<Operation[]>(changeSet.operations);
+
+  useEffect(() => {
+    setOperations(changeSet.operations);
+  }, [changeSet]);
+
+  function update(index: number, patch: Partial<Operation>) {
+    setOperations((current) =>
+      current.map((operation, position) =>
+        position === index ? { ...operation, ...patch } : operation
+      )
+    );
+  }
+
+  return (
+    <div>
+      <div className="overflow-hidden rounded-xl border bg-white/65">
+        {operations.length === 0 && (
+          <p className="px-4 py-6 text-center text-sm text-gray-500">
+            已移除全部修改，批准后不会更改任务。
+          </p>
+        )}
+        {operations.map((operation, index) => {
+          const created =
+            operation.field === "__create__" &&
+            typeof operation.after === "object" &&
+            operation.after !== null;
+          const createdValue = created
+            ? (operation.after as Record<string, unknown>)
+            : null;
+          return (
+            <div
+              key={`${operation.entity_id}:${operation.field}`}
+              className="border-b px-4 py-3 last:border-b-0"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium">{operation.label}</p>
+                  <p className="mt-0.5 text-xs text-gray-500">{operation.reason}</p>
+                </div>
+                <button
+                  onClick={() =>
+                    setOperations((current) =>
+                      current.filter((_, position) => position !== index)
+                    )
+                  }
+                  className="rounded-lg p-1.5 text-gray-400 hover:bg-black/5 hover:text-red-600"
+                  aria-label={`移除${operation.label}的变更`}
+                >
+                  <X size={14} />
+                </button>
+              </div>
+              {createdValue ? (
+                <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_160px]">
+                  <input
+                    value={String(createdValue.title ?? "")}
+                    onChange={(event) =>
+                      update(index, {
+                        label: event.target.value,
+                        after: { ...createdValue, title: event.target.value },
+                      })
+                    }
+                    className="rounded-lg border bg-white/70 px-3 py-2 text-sm"
+                    aria-label="新任务标题"
+                  />
+                  <input
+                    type="date"
+                    value={String(createdValue.scheduled_date ?? "")}
+                    onChange={(event) =>
+                      update(index, {
+                        after: {
+                          ...createdValue,
+                          scheduled_date: event.target.value,
+                        },
+                      })
+                    }
+                    className="rounded-lg border bg-white/70 px-3 py-2 text-sm"
+                    aria-label="新任务日期"
+                  />
+                </div>
+              ) : operation.field === "scheduled_date" ? (
+                <div className="mt-3 grid items-center gap-2 sm:grid-cols-[1fr_20px_1fr]">
+                  <span className="text-sm text-gray-500">
+                    {String(operation.before ?? "—")}
+                  </span>
+                  <ChevronRight size={15} className="text-gray-400" />
+                  <input
+                    type="date"
+                    value={String(operation.after ?? "")}
+                    onChange={(event) => update(index, { after: event.target.value })}
+                    className="rounded-lg border bg-white/70 px-3 py-2 text-sm"
+                    aria-label={`${operation.label}的新日期`}
+                  />
+                </div>
+              ) : (
+                <div className="mt-3 flex items-center gap-2 text-sm">
+                  <span className="text-gray-500">
+                    {operation.field === "__delete__"
+                      ? "将删除此任务"
+                      : `${String(operation.before ?? "—")} → ${String(operation.after ?? "—")}`}
+                  </span>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <div className="mt-3 flex justify-end">
+        <button
+          onClick={() =>
+            onSave({
+              ...changeSet,
+              summary: `用户调整后的方案，共 ${operations.length} 项变更`,
+              operations,
+            })
+          }
+          disabled={disabled}
+          className="inline-flex items-center gap-2 rounded-xl border bg-white/70 px-3 py-2 text-sm font-medium disabled:opacity-50"
+        >
+          <Save size={14} /> 保存方案修改
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function AgentWorkbench() {
   const { goals, fetchGoals } = useGoalStore();
   const { showToast } = useToast();
+  const { refresh: refreshTasks } = useTasks();
   const [request, setRequest] = useState(
     "检查我最近两周的执行情况，把落后的任务重新安排到下周。周三晚上不要排任务，修改前让我确认。"
   );
@@ -130,12 +276,18 @@ export default function AgentWorkbench() {
   }, [selectedId, loadRun]);
 
   useEffect(() => {
-    if (!run || !["planning", "running"].includes(run.status)) return;
+    if (!run || !["planning", "queued", "running", "executing"].includes(run.status)) return;
     const timer = window.setInterval(() => {
       loadRun(run.id).catch(() => undefined);
     }, 2000);
     return () => window.clearInterval(timer);
   }, [run, loadRun]);
+
+  useEffect(() => {
+    if (run?.status === "completed" || run?.status === "undone") {
+      refreshTasks();
+    }
+  }, [run?.status, refreshTasks]);
 
   const pendingApproval = useMemo(
     () => run?.approvals.find((item) => item.status === "pending"),
@@ -153,7 +305,24 @@ export default function AgentWorkbench() {
       setRun(created);
       setSelectedId(created.id);
       await loadRuns();
-      showToast("分析完成，已生成可审阅的执行方案", "success");
+      showToast("Agent 任务已进入后台队列", "success");
+    } catch (error) {
+      showToast((error as Error).message, "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveChangeSet(changeSet: Approval["change_set"]) {
+    if (!run || !pendingApproval) return;
+    setBusy(true);
+    try {
+      const next = await api.patch<AgentRun>(
+        `/api/v2/agent/runs/${run.id}/approvals/${pendingApproval.id}`,
+        { change_set: changeSet }
+      );
+      setRun(next);
+      showToast("变更方案已更新，请重新核对后批准", "success");
     } catch (error) {
       showToast((error as Error).message, "error");
     } finally {
@@ -254,6 +423,18 @@ export default function AgentWorkbench() {
               aria-label="告诉 Agent 要完成什么"
               placeholder="例如：检查最近两周执行情况，生成下周调整方案，修改前让我确认。"
             />
+            <div className="mt-2 flex flex-wrap gap-2">
+              {promptExamples.map((example) => (
+                <button
+                  key={example}
+                  onClick={() => setRequest(example)}
+                  className="rounded-full border px-3 py-1.5 text-left text-xs text-gray-500 transition hover:text-gray-800"
+                  style={{ borderColor: "var(--border)" }}
+                >
+                  {example}
+                </button>
+              ))}
+            </div>
             <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t pt-3">
               <select
                 value={goalId}
@@ -375,7 +556,7 @@ export default function AgentWorkbench() {
                       <RefreshCw size={15} /> 重试失败步骤
                     </button>
                   )}
-                  {["planning", "running", "waiting_approval"].includes(run.status) && (
+                  {["planning", "queued", "running", "executing", "waiting_approval"].includes(run.status) && (
                     <div className="mt-5 grid grid-cols-2 gap-2">
                       <button
                         onClick={() => action("pause")}
@@ -433,22 +614,11 @@ export default function AgentWorkbench() {
                       {pendingApproval.change_set.operations.length} 项修改
                     </span>
                   </div>
-                  <div className="overflow-hidden rounded-xl border bg-white/65">
-                    {pendingApproval.change_set.operations.map((operation) => (
-                      <div
-                        key={operation.entity_id}
-                        className="grid gap-2 border-b px-4 py-3 last:border-b-0 md:grid-cols-[minmax(0,1fr)_130px_20px_130px]"
-                      >
-                        <div>
-                          <p className="text-sm font-medium">{operation.label}</p>
-                          <p className="mt-0.5 text-xs text-gray-500">{operation.reason}</p>
-                        </div>
-                        <span className="text-sm text-gray-500">{operation.before}</span>
-                        <ChevronRight size={15} className="text-gray-400" />
-                        <span className="text-sm font-medium">{operation.after}</span>
-                      </div>
-                    ))}
-                  </div>
+                  <EditableChangeSet
+                    changeSet={pendingApproval.change_set}
+                    disabled={busy}
+                    onSave={saveChangeSet}
+                  />
                   {pendingApproval.change_set.warnings?.map((warning) => (
                     <p key={warning} className="mt-2 text-xs text-amber-800">
                       {warning}

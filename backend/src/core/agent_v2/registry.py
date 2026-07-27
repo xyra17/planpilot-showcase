@@ -9,7 +9,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.agent_v2.schemas import AgentRole, Effect, Risk, ToolContext
 from src.models import KnowledgeItem
 from src.services.agent_context import load_learning_context, summarize_execution
-from src.services.agent_schedule import apply_task_changes, build_reschedule_preview
+from src.services.agent_schedule import (
+    apply_task_changes,
+    build_reschedule_preview,
+    build_task_mutation_preview,
+)
 
 Handler = Callable[[AsyncSession, ToolContext, dict[str, Any]], Awaitable[dict[str, Any]]]
 
@@ -100,11 +104,27 @@ async def _reschedule_preview(
     ).model_dump()
 
 
+async def _task_mutation_preview(
+    _db: AsyncSession, _ctx: ToolContext, payload: dict[str, Any]
+) -> dict[str, Any]:
+    return build_task_mutation_preview(
+        payload["context"],
+        request=str(payload["request"]),
+        goal_id=payload.get("goal_id"),
+        excluded_weekdays=payload.get("excluded_weekdays", []),
+    ).model_dump()
+
+
 async def _review_plan(
     _db: AsyncSession, _ctx: ToolContext, payload: dict[str, Any]
 ) -> dict[str, Any]:
     change_set = payload["change_set"]
     warnings = list(change_set.get("warnings", []))
+    if any(
+        item.get("field") == "__delete__"
+        for item in change_set.get("operations", [])
+    ):
+        warnings.append("方案包含删除操作，执行前请重点核对；撤销依赖所属目标仍存在")
     if len(change_set.get("operations", [])) > 10:
         warnings.append("一次调整超过 10 项任务，建议分批确认")
     return {
@@ -158,6 +178,27 @@ async def _knowledge_search(
 
 def build_registry() -> ToolRegistry:
     registry = ToolRegistry()
+    registry.register(
+        ToolSpec(
+            "tasks.preview_mutation",
+            "生成创建、编辑、完成或删除任务的结构化变更预览",
+            AgentRole.SCHEDULE_OPTIMIZER,
+            Effect.PROPOSE,
+            Risk.LOW,
+            False,
+            10,
+            1,
+            True,
+            False,
+            _task_mutation_preview,
+            {
+                "context": "context.load output",
+                "request": "string",
+                "goal_id": "string|null",
+            },
+            {"summary": "string", "operations": "ChangeOperation[]"},
+        )
+    )
     registry.register(
         ToolSpec(
             "context.load",
@@ -229,7 +270,7 @@ def build_registry() -> ToolRegistry:
     registry.register(
         ToolSpec(
             "tasks.apply_changes",
-            "应用获批的任务日期变更",
+            "应用获批的任务创建、编辑、完成、删除或日期变更",
             AgentRole.MAIN,
             Effect.WRITE,
             Risk.MEDIUM,

@@ -62,6 +62,7 @@ async def client(db: AsyncSession) -> AsyncClient:
     redis_mock.exists.return_value = 0
     with (
         patch("src.tasks.knowledge.process_knowledge_item.apply_async", return_value=None),
+        patch("src.tasks.agent_runs.execute_agent_run.apply_async", return_value=None),
         patch("src.redis_client.get_redis", return_value=redis_mock),
     ):
         test_host = f"test-{uuid.uuid4().hex}"

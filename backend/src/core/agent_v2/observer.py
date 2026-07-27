@@ -19,12 +19,28 @@ async def verify_task_changes(
                 .where(Task.id == operation.entity_id, Goal.user_id == user_id)
             )
         ).scalar_one_or_none()
-        if not row or row.scheduled_date != operation.after:
+        if operation.field == "__delete__":
+            ok = row is None
+            actual = "deleted" if row is None else "present"
+        elif operation.field == "__create__":
+            expected = dict(operation.after or {})
+            ok = bool(
+                row
+                and row.goal_id == expected.get("goal_id")
+                and row.title == expected.get("title")
+                and row.scheduled_date == expected.get("scheduled_date")
+            )
+            actual = "created" if row else "missing"
+        else:
+            actual_value = getattr(row, operation.field, None) if row else None
+            ok = row is not None and actual_value == operation.after
+            actual = str(actual_value) if row else "missing"
+        if not ok:
             mismatches.append(
                 {
                     "entity_id": operation.entity_id,
                     "expected": str(operation.after),
-                    "actual": row.scheduled_date if row else "missing",
+                    "actual": actual,
                 }
             )
     return {"verified": not mismatches, "mismatches": mismatches}

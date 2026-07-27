@@ -74,6 +74,10 @@ class RejectRequest(BaseModel):
     reason: str | None = Field(default=None, max_length=500)
 
 
+class EditApprovalRequest(BaseModel):
+    change_set: ChangeSet
+
+
 class ProactiveSuggestionRequest(BaseModel):
     goal_id: str | None = None
     lookback_days: int = Field(default=14, ge=7, le=90)

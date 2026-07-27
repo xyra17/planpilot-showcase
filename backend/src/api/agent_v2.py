@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,6 +10,7 @@ from src.core.agent_v2.orchestrator import (
     approve_run,
     cancel_run,
     create_run,
+    edit_approval,
     pause_run,
     reject_run,
     resume_run,
@@ -20,14 +23,24 @@ from src.core.agent_v2.registry import build_registry
 from src.core.agent_v2.schemas import (
     ApprovalRequest,
     CreateRunRequest,
+    EditApprovalRequest,
     ProactiveSuggestionRequest,
     RejectRequest,
 )
 from src.database import get_db
 from src.deps import get_current_user
 from src.models import AgentRun, User
+from src.tasks.agent_runs import dispatch_agent_run
 
 router = APIRouter(prefix="/api/v2/agent", tags=["agent-v2"])
+logger = logging.getLogger(__name__)
+
+
+def _dispatch(run_id: str, user_id: str) -> None:
+    try:
+        dispatch_agent_run(run_id, user_id)
+    except Exception:
+        logger.exception("Agent run dispatch failed; recovery task will retry: %s", run_id)
 
 
 @router.get("/tools")
@@ -48,7 +61,9 @@ async def start_run(
         goal_id=body.goal_id,
         step_budget=body.step_budget,
         token_budget=body.token_budget,
+        auto_advance=False,
     )
+    _dispatch(run.id, current_user.id)
     return await run_detail(db, current_user.id, run.id)
 
 
@@ -95,6 +110,26 @@ async def approve(
         run_id=run_id,
         approval_id=body.approval_id,
         expected_hash=body.change_hash,
+        auto_advance=False,
+    )
+    _dispatch(run_id, current_user.id)
+    return await run_detail(db, current_user.id, run_id)
+
+
+@router.patch("/runs/{run_id}/approvals/{approval_id}")
+async def edit_change_set(
+    run_id: str,
+    approval_id: str,
+    body: EditApprovalRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    await edit_approval(
+        db,
+        user_id=current_user.id,
+        run_id=run_id,
+        approval_id=approval_id,
+        change_set=body.change_set,
     )
     return await run_detail(db, current_user.id, run_id)
 
@@ -143,7 +178,10 @@ async def resume(
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     await resume_run(db, user_id=current_user.id, run_id=run_id)
-    return await run_detail(db, current_user.id, run_id)
+    detail = await run_detail(db, current_user.id, run_id)
+    if detail["status"] == "queued":
+        _dispatch(run_id, current_user.id)
+    return detail
 
 
 @router.post("/runs/{run_id}/retry")
@@ -152,7 +190,10 @@ async def retry(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
-    await retry_run(db, user_id=current_user.id, run_id=run_id)
+    await retry_run(
+        db, user_id=current_user.id, run_id=run_id, auto_advance=False
+    )
+    _dispatch(run_id, current_user.id)
     return await run_detail(db, current_user.id, run_id)
 
 
@@ -183,5 +224,7 @@ async def create_suggestion(
         goal_id=body.goal_id,
         step_budget=10,
         token_budget=12000,
+        auto_advance=False,
     )
+    _dispatch(run.id, current_user.id)
     return await run_detail(db, current_user.id, run.id)

@@ -13,6 +13,7 @@ celery_app = Celery(
         "src.tasks.reminders",
         "src.tasks.knowledge",
         "src.tasks.agent_suggestions",
+        "src.tasks.agent_runs",
     ],
 )
 
@@ -46,5 +47,10 @@ celery_app.conf.beat_schedule = {
         "task": "src.tasks.agent_suggestions.generate_agent_suggestions",
         "schedule": crontab(hour=8, minute=0),
         "options": {"expires": 3600},
+    },
+    "recover-agent-runs": {
+        "task": "src.tasks.agent_runs.recover_agent_runs",
+        "schedule": crontab(minute="*/2"),
+        "options": {"expires": 90},
     },
 }

@@ -103,17 +103,46 @@ def create_plan(
             depends_on=[0],
         ),
     ]
-    if not any(
-        term in request for term in ("安排", "调整", "落后", "逾期", "重规划", "改到")
-    ):
+    mutation_terms = (
+        "安排",
+        "调整",
+        "落后",
+        "逾期",
+        "重规划",
+        "改到",
+        "新增",
+        "创建",
+        "添加",
+        "创建任务",
+        "添加任务",
+        "删除任务",
+        "删掉任务",
+        "移除任务",
+        "完成任务",
+        "标记完成",
+    )
+    if not any(term in request for term in mutation_terms):
         objective["intent"] = "execution_analysis"
         return objective, base_steps
 
-    preview_tool = next(
-        tool
-        for tool in registry.search("生成 任务 重新排期 预览", limit=10)
-        if tool.role == AgentRole.SCHEDULE_OPTIMIZER
+    is_crud = any(
+        term in request
+        for term in (
+            "新增",
+            "创建",
+            "添加",
+            "创建任务",
+            "添加任务",
+            "删除任务",
+            "删掉任务",
+            "移除任务",
+            "完成任务",
+            "标记完成",
+            "改到",
+        )
     )
+    preview_name = "tasks.preview_mutation" if is_crud else "schedule.preview_reschedule"
+    preview_tool = registry.get(preview_name)
     review_tool = next(
         tool
         for tool in registry.search("审查 变更 方案 风险", limit=10)
@@ -128,10 +157,14 @@ def create_plan(
         *base_steps,
         PlanStep(
             index=2,
-            title="生成重新排期方案",
+            title="生成任务变更方案" if is_crud else "生成重新排期方案",
             agent_role=preview_tool.role,
             tool_name=preview_tool.name,
-            input={"excluded_weekdays": constraints["excluded_weekdays"]},
+            input={
+                "excluded_weekdays": constraints["excluded_weekdays"],
+                "request": request,
+                "goal_id": goal_id,
+            },
             depends_on=[0, 1],
         ),
         PlanStep(

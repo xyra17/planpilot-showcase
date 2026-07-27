@@ -77,10 +77,12 @@ async def load_learning_context(
                 "id": task.id,
                 "goal_id": task.goal_id,
                 "title": task.title,
+                "description": task.description,
                 "date": task.scheduled_date,
                 "status": task.status,
                 "estimated_minutes": task.estimated_mins,
                 "priority": task.priority,
+                "mastery_level": task.mastery_level,
             }
             for task in tasks
         ],

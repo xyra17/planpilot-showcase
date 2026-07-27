@@ -8,6 +8,7 @@ from src.celery_app import celery_app
 from src.core.agent_v2.orchestrator import create_run
 from src.database import AsyncSessionLocal
 from src.models import AgentRun, Goal, Task
+from src.tasks.agent_runs import dispatch_agent_run
 
 logger = get_task_logger(__name__)
 SUGGESTION_PREFIX = "主动检查最近 14 天"
@@ -42,7 +43,7 @@ async def _generate_all() -> dict[str, int]:
             ).scalar_one_or_none()
             if exists:
                 continue
-            await create_run(
+            run = await create_run(
                 db,
                 user_id=user_id,
                 request=(
@@ -52,7 +53,9 @@ async def _generate_all() -> dict[str, int]:
                 goal_id=None,
                 step_budget=10,
                 token_budget=12000,
+                auto_advance=False,
             )
+            dispatch_agent_run(run.id, user_id)
             created += 1
     return {"created": created}
 
