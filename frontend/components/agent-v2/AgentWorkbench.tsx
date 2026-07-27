@@ -5,6 +5,7 @@ import {
   Activity,
   Bot,
   Check,
+  ChevronLeft,
   ChevronRight,
   Circle,
   History,
@@ -257,6 +258,7 @@ export default function AgentWorkbench() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [run, setRun] = useState<AgentRun | null>(null);
   const [busy, setBusy] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(true);
 
   const loadRuns = useCallback(async () => {
     const rows = await api.get<AgentRun[]>("/api/v2/agent/runs");
@@ -381,10 +383,35 @@ export default function AgentWorkbench() {
   }
 
   return (
-    <div className="grid h-full min-h-0 grid-cols-[280px_minmax(0,1fr)]">
-      <aside className="border-r border-gray-200/80 bg-white/55 p-4">
-        <div className="mb-4 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-sm font-semibold">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
+      <header
+        className="flex flex-shrink-0 items-start gap-3 border-b px-6 py-5 lg:px-8"
+        style={{ borderColor: "var(--border)", background: "var(--card)" }}
+      >
+        <span
+          className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl text-white"
+          style={{ background: "var(--accent)" }}
+        >
+          <Sparkles size={19} />
+        </span>
+        <div>
+          <h1 className="text-xl font-semibold text-gray-900">Agent 工作台</h1>
+          <p className="mt-1 text-sm text-gray-500">
+            主 Agent 负责审批与执行，从属 Agent 只进行分析和提出方案。
+          </p>
+        </div>
+      </header>
+
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+      <div
+        className={`flex-shrink-0 transition-all duration-200 ${
+          historyOpen ? "w-[280px]" : "w-10"
+        }`}
+      >
+      {historyOpen ? (
+      <aside className="flex h-full min-h-0 flex-col border-r border-gray-200/80 bg-white/55 p-4">
+        <div className="mb-4 flex flex-shrink-0 items-center gap-1">
+          <div className="flex min-w-0 flex-1 items-center gap-2 text-sm font-semibold">
             <History size={16} /> 历史任务
           </div>
           <button
@@ -394,8 +421,16 @@ export default function AgentWorkbench() {
           >
             <RefreshCw size={15} />
           </button>
+          <button
+            onClick={() => setHistoryOpen(false)}
+            className="rounded-lg p-2 text-gray-500 transition hover:bg-black/5"
+            title="收起历史任务"
+            aria-label="收起历史任务"
+          >
+            <ChevronLeft size={15} />
+          </button>
         </div>
-        <div className="space-y-2 overflow-y-auto">
+        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto">
           {runs.length === 0 && (
             <p className="px-2 py-6 text-center text-sm text-gray-400">
               还没有 Agent 任务
@@ -436,24 +471,20 @@ export default function AgentWorkbench() {
           ))}
         </div>
       </aside>
+      ) : (
+        <button
+          onClick={() => setHistoryOpen(true)}
+          className="mt-4 flex h-9 w-8 items-center justify-center rounded-lg text-gray-400 transition hover:bg-gray-100 hover:text-gray-600"
+          title="展开历史任务"
+          aria-label="展开历史任务"
+        >
+          <ChevronRight size={14} />
+        </button>
+      )}
+      </div>
 
-      <section className="min-h-0 overflow-y-auto p-6 lg:p-8">
+      <section className="min-h-0 min-w-0 flex-1 overflow-y-auto p-6 lg:p-8">
         <div className="mx-auto max-w-5xl">
-          <div className="mb-6 flex items-start gap-3">
-            <span
-              className="flex h-10 w-10 items-center justify-center rounded-2xl text-white"
-              style={{ background: "var(--accent)" }}
-            >
-              <Sparkles size={19} />
-            </span>
-            <div>
-              <h1 className="text-xl font-semibold text-gray-900">Agent 工作台</h1>
-              <p className="mt-1 text-sm text-gray-500">
-                主 Agent 负责审批与执行，从属 Agent 只进行分析和提出方案。
-              </p>
-            </div>
-          </div>
-
           <div
             className="mb-6 rounded-2xl border p-4 shadow-sm"
             style={{ background: "var(--card)", borderColor: "var(--border)" }}
@@ -705,6 +736,7 @@ export default function AgentWorkbench() {
           )}
         </div>
       </section>
+      </div>
     </div>
   );
 }
