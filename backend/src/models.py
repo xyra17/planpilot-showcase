@@ -32,6 +32,8 @@ def new_uuid() -> str:
 class User(Base):
     __tablename__ = "users"
 
+    __table_args__ = (UniqueConstraint("email", name="users_email_key"),)
+
     id: Mapped[str] = mapped_column(String, primary_key=True, default=new_uuid)
     email: Mapped[str] = mapped_column(String, unique=True, nullable=False, index=True)
     username: Mapped[str] = mapped_column(String, unique=True, nullable=False)
@@ -814,6 +816,10 @@ class AgentAuditEvent(Base):
 class PasswordResetToken(Base):
     __tablename__ = "password_reset_tokens"
 
+    __table_args__ = (
+        UniqueConstraint("token", name="password_reset_tokens_token_key"),
+    )
+
     id: Mapped[str] = mapped_column(String, primary_key=True, default=new_uuid)
     user_id: Mapped[str] = mapped_column(
         String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
@@ -826,6 +832,10 @@ class PasswordResetToken(Base):
 
 class EmailVerificationToken(Base):
     __tablename__ = "email_verification_tokens"
+
+    __table_args__ = (
+        UniqueConstraint("token", name="email_verification_tokens_token_key"),
+    )
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=new_uuid)
     user_id: Mapped[str] = mapped_column(
