@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { BookOpen, CalendarDays, ChevronDown, ExternalLink, Plus } from "lucide-react";
+import { CalendarDays, ExternalLink, Plus } from "lucide-react";
 import { api } from "@/lib/api";
 import type { KnowledgeNote } from "@/lib/knowledge-context";
 
@@ -21,16 +21,16 @@ function stripHtml(html: string) {
 }
 
 export default function GoalNotesPanel({ goalId }: GoalNotesPanelProps) {
+  const notesHref = "/studio/work/notes";
   const [notes, setNotes] = useState<KnowledgeNote[]>([]);
   const [loading, setLoading] = useState(true);
-  const [newMenuOpen, setNewMenuOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     const data = await api.get<KnowledgeNote[]>(
       `/api/v1/knowledge/notes?goal_id=${goalId}`
     ).catch(() => []);
-    setNotes(data.filter((note) => ["daily_log", "flash_card"].includes(note.noteType)));
+    setNotes(data.filter((note) => note.noteType === "daily_log"));
     setLoading(false);
   }, [goalId]);
 
@@ -42,12 +42,7 @@ export default function GoalNotesPanel({ goalId }: GoalNotesPanelProps) {
     if (aDate !== bDate) return bDate - aDate;
     return Date.parse(b.updatedAt || b.createdAt) - Date.parse(a.updatedAt || a.createdAt);
   };
-  const studyNotes = notes
-    .filter((note) => note.noteType === "daily_log")
-    .sort(byRecordDateDesc);
-  const studyLogs = notes
-    .filter((note) => note.noteType === "flash_card")
-    .sort(byRecordDateDesc);
+  const studyNotes = [...notes].sort(byRecordDateDesc);
 
   return (
     <div className="space-y-4 px-4 py-4">
@@ -57,37 +52,14 @@ export default function GoalNotesPanel({ goalId }: GoalNotesPanelProps) {
             <CalendarDays size={12} style={{ color: "var(--accent)" }} />
             笔记 {studyNotes.length}
           </span>
-          <span className="inline-flex items-center gap-1">
-            <BookOpen size={12} style={{ color: "var(--accent)" }} />
-            日志 {studyLogs.length}
-          </span>
         </div>
-        <div className="relative">
-          <button
-            onClick={() => setNewMenuOpen((open) => !open)}
-            aria-expanded={newMenuOpen}
-            className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium text-white transition hover:opacity-90"
-            style={{ backgroundColor: "var(--accent)" }}
-          >
-            <Plus size={12} />新建<ChevronDown size={11} />
-          </button>
-          {newMenuOpen && (
-            <div className="absolute right-0 top-9 z-20 w-40 overflow-hidden rounded-xl border border-gray-100 bg-white p-1.5 shadow-xl">
-              <Link
-                href={`/dashboard/notes?tab=log&goalId=${goalId}&create=1`}
-                className="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-gray-600 transition hover:bg-gray-50"
-              >
-                <CalendarDays size={13} />学习笔记
-              </Link>
-              <Link
-                href={`/dashboard/notes?tab=card&goalId=${goalId}&create=1`}
-                className="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-gray-600 transition hover:bg-gray-50"
-              >
-                <BookOpen size={13} />学习日志
-              </Link>
-            </div>
-          )}
-        </div>
+        <Link
+          href={`${notesHref}?goalId=${goalId}&create=1`}
+          className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium text-white transition hover:opacity-90"
+          style={{ backgroundColor: "var(--accent)" }}
+        >
+          <Plus size={12} />新建笔记
+        </Link>
       </div>
 
       {loading ? (
@@ -97,28 +69,17 @@ export default function GoalNotesPanel({ goalId }: GoalNotesPanelProps) {
           <p className="text-xs text-gray-400">这个目标还没有相关笔记</p>
         </div>
       ) : (
-        <div className="space-y-5">
-          {([
-            { label: "学习笔记", icon: CalendarDays, tab: "log", items: studyNotes },
-            { label: "学习日志", icon: BookOpen, tab: "card", items: studyLogs },
-          ] as const).map((group) => (
-            <section key={group.tab}>
-              <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-gray-500">
-                <group.icon size={13} style={{ color: "var(--accent)" }} />
-                {group.label}
-                <span className="text-gray-300">{group.items.length}</span>
-              </div>
-              {group.items.length === 0 ? (
-                <p className="rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-400">暂无内容</p>
-              ) : (
-                <div
-                  className="max-h-64 space-y-2 overflow-y-auto pr-1"
-                  aria-label={`${group.label}，按记录日期从新到旧排列`}
-                >
-                  {group.items.map((note) => (
+        <section>
+          <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-gray-500">
+            <CalendarDays size={13} style={{ color: "var(--accent)" }} />
+            学习笔记
+            <span className="text-gray-300">{studyNotes.length}</span>
+          </div>
+          <div className="space-y-2" aria-label="学习笔记，按记录日期从新到旧排列">
+                  {studyNotes.map((note) => (
                     <Link
                       key={note.id}
-                      href={`/dashboard/notes?tab=${group.tab}&goalId=${goalId}`}
+                      href={`${notesHref}?goalId=${goalId}`}
                       className="block rounded-xl border border-gray-100 bg-white px-3 py-2.5 transition hover:border-gray-200 hover:shadow-sm"
                     >
                       <div className="flex items-start justify-between gap-2">
@@ -130,11 +91,8 @@ export default function GoalNotesPanel({ goalId }: GoalNotesPanelProps) {
                       <p className="mt-1 text-[10px] text-gray-400">{note.date}</p>
                     </Link>
                   ))}
-                </div>
-              )}
-            </section>
-          ))}
-        </div>
+          </div>
+        </section>
       )}
     </div>
   );

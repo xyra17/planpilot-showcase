@@ -6,7 +6,6 @@ import Placeholder from "@tiptap/extension-placeholder";
 import TaskList from "@tiptap/extension-task-list";
 import TaskItem from "@tiptap/extension-task-item";
 import Highlight from "@tiptap/extension-highlight";
-import Underline from "@tiptap/extension-underline";
 import Image from "@tiptap/extension-image";
 import { Extension, InputRule } from "@tiptap/core";
 import { useEffect, useRef, useCallback } from "react";
@@ -14,14 +13,9 @@ import EditorToolbar from "./EditorToolbar";
 import SlashMenu from "./SlashMenu";
 import ResizableImage from "./ResizableImage";
 import { useState } from "react";
+import { authFetch } from "@/lib/api";
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 const SERVE_RE = /\/api\/v1\/knowledge\/files\/([^"' >]+)\/serve/g;
-
-function getToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem("access_token");
-}
 
 // ==text== → 高亮
 const HighlightInputRule = new InputRule({
@@ -116,8 +110,7 @@ export default function TiptapEditor({
   const suppressUpdate = useRef(false);
 
   const resolveImages = useCallback(async (html: string): Promise<string> => {
-    const token = getToken();
-    if (!token || !SERVE_RE.test(html)) return html;
+    if (!SERVE_RE.test(html)) return html;
     SERVE_RE.lastIndex = 0;
 
     const matches = Array.from(html.matchAll(new RegExp(SERVE_RE.source, "g")));
@@ -127,9 +120,7 @@ export default function TiptapEditor({
       unique.map(async (apiPath) => {
         if (apiToBlob.current.has(apiPath)) return;
         try {
-          const res = await fetch(`${BASE_URL}${apiPath}`, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
+          const res = await authFetch(apiPath);
           if (!res.ok) return;
           const blob = await res.blob();
           const blobUrl = URL.createObjectURL(blob);
@@ -159,7 +150,6 @@ export default function TiptapEditor({
       TaskList,
       TaskItem.configure({ nested: true }),
       Highlight,
-      Underline,
       ResizableImageExtension.configure({ inline: false }),
       MarkdownShortcuts,
     ],
@@ -221,11 +211,13 @@ export default function TiptapEditor({
       editor.commands.setContent(resolved);
       suppressUpdate.current = false;
     });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [content, editor]);
 
   useEffect(() => {
     return () => {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
       blobToApi.current.forEach((_, blobUrl) => {
         URL.revokeObjectURL(blobUrl);
       });

@@ -1,0 +1,365 @@
+/* The quick-task dialog uses compact, themed popovers instead of OS-native menus. */
+.app-shell .task-dialog-field {
+  min-width: 0;
+  color: var(--workspace-secondary);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.app-shell .task-dialog .task-field-label {
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 680;
+  line-height: 1.3;
+}
+
+.app-shell .task-dialog .task-field-label svg {
+  width: 15px;
+  height: 15px;
+}
+
+.app-shell .task-dialog .task-time-range {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid var(--workspace-border);
+}
+
+.app-shell .task-dialog .task-time-range > label {
+  min-width: 0;
+}
+
+.app-shell .task-dialog .task-time-range > label:first-child .availability-time-popover {
+  right: auto;
+  left: 0;
+}
+
+.app-shell .task-dialog .task-time-range > label:last-child .availability-time-popover {
+  right: 0;
+  left: auto;
+}
+
+.app-shell .task-dialog .task-time-error {
+  grid-column: 1 / -1;
+  margin: -7px 0 0;
+  color: #c44a47;
+  font-size: 11px;
+  font-weight: 620;
+  line-height: 1.35;
+}
+
+.app-shell .quick-task-select-trigger {
+  display: flex;
+  width: 100%;
+  height: 44px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 8px;
+  padding: 0 11px 0 12px;
+  color: var(--workspace-text);
+  border: 1px solid var(--workspace-border);
+  border-radius: 8px;
+  background: var(--workspace-panel-subtle);
+  font-size: 13px;
+  font-weight: 560;
+  line-height: 1;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
+}
+
+.app-shell .quick-task-select-trigger:hover {
+  border-color: var(--workspace-border-strong);
+  background: color-mix(in srgb, var(--workspace-accent) 3%, var(--workspace-panel-subtle));
+}
+
+.app-shell .quick-task-select-trigger:is(:focus-visible, [data-state="open"]) {
+  border-color: color-mix(in srgb, var(--workspace-accent) 68%, var(--workspace-border));
+  background: color-mix(in srgb, var(--workspace-accent) 3%, var(--workspace-panel-subtle));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--workspace-accent) 11%, transparent);
+}
+
+.app-shell .quick-task-select-trigger-value {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.app-shell .quick-task-select-trigger-value > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-shell .quick-task-select-trigger > svg {
+  flex: 0 0 auto;
+  color: var(--workspace-secondary);
+  transition: color 160ms ease, transform 180ms cubic-bezier(.22, 1, .36, 1);
+}
+
+.app-shell .quick-task-select-trigger[data-state="open"] > svg {
+  color: var(--workspace-accent);
+  transform: rotate(180deg);
+}
+
+.app-shell .quick-task-select-content {
+  z-index: 260;
+  width: var(--radix-select-trigger-width);
+  min-width: min(250px, calc(100vw - 24px));
+  max-width: min(310px, calc(100vw - 24px));
+  max-height: min(var(--radix-select-content-available-height), 330px);
+  overflow: hidden;
+  color: var(--workspace-text);
+  border: 1px solid color-mix(in srgb, var(--workspace-accent) 20%, var(--workspace-border));
+  border-radius: 12px;
+  background:
+    radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--workspace-accent) 9%, transparent), transparent 45%),
+    var(--workspace-panel);
+  box-shadow:
+    0 20px 46px color-mix(in srgb, var(--workspace-text) 15%, transparent),
+    0 4px 12px color-mix(in srgb, var(--workspace-accent) 8%, transparent);
+  transform-origin: var(--radix-select-content-transform-origin);
+  animation: quick-task-select-in 170ms cubic-bezier(.22, 1, .36, 1) both;
+}
+
+.app-shell .quick-task-select-heading {
+  display: flex;
+  min-height: 38px;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  color: var(--workspace-secondary);
+  border-bottom: 1px solid var(--workspace-border);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.app-shell .quick-task-select-heading > span {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  color: var(--workspace-accent);
+  border-radius: 7px;
+  background: var(--workspace-accent-soft);
+}
+
+.app-shell .quick-task-select-viewport {
+  padding: 5px;
+}
+
+.app-shell .quick-task-select-content.is-duration .quick-task-select-viewport {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.app-shell .quick-task-select-content.is-duration .quick-task-select-option + .quick-task-select-option {
+  margin-top: 0;
+}
+
+.app-shell .quick-task-select-option {
+  position: relative;
+  display: grid;
+  width: 100%;
+  min-height: 44px;
+  grid-template-columns: 28px minmax(0, 1fr) 18px;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 8px;
+  color: var(--workspace-secondary);
+  border: 1px solid transparent;
+  border-radius: 9px;
+  outline: none;
+  cursor: pointer;
+  user-select: none;
+}
+
+.app-shell .quick-task-select-option + .quick-task-select-option {
+  margin-top: 2px;
+}
+
+.app-shell .quick-task-select-content.is-duration .quick-task-select-option {
+  min-height: 44px;
+  grid-template-columns: 27px minmax(0, 1fr) 14px;
+  gap: 5px;
+  padding: 3px 5px;
+}
+
+.app-shell .quick-task-select-option:is(:hover, [data-highlighted]) {
+  color: var(--workspace-text);
+  border-color: color-mix(in srgb, var(--workspace-accent) 12%, transparent);
+  background: color-mix(in srgb, var(--workspace-accent) 7%, transparent);
+}
+
+.app-shell .quick-task-select-option[data-state="checked"] {
+  color: var(--workspace-accent);
+  border-color: color-mix(in srgb, var(--workspace-accent) 16%, transparent);
+  background: color-mix(in srgb, var(--workspace-accent) 9%, var(--workspace-panel));
+}
+
+.app-shell .quick-task-select-option-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.app-shell .quick-task-select-option-copy strong {
+  overflow: hidden;
+  color: currentColor;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-shell .quick-task-select-option-copy small {
+  overflow: hidden;
+  color: var(--workspace-tertiary);
+  width: 119%;
+  font-size: 12px;
+  font-weight: 520;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  transform: scale(.84);
+  transform-origin: left center;
+  white-space: nowrap;
+}
+
+.app-shell .quick-task-select-goal-mark,
+.app-shell .quick-task-select-minutes {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  color: var(--workspace-accent);
+  border-radius: 8px;
+  background: var(--workspace-accent-soft);
+}
+
+.app-shell .quick-task-select-minutes {
+  font-size: 11px;
+  font-weight: 760;
+  font-variant-numeric: tabular-nums;
+}
+
+.app-shell .quick-task-select-dot {
+  width: 8px;
+  height: 8px;
+  justify-self: center;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 0 4px color-mix(in srgb, currentColor 10%, transparent);
+}
+
+.app-shell .quick-task-select-dot.is-high,
+.app-shell .quick-task-select-option.is-high { color: #c44a47; }
+.app-shell .quick-task-select-dot.is-medium,
+.app-shell .quick-task-select-option.is-medium { color: var(--workspace-accent); }
+.app-shell .quick-task-select-dot.is-low,
+.app-shell .quick-task-select-option.is-low { color: #78839a; }
+
+.app-shell .quick-task-select-check {
+  display: grid;
+  place-items: center;
+  color: currentColor;
+}
+
+/* The task time picker shares the same readable hierarchy while staying short
+   enough to keep its current value and actions inside a laptop viewport. */
+.app-shell .task-dialog .clock-time-picker .availability-time-popover {
+  width: min(264px, calc(100vw - 32px));
+}
+
+.app-shell .task-dialog .clock-time-picker .availability-time-popover > header {
+  min-height: 38px;
+  padding: 6px 10px;
+}
+
+.app-shell .task-dialog .clock-time-picker .availability-time-popover > header span {
+  font-size: 13px;
+}
+
+.app-shell .task-dialog .clock-time-picker .availability-time-popover > header strong {
+  font-size: 16px;
+}
+
+.app-shell .task-dialog .clock-time-picker .availability-time-columns {
+  padding: 4px 8px 5px;
+}
+
+.app-shell .task-dialog .clock-time-picker .availability-time-columns section > span {
+  padding: 4px 7px;
+  font-size: 12px;
+}
+
+.app-shell .task-dialog .clock-time-picker .availability-time-options {
+  max-height: 96px;
+  padding: 0 4px 3px;
+}
+
+.app-shell .task-dialog .clock-time-picker .availability-time-options button {
+  min-height: 28px;
+  padding: 3px 7px;
+  font-size: 12px;
+}
+
+.app-shell .task-dialog .clock-time-picker .availability-time-popover > footer {
+  min-height: 40px;
+  gap: 6px;
+  padding: 5px 8px;
+}
+
+.app-shell .task-dialog .clock-time-picker .availability-time-popover > footer small {
+  font-size: 9px;
+}
+
+.app-shell .task-dialog .clock-time-picker .availability-time-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.app-shell .task-dialog .clock-time-picker .availability-time-popover > footer button {
+  min-height: 30px;
+  padding: 4px 8px;
+  font-size: 10px;
+}
+
+.app-shell .task-dialog .clock-time-picker .availability-time-popover > footer button.is-cancel {
+  color: var(--workspace-secondary);
+  border: 1px solid var(--workspace-border);
+  background: transparent;
+  box-shadow: none;
+}
+
+@keyframes quick-task-select-in {
+  from { opacity: 0; transform: translateY(-4px) scale(.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (max-width: 620px) {
+  .app-shell .task-dialog .task-time-range {
+    gap: 10px;
+  }
+
+  .app-shell .quick-task-select-content {
+    width: var(--radix-select-trigger-width);
+    min-width: var(--radix-select-trigger-width);
+    max-width: calc(100vw - 32px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-shell .quick-task-select-content {
+    animation: none;
+  }
+}

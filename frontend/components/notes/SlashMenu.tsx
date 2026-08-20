@@ -50,6 +50,7 @@ export default function SlashMenu({ editor, goalId, position, onClose }: SlashMe
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeIdx]);
 
   const execute = async (command: string) => {
@@ -141,7 +142,7 @@ export default function SlashMenu({ editor, goalId, position, onClose }: SlashMe
           onMouseDown={(e) => { e.preventDefault(); execute(cmd.id); }}
           onMouseEnter={() => setActiveIdx(i)}
           className={`slash-menu-item w-full flex items-center gap-3 px-3 py-2.5 text-left transition ${
-            i === activeIdx ? "bg-blue-50" : "hover:bg-gray-50"
+            i === activeIdx ? "bg-accent-light" : "hover:bg-gray-50"
           } disabled:opacity-40`}
         >
           <span className="slash-menu-icon flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-gray-500">

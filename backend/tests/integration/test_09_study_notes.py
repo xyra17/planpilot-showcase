@@ -1,4 +1,5 @@
 """学习记录专项测试（8 用例）"""
+
 import io
 
 import pytest
@@ -9,6 +10,7 @@ pytestmark = pytest.mark.integration
 
 # ── 辅助：注册并登录第二用户 ─────────────────────────────────────────────
 
+
 async def _auth_headers_user2(client: AsyncClient, seed: dict) -> dict:
     r = await client.post("/api/v1/auth/register", json=seed["user2"])
     if r.status_code == 400:
@@ -17,20 +19,19 @@ async def _auth_headers_user2(client: AsyncClient, seed: dict) -> dict:
             json={"email": seed["user2"]["email"], "password": seed["user2"]["password"]},
         )
     assert r.status_code in (200, 201), r.text
-    return {"Authorization": f"Bearer {r.json()['access_token']}"}
+    return {"Authorization": f"Bearer {r.cookies.get('pp_access')}"}
 
 
 # ── 1. 同一天可创建多篇笔记 ──────────────────────────────────────────────
 
-async def test_multiple_notes_same_day(
-    client: AsyncClient, auth_headers: dict, shared: dict
-):
+
+async def test_multiple_notes_same_day(client: AsyncClient, auth_headers: dict, shared: dict):
     date = "2026-01-15"
     ids = []
     for i in range(2):
         r = await client.post(
             "/api/v1/knowledge/notes",
-            json={"content": f"学习记录第{i+1}篇", "noteType": "daily_log", "noteDate": date},
+            json={"content": f"学习记录第{i + 1}篇", "noteType": "daily_log", "noteDate": date},
             headers=auth_headers,
         )
         assert r.status_code in (200, 201), r.text
@@ -49,9 +50,8 @@ async def test_multiple_notes_same_day(
 
 # ── 2. 历史日期笔记按 note_date 过滤 ────────────────────────────────────
 
-async def test_historical_date_filter(
-    client: AsyncClient, auth_headers: dict
-):
+
+async def test_historical_date_filter(client: AsyncClient, auth_headers: dict):
     hist_date = "2025-03-20"
     r = await client.post(
         "/api/v1/knowledge/notes",
@@ -80,9 +80,8 @@ async def test_historical_date_filter(
 
 # ── 3. PATCH 笔记可更新 goalId ──────────────────────────────────────────
 
-async def test_update_goal_id(
-    client: AsyncClient, auth_headers: dict, shared: dict, seed: dict
-):
+
+async def test_update_goal_id(client: AsyncClient, auth_headers: dict, shared: dict, seed: dict):
     goal_id = shared.get("goal_id_1")
     if not goal_id:
         gr = await client.post("/api/v1/goals", json=seed["goals"][0], headers=auth_headers)
@@ -116,9 +115,8 @@ async def test_update_goal_id(
 
 # ── 4. 上传附件时传入 note_id 关联笔记 ──────────────────────────────────
 
-async def test_attachment_linked_to_note(
-    client: AsyncClient, auth_headers: dict, shared: dict
-):
+
+async def test_attachment_linked_to_note(client: AsyncClient, auth_headers: dict, shared: dict):
     note_ids = shared.get("sn_note_ids", [])
     assert note_ids, "depends on test_multiple_notes_same_day"
     note_id = note_ids[0]
@@ -136,6 +134,7 @@ async def test_attachment_linked_to_note(
 
 # ── 5. 附件不出现在 /knowledge/files ─────────────────────────────────────
 
+
 async def test_attachment_hidden_from_files_list(
     client: AsyncClient, auth_headers: dict, shared: dict
 ):
@@ -151,9 +150,8 @@ async def test_attachment_hidden_from_files_list(
 
 # ── 6. 删除笔记后附件一并不可访问 ─────────────────────────────────────────
 
-async def test_delete_note_with_attachment(
-    client: AsyncClient, auth_headers: dict, shared: dict
-):
+
+async def test_delete_note_with_attachment(client: AsyncClient, auth_headers: dict, shared: dict):
     note_ids = shared.get("sn_note_ids", [])
     assert note_ids, "depends on test_multiple_notes_same_day"
     note_id = note_ids[0]
@@ -168,6 +166,7 @@ async def test_delete_note_with_attachment(
 
 
 # ── 7. 其他用户无法访问该笔记 ────────────────────────────────────────────
+
 
 async def test_other_user_cannot_access_note(
     client: AsyncClient, auth_headers: dict, shared: dict, seed: dict
@@ -190,9 +189,8 @@ async def test_other_user_cannot_access_note(
 
 # ── 8. noteDate 格式非法返回 422 ─────────────────────────────────────────
 
-async def test_invalid_note_date_format(
-    client: AsyncClient, auth_headers: dict
-):
+
+async def test_invalid_note_date_format(client: AsyncClient, auth_headers: dict):
     for bad_date in ("20260115", "2026/01/15", "not-a-date", "2026-13-01"):
         r = await client.post(
             "/api/v1/knowledge/notes",
@@ -204,12 +202,11 @@ async def test_invalid_note_date_format(
 
 # ── 9. 目标为主、任务为可选关联，且标题与时间输出正确 ─────────────────────
 
+
 async def test_note_goal_task_relation_and_clean_title(
     client: AsyncClient, auth_headers: dict, seed: dict
 ):
-    goal_response = await client.post(
-        "/api/v1/goals", json=seed["goals"][0], headers=auth_headers
-    )
+    goal_response = await client.post("/api/v1/goals", json=seed["goals"][0], headers=auth_headers)
     assert goal_response.status_code == 201, goal_response.text
     goal_id = goal_response.json()["id"]
 
@@ -249,12 +246,11 @@ async def test_note_goal_task_relation_and_clean_title(
 
 # ── 10. 任务删除后笔记保留目标和任务标题快照 ──────────────────────────────
 
+
 async def test_deleted_task_keeps_note_snapshot(
     client: AsyncClient, auth_headers: dict, seed: dict
 ):
-    goal_response = await client.post(
-        "/api/v1/goals", json=seed["goals"][0], headers=auth_headers
-    )
+    goal_response = await client.post("/api/v1/goals", json=seed["goals"][0], headers=auth_headers)
     assert goal_response.status_code == 201, goal_response.text
     goal_id = goal_response.json()["id"]
     task_response = await client.post(
@@ -276,14 +272,10 @@ async def test_deleted_task_keeps_note_snapshot(
     )
     note_id = note_response.json()["id"]
 
-    delete_response = await client.delete(
-        f"/api/v1/tasks/{task_id}", headers=auth_headers
-    )
+    delete_response = await client.delete(f"/api/v1/tasks/{task_id}", headers=auth_headers)
     assert delete_response.status_code == 204
 
-    get_response = await client.get(
-        f"/api/v1/knowledge/notes/{note_id}", headers=auth_headers
-    )
+    get_response = await client.get(f"/api/v1/knowledge/notes/{note_id}", headers=auth_headers)
     assert get_response.status_code == 200, get_response.text
     note = get_response.json()
     assert note["goalId"] == goal_id
@@ -294,9 +286,8 @@ async def test_deleted_task_keeps_note_snapshot(
 
 # ── 11. 快速记录可创建，并可转换为用户维护的其他笔记类型 ────────────────
 
-async def test_quick_note_creation_and_conversion(
-    client: AsyncClient, auth_headers: dict
-):
+
+async def test_quick_note_creation_and_conversion(client: AsyncClient, auth_headers: dict):
     create_response = await client.post(
         "/api/v1/knowledge/notes",
         json={
@@ -330,9 +321,8 @@ async def test_quick_note_creation_and_conversion(
 
 # ── 12. 系统摘录不能被转换，避免破坏来源语义 ────────────────────────────
 
-async def test_system_note_type_cannot_be_converted(
-    client: AsyncClient, auth_headers: dict
-):
+
+async def test_system_note_type_cannot_be_converted(client: AsyncClient, auth_headers: dict):
     create_response = await client.post(
         "/api/v1/knowledge/notes",
         json={

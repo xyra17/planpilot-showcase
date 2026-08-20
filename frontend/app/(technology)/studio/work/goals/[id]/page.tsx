@@ -1,0 +1,1353 @@
+"use client";
+
+import { useState, useRef, useEffect, useCallback } from "react";
+
+
+import Link from "next/link";
+import { useParams, useSearchParams } from "next/navigation";
+import {
+  ArrowLeft, CheckCircle2, Circle, Clock,
+  Plus, Trash2, Pencil, FileText,
+  Check, X, ChevronLeft, ChevronRight, ChevronDown, ChevronUp,
+  Loader2, BookOpen, Calendar, BarChart3,
+} from "lucide-react";
+import { useTasks, type Task, type Priority } from "@/lib/tasks-context";
+import { cn } from "@/lib/utils";
+import { VerificationDialog } from "@/components/agent/VerificationDialog";
+import { ProgressOverview } from "@/components/goal/ProgressOverview";
+import PlanModeSelector, { type KbMode, type PacingMode } from "@/components/goal/PlanModeSelector";
+import { DebtCard } from "@/components/agent/DebtCard";
+import { api, ApiError } from "@/lib/api";
+import type { Goal } from "@/lib/stores/goalStore";
+import TaskNoteDrawer from "@/components/notes/TaskNoteDrawer";
+import GoalNotesPanel from "@/components/notes/GoalNotesPanel";
+import { signalPiloContext } from "@/lib/technology/piloContext";
+import { useAuth } from "@/components/technology/AuthProvider";
+import { PRODUCT_STORAGE_KEYS, readProductArray } from "@/lib/technology/productData";
+
+const TODAY = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; })();
+const MONTH_NAMES = ["一月","二月","三月","四月","五月","六月","七月","八月","九月","十月","十一月","十二月"];
+const DAY_NAMES_SHORT = ["一","二","三","四","五","六","日"];
+
+const STATUS_LABEL: Record<string, string> = {
+  active: "进行中", completed: "已完成", paused: "暂停", abandoned: "已放弃",
+};
+
+const GUEST_DEMO_GOALS: Record<string, Goal> = {
+  "1": { id: "1", type: "skill", title: "算法基础体系化", deadline: "2026-09-30", daily_hours: 1, current_level: "intermediate", status: "active", meta: {}, created_at: "2026-08-01T00:00:00Z", work_schedule: "all", kb_id: null },
+  "2": { id: "2", type: "exam", title: "前端面试准备", deadline: "2026-10-18", daily_hours: 0.75, current_level: "intermediate", status: "active", meta: {}, created_at: "2026-08-01T00:00:00Z", work_schedule: "all", kb_id: null },
+  "3": { id: "3", type: "habit", title: "英文技术阅读", deadline: "2027-01-01", daily_hours: 0.33, current_level: "beginner", status: "paused", meta: {}, created_at: "2026-08-01T00:00:00Z", work_schedule: "all", kb_id: null },
+};
+
+const LOCAL_GOAL_TYPES: Record<string, Goal["type"]> = {
+  "考试备考": "exam",
+  "认证学习": "certification",
+  "技能提升": "skill",
+  "阅读计划": "reading",
+  "语言学习": "language",
+  "习惯养成": "habit",
+};
+
+function readLocalGoal(id: string): Goal | null {
+  const stored = readProductArray<Record<string, unknown>>(PRODUCT_STORAGE_KEYS.goals, [])
+    .find((item) => String(item.id) === id);
+  if (!stored || typeof stored.name !== "string") return null;
+  const dailyText = String(stored.daily ?? "");
+  const dailyMinutes = Number.parseFloat(dailyText.match(/[\d.]+/)?.[0] ?? "0");
+  const status = stored.status === "已暂停" ? "paused" : stored.status === "已完成" ? "completed" : "active";
+  return {
+    id,
+    type: LOCAL_GOAL_TYPES[String(stored.type)] ?? "skill",
+    title: stored.name,
+    deadline: String(stored.deadlineDate ?? ""),
+    daily_hours: dailyMinutes / 60,
+    current_level: "beginner",
+    status,
+    meta: {},
+    created_at: new Date().toISOString(),
+    work_schedule: "all",
+    kb_id: null,
+  };
+}
+
+function planErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof ApiError) {
+    if (error.status === 401 || error.status === 403) return "当前账号没有权限读取这份学习计划，请重新登录后重试。";
+    if (error.status === 404) return "目标或学习计划不存在，请返回目标列表确认当前账号。";
+  }
+  return fallback;
+}
+
+function computeDaysLeft(deadline: string) {
+  const diff = new Date(deadline).getTime() - Date.now();
+  return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+}
+
+function GoalExecutionPanel({
+  goal,
+  tasks,
+  daysLeft,
+}: {
+  goal: Goal;
+  tasks: Task[];
+  daysLeft: number;
+}) {
+  const priorityOrder: Record<Priority, number> = { high: 0, medium: 1, low: 2 };
+  const incompleteTasks = tasks.filter((task) => !task.done);
+  const nextTask = [...incompleteTasks].sort((left, right) =>
+    left.date.localeCompare(right.date)
+    || priorityOrder[left.priority ?? "medium"] - priorityOrder[right.priority ?? "medium"]
+  )[0];
+  const remainingMinutes = incompleteTasks.reduce((total, task) => total + task.estimatedMinutes, 0);
+  const dailyCapacityMinutes = Math.max(0, Math.round(goal.daily_hours * 60));
+  const requiredMinutesPerDay = remainingMinutes
+    ? Math.ceil(remainingMinutes / Math.max(daysLeft, 1))
+    : 0;
+  const loadRatio = dailyCapacityMinutes
+    ? requiredMinutesPerDay / dailyCapacityMinutes
+    : requiredMinutesPerDay > 0 ? 2 : 0;
+  const dateAtOffset = (offset: number) => {
+    const date = new Date(`${TODAY}T12:00:00`);
+    date.setDate(date.getDate() + offset);
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  };
+  const weekDays = Array.from({ length: 7 }, (_, offset) => {
+    const date = dateAtOffset(offset);
+    const dateTasks = tasks.filter((task) => task.date === date);
+    const day = new Date(`${date}T12:00:00`);
+    const labels = ["日", "一", "二", "三", "四", "五", "六"];
+    return {
+      date,
+      label: offset === 0 ? "今天" : `周${labels[day.getDay()]}`,
+      total: dateTasks.length,
+      done: dateTasks.filter((task) => task.done).length,
+    };
+  });
+  const maxDayTasks = Math.max(1, ...weekDays.map((day) => day.total));
+  const upcomingCount = weekDays.reduce((total, day) => total + day.total, 0);
+  const todayPlan = weekDays[0];
+  const formatDuration = (minutes: number) => {
+    if (minutes < 60) return `${minutes} 分钟`;
+    const hours = Math.round((minutes / 60) * 10) / 10;
+    return `${hours} 小时`;
+  };
+  const nextTaskDate = nextTask
+    ? nextTask.date < TODAY
+      ? "已延期"
+      : nextTask.date === TODAY
+        ? "今天"
+        : `${Number(nextTask.date.slice(5, 7))}月${Number(nextTask.date.slice(8, 10))}日`
+    : "";
+  return (
+    <section className={cn("goal-execution", nextTask ? "has-next-task" : "is-next-task-empty")} aria-label="当前目标执行节奏">
+      <header className="goal-execution-header">
+        <div><span>本轮安排</span><strong>{todayPlan.total ? `今天还剩 ${todayPlan.total - todayPlan.done} 项` : "今天尚未安排任务"}</strong></div>
+        <small>{upcomingCount} 项进入未来 7 天</small>
+      </header>
+
+      <dl className="goal-execution-kpis">
+        <div><dt>今日完成</dt><dd>{todayPlan.done}/{todayPlan.total}</dd></div>
+        <div><dt>七日安排</dt><dd>{upcomingCount}<small>项</small></dd></div>
+        <div><dt>剩余投入</dt><dd>{formatDuration(remainingMinutes)}</dd></div>
+      </dl>
+
+      <section className="goal-execution-capacity" aria-label="投入匹配">
+        <header><span>投入匹配</span><strong>{requiredMinutesPerDay} / {dailyCapacityMinutes} 分钟/日</strong></header>
+        <div className="goal-execution-capacity-track" role="img" aria-label={`每天需要 ${requiredMinutesPerDay} 分钟，当前设置每天投入 ${dailyCapacityMinutes} 分钟`}>
+          <i style={{ width: `${Math.min(100, loadRatio * 100)}%` }} />
+          <span aria-hidden="true" />
+        </div>
+        <footer><span>计划所需</span><span>当前日均投入</span></footer>
+      </section>
+
+      <section className="goal-execution-week" aria-label="未来七天任务安排">
+        <header><span>未来 7 天</span><strong>{upcomingCount} 项已安排</strong></header>
+        <div className="goal-execution-week-chart" role="img" aria-label={`未来七天共安排 ${upcomingCount} 项任务`}>
+          {weekDays.map((day, index) => (
+            <div key={day.date} aria-label={`${day.label} ${day.total} 项任务，完成 ${day.done} 项`}>
+              <span className="goal-execution-day-count">{day.total || "·"}</span>
+              <span className="goal-execution-day-track">
+                <i
+                  className={day.total ? "has-tasks" : ""}
+                  style={{ height: day.total ? `${Math.max(16, (day.total / maxDayTasks) * 100)}%` : "4px", animationDelay: `${160 + index * 45}ms` }}
+                >
+                  {day.done > 0 && <b style={{ height: `${(day.done / day.total) * 100}%` }} />}
+                </i>
+              </span>
+              <small>{day.label}</small>
+            </div>
+          ))}
+        </div>
+        <footer><span><i className="is-planned" />已安排</span><span><i className="is-done" />已完成</span></footer>
+      </section>
+
+      {nextTask && (
+        <div className="goal-execution-next">
+          <span>下一项任务</span>
+          <div><strong>{nextTask.title}</strong><small>{nextTaskDate} · {nextTask.estimatedMinutes} 分钟 · {PRIORITY_LABEL[nextTask.priority ?? "medium"]}优先级</small></div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+// ── 月历组件 ─────────────────────────────────────────────────
+function MiniCalendar({
+  tasksByDate, selectedDate, onSelect,
+}: {
+  tasksByDate: Record<string, Task[]>; selectedDate: string; onSelect: (d: string) => void;
+}) {
+  const todayParts = TODAY.split("-");
+  const [viewYear, setViewYear] = useState(Number(todayParts[0]));
+  const [viewMonth, setViewMonth] = useState(Number(todayParts[1]) - 1);
+
+  function prevMonth() {
+    if (viewMonth === 0) { setViewMonth(11); setViewYear((y) => y - 1); }
+    else setViewMonth((m) => m - 1);
+  }
+  function nextMonth() {
+    if (viewMonth === 11) { setViewMonth(0); setViewYear((y) => y + 1); }
+    else setViewMonth((m) => m + 1);
+  }
+
+  function fmt(y: number, m: number, d: number) {
+    return `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  }
+
+  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+  const firstDow = new Date(viewYear, viewMonth, 1).getDay();
+  const startOffset = firstDow === 0 ? 6 : firstDow - 1;
+
+  const cells: (number | null)[] = [
+    ...Array(startOffset).fill(null),
+    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
+  ];
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  return (
+    <div className="mx-auto w-full max-w-[360px]">
+      <div className="mb-2 flex items-center justify-between">
+        <button onClick={prevMonth} className="p-1 rounded-lg hover:bg-gray-100 text-gray-500 transition">
+          <ChevronLeft size={14} />
+        </button>
+        <span className="text-xs font-semibold text-gray-700">{viewYear}年 {MONTH_NAMES[viewMonth]}</span>
+        <button onClick={nextMonth} className="p-1 rounded-lg hover:bg-gray-100 text-gray-500 transition">
+          <ChevronRight size={14} />
+        </button>
+      </div>
+
+      <div className="mb-0.5 grid grid-cols-7">
+        {DAY_NAMES_SHORT.map((d) => (
+          <div key={d} className="py-0.5 text-center text-[11px] text-gray-300">{d}</div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-7 gap-y-0.5">
+        {cells.map((day, i) => {
+          if (!day) return <div key={i} />;
+          const dateStr = fmt(viewYear, viewMonth, day);
+          const hasTasks = !!tasksByDate[dateStr]?.length;
+          const allDone = hasTasks && tasksByDate[dateStr].every((t) => t.done);
+          const isToday = dateStr === TODAY;
+          const isSelected = dateStr === selectedDate;
+          return (
+            <button key={i} onClick={() => onSelect(dateStr)}
+              className={cn(
+                "relative flex h-7 flex-col items-center justify-center rounded-lg text-[11px] transition",
+                isSelected ? "text-white font-semibold"
+                : isToday ? "font-bold text-gray-900 ring-1 ring-inset ring-gray-300"
+                : "text-gray-600 hover:bg-gray-100",
+              )}
+              style={isSelected ? { backgroundColor: "var(--accent)" } : {}}
+            >
+              {day}
+              {hasTasks && (
+                <span className="absolute bottom-0.5 w-1 h-1 rounded-full"
+                  style={{ backgroundColor: isSelected ? "rgba(255,255,255,0.7)" : allDone ? "var(--accent)" : "#f59e0b" }} />
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="mt-2 flex items-center justify-center gap-3 border-t border-gray-50 pt-2 text-[11px] text-gray-400">
+        <span className="flex items-center gap-1">
+          <span className="w-2 h-2 rounded-full inline-block" style={{ backgroundColor: "var(--accent)" }} /> 已完成
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="w-2 h-2 rounded-full bg-amber-400 inline-block" /> 待完成
+        </span>
+      </div>
+    </div>
+  );
+}
+
+const PRIORITY_LABEL: Record<string, string> = { high: "高", medium: "中", low: "低" };
+const PRIORITY_DOT: Record<string, string> = { high: "bg-red-400", medium: "bg-yellow-400", low: "bg-gray-300" };
+const PRIORITY_CLS: Record<string, { on: string; off: string }> = {
+  high:   { on: "bg-red-500 text-white",    off: "text-red-500 hover:bg-red-50" },
+  medium: { on: "bg-yellow-400 text-white", off: "text-yellow-600 hover:bg-yellow-50" },
+  low:    { on: "bg-gray-400 text-white",   off: "text-gray-400 hover:bg-gray-100" },
+};
+
+// ── 任务列表（单天） ─────────────────────────────────────────
+function DayTaskList({
+  tasks, selectedDate, goalId, goalTitle, focusTaskId,
+}: {
+  tasks: Task[]; selectedDate: string; goalId: string; goalTitle: string; focusTaskId?: string | null;
+}) {
+  const { addTask, updateTask, deleteTask, toggleTask } = useTasks();
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editMinutes, setEditMinutes] = useState(30);
+  const [showAdd, setShowAdd] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
+  const [newMinutes, setNewMinutes] = useState(30);
+  const [newPriority, setNewPriority] = useState<Priority>("medium");
+  const [editPriority, setEditPriority] = useState<Priority>("medium");
+  const [noteTask, setNoteTask] = useState<Task | null>(null);
+  const addRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => { if (showAdd) addRef.current?.focus(); }, [showAdd]);
+
+  const dayTasks = tasks.filter((t) => t.goalId === goalId && t.date === selectedDate);
+  const done = dayTasks.filter((t) => t.done).length;
+  const isToday = selectedDate === TODAY;
+
+  function saveEdit(id: string) {
+    if (editTitle.trim()) updateTask(id, { title: editTitle.trim(), estimatedMinutes: editMinutes, priority: editPriority });
+    setEditingId(null);
+  }
+
+  function submitAdd() {
+    if (!newTitle.trim()) return;
+    addTask({ title: newTitle.trim(), goalId, goalTitle, done: false, estimatedMinutes: newMinutes, date: selectedDate, priority: newPriority });
+    setNewTitle(""); setNewMinutes(30); setNewPriority("medium"); setShowAdd(false);
+  }
+
+  return (
+    <div className="mt-3 pt-3 border-t border-gray-100">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs font-semibold text-gray-500">{isToday ? "今日任务" : selectedDate}</span>
+        <div className="flex items-center gap-2">
+          {dayTasks.length > 0 && <span className="text-xs text-gray-400">{done}/{dayTasks.length} 完成</span>}
+          <button onClick={() => setShowAdd((v) => !v)} className="p-1 rounded-lg transition" style={{ color: "var(--accent)" }}>
+            <Plus size={13} />
+          </button>
+        </div>
+      </div>
+
+      {showAdd && (
+        <div className="mb-2 p-2.5 bg-gray-50 rounded-xl border border-gray-100 space-y-1.5">
+          <input ref={addRef} value={newTitle} onChange={(e) => setNewTitle(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") submitAdd(); if (e.key === "Escape") setShowAdd(false); }}
+            placeholder="任务名称…" className="w-full px-2.5 py-1.5 text-xs bg-white border border-gray-200 rounded-lg outline-none" />
+          <div className="flex items-center gap-1.5">
+            <input type="number" min={5} max={480} value={newMinutes} onChange={(e) => setNewMinutes(Number(e.target.value))}
+              className="w-14 px-2 py-1 text-xs bg-white border border-gray-200 rounded-lg outline-none text-center" />
+            <span className="text-xs text-gray-400">分钟</span>
+            <div className="flex gap-0.5 ml-1">
+              {(["high", "medium", "low"] as Priority[]).map((p) => (
+                <button key={p} type="button" onClick={() => setNewPriority(p)}
+                  className={cn("px-1.5 py-0.5 text-xs rounded-md transition", PRIORITY_CLS[p][newPriority === p ? "on" : "off"])}>
+                  {PRIORITY_LABEL[p]}
+                </button>
+              ))}
+            </div>
+            <div className="ml-auto flex gap-1">
+              <button onClick={() => setShowAdd(false)} className="text-xs px-2 py-1 rounded-lg bg-gray-100 text-gray-500">取消</button>
+              <button onClick={submitAdd} className="text-xs px-2 py-1 rounded-lg text-white" style={{ backgroundColor: "var(--accent)" }}>保存</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {dayTasks.length === 0 && !showAdd && (
+        <p className="text-xs text-gray-400 py-3 text-center">当天暂无任务</p>
+      )}
+
+      <div className="goal-task-scroll space-y-1 max-h-40 overflow-y-auto">
+        {dayTasks.map((task) => (
+          <div
+            key={task.id}
+            data-search-target={focusTaskId === task.id ? "true" : undefined}
+            className={cn("goal-task-item group flex items-start gap-2 px-2.5 py-2 rounded-xl transition", focusTaskId === task.id && "is-search-target")}
+          >
+            <button onClick={() => toggleTask(task.id)} className="mt-0.5 flex-shrink-0">
+              {task.done
+                ? <CheckCircle2 size={14} style={{ color: "var(--accent)" }} />
+                : <Circle size={14} className="text-gray-300 group-hover:text-gray-400 transition" />}
+            </button>
+            {editingId === task.id ? (
+              <div className="flex-1 space-y-1">
+                <input value={editTitle} onChange={(e) => setEditTitle(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") saveEdit(task.id); if (e.key === "Escape") setEditingId(null); }}
+                  className="w-full px-2 py-1 text-xs bg-white border border-gray-200 rounded-lg outline-none" autoFocus />
+                <div className="flex items-center gap-1">
+                  <input type="number" min={5} max={480} value={editMinutes} onChange={(e) => setEditMinutes(Number(e.target.value))}
+                    className="w-12 px-1.5 py-0.5 text-xs bg-white border border-gray-200 rounded-lg outline-none text-center" />
+                  <span className="text-xs text-gray-400">min</span>
+                  <div className="flex gap-0.5 ml-1">
+                    {(["high", "medium", "low"] as Priority[]).map((p) => (
+                      <button key={p} type="button" onClick={() => setEditPriority(p)}
+                        className={cn("px-1.5 py-0.5 text-xs rounded-md transition", PRIORITY_CLS[p][editPriority === p ? "on" : "off"])}>
+                        {PRIORITY_LABEL[p]}
+                      </button>
+                    ))}
+                  </div>
+                  <button onClick={() => saveEdit(task.id)} className="ml-auto p-1" style={{ color: "var(--accent)" }}><Check size={11} /></button>
+                  <button onClick={() => setEditingId(null)} className="p-1 text-gray-400"><X size={11} /></button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="flex-1 min-w-0">
+                  <p className={cn("text-[13px] font-medium leading-snug", task.done ? "line-through text-gray-400" : "text-gray-700")}>{task.title}</p>
+                  <span className="goal-task-meta mt-1 flex w-fit items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] text-gray-400">
+                    <span className={cn("w-1.5 h-1.5 rounded-full flex-shrink-0", PRIORITY_DOT[task.priority ?? "medium"])} />
+                    <Clock size={9} />{task.estimatedMinutes} 分钟
+                  </span>
+                </div>
+                <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition">
+                  <button onClick={() => setNoteTask(task)} title="记笔记"
+                    className="p-1 rounded hover:bg-gray-100 text-gray-400"><FileText size={10} /></button>
+                  <button onClick={() => { setEditingId(task.id); setEditTitle(task.title); setEditMinutes(task.estimatedMinutes); setEditPriority(task.priority ?? "medium"); }}
+                    className="p-1 rounded hover:bg-gray-100 text-gray-400"><Pencil size={10} /></button>
+                  <button onClick={() => deleteTask(task.id)} className="p-1 rounded hover:bg-red-50 text-gray-400 hover:text-red-500"><Trash2 size={10} /></button>
+                </div>
+              </>
+            )}
+          </div>
+        ))}
+      </div>
+      <TaskNoteDrawer task={noteTask} onClose={() => setNoteTask(null)} />
+    </div>
+  );
+}
+
+// ── 任务工作区：同一组件内切换今日清单与日历 ────────────────
+function GoalTasksWorkspace({
+  goal,
+  tasks,
+  selectedDate,
+  onSelectDate,
+  onToggleTask,
+  onVerify,
+  focusTaskId,
+}: {
+  goal: Goal;
+  tasks: Task[];
+  selectedDate: string;
+  onSelectDate: (date: string) => void;
+  onToggleTask: (taskId: string) => void;
+  onVerify: (task: Task) => void;
+  focusTaskId?: string | null;
+}) {
+  const { addTask, updateTask, deleteTask } = useTasks();
+  const [view, setView] = useState<"today" | "calendar">("today");
+  const [showAdd, setShowAdd] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
+  const [newMinutes, setNewMinutes] = useState(30);
+  const [newPriority, setNewPriority] = useState<Priority>("medium");
+  const [isCreating, setIsCreating] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editMinutes, setEditMinutes] = useState(30);
+  const [editPriority, setEditPriority] = useState<Priority>("medium");
+  const addRef = useRef<HTMLInputElement>(null);
+  const workspaceRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (showAdd) addRef.current?.focus();
+  }, [showAdd]);
+
+  useEffect(() => {
+    if (!focusTaskId) return;
+    const focusedTask = tasks.find((task) => task.id === focusTaskId);
+    if (!focusedTask) return;
+    setView(focusedTask.date === TODAY ? "today" : "calendar");
+    onSelectDate(focusedTask.date);
+  }, [focusTaskId, onSelectDate, tasks]);
+
+  useEffect(() => {
+    if (!focusTaskId) return;
+    const timer = window.setTimeout(() => {
+      workspaceRef.current?.querySelector<HTMLElement>('[data-search-target="true"]')?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 120);
+    return () => window.clearTimeout(timer);
+  }, [focusTaskId, selectedDate, view]);
+
+  const todayTasks = tasks.filter((task) => task.date === TODAY);
+  const doneTasks = todayTasks.filter((task) => task.done).length;
+  const tasksByDate = tasks.reduce<Record<string, Task[]>>((acc, task) => {
+    if (!acc[task.date]) acc[task.date] = [];
+    acc[task.date].push(task);
+    return acc;
+  }, {});
+
+  function cancelAdd() {
+    setShowAdd(false);
+    setNewTitle("");
+    setNewMinutes(30);
+    setNewPriority("medium");
+  }
+
+  async function submitAdd() {
+    const title = newTitle.trim();
+    if (!title || isCreating) return;
+    setIsCreating(true);
+    try {
+      await addTask({
+        title,
+        goalId: goal.id,
+        goalTitle: goal.title,
+        done: false,
+        estimatedMinutes: Math.min(480, Math.max(5, newMinutes || 30)),
+        date: TODAY,
+        priority: newPriority,
+      });
+      cancelAdd();
+    } finally {
+      setIsCreating(false);
+    }
+  }
+
+  function beginEdit(task: Task) {
+    setEditingId(task.id);
+    setEditTitle(task.title);
+    setEditMinutes(task.estimatedMinutes);
+    setEditPriority(task.priority ?? "medium");
+  }
+
+  async function saveEdit(taskId: string) {
+    const title = editTitle.trim();
+    if (!title) return;
+    setEditingId(null);
+    await updateTask(taskId, {
+      title,
+      estimatedMinutes: Math.min(480, Math.max(5, editMinutes || 30)),
+      priority: editPriority,
+    });
+  }
+
+  return (
+    <div ref={workspaceRef} className="px-4 py-4 min-h-[260px]">
+      <div className="goal-task-toolbar mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-gray-100 pb-2">
+        <div
+          className="goal-task-view-tabs inline-flex items-center gap-4"
+          role="tablist"
+          aria-label="任务查看方式"
+        >
+          {(["today", "calendar"] as const).map((item) => {
+            const active = view === item;
+            const Icon = item === "today" ? CheckCircle2 : Calendar;
+            return (
+              <button
+                key={item}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => setView(item)}
+                className={cn(
+                  "goal-task-view-tab relative flex items-center gap-1.5 px-0.5 py-1 text-xs font-medium transition",
+                  active ? "is-active" : "text-gray-400 hover:text-gray-600"
+                )}
+                style={active ? { color: "var(--accent)" } : {}}
+              >
+                <Icon size={13} />
+                {item === "today" ? "今日任务" : "历史任务"}
+              </button>
+            );
+          })}
+        </div>
+        {view === "today" ? (
+          <div className="goal-task-toolbar-actions ml-auto flex items-center gap-2">
+            <span className="text-[11px] text-gray-400">{doneTasks}/{todayTasks.length} 已完成</span>
+            <button
+              type="button"
+              onClick={() => setShowAdd(true)}
+              className="goal-task-add-button flex h-6 items-center gap-1 rounded-full border px-2 py-0 text-[10px] font-medium transition"
+              style={{
+                color: "var(--accent)",
+                borderColor: "color-mix(in srgb, var(--accent) 28%, transparent)",
+                backgroundColor: "var(--accent-light)",
+              }}
+            >
+              <Plus size={11} />
+              新建任务
+            </button>
+          </div>
+        ) : selectedDate !== TODAY ? (
+            <button
+              type="button"
+              onClick={() => onSelectDate(TODAY)}
+              className="text-xs text-gray-400 transition hover:text-gray-600"
+            >
+              回到今天
+            </button>
+        ) : null}
+      </div>
+
+      {view === "today" ? (
+        <div className="space-y-1">
+          {showAdd && (
+            <div className="goal-task-editor mb-2 rounded-xl border border-gray-100 px-3 py-2.5">
+              <input
+                ref={addRef}
+                value={newTitle}
+                onChange={(event) => setNewTitle(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") void submitAdd();
+                  if (event.key === "Escape") cancelAdd();
+                }}
+                placeholder={`为“${goal.title}”添加今日任务`}
+                aria-label="任务名称"
+                className="w-full bg-transparent text-[13px] font-medium text-gray-700 outline-none placeholder:text-gray-300"
+              />
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <label className="flex items-center gap-1 text-[11px] text-gray-400">
+                  <Clock size={11} />
+                  <input
+                    type="number"
+                    min={5}
+                    max={480}
+                    value={newMinutes}
+                    onChange={(event) => setNewMinutes(Number(event.target.value))}
+                    className="goal-task-minutes w-14 rounded-md border border-gray-100 bg-transparent px-1.5 py-1 text-center text-[11px] outline-none"
+                  />
+                  分钟
+                </label>
+                <div className="flex items-center gap-1" aria-label="任务优先级">
+                  {(["high", "medium", "low"] as Priority[]).map((priority) => (
+                    <button
+                      key={priority}
+                      type="button"
+                      onClick={() => setNewPriority(priority)}
+                      className={cn(
+                        "rounded-md px-1.5 py-0.5 text-[10px] transition",
+                        PRIORITY_CLS[priority][newPriority === priority ? "on" : "off"]
+                      )}
+                    >
+                      {PRIORITY_LABEL[priority]}
+                    </button>
+                  ))}
+                </div>
+                <div className="ml-auto flex items-center gap-1">
+                  <button type="button" onClick={cancelAdd} className="rounded-md px-2 py-1 text-[11px] text-gray-400 transition hover:bg-gray-100">
+                    取消
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void submitAdd()}
+                    disabled={!newTitle.trim() || isCreating}
+                    className="rounded-md px-2 py-1 text-[11px] font-medium text-white transition disabled:opacity-40"
+                    style={{ backgroundColor: "var(--accent)" }}
+                  >
+                    {isCreating ? "创建中…" : "创建"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+          {todayTasks.length === 0 && (
+            <div className="goal-task-empty">
+              <span className="goal-task-empty-icon" aria-hidden="true"><CheckCircle2 size={19} /></span>
+              <strong>今天还没有任务</strong>
+              <p>添加一个明确的小任务，开始推进这个目标。</p>
+              <button type="button" onClick={() => setShowAdd(true)}>
+                <Plus size={13} /> 新建第一个任务
+              </button>
+            </div>
+          )}
+          {todayTasks.map((task) => (
+            <div
+              key={task.id}
+              data-search-target={focusTaskId === task.id ? "true" : undefined}
+              className={cn("goal-task-item group flex items-start gap-2 rounded-xl px-2.5 py-2.5 transition", focusTaskId === task.id && "is-search-target")}
+            >
+              <button type="button" onClick={() => onToggleTask(task.id)} className="mt-0.5 flex-shrink-0" aria-label={task.done ? "标记为未完成" : "标记为已完成"}>
+                {task.done
+                  ? <CheckCircle2 size={15} style={{ color: "var(--accent)" }} />
+                  : <Circle size={15} className="flex-shrink-0 text-gray-300 transition group-hover:text-gray-400" />}
+              </button>
+              {editingId === task.id ? (
+                <div className="min-w-0 flex-1">
+                  <input
+                    value={editTitle}
+                    onChange={(event) => setEditTitle(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") void saveEdit(task.id);
+                      if (event.key === "Escape") setEditingId(null);
+                    }}
+                    aria-label="编辑任务名称"
+                    className="w-full rounded-lg border border-gray-100 bg-transparent px-2 py-1 text-[13px] font-medium text-gray-700 outline-none"
+                    autoFocus
+                  />
+                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                    <label className="flex items-center gap-1 text-[10px] text-gray-400">
+                      <Clock size={10} />
+                      <input
+                        type="number"
+                        min={5}
+                        max={480}
+                        value={editMinutes}
+                        onChange={(event) => setEditMinutes(Number(event.target.value))}
+                        className="goal-task-minutes w-12 rounded-md border border-gray-100 bg-transparent px-1 py-0.5 text-center outline-none"
+                      />
+                      分钟
+                    </label>
+                    {(["high", "medium", "low"] as Priority[]).map((priority) => (
+                      <button
+                        key={priority}
+                        type="button"
+                        onClick={() => setEditPriority(priority)}
+                        className={cn(
+                          "rounded-md px-1.5 py-0.5 text-[10px] transition",
+                          PRIORITY_CLS[priority][editPriority === priority ? "on" : "off"]
+                        )}
+                      >
+                        {PRIORITY_LABEL[priority]}
+                      </button>
+                    ))}
+                    <button type="button" onClick={() => void saveEdit(task.id)} className="ml-auto rounded-md p-1" style={{ color: "var(--accent)" }} aria-label="保存编辑">
+                      <Check size={12} />
+                    </button>
+                    <button type="button" onClick={() => setEditingId(null)} className="rounded-md p-1 text-gray-400" aria-label="取消编辑">
+                      <X size={12} />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="min-w-0 flex-1">
+                    <p className={cn("text-[13px] font-medium leading-snug", task.done ? "text-gray-400 line-through" : "text-gray-700")}>{task.title}</p>
+                    {task.description && <p className="goal-task-description mt-1 text-[11px] leading-relaxed">{task.description}</p>}
+                    <span className="goal-task-meta mt-1.5 flex w-fit items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] text-gray-400">
+                      <span className={cn("h-1.5 w-1.5 rounded-full", PRIORITY_DOT[task.priority ?? "medium"])} />
+                      <Clock size={10} />{task.estimatedMinutes} 分钟
+                    </span>
+                  </div>
+                  <div className="goal-task-actions flex shrink-0 items-center gap-0.5">
+                    {task.done && (
+                      <button
+                        type="button"
+                        onClick={() => onVerify(task)}
+                        className="mr-1 rounded-lg px-2 py-0.5 text-xs text-white transition"
+                        style={{ backgroundColor: "var(--accent)" }}
+                      >
+                        验收
+                      </button>
+                    )}
+                    <button type="button" onClick={() => beginEdit(task)} className="rounded-md p-1.5 text-gray-400 transition hover:bg-gray-100" aria-label={`编辑任务“${task.title}”`}>
+                      <Pencil size={12} />
+                    </button>
+                    <button type="button" onClick={() => void deleteTask(task.id)} className="rounded-md p-1.5 text-gray-400 transition hover:bg-red-50 hover:text-red-500" aria-label={`删除任务“${task.title}”`}>
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <>
+          <MiniCalendar tasksByDate={tasksByDate} selectedDate={selectedDate} onSelect={onSelectDate} />
+          <DayTaskList tasks={tasks} selectedDate={selectedDate} goalId={goal.id} goalTitle={goal.title} focusTaskId={focusTaskId} />
+        </>
+      )}
+    </div>
+  );
+}
+
+interface PlanTask {
+  id: string;
+  title: string;
+  estimated_mins: number;
+  status: string;
+  mastery_level: string;
+  scheduled_date: string;
+}
+
+interface MacroPlan {
+  id: string;
+  version: number;
+  created_at: string;
+  phases: { name: string; focus: string; days: number; start_date?: string; end_date?: string; total: number; done: number; tasks: PlanTask[] }[];
+  total_tasks: number;
+  completed_tasks: number;
+}
+
+function fmtDate(iso: string) {
+  if (!iso) return "";
+  const d = new Date(iso + "T00:00:00");
+  return `${d.getMonth() + 1}月${d.getDate()}日`;
+}
+function buildDayMapFromPlan(phases: MacroPlan["phases"]): Map<string, number> {
+  const dates = new Set<string>();
+  for (const p of phases) for (const t of p.tasks) if (t.scheduled_date) dates.add(t.scheduled_date);
+  const sorted = Array.from(dates).sort();
+  const map = new Map<string, number>();
+  sorted.forEach((d, i) => map.set(d, i + 1));
+  return map;
+}
+function dayLabel(n: number) { return `day${String(n).padStart(2, "0")}`; }
+
+function PlanOverview({ goalId, goalType, goalTitle, refreshKey, onPlanLoad }: { goalId: string; deadline: string; goalType: Goal["type"]; goalTitle: string; refreshKey?: number; onPlanLoad?: (totalDays: number) => void }) {
+  const [plan, setPlan] = useState<MacroPlan | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [regenerating, setRegenerating] = useState(false);
+  const [showPlanMode, setShowPlanMode] = useState(false);
+  const [expandedPhases, setExpandedPhases] = useState<Set<number>>(new Set());
+  const [taskOverrides, setTaskOverrides] = useState<Record<string, Partial<PlanTask>>>({});
+  const [planError, setPlanError] = useState<string | null>(null);
+  const fetchPlan = useCallback(async () => {
+    setPlanError(null);
+    try {
+      const res = await api.get<{ plan: MacroPlan | null }>(`/api/v1/goals/${goalId}/plan`);
+      setPlan(res.plan);
+      setTaskOverrides({});
+      if (res.plan) {
+        const dates = new Set<string>();
+        for (const p of res.plan.phases) for (const t of (p.tasks ?? [])) if (t.scheduled_date) dates.add(t.scheduled_date);
+        onPlanLoad?.(dates.size);
+      }
+    } catch (error) {
+      setPlan(null);
+      setPlanError(planErrorMessage(error, "学习计划同步失败，请重试。"));
+    } finally {
+      setLoading(false);
+    }
+  }, [goalId, onPlanLoad]);
+
+  useEffect(() => { fetchPlan(); }, [fetchPlan, refreshKey]);
+
+  async function handleRegenerate(mode: KbMode = "no_kb", intentSupplement = "", pacingMode: PacingMode = "fixed") {
+    setRegenerating(true);
+    setPlanError(null);
+    try {
+      await api.post(`/api/v1/agent/macro-plan/${goalId}`, {
+        kb_mode: mode,
+        user_intent_supplement: intentSupplement,
+        pacing_mode: pacingMode,
+      });
+      setShowPlanMode(false);
+      await fetchPlan();
+    } catch (error) {
+      setPlanError(planErrorMessage(error, "学习计划生成失败，请检查服务后重试。"));
+    } finally {
+      setRegenerating(false);
+    }
+  }
+
+  function togglePhase(i: number) {
+    setExpandedPhases((prev) => {
+      const next = new Set(prev);
+      if (next.has(i)) { next.delete(i); } else { next.add(i); }
+      return next;
+    });
+  }
+
+  if (loading) return <div className="py-3 text-xs text-gray-400 text-center">加载中…</div>;
+
+  if (planError) {
+    return (
+      <div className="goal-plan-error flex flex-col items-center gap-2 px-4 py-6 text-center" role="alert">
+        <strong className="text-xs text-gray-700">{planError}</strong>
+        <button type="button" onClick={() => void fetchPlan()} className="text-xs text-accent hover:underline">重试读取计划</button>
+      </div>
+    );
+  }
+
+  if (!plan) {
+    return (
+      <>
+        <div className="goal-plan-empty text-center py-4">
+          <span className="goal-plan-empty-icon"><BookOpen size={18} /></span>
+          <strong>还没有学习计划</strong>
+          <p className="text-xs text-gray-400 mb-2">先选择参考资料如何参与，再生成阶段安排</p>
+          <button
+            onClick={() => setShowPlanMode(true)}
+            disabled={regenerating}
+            className="text-xs px-3 py-1.5 rounded-lg text-white transition disabled:opacity-50 flex items-center gap-1 mx-auto"
+            style={{ backgroundColor: "var(--accent)" }}
+          >
+            {regenerating ? <><Loader2 size={10} className="animate-spin" /> 生成中…</> : "设置资料并生成计划"}
+          </button>
+        </div>
+        <PlanModeSelector open={showPlanMode} hasKb={false} goalId={goalId} goalType={goalType} goalTitle={goalTitle} onClose={() => setShowPlanMode(false)} onConfirm={(mode, intent, pacing) => void handleRegenerate(mode, intent, pacing)} />
+      </>
+    );
+  }
+
+  const allPlanTasks = plan.phases.flatMap((p) => p.tasks ?? []);
+  const masteredCount = allPlanTasks.filter((t) => ["L3", "L4"].includes(taskOverrides[t.id]?.mastery_level ?? t.mastery_level)).length;
+  const pct = plan.total_tasks > 0 ? Math.round(masteredCount / plan.total_tasks * 100) : 0;
+  const dayMap = buildDayMapFromPlan(plan.phases);
+  const totalDays = dayMap.size;
+  const firstDate = plan.phases[0]?.start_date;
+  const lastDate = plan.phases[plan.phases.length - 1]?.end_date;
+  return (
+    <>
+    <div className="goal-plan-overview space-y-3">
+      {/* 整体进度 */}
+      <div className="goal-plan-summary flex items-center justify-between text-xs">
+        <span className="text-gray-500">总体进度 <span className="font-semibold text-gray-800">{pct}%</span></span>
+        <span className="text-gray-400">{masteredCount}/{plan.total_tasks} 已掌握</span>
+      </div>
+      <div className="plan-progress-track w-full bg-gray-100 rounded-full h-1.5">
+        <div className="goal-plan-progress-fill h-1.5 rounded-full transition-all" style={{ width: `${pct}%` }} />
+      </div>
+      {totalDays > 0 && firstDate && lastDate && (
+        <p className="text-xs text-gray-400">
+          预计 {totalDays} 天（{fmtDate(firstDate)} - {fmtDate(lastDate)}）
+        </p>
+      )}
+
+      {/* 阶段列表 */}
+      <div className="goal-plan-phase-list space-y-1.5 mt-1">
+        {plan.phases.map((phase, i) => {
+          const tasks = phase.tasks ?? [];
+          const phaseMastered = tasks.filter((t) => ["L3", "L4"].includes(taskOverrides[t.id]?.mastery_level ?? t.mastery_level)).length;
+          const phasePct = phase.total > 0 ? Math.round(phaseMastered / phase.total * 100) : 0;
+          const isComplete = phase.total > 0 && phaseMastered === phase.total;
+          const isExpanded = expandedPhases.has(i);
+          const startDay = phase.start_date ? dayMap.get(phase.start_date) : undefined;
+          const endDay = phase.end_date ? dayMap.get(phase.end_date) : undefined;
+          const phaseRange = startDay != null && endDay != null
+            ? (startDay === endDay ? dayLabel(startDay) : `${dayLabel(startDay)}-${dayLabel(endDay)}`)
+            : null;
+          const phaseRangeTitle = phase.start_date && phase.end_date
+            ? `${fmtDate(phase.start_date)} - ${fmtDate(phase.end_date)}`
+            : "";
+          return (
+            <div key={i} className={`goal-plan-phase tone-${i % 3} rounded-xl border border-gray-100 overflow-hidden`}>
+              {/* 阶段头 */}
+              <button
+                onClick={() => togglePhase(i)}
+                className="goal-plan-phase-heading w-full flex items-center gap-2 px-2.5 py-2 bg-gray-50 hover:bg-gray-100 transition text-left"
+              >
+                {isExpanded ? <ChevronDown size={12} className="text-gray-400 flex-shrink-0" /> : <ChevronRight size={12} className="text-gray-400 flex-shrink-0" />}
+                <span
+                  className={cn("plan-phase-title flex-1 truncate text-xs font-medium", isComplete ? "is-complete" : "text-gray-700")}
+                  style={isComplete ? { color: "var(--accent)" } : {}}
+                >
+                  {isComplete ? "✓ " : ""}{phase.name}
+                </span>
+                {phaseRange && (
+                  <span
+                    className="text-xs font-mono text-gray-400 flex-shrink-0 cursor-default"
+                    title={phaseRangeTitle}
+                  >
+                    {phaseRange}
+                  </span>
+                )}
+                <span className="text-xs text-gray-400 flex-shrink-0">{phaseMastered}/{phase.total}</span>
+              </button>
+
+              {/* 进度条 */}
+              <div className="plan-phase-progress-track h-1 bg-gray-200">
+                <div className="goal-plan-phase-fill h-1 transition-all" style={{ width: `${phasePct}%` }} />
+              </div>
+
+              {/* 阶段焦点 + 任务列表 */}
+              {isExpanded && (
+                <div className="bg-white">
+                  {phase.focus && (
+                    <p className="text-xs text-gray-400 px-3 pt-2 pb-1 leading-snug">{phase.focus}</p>
+                  )}
+                  {tasks.length === 0 && (
+                    <p className="text-xs text-gray-400 px-3 py-3 text-center">暂无任务数据</p>
+                  )}
+                  {tasks.map((task, ti) => {
+                    const override = taskOverrides[task.id] ?? {};
+                    const status = override.status ?? task.status;
+                    const mastery = override.mastery_level ?? task.mastery_level;
+                    const isDone = status === "completed" || status === "done";
+                    const isMastered = ["L3", "L4"].includes(mastery);
+                    const dn = task.scheduled_date ? dayMap.get(task.scheduled_date) : undefined;
+                    return (
+                      <div key={task.id} className="goal-plan-task flex items-center gap-2 px-3 py-2 border-t border-gray-50 hover:bg-gray-50 transition group">
+                        {/* 任务序号仅用于定位，不承担完成或掌握状态 */}
+                        <span
+                          title={isDone ? "任务已完成" : "任务序号"}
+                          className="plan-task-number flex h-5 w-5 flex-shrink-0 cursor-default items-center justify-center rounded border border-gray-200 text-[10px] font-semibold text-gray-400"
+                        >
+                          {ti + 1}
+                        </span>
+
+                        {dn != null && !isMastered && (
+                          <span
+                            className="text-xs font-mono text-gray-400 flex-shrink-0 w-10 cursor-default"
+                            title={task.scheduled_date ? fmtDate(task.scheduled_date) : ""}
+                          >
+                            {dayLabel(dn)}
+                          </span>
+                        )}
+
+                        {/* 任务标题 */}
+                        <span className={cn("flex-1 text-xs leading-snug truncate", isMastered ? "line-through text-gray-400" : isDone ? "text-gray-400" : "text-gray-700")}>
+                          {task.title}
+                        </span>
+
+                        {/* 时长 */}
+                        <span className="flex items-center gap-0.5 text-xs text-gray-400 flex-shrink-0">
+                          <Clock size={9} />{task.estimated_mins}min
+                        </span>
+
+                        {/* 掌握度徽章（只读，来自打卡），unknown/L1 不显示 */}
+                        {["L2", "L3", "L4"].includes(mastery) && (
+                          <span
+                            className="flex-shrink-0 text-[11px] px-2 py-0.5 rounded-md border"
+                            style={["L3", "L4"].includes(mastery) ? {
+                              color: "var(--accent)",
+                              borderColor: "color-mix(in srgb, var(--accent) 30%, transparent)",
+                              backgroundColor: "var(--accent-light)",
+                            } : {
+                              color: "#6b7280",
+                              borderColor: "#e5e7eb",
+                              backgroundColor: "#f9fafb",
+                            }}
+                          >
+                            {["L3", "L4"].includes(mastery) ? "已掌握" : "了解"}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+    </div>
+    </>
+  );
+}
+
+export default function GoalDetailPage() {
+  const params = useParams<{ id: string }>();
+  const searchParams = useSearchParams();
+  const { status: authStatus } = useAuth();
+  const focusedTaskId = searchParams.get("taskId");
+  const goalsHref = "/studio/work/goals";
+  const [goal, setGoal] = useState<Goal | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [goalLoadError, setGoalLoadError] = useState<string | null>(null);
+  const [goalLoadAttempt, setGoalLoadAttempt] = useState(0);
+  const announcedGoalIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (authStatus === "loading") return;
+    let active = true;
+    setLoading(true);
+    setGoalLoadError(null);
+    const loadGoal = async () => {
+      if (authStatus === "unauthenticated") {
+        const localGoal = readLocalGoal(params.id) ?? GUEST_DEMO_GOALS[params.id] ?? null;
+        if (active) {
+          setGoal(localGoal);
+          if (!localGoal) setGoalLoadError("本地目标不存在或已被清理。");
+          setLoading(false);
+        }
+        return;
+      }
+      try {
+        const remoteGoal = await api.get<Goal>(`/api/v1/goals/${params.id}`);
+        if (active) setGoal(remoteGoal);
+      } catch (error) {
+        if (active) {
+          setGoal(null);
+          setGoalLoadError(planErrorMessage(error, "目标数据同步失败，请重试。"));
+        }
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+    void loadGoal();
+    return () => { active = false; };
+  }, [authStatus, goalLoadAttempt, params.id]);
+
+  const { tasks, toggleTask } = useTasks();
+  const goalTasks = goal ? tasks.filter((t) => t.goalId === goal.id) : [];
+  const completedGoalTasks = goalTasks.filter((task) => task.done).length;
+  const goalProgress = goalTasks.length ? Math.round((completedGoalTasks / goalTasks.length) * 100) : 0;
+
+  const handleToggleTask = async (taskId: string) => {
+    const target = goalTasks.find((task) => task.id === taskId);
+    await toggleTask(taskId);
+    setProgressRefreshKey(prev => prev + 1);
+    if (target && !target.done) {
+      signalPiloContext({
+        kind: "completed",
+        surface: "goals",
+        objectId: goal?.id,
+        objectTitle: goal?.title,
+        message: `“${target.title}”完成了。先把这一步留住就好。`,
+      });
+    }
+  };
+
+  const [tab, setTab] = useState<"tasks" | "notes">("tasks");
+  const [rightTab, setRightTab] = useState<"plan" | "execution">("execution");
+  const [selectedDate, setSelectedDate] = useState(TODAY);
+  const [verifyTask, setVerifyTask] = useState<{ taskId: string; taskTitle: string } | null>(null);
+  const [statsCollapsed, setStatsCollapsed] = useState(false);
+  const [planRefreshKey, setPlanRefreshKey] = useState(0);
+  const [progressRefreshKey, setProgressRefreshKey] = useState(0);
+  const [planTotalDays, setPlanTotalDays] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!goal) return;
+    signalPiloContext({
+      kind: announcedGoalIdRef.current === goal.id ? "scope" : "object-opened",
+      surface: "goals",
+      objectId: goal.id,
+      objectTitle: goal.title,
+      progress: goalProgress,
+      itemCount: goalTasks.length,
+      completedCount: completedGoalTasks,
+    });
+    announcedGoalIdRef.current = goal.id;
+  }, [completedGoalTasks, goal, goalProgress, goalTasks.length]);
+
+  // 从其他页面（打卡、首页任务完成）回来时刷新计划数据
+  useEffect(() => {
+    const handleVisible = () => {
+      if (document.visibilityState === "visible") {
+        setPlanRefreshKey((k) => k + 1);
+        setProgressRefreshKey((k) => k + 1);
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisible);
+    return () => document.removeEventListener("visibilitychange", handleVisible);
+  }, []);
+
+  const [sidebarWidth, setSidebarWidth] = useState(() =>
+    typeof window !== "undefined" ? Math.round(window.innerWidth * 0.4) : 480
+  );
+  const isDragging = useRef(false);
+  const dragStartX = useRef(0);
+  const dragStartWidth = useRef(0);
+
+  const onDragStart = useCallback((e: React.MouseEvent) => {
+    isDragging.current = true;
+    dragStartX.current = e.clientX;
+    dragStartWidth.current = sidebarWidth;
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  }, [sidebarWidth]);
+
+  const resizePanelsByKeyboard = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+    event.preventDefault();
+    setSidebarWidth((current) => Math.min(700, Math.max(240, current + (event.key === "ArrowRight" ? 20 : -20))));
+  }, []);
+
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      if (!isDragging.current) return;
+      const delta = e.clientX - dragStartX.current;
+      setSidebarWidth(Math.min(700, Math.max(240, dragStartWidth.current + delta)));
+    };
+    const onUp = () => {
+      if (!isDragging.current) return;
+      isDragging.current = false;
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full text-gray-400">
+        <Loader2 size={24} className="animate-spin" />
+      </div>
+    );
+  }
+
+  if (!goal) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-gray-400 gap-3" role="alert">
+        <p className="text-sm">{goalLoadError ?? "目标不存在或无权访问"}</p>
+        {goalLoadError && <button type="button" onClick={() => setGoalLoadAttempt((attempt) => attempt + 1)} className="text-accent text-sm hover:underline">重试读取目标</button>}
+        <Link href={goalsHref} className="text-accent text-sm hover:underline">返回目标列表</Link>
+      </div>
+    );
+  }
+
+  const daysLeft = computeDaysLeft(goal.deadline);
+
+  return (
+    <div className="goal-detail-page flex flex-col h-full overflow-hidden bg-gray-50">
+      {/* 顶部返回栏 */}
+      <div className="goal-detail-header flex items-center gap-3 px-6 py-3 bg-white border-b border-gray-100 flex-shrink-0">
+        <Link href={goalsHref} className="text-gray-400 hover:text-gray-600 transition p-1 -ml-1 rounded-lg hover:bg-gray-100">
+          <ArrowLeft size={18} />
+        </Link>
+        <span className="text-sm text-gray-400">/</span>
+        <Link href={goalsHref} className="text-sm font-medium text-gray-500 hover:text-gray-800 transition">我的目标</Link>
+        <span className="text-sm text-gray-400">/</span>
+        <span className="min-w-0 text-sm font-semibold text-gray-900 truncate">{goal.title}</span>
+        <span className="hidden min-[900px]:inline text-xs text-gray-400 truncate">
+          截止 {goal.deadline} · {planTotalDays != null ? `计划 ${planTotalDays} 天` : `剩余 ${daysLeft} 天`} · 每日 {goal.daily_hours}h
+        </span>
+        <span
+          className="goal-status ml-auto text-xs font-medium px-2.5 py-1 rounded-full"
+          style={{ color: "var(--accent)", backgroundColor: "var(--accent-light)" }}
+        >
+          {STATUS_LABEL[goal.status] ?? goal.status}
+        </span>
+      </div>
+
+      <div className="goal-detail-body flex flex-1 overflow-hidden">
+        {/* ── 左侧面板 ── */}
+        <aside
+          className="goal-detail-left flex flex-shrink-0 flex-col overflow-hidden bg-white border-r border-gray-100"
+          style={{ width: sidebarWidth }}
+        >
+          {/* 数据指标 — 可折叠 */}
+              <div className={cn("goal-detail-stats flex-shrink-0 border-b border-gray-100", statsCollapsed && "is-collapsed")}>
+                <div className="goal-stats-toolbar flex items-center">
+                  <div className="goal-stats-title flex-1 flex items-center px-4 py-3">
+                    <div className="flex items-center gap-1.5" style={{ color: "var(--accent)" }}>
+                      <div className="w-4 h-4 rounded-full flex items-center justify-center" style={{ backgroundColor: "var(--accent)" }}>
+                        <BarChart3 size={9} className="text-white" />
+                      </div>
+                      <span className="text-sm font-semibold">数据指标</span>
+                    </div>
+                  </div>
+                  <div className="goal-stats-controls mr-3" aria-label="数据面板显示控制">
+                    <button
+                      onClick={() => setStatsCollapsed((v) => !v)}
+                      className={cn("goal-stats-heading goal-stats-toggle-button", statsCollapsed && "is-collapsed")}
+                      aria-expanded={!statsCollapsed}
+                      aria-controls="goal-statistics-content"
+                      aria-label={statsCollapsed ? "展开数据指标" : "收起数据指标"}
+                      data-tooltip={statsCollapsed ? "展开指标" : "收起指标"}
+                    >
+                      <ChevronUp size={15} />
+                    </button>
+                  </div>
+                </div>
+                <div
+                  id="goal-statistics-content"
+                  className={cn("goal-stats-content", statsCollapsed && "is-collapsed")}
+                  aria-hidden={statsCollapsed}
+                >
+                  <div className="goal-stats-content-inner">
+                    <div className="space-y-3 px-4 pb-3 pt-2">
+                      <ProgressOverview goalId={goal.id} refreshKey={progressRefreshKey} />
+                      <DebtCard goalId={goal.id} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 顶层只区分任务与笔记；今日/日历在任务组件内部切换 */}
+              <div className="flex items-center border-b border-gray-100 flex-shrink-0">
+                {(["tasks", "notes"] as const).map((t) => (
+                  <button key={t} onClick={() => setTab(t)}
+                    className={cn(`goal-primary-tab goal-primary-tab-${t}`, "flex-1 py-3 text-sm font-semibold transition flex items-center justify-center gap-1.5",
+                      tab === t ? "border-b-2 text-gray-900" : "text-gray-400 hover:text-gray-600"
+                    )}
+                    style={tab === t ? { borderColor: "var(--accent)", color: "var(--accent)" } : {}}>
+                    {t === "tasks"
+                      ? <><div className="w-4 h-4 rounded-full flex items-center justify-center" style={{ backgroundColor: "var(--accent)" }}><CheckCircle2 size={9} className="text-white" /></div>任务</>
+                      : <><div className="w-4 h-4 rounded-full flex items-center justify-center" style={{ backgroundColor: "var(--accent)" }}><FileText size={9} className="text-white" /></div>相关笔记</>
+                    }
+                  </button>
+                ))}
+              </div>
+
+              {/* Tab 内容 */}
+              <div className="goal-detail-scroll flex-1 overflow-y-auto">
+                {tab === "tasks" && (
+                  <GoalTasksWorkspace
+                    goal={goal}
+                    tasks={goalTasks}
+                    selectedDate={selectedDate}
+                    onSelectDate={setSelectedDate}
+                    onToggleTask={handleToggleTask}
+                    onVerify={(task) => setVerifyTask({ taskId: task.id, taskTitle: task.title })}
+                    focusTaskId={focusedTaskId}
+                  />
+                )}
+
+                {tab === "notes" && <GoalNotesPanel goalId={goal.id} />}
+              </div>
+
+        </aside>
+
+        {/* ── 拖拽分割线 ── */}
+        <div
+          onMouseDown={onDragStart}
+          onKeyDown={resizePanelsByKeyboard}
+          className="goal-detail-resizer flex-shrink-0 cursor-col-resize bg-gray-100 transition-colors"
+          style={{ touchAction: "none" }}
+          role="separator"
+          aria-label="调整左右面板宽度"
+          aria-orientation="vertical"
+          aria-valuemin={240}
+          aria-valuemax={700}
+          aria-valuenow={sidebarWidth}
+          tabIndex={0}
+        />
+
+        {/* ── 右侧执行节奏与学习计划 ── */}
+        <div className="goal-detail-right flex flex-1 flex-col overflow-hidden">
+          <div className="goal-right-tabs flex flex-shrink-0 items-center gap-0 border-b border-gray-100 bg-white px-4 py-0">
+                {(["execution", "plan"] as const).map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => setRightTab(t)}
+                    className={cn(
+                      `goal-right-tab goal-right-tab-${t}`,
+                      "flex items-center gap-1.5 px-4 py-3 text-sm font-semibold border-b-2 transition",
+                      rightTab === t ? "text-gray-900" : "border-transparent text-gray-400 hover:text-gray-600"
+                    )}
+                    style={rightTab === t ? { borderColor: "var(--accent)", color: "var(--accent)" } : {}}
+                  >
+                    {t === "execution"
+                      ? <><div className="w-4 h-4 rounded-full flex items-center justify-center" style={{ backgroundColor: "var(--accent)" }}><BarChart3 size={9} className="text-white" /></div>执行节奏</>
+                      : <><div className="w-4 h-4 rounded-full flex items-center justify-center" style={{ backgroundColor: "var(--accent)" }}><BookOpen size={9} className="text-white" /></div>学习计划</>
+                    }
+                  </button>
+            ))}
+          </div>
+          {rightTab === "plan" && (
+                <div className="goal-plan-shell flex-1 flex flex-col overflow-hidden">
+                  <div className="flex-1 overflow-y-auto px-5 py-4">
+                    <PlanOverview goalId={goal.id} goalType={goal.type} goalTitle={goal.title} deadline={goal.deadline} refreshKey={planRefreshKey} onPlanLoad={setPlanTotalDays} />
+                  </div>
+                </div>
+          )}
+              {rightTab === "execution" && (
+                <GoalExecutionPanel
+                  goal={goal}
+                  tasks={goalTasks}
+                  daysLeft={daysLeft}
+                />
+              )}
+        </div>
+      </div>
+
+      {verifyTask && (
+        <VerificationDialog
+          goalId={goal.id}
+          taskId={verifyTask.taskId}
+          taskTitle={verifyTask.taskTitle}
+          onClose={() => { setVerifyTask(null); setPlanRefreshKey((k) => k + 1); setProgressRefreshKey((k) => k + 1); }}
+        />
+      )}
+    </div>
+  );
+}

@@ -10,15 +10,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.models import CheckinRecord, Goal, Task
 
 
-async def assert_goal_access(
-    db: AsyncSession, user_id: str, goal_id: str | None
-) -> Goal | None:
+async def assert_goal_access(db: AsyncSession, user_id: str, goal_id: str | None) -> Goal | None:
     if not goal_id:
         return None
     goal = (
-        await db.execute(
-            select(Goal).where(Goal.id == goal_id, Goal.user_id == user_id)
-        )
+        await db.execute(select(Goal).where(Goal.id == goal_id, Goal.user_id == user_id))
     ).scalar_one_or_none()
     if not goal:
         raise HTTPException(404, "目标不存在或无权访问")
@@ -43,23 +39,31 @@ async def load_learning_context(
 
     since = (date.today() - timedelta(days=lookback_days - 1)).isoformat()
     tasks = (
-        await db.execute(
-            select(Task)
-            .where(Task.goal_id.in_(goal_ids))
-            .order_by(Task.scheduled_date, Task.created_at)
-        )
-    ).scalars().all()
-    checkins = (
-        await db.execute(
-            select(CheckinRecord)
-            .where(
-                CheckinRecord.user_id == user_id,
-                CheckinRecord.goal_id.in_(goal_ids),
-                CheckinRecord.date >= since,
+        (
+            await db.execute(
+                select(Task)
+                .where(Task.goal_id.in_(goal_ids))
+                .order_by(Task.scheduled_date, Task.created_at)
             )
-            .order_by(CheckinRecord.date)
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
+    checkins = (
+        (
+            await db.execute(
+                select(CheckinRecord)
+                .where(
+                    CheckinRecord.user_id == user_id,
+                    CheckinRecord.goal_id.in_(goal_ids),
+                    CheckinRecord.date >= since,
+                )
+                .order_by(CheckinRecord.date)
+            )
+        )
+        .scalars()
+        .all()
+    )
     return {
         "lookback_days": lookback_days,
         "goals": [
@@ -69,6 +73,7 @@ async def load_learning_context(
                 "deadline": goal.deadline,
                 "daily_hours": goal.daily_hours,
                 "status": goal.status,
+                "version": goal.version,
             }
             for goal in goals
         ],
@@ -83,6 +88,7 @@ async def load_learning_context(
                 "estimated_minutes": task.estimated_mins,
                 "priority": task.priority,
                 "mastery_level": task.mastery_level,
+                "version": task.version,
             }
             for task in tasks
         ],
@@ -101,16 +107,10 @@ async def load_learning_context(
 def summarize_execution(context: dict[str, Any]) -> dict[str, Any]:
     today = date.today().isoformat()
     tasks = context["tasks"]
-    recent_start = (
-        date.today() - timedelta(days=context["lookback_days"] - 1)
-    ).isoformat()
+    recent_start = (date.today() - timedelta(days=context["lookback_days"] - 1)).isoformat()
     recent = [task for task in tasks if recent_start <= task["date"] <= today]
     completed = [task for task in recent if task["status"] == "completed"]
-    overdue = [
-        task
-        for task in tasks
-        if task["date"] < today and task["status"] != "completed"
-    ]
+    overdue = [task for task in tasks if task["date"] < today and task["status"] != "completed"]
     pending = [task for task in tasks if task["status"] != "completed"]
     completion_rate = round(len(completed) / len(recent) * 100) if recent else 100
     return {

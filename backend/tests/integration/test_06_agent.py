@@ -5,7 +5,35 @@ from httpx import AsyncClient
 
 pytestmark = pytest.mark.integration
 
-HAS_LLM = bool(os.getenv("SMART_API_KEY") and os.getenv("SMART_API_KEY") not in ("", "test"))
+HAS_LLM = (
+    os.getenv("PLANPILOT_RUN_LIVE_LLM_TESTS") == "1"
+    and bool(os.getenv("SMART_API_KEY"))
+    and os.getenv("SMART_API_KEY") != "test"
+)
+
+
+async def test_plan_context_reads_goal_linked_reference_files(
+    client: AsyncClient, auth: dict, goal_id: str
+):
+    """新式 goal_ids 资料关联必须进入计划上下文，不能只读取旧 kb_id。"""
+    upload = await client.post(
+        "/api/v1/knowledge/upload",
+        headers=auth,
+        files={
+            "file": (
+                "阶段规划参考.txt",
+                "第一阶段先理解基础概念，第二阶段完成综合练习。".encode(),
+                "text/plain",
+            )
+        },
+        data={"goal_ids": goal_id},
+    )
+    assert upload.status_code == 200, upload.text
+
+    response = await client.get(f"/api/v1/agent/plan-context/{goal_id}", headers=auth)
+    assert response.status_code == 200, response.text
+    titles = [item["title"] for item in response.json()["kb_overview"]]
+    assert "阶段规划参考.txt" in titles
 
 
 async def test_macro_plan_generate(client: AsyncClient, auth_headers: dict, shared: dict):

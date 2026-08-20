@@ -51,11 +51,12 @@ export default function ResizableImage({
       ref={wrapperRef}
       as="figure"
       className={`resizable-image group relative my-3 max-w-full rounded-lg ${
-        selected ? "ring-2 ring-blue-500 ring-offset-2" : ""
+        selected ? "ring-2 ring-[var(--accent)] ring-offset-2" : ""
       }`}
       style={{ width: `${width}%` }}
       data-drag-handle
     >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={node.attrs.src}
         alt={node.attrs.alt ?? ""}
@@ -73,7 +74,7 @@ export default function ResizableImage({
             aria-label="拖动调整图片大小"
             title="拖动调整图片大小"
             onPointerDown={startResize}
-            className="image-resize-handle absolute -bottom-2 -right-2 h-5 w-5 cursor-nwse-resize rounded-full border-2 border-white bg-blue-500 shadow-md"
+            className="image-resize-handle absolute -bottom-2 -right-2 h-5 w-5 cursor-nwse-resize rounded-full border-2 border-white bg-[var(--accent)] shadow-md"
           />
         </>
       )}

@@ -1,0 +1,6756 @@
+/* Notes workspace: one canvas, quiet dividers, no nested cards. */
+
+.app-shell .tech-notes-migrated {
+  --goal-tech-panel: var(--workspace-panel);
+  --goal-tech-border: var(--workspace-border);
+  --goal-tech-text: var(--workspace-text);
+  --goal-tech-muted: var(--workspace-secondary);
+  --notes-accent: var(--workspace-accent);
+  --notes-accent-soft: var(--workspace-accent-soft);
+  --notes-panel: var(--workspace-panel);
+  --notes-panel-soft: var(--workspace-panel-subtle);
+  --notes-border: var(--workspace-border);
+  --notes-text: var(--workspace-text);
+  --notes-muted: var(--workspace-secondary);
+  display: flex;
+  min-height: calc(100dvh - 68px);
+  flex-direction: column;
+  background: transparent !important;
+}
+
+.app-shell .page-content:has(> .tech-notes-migrated) {
+  width: 100%;
+  max-width: none;
+  height: 100vh;
+  min-height: 100vh;
+  overflow: hidden;
+  background: transparent;
+}
+
+/* Page/document actions stay above editor formatting; the card geometry and
+   typography come from the shared goals-redesign-heading rule. */
+.app-shell .tech-notes-migrated .notes-reference-header {
+  position: relative;
+  z-index: 12;
+}
+
+.app-shell .tech-notes-migrated .workspace-page-title > svg {
+  flex: none;
+  color: var(--notes-accent);
+}
+
+.app-shell .tech-notes-migrated .notes-reference-tools {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.app-shell .tech-notes-migrated .notes-reference-actions {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+/* The search field has one focus surface only; the input itself stays frameless. */
+.app-shell .tech-notes-migrated .notes-command-search {
+  display: flex;
+  width: 280px;
+  min-width: 0;
+  height: 40px;
+  align-items: center;
+  gap: 10px;
+  padding: 0 13px;
+  color: color-mix(in srgb, var(--notes-accent) 58%, var(--notes-muted));
+  background:
+    radial-gradient(circle at 12% 50%, color-mix(in srgb, var(--notes-accent) 10%, transparent), transparent 62%),
+    color-mix(in srgb, var(--notes-accent) 4%, var(--notes-panel));
+  border: 1px solid color-mix(in srgb, var(--notes-accent) 22%, var(--notes-border));
+  border-radius: 10px;
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--notes-accent) 7%, transparent);
+  transition: color 180ms ease, background 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.app-shell .tech-notes-migrated .notes-command-search:hover {
+  border-color: color-mix(in srgb, var(--notes-accent) 34%, var(--notes-border));
+}
+
+.app-shell .tech-notes-migrated .notes-command-search:focus-within {
+  color: var(--notes-accent);
+  background:
+    radial-gradient(circle at 16% 50%, color-mix(in srgb, var(--notes-accent) 14%, transparent), transparent 66%),
+    color-mix(in srgb, var(--notes-accent) 5%, var(--notes-panel));
+  border-color: color-mix(in srgb, var(--notes-accent) 52%, var(--notes-border));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--notes-accent) 9%, transparent), 0 12px 30px color-mix(in srgb, var(--notes-accent) 10%, transparent);
+}
+
+.app-shell .tech-notes-migrated .notes-command-search input {
+  min-width: 0;
+  height: 100%;
+  flex: 1;
+  padding: 0;
+  color: var(--notes-text);
+  font: inherit;
+  font-size: 12px;
+  background: transparent;
+  border: 0;
+  outline: 0;
+  box-shadow: none;
+}
+
+.app-shell .tech-notes-migrated .notes-command-search input::placeholder {
+  color: color-mix(in srgb, var(--notes-muted) 82%, transparent);
+  opacity: 1;
+}
+
+.app-shell .tech-notes-migrated .notes-command-search button {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  flex: none;
+  padding: 0;
+  place-items: center;
+  color: var(--notes-muted);
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.app-shell .tech-notes-migrated .notes-command-search button:hover {
+  color: var(--notes-accent);
+  background: color-mix(in srgb, var(--notes-accent) 8%, transparent);
+}
+
+.app-shell .tech-notes-migrated .notes-create-action {
+  min-height: 40px;
+  padding-inline: 15px;
+  font-size: 12px;
+  border-radius: 10px;
+  white-space: nowrap;
+  box-shadow: 0 7px 18px color-mix(in srgb, var(--notes-accent) 16%, transparent);
+}
+
+/* One shared workspace card; the rail and editor never become cards inside it. */
+.app-shell .tech-notes-migrated .notes-workspace {
+  position: relative;
+  display: grid;
+  min-height: 580px;
+  height: auto;
+  flex: 1 1 auto;
+  grid-template-columns: minmax(260px, 30%) minmax(0, 1fr) !important;
+  gap: 0;
+  overflow: hidden;
+  background: var(--notes-panel) !important;
+  border: 1px solid var(--notes-border) !important;
+  border-radius: 14px;
+  box-shadow: 0 10px 30px color-mix(in srgb, var(--notes-text) 5%, transparent) !important;
+  transition: grid-template-columns 220ms ease;
+}
+
+.app-shell .tech-notes-migrated .notes-workspace.is-index-collapsed {
+  grid-template-columns: 42px minmax(0, 1fr) !important;
+}
+
+/* Index and date filter live in one unboxed rail. */
+.app-shell .tech-notes-migrated .notes-list {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  overflow: visible;
+  color: var(--notes-text);
+  background: transparent !important;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.app-shell .tech-notes-migrated .notes-list > header {
+  position: relative;
+  z-index: 8;
+  display: flex;
+  min-height: 52px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 14px;
+  background: transparent;
+  border: 0;
+}
+
+.app-shell .tech-notes-migrated .notes-list-heading {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+}
+
+.app-shell .tech-notes-migrated .notes-list-heading > svg {
+  flex: none;
+  color: var(--notes-accent);
+}
+
+.app-shell .tech-notes-migrated .notes-list-heading > span {
+  color: var(--notes-muted);
+  font-size: 10px;
+  font-weight: 620;
+  background: transparent;
+  border: 0;
+  white-space: nowrap;
+}
+
+.app-shell .tech-notes-migrated .notes-index-collapse {
+  position: absolute;
+  z-index: 10;
+  top: 10px;
+  right: -16px;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  color: var(--notes-muted);
+  background: color-mix(in srgb, var(--notes-panel) 92%, transparent);
+  border: 1px solid color-mix(in srgb, var(--notes-border) 76%, transparent);
+  border-radius: 7px;
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--notes-text) 5%, transparent);
+  opacity: .42;
+  cursor: pointer;
+  transition: color 170ms ease, opacity 170ms ease, background 170ms ease;
+}
+
+/* Keep the control visually quiet while preserving a comfortable pointer target. */
+.app-shell .tech-notes-migrated .notes-index-collapse::after {
+  position: absolute;
+  inset: -6px;
+  content: "";
+}
+
+.app-shell .tech-notes-migrated .notes-index-collapse:hover,
+.app-shell .tech-notes-migrated .notes-index-collapse:focus-visible {
+  color: var(--notes-accent);
+  background: var(--notes-panel);
+  opacity: 1;
+}
+
+.app-shell .tech-notes-migrated .notes-workspace.is-index-collapsed .notes-list > header,
+.app-shell .tech-notes-migrated .notes-workspace.is-index-collapsed .notes-list-scroll {
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.app-shell .tech-notes-migrated .notes-workspace.is-index-collapsed .notes-index-collapse {
+  right: 5px;
+}
+
+.app-shell .tech-notes-migrated .notes-date-filter {
+  position: static;
+  flex: none;
+}
+
+.app-shell .tech-notes-migrated .notes-date-filter summary {
+  position: relative;
+  width: 36px;
+  min-height: 36px;
+  display: grid;
+  padding: 0;
+  place-items: center;
+  color: var(--notes-muted);
+  font-size: 11px;
+  font-weight: 640;
+  background: transparent;
+  border: 0;
+  border-radius: 7px;
+  cursor: pointer;
+  list-style: none;
+  transition: color 170ms ease, background 170ms ease;
+}
+
+.app-shell .tech-notes-migrated .notes-date-filter summary::-webkit-details-marker {
+  display: none;
+}
+
+.app-shell .tech-notes-migrated .notes-date-filter summary:hover,
+.app-shell .tech-notes-migrated .notes-date-filter[open] summary {
+  color: var(--notes-accent);
+  background: color-mix(in srgb, var(--notes-accent) 5%, transparent);
+}
+
+.app-shell .tech-notes-migrated .notes-date-filter summary > i {
+  position: absolute;
+  right: 7px;
+  bottom: 7px;
+  width: 4px;
+  height: 4px;
+  background: var(--notes-accent);
+  border: 1px solid var(--notes-panel);
+  border-radius: 50%;
+}
+
+.app-shell .tech-notes-migrated .notes-date-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 14px;
+  left: 14px;
+  width: auto;
+  padding: 14px;
+  color: var(--notes-text);
+  background: var(--notes-panel);
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.app-shell .tech-notes-migrated .notes-date-popover-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.app-shell .tech-notes-migrated .notes-date-popover-head div {
+  display: grid;
+  gap: 2px;
+}
+
+.app-shell .tech-notes-migrated .notes-date-popover-head small {
+  color: var(--notes-accent);
+  font-size: 9px;
+  font-weight: 750;
+  letter-spacing: .12em;
+}
+
+.app-shell .tech-notes-migrated .notes-date-popover-head strong {
+  font-size: 13px;
+  font-weight: 660;
+}
+
+.app-shell .tech-notes-migrated .notes-date-popover-head button {
+  min-height: 34px;
+  padding: 0 8px;
+  color: var(--notes-muted);
+  font-size: 10px;
+  background: transparent;
+  border: 0;
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.app-shell .tech-notes-migrated .notes-calendar-tabs {
+  display: flex;
+  gap: 18px;
+  margin-bottom: 9px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+}
+
+.app-shell .tech-notes-migrated .notes-calendar-tabs button {
+  min-height: 34px;
+  padding: 0 2px;
+  color: var(--notes-muted);
+  font-size: 11px;
+  font-weight: 650;
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  cursor: pointer;
+}
+
+.app-shell .tech-notes-migrated .notes-calendar-tabs button.is-active,
+.app-shell .tech-notes-migrated .notes-date-popover-head button.is-active {
+  color: var(--notes-accent);
+  background: transparent;
+  border-color: var(--notes-accent);
+}
+
+.app-shell .tech-notes-migrated .notes-date-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 3px;
+}
+
+.app-shell .tech-notes-migrated .notes-date-grid button {
+  position: relative;
+  height: 38px;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  padding: 2px;
+  color: var(--notes-muted);
+  background: transparent;
+  border: 0;
+  border-radius: 9px;
+  cursor: pointer;
+}
+
+.app-shell .tech-notes-migrated .notes-date-grid button:hover {
+  color: var(--notes-text);
+  background: color-mix(in srgb, var(--notes-accent) 5%, transparent);
+}
+
+.app-shell .tech-notes-migrated .notes-date-grid button.is-active {
+  color: var(--notes-accent);
+  background: var(--notes-accent-soft);
+}
+
+.app-shell .tech-notes-migrated .notes-date-grid button.is-outside {
+  opacity: .34;
+}
+
+.app-shell .tech-notes-migrated .notes-date-grid span {
+  font-size: 9px;
+}
+
+.app-shell .tech-notes-migrated .notes-date-grid strong {
+  font-size: 11px;
+}
+
+.app-shell .tech-notes-migrated .notes-date-grid i {
+  position: absolute;
+  right: 5px;
+  bottom: 4px;
+  width: 4px;
+  height: 4px;
+  background: var(--notes-accent);
+  border-radius: 50%;
+}
+
+/* Notes form a timeline; only the selected row receives a soft state layer. */
+.app-shell .tech-notes-migrated .notes-list-scroll {
+  min-height: 120px;
+  max-height: none;
+  flex: 1;
+  padding: 0 10px 16px;
+  overflow-y: auto;
+  transition: opacity 140ms ease;
+}
+
+.app-shell .tech-notes-migrated .notes-list-row {
+  position: relative;
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 7px;
+  align-items: center;
+  margin: 0;
+  padding: 11px 9px 11px 14px;
+  color: var(--notes-text);
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--notes-border) 66%, transparent);
+  border-radius: 0;
+  overflow: hidden;
+  transition: background 170ms ease;
+}
+
+.app-shell .tech-notes-migrated .notes-list-row::before {
+  position: absolute;
+  inset: 8px auto 8px 0;
+  width: 2px;
+  content: "";
+  background: var(--notes-accent);
+  border-radius: 999px;
+  opacity: 0;
+  transition: opacity 170ms ease;
+}
+
+.app-shell .tech-notes-migrated .notes-list-row:hover {
+  background: color-mix(in srgb, var(--notes-accent) 3%, transparent);
+}
+
+.app-shell .tech-notes-migrated .notes-list-row.is-active {
+  background: color-mix(in srgb, var(--notes-accent) 6%, transparent);
+  border-bottom-color: transparent;
+  border-radius: 6px;
+}
+
+.app-shell .tech-notes-migrated .notes-list-row.is-active::before {
+  opacity: 1;
+}
+
+.app-shell .tech-notes-migrated .note-list-select {
+  min-width: 0;
+  display: block;
+  padding: 0;
+  color: inherit;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.app-shell .tech-notes-migrated .note-list-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.app-shell .tech-notes-migrated .note-list-meta small,
+.app-shell .tech-notes-migrated .note-list-meta em {
+  color: var(--notes-muted);
+  font-size: 10px;
+  font-style: normal;
+}
+
+.app-shell .tech-notes-migrated .note-list-meta em {
+  color: var(--workspace-danger, #c45d67);
+}
+
+.app-shell .tech-notes-migrated .note-list-select strong {
+  display: block;
+  margin-top: 5px;
+  overflow: hidden;
+  color: var(--notes-text);
+  font-size: 12px;
+  font-weight: 670;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-shell .tech-notes-migrated .note-list-select .note-list-preview {
+  display: -webkit-box;
+  margin-top: 3px;
+  color: var(--notes-muted);
+  font-size: 10px;
+  line-height: 1.55;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+  overflow: hidden;
+}
+
+.app-shell .tech-notes-migrated .note-list-goal-picker {
+  width: fit-content;
+  max-width: 100%;
+  height: 27px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 7px;
+  color: color-mix(in srgb, var(--notes-accent) 60%, var(--notes-muted));
+  background: color-mix(in srgb, var(--notes-accent) 5%, transparent);
+  border-radius: 6px;
+}
+
+.app-shell .tech-notes-migrated .note-list-goal-picker svg {
+  flex: none;
+}
+
+.app-shell .tech-notes-migrated .note-list-goal-picker select {
+  width: auto;
+  max-width: 116px;
+  height: 25px;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 620;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  outline: 0;
+  appearance: none;
+  cursor: pointer;
+}
+
+.app-shell .tech-notes-migrated .note-list-goal-picker:focus-within {
+  color: var(--notes-text);
+  background: color-mix(in srgb, var(--notes-accent) 8%, transparent);
+}
+
+.app-shell .tech-notes-migrated .note-list-goal-label {
+  width: fit-content;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--notes-muted);
+  font-size: 9px;
+  background: transparent;
+}
+
+.app-shell .tech-notes-migrated .notes-empty-state {
+  min-height: 180px;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 8px;
+  padding: 24px;
+  color: var(--notes-muted);
+  text-align: center;
+}
+
+.app-shell .tech-notes-migrated .notes-empty-state strong {
+  color: var(--notes-text);
+  font-size: 12px;
+}
+
+.app-shell .tech-notes-migrated .notes-empty-state span {
+  font-size: 10px;
+}
+
+/* Editor is part of the same canvas, separated only by one vertical divider. */
+.app-shell .tech-notes-migrated .note-editor {
+  position: relative;
+  min-width: 0;
+  min-height: 580px;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  background: transparent !important;
+  border: 0;
+  border-left: 1px solid color-mix(in srgb, var(--notes-border) 72%, transparent);
+  border-radius: 0;
+  box-shadow: none;
+  overflow: hidden;
+}
+
+.app-shell .tech-notes-migrated .note-title-editor {
+  box-sizing: border-box;
+  width: min(820px, calc(100% - 48px));
+  min-width: 0;
+  min-height: 72px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-inline: auto;
+  padding: 18px 8px 6px;
+  background: transparent;
+  border: 0;
+  cursor: text;
+}
+
+.app-shell .tech-notes-migrated .note-title-editor-icon {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  flex: none;
+  place-items: center;
+  color: var(--notes-accent);
+  background: var(--notes-accent-soft);
+  border-radius: 7px;
+  transition: background 170ms ease, color 170ms ease;
+}
+
+.app-shell .tech-notes-migrated .note-title-editor:focus-within .note-title-editor-icon {
+  color: color-mix(in srgb, var(--notes-accent) 82%, var(--notes-text));
+  background: color-mix(in srgb, var(--notes-accent) 14%, var(--notes-panel));
+}
+
+.app-shell .tech-notes-migrated .note-title-editor .note-title-input {
+  width: 100%;
+  min-width: 0;
+  height: 48px;
+  margin: 0;
+  padding: 0;
+  color: var(--notes-text);
+  font: inherit;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.35;
+  letter-spacing: 0;
+  background: transparent;
+  border: 0 !important;
+  border-bottom: 0 !important;
+  outline: 0;
+  box-shadow: none;
+}
+
+.app-shell .tech-notes-migrated .note-title-editor .note-title-input::placeholder {
+  color: color-mix(in srgb, var(--notes-muted) 62%, transparent);
+}
+
+.app-shell .tech-notes-migrated .note-edit-head-actions {
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+}
+
+.app-shell .tech-notes-migrated .note-editor-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.app-shell .tech-notes-migrated .note-save-state {
+  min-width: 58px;
+  padding-inline: 4px;
+}
+
+.app-shell .tech-notes-migrated .note-head-cancel:disabled,
+.app-shell .tech-notes-migrated .note-head-save:disabled {
+  display: none;
+}
+
+.app-shell .tech-notes-migrated .note-head-save {
+  color: #fff !important;
+  background: var(--notes-accent) !important;
+}
+
+.app-shell .tech-notes-migrated .note-head-save svg,
+.app-shell .tech-notes-migrated .note-head-save span {
+  color: inherit !important;
+}
+
+.app-shell .tech-notes-migrated .note-head-save:hover:not(:disabled) {
+  color: #fff !important;
+  background: color-mix(in srgb, var(--notes-accent) 86%, #111827) !important;
+}
+
+.app-shell .tech-notes-migrated .note-editor-actions {
+  display: flex;
+  gap: 0;
+}
+
+.app-shell .tech-notes-migrated .note-editor-actions button {
+  width: 34px;
+  height: 34px;
+  color: var(--notes-muted);
+  background: transparent;
+  border: 0;
+  border-radius: 9px;
+}
+
+.app-shell .tech-notes-migrated .note-editor-actions button:hover {
+  color: var(--notes-accent);
+  background: var(--notes-accent-soft);
+}
+
+.app-shell .tech-notes-migrated .note-editor-actions button:nth-child(2):hover {
+  color: var(--workspace-danger, #c45d67);
+  background: color-mix(in srgb, var(--workspace-danger, #c45d67) 9%, transparent);
+}
+
+.app-shell .tech-notes-migrated .notes-notion-canvas {
+  min-height: 0;
+  display: flex;
+  flex: 1;
+  padding: 0 0 32px;
+  overflow-y: auto;
+  flex-direction: column;
+  background: transparent !important;
+}
+
+.app-shell .tech-notes-migrated .notes-notion-canvas .notion-resource-editor {
+  width: 100%;
+  min-height: 0;
+  flex: 1;
+  margin: 0;
+  background: transparent;
+  border-top: 0;
+}
+
+.app-shell .tech-notes-migrated .notes-notion-canvas .notion-editor-toolbar {
+  position: sticky;
+  min-height: 52px;
+  padding: 0;
+  background: color-mix(in srgb, var(--notes-panel-soft) 38%, transparent);
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--notes-border) 72%, transparent);
+  border-radius: 0;
+  backdrop-filter: none;
+}
+
+.app-shell .tech-notes-migrated .notes-notion-canvas .notion-toolbar-scroll {
+  padding: 8px 10px 8px 18px;
+}
+
+.app-shell .tech-notes-migrated .notes-notion-canvas .notion-prosemirror {
+  min-height: 420px;
+  box-sizing: border-box;
+  width: min(820px, calc(100% - 48px));
+  margin-inline: auto;
+  padding: 8px 8px 48px;
+  font-size: 14px;
+  line-height: 1.8;
+}
+
+.app-shell .tech-notes-migrated .note-editor.is-fullscreen {
+  inset: 16px 18px 16px 226px !important;
+  z-index: 95;
+  min-height: calc(100dvh - 32px) !important;
+  padding: 0 !important;
+  background: var(--notes-panel) !important;
+  border: 1px solid var(--notes-border) !important;
+  border-radius: 16px;
+  box-shadow: 0 24px 70px color-mix(in srgb, #132b35 22%, transparent);
+}
+
+/* Notes polish pass: align the page with the goals header and inherit its workspace palette. */
+.app-shell .tech-notes-migrated {
+  --notes-accent: var(--workspace-accent);
+  --notes-accent-strong: var(--workspace-accent);
+  --notes-accent-soft: var(--workspace-accent-soft);
+  --notes-warm: var(--notes-panel-soft);
+}
+
+.app-shell .tech-notes-migrated .notes-command-search {
+  height: 43px;
+  background: var(--notes-panel-soft);
+  border-color: var(--notes-border);
+  border-radius: 10px;
+  box-shadow: none;
+}
+
+.app-shell .tech-notes-migrated .notes-command-search:focus-within {
+  border-color: color-mix(in srgb, var(--notes-accent) 48%, var(--notes-border));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--notes-accent) 10%, transparent);
+}
+
+.app-shell .tech-notes-migrated .notes-create-action {
+  min-height: 43px;
+  color: #fff !important;
+  background: var(--notes-accent) !important;
+  border-color: transparent;
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--notes-accent) 22%, transparent);
+  transition: transform 180ms cubic-bezier(.16, 1, .3, 1), box-shadow 180ms ease, filter 180ms ease;
+}
+
+.app-shell .tech-notes-migrated .notes-create-action:hover {
+  transform: translateY(-1px);
+  filter: saturate(1.06);
+  box-shadow: 0 11px 24px color-mix(in srgb, var(--notes-accent) 27%, transparent);
+}
+
+.app-shell .tech-notes-migrated .notes-workspace {
+  grid-template-columns: minmax(300px, 30%) minmax(0, 1fr) !important;
+  border-color: color-mix(in srgb, var(--notes-border) 86%, var(--notes-accent));
+  border-radius: 16px;
+  box-shadow: 0 14px 38px color-mix(in srgb, #17393d 7%, transparent) !important;
+}
+
+.app-shell .tech-notes-migrated .notes-workspace.is-index-collapsed {
+  grid-template-columns: 52px minmax(0, 1fr) !important;
+}
+
+.app-shell .tech-notes-migrated .notes-list {
+  background: color-mix(in srgb, var(--notes-warm) 76%, var(--notes-panel)) !important;
+}
+
+.app-shell .tech-notes-migrated .notes-list > header {
+  min-height: 72px;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 12px 56px 12px 12px;
+  border-bottom: 1px solid color-mix(in srgb, var(--notes-border) 80%, transparent);
+}
+
+.app-shell .tech-notes-migrated .notes-date-filter {
+  min-width: 0;
+}
+
+.app-shell .tech-notes-migrated .notes-date-filter summary {
+  width: auto;
+  min-width: 134px;
+  height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 9px;
+  padding: 0 10px;
+  color: var(--notes-accent-strong);
+  background: var(--notes-panel);
+  border: 1px solid color-mix(in srgb, var(--notes-accent) 18%, var(--notes-border));
+  border-radius: 11px;
+  box-shadow: 0 4px 12px color-mix(in srgb, #193d40 4%, transparent);
+}
+
+.app-shell .tech-notes-migrated .notes-date-filter summary:hover,
+.app-shell .tech-notes-migrated .notes-date-filter[open] summary {
+  color: var(--notes-accent-strong);
+  background: var(--notes-accent-soft);
+  border-color: color-mix(in srgb, var(--notes-accent) 32%, var(--notes-border));
+  transform: translateY(-1px);
+}
+
+.app-shell .tech-notes-migrated .notes-date-summary-copy {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+  text-align: left;
+}
+
+.app-shell .tech-notes-migrated .notes-date-summary-copy small {
+  color: var(--notes-muted);
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.app-shell .tech-notes-migrated .notes-date-summary-copy strong {
+  color: var(--notes-text);
+  font-size: 12px;
+  font-weight: 680;
+  line-height: 1.25;
+}
+
+.app-shell .tech-notes-migrated .notes-date-chevron {
+  margin-left: auto;
+  color: var(--notes-muted);
+  transition: transform 180ms ease;
+}
+
+.app-shell .tech-notes-migrated .notes-date-filter[open] .notes-date-chevron {
+  transform: rotate(180deg);
+}
+
+.app-shell .tech-notes-migrated .notes-list-heading {
+  height: 46px;
+  gap: 7px;
+  padding: 0 10px;
+  color: var(--notes-muted);
+  background: color-mix(in srgb, var(--notes-accent-soft) 46%, var(--notes-panel));
+  border: 1px solid color-mix(in srgb, var(--notes-accent) 12%, var(--notes-border));
+  border-radius: 11px;
+}
+
+.app-shell .tech-notes-migrated .notes-list-heading > span {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+}
+
+.app-shell .tech-notes-migrated .notes-list-heading > span strong {
+  color: var(--notes-text);
+  font-size: 14px;
+  font-weight: 720;
+}
+
+.app-shell .tech-notes-migrated .notes-list-heading > span small {
+  color: var(--notes-muted);
+  font-size: 9px;
+  font-weight: 620;
+}
+
+.app-shell .tech-notes-migrated .notes-index-collapse {
+  top: 18px;
+  right: 12px;
+  width: 36px;
+  height: 36px;
+  color: var(--notes-muted);
+  background: transparent;
+  border-color: transparent;
+  border-radius: 10px;
+  box-shadow: none;
+  opacity: .72;
+  transition: color 180ms ease, opacity 180ms ease, background 180ms ease, transform 180ms cubic-bezier(.16, 1, .3, 1);
+}
+
+.app-shell .tech-notes-migrated .notes-index-collapse:hover,
+.app-shell .tech-notes-migrated .notes-index-collapse:focus-visible {
+  color: var(--notes-accent-strong);
+  background: var(--notes-accent-soft);
+  opacity: 1;
+  transform: translateX(-2px);
+}
+
+.app-shell .tech-notes-migrated .notes-workspace.is-index-collapsed .notes-index-collapse {
+  right: 8px;
+  transform: none;
+}
+
+.app-shell .tech-notes-migrated .notes-date-popover {
+  top: calc(100% + 8px);
+  right: auto;
+  left: 12px;
+  width: min(292px, calc(100% - 24px));
+  padding: 16px;
+  background: color-mix(in srgb, var(--notes-panel) 97%, var(--notes-warm));
+  border: 1px solid var(--notes-border);
+  border-radius: 14px;
+  box-shadow: 0 18px 44px color-mix(in srgb, #17373c 14%, transparent);
+  animation: notes-popover-in 180ms cubic-bezier(.16, 1, .3, 1) both;
+}
+
+@keyframes notes-popover-in {
+  from { opacity: 0; transform: translateY(-6px) scale(.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.app-shell .tech-notes-migrated .notes-list-scroll {
+  padding: 10px 12px 18px;
+}
+
+.app-shell .tech-notes-migrated .notes-list-row {
+  margin-bottom: 5px;
+  padding: 13px 12px 12px 16px;
+  border: 1px solid transparent;
+  border-radius: 11px;
+  transition: background 180ms ease, border-color 180ms ease, box-shadow 180ms ease, transform 180ms cubic-bezier(.16, 1, .3, 1);
+}
+
+.app-shell .tech-notes-migrated .notes-list-row:hover {
+  background: var(--notes-panel);
+  border-color: color-mix(in srgb, var(--notes-accent) 10%, var(--notes-border));
+  transform: translateX(2px);
+}
+
+.app-shell .tech-notes-migrated .notes-list-row.is-active {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--notes-accent-soft) 72%, var(--notes-panel)), var(--notes-panel));
+  border-color: color-mix(in srgb, var(--notes-accent) 16%, var(--notes-border));
+  box-shadow: 0 7px 18px color-mix(in srgb, var(--notes-accent) 8%, transparent);
+}
+
+.app-shell .tech-notes-migrated .notes-list-row::before {
+  inset: 12px auto 12px 5px;
+  width: 3px;
+}
+
+.app-shell .tech-notes-migrated .note-editor {
+  border-left-color: color-mix(in srgb, var(--notes-border) 86%, var(--notes-accent));
+}
+
+.app-shell .tech-notes-migrated .notes-notion-canvas .notion-editor-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 18;
+  min-height: 66px;
+  display: flex;
+  align-items: center;
+  padding: 10px 18px;
+  background: color-mix(in srgb, var(--notes-warm) 82%, var(--notes-panel));
+  border-bottom: 1px solid var(--notes-border);
+  box-shadow: 0 5px 16px color-mix(in srgb, #193b40 4%, transparent);
+}
+
+.app-shell .tech-notes-migrated .notes-notion-canvas .notion-toolbar-scroll {
+  width: fit-content;
+  max-width: 100%;
+  min-height: 44px;
+  padding: 4px 6px;
+  background: var(--notes-panel);
+  border: 1px solid color-mix(in srgb, var(--notes-accent) 10%, var(--notes-border));
+  border-radius: 12px;
+  box-shadow: 0 5px 16px color-mix(in srgb, #193b40 5%, transparent);
+}
+
+.app-shell .tech-notes-migrated .notion-editor-toolbar button {
+  border-radius: 8px;
+  transition: color 150ms ease, background 150ms ease, transform 150ms ease;
+}
+
+.app-shell .tech-notes-migrated .notion-editor-toolbar button:hover {
+  color: var(--notes-accent-strong);
+  background: var(--notes-accent-soft);
+  transform: translateY(-1px);
+}
+
+.app-shell .tech-notes-migrated .notion-editor-toolbar button.is-active {
+  color: #fff;
+  background: var(--notes-accent);
+}
+
+.app-shell .tech-notes-migrated .note-document-heading {
+  width: min(980px, calc(100% - 48px));
+  min-height: 88px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 18px;
+  margin-inline: auto;
+  padding: 16px 8px 8px;
+  border-bottom: 1px solid color-mix(in srgb, var(--notes-border) 56%, transparent);
+}
+
+.app-shell .tech-notes-migrated .note-title-editor {
+  width: 100%;
+  min-height: 56px;
+  margin: 0;
+  padding: 0;
+}
+
+.app-shell .tech-notes-migrated .note-title-editor-icon {
+  width: 34px;
+  height: 34px;
+  color: var(--notes-accent-strong);
+  background: var(--notes-accent-soft);
+  border-radius: 10px;
+}
+
+.app-shell .tech-notes-migrated .note-title-editor .note-title-input {
+  height: 56px;
+  font-size: clamp(21px, 2vw, 27px);
+  font-weight: 700;
+}
+
+.app-shell .tech-notes-migrated .note-editor-controls {
+  flex: none;
+  gap: 8px;
+}
+
+.app-shell .tech-notes-migrated .note-edit-head-actions {
+  gap: 5px;
+}
+
+.app-shell .tech-notes-migrated .note-save-state {
+  width: auto;
+  min-width: auto;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 9px;
+  color: var(--notes-accent-strong);
+  font-size: 10px;
+  font-weight: 650;
+  white-space: nowrap;
+  background: var(--notes-accent-soft);
+  border-radius: 9px;
+}
+
+.app-shell .tech-notes-migrated .note-save-state.is-dirty {
+  color: #a85e21;
+  background: #fff3e8;
+}
+
+.app-shell .tech-notes-migrated .note-head-cancel,
+.app-shell .tech-notes-migrated .note-head-save {
+  min-width: 56px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 10px;
+  text-align: center;
+  border: 0;
+  border-radius: 9px;
+}
+
+.app-shell .tech-notes-migrated .note-head-cancel {
+  color: var(--notes-muted);
+  background: var(--notes-panel-soft);
+}
+
+.app-shell .tech-notes-migrated .note-editor-actions {
+  gap: 3px;
+  padding-left: 7px;
+  border-left: 1px solid var(--notes-border);
+}
+
+.app-shell .tech-notes-migrated .note-editor-actions button {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  padding: 0;
+  place-items: center;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: color 150ms ease, background 150ms ease, transform 150ms cubic-bezier(.16, 1, .3, 1);
+}
+
+.app-shell .tech-notes-migrated .note-editor-actions button:hover {
+  color: var(--notes-accent-strong);
+  background: var(--notes-accent-soft);
+  transform: translateY(-1px);
+}
+
+.app-shell .tech-notes-migrated .notes-notion-canvas .notion-prosemirror {
+  width: min(980px, calc(100% - 48px));
+  padding-top: 18px;
+  font-size: 15px;
+}
+
+.app-shell .tech-notes-migrated .note-editor.is-fullscreen .notes-notion-canvas {
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  border: 0 !important;
+}
+
+.app-shell .tech-notes-migrated .note-editor.is-fullscreen :is(.note-document-heading, .notion-prosemirror) {
+  width: min(1120px, calc(100% - 56px));
+}
+
+/* Consistency correction: use workspace purple and remove nested framed surfaces. */
+.app-shell .tech-notes-migrated {
+  --notes-accent: var(--workspace-accent);
+  --notes-accent-strong: var(--workspace-accent);
+  --notes-accent-soft: var(--workspace-accent-soft);
+  --notes-warm: var(--workspace-panel-subtle);
+}
+
+.app-shell .tech-notes-migrated .notes-create-action {
+  background: var(--workspace-accent) !important;
+  box-shadow: 0 7px 18px color-mix(in srgb, var(--workspace-accent) 16%, transparent);
+}
+
+.app-shell .tech-notes-migrated .notes-workspace {
+  grid-template-columns: 30% minmax(0, 1fr) !important;
+  border-color: var(--notes-border) !important;
+  border-radius: 14px;
+  box-shadow: 0 10px 30px color-mix(in srgb, var(--notes-text) 5%, transparent) !important;
+}
+
+.app-shell .tech-notes-migrated .notes-workspace.is-index-collapsed {
+  grid-template-columns: 44px minmax(0, 1fr) !important;
+}
+
+.app-shell .tech-notes-migrated .notes-list {
+  background: var(--notes-panel) !important;
+}
+
+.app-shell .tech-notes-migrated .notes-list > header {
+  min-height: 56px;
+  display: block;
+  padding: 5px 38px 5px 10px;
+  border-bottom: 1px solid color-mix(in srgb, var(--notes-border) 72%, transparent);
+}
+
+.app-shell .tech-notes-migrated .notes-goal-control {
+  position: relative;
+  min-width: 0;
+  flex: 1;
+}
+
+.app-shell .tech-notes-migrated .notes-goal-trigger {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  height: 46px;
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  padding: 0 9px;
+  color: var(--notes-muted);
+  text-align: left;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  box-shadow: none;
+  transition: color 180ms ease, background 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.app-shell .tech-notes-migrated .notes-goal-trigger:hover,
+.app-shell .tech-notes-migrated .notes-goal-trigger[aria-expanded="true"] {
+  color: var(--notes-accent);
+  background: color-mix(in srgb, var(--notes-accent-soft) 54%, transparent);
+  border-color: transparent;
+  outline: 0;
+  box-shadow: none;
+}
+
+.app-shell .tech-notes-migrated .notes-goal-trigger > svg:first-child {
+  width: 30px;
+  height: 30px;
+  padding: 7px;
+  box-sizing: border-box;
+  flex: none;
+  color: var(--notes-accent);
+  background: var(--notes-accent-soft);
+  border-radius: 9px;
+  transition: color 180ms ease, transform 180ms cubic-bezier(.16, 1, .3, 1);
+}
+
+.app-shell .tech-notes-migrated .notes-goal-trigger:hover > svg:first-child,
+.app-shell .tech-notes-migrated .notes-goal-trigger[aria-expanded="true"] > svg:first-child {
+  color: var(--notes-accent);
+  transform: scale(1.08);
+}
+
+.app-shell .tech-notes-migrated .notes-goal-trigger > span {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  flex: 1;
+}
+
+.app-shell .tech-notes-migrated .notes-filter-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--notes-muted);
+  font-size: 10px !important;
+  font-weight: 610;
+  line-height: 16px;
+  padding: 0 6px;
+  background: color-mix(in srgb, var(--notes-accent-soft) 68%, transparent);
+  border-radius: 999px;
+  white-space: nowrap;
+  transform: translateY(1px);
+}
+
+.app-shell .tech-notes-migrated .notes-filter-count b {
+  color: var(--notes-text);
+  font-weight: 720;
+}
+
+.app-shell .notes-page-redesign.tech-notes-migrated .notes-list .notes-goal-trigger strong {
+  min-width: 0;
+  max-width: 100%;
+  display: block;
+  min-height: 24px;
+  flex: 0 1 auto;
+  margin: 0;
+  overflow: hidden;
+  color: var(--notes-text);
+  font-size: 17px;
+  font-weight: 760;
+  line-height: 24px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color 180ms ease;
+}
+
+.app-shell .tech-notes-migrated .notes-filter-copy > svg {
+  width: 15px;
+  height: 15px;
+  flex: none;
+  align-self: center;
+  color: color-mix(in srgb, var(--notes-accent) 72%, var(--notes-muted));
+  transform: translateY(2px);
+  transition: color 180ms ease, transform 180ms cubic-bezier(.16, 1, .3, 1);
+}
+
+.app-shell .notes-page-redesign.tech-notes-migrated .notes-list .notes-goal-trigger:hover strong,
+.app-shell .notes-page-redesign.tech-notes-migrated .notes-list .notes-goal-trigger[aria-expanded="true"] strong {
+  color: var(--notes-accent);
+}
+
+.app-shell .tech-notes-migrated .notes-goal-trigger:hover .notes-filter-copy > svg {
+  color: var(--notes-accent);
+  transform: translateY(2px);
+}
+
+.app-shell .tech-notes-migrated .notes-filter-copy > svg.is-open {
+  color: var(--notes-accent);
+  transform: translateY(2px) rotate(180deg);
+}
+
+.app-shell .tech-notes-migrated .notes-goal-popover {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 8px);
+  left: 0;
+  width: min(224px, calc(100vw - 32px));
+  overflow: hidden;
+  color: var(--notes-text);
+  background: var(--notes-panel);
+  border: 1px solid var(--notes-border);
+  border-radius: 10px;
+  box-shadow: 0 16px 40px color-mix(in srgb, var(--notes-text) 14%, transparent);
+}
+
+.app-shell .tech-notes-migrated .notes-goal-popover > header {
+  display: grid;
+  gap: 3px;
+  padding: 13px 14px 10px;
+  border-bottom: 1px solid color-mix(in srgb, var(--notes-border) 72%, transparent);
+}
+
+.app-shell .tech-notes-migrated .notes-goal-popover > header strong {
+  font-size: 12px;
+  font-weight: 680;
+}
+
+.app-shell .tech-notes-migrated .notes-goal-popover > header small {
+  color: var(--notes-muted);
+  font-size: 9px;
+}
+
+.app-shell .tech-notes-migrated .notes-goal-popover > div {
+  max-height: 240px;
+  padding: 5px;
+  overflow-y: auto;
+}
+
+.app-shell .tech-notes-migrated .notes-goal-popover > div > button {
+  width: 100%;
+  min-height: 34px;
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  color: var(--notes-muted);
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: 7px;
+  cursor: pointer;
+}
+
+.app-shell .tech-notes-migrated .notes-goal-popover > div > button:hover,
+.app-shell .tech-notes-migrated .notes-goal-popover > div > button.is-selected {
+  color: var(--notes-accent);
+  background: var(--notes-accent-soft);
+}
+
+.app-shell .tech-notes-migrated .notes-goal-popover > div > button span {
+  overflow: hidden;
+  color: var(--notes-text);
+  font-size: 12px;
+  font-weight: 640;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-shell .tech-notes-migrated .notes-goal-popover > div > button .notes-goal-option-count {
+  overflow: visible;
+  color: var(--notes-muted);
+  margin-left: 10px;
+  padding-right: 2px;
+  font-size: 10px !important;
+  font-weight: 590;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.app-shell .tech-notes-migrated .notes-goal-popover > div > button:hover .notes-goal-option-count,
+.app-shell .tech-notes-migrated .notes-goal-popover > div > button.is-selected .notes-goal-option-count {
+  color: var(--notes-accent);
+}
+
+.app-shell .tech-notes-migrated .notes-goal-popover > div > button > svg:last-child {
+  justify-self: end;
+}
+
+.app-shell .tech-notes-migrated .notes-list-heading {
+  width: auto;
+  height: auto;
+  flex: none;
+  padding-left: 10px;
+  background: transparent;
+  border: 0;
+  border-left: 1px solid color-mix(in srgb, var(--notes-border) 72%, transparent);
+  border-radius: 0;
+}
+
+.app-shell .tech-notes-migrated .notes-list-heading > span strong {
+  font-size: 12px;
+  font-weight: 680;
+}
+
+.app-shell .tech-notes-migrated .notes-list-heading > span small {
+  font-size: 10px;
+  font-weight: 560;
+}
+
+.app-shell .tech-notes-migrated .notes-index-collapse {
+  top: 12px;
+  right: 10px;
+  width: 22px;
+  height: 32px;
+  color: var(--notes-muted);
+  background: transparent;
+  border: 0;
+  border-left: 0;
+  border-radius: 0;
+  box-shadow: none;
+  opacity: .7;
+  transform: none;
+}
+
+.app-shell .tech-notes-migrated .notes-index-collapse:hover,
+.app-shell .tech-notes-migrated .notes-index-collapse:focus-visible {
+  color: var(--notes-accent);
+  background: transparent;
+  opacity: 1;
+  transform: none;
+}
+
+.app-shell .tech-notes-migrated .notes-workspace.is-index-collapsed .notes-index-collapse {
+  right: 8px;
+}
+
+.app-shell .tech-notes-migrated .notes-list-scroll {
+  padding: 8px 10px 16px;
+}
+
+.app-shell .tech-notes-migrated .notes-list-row,
+.app-shell .tech-notes-migrated .notes-list-row:hover,
+.app-shell .tech-notes-migrated .notes-list-row.is-active {
+  margin: 0;
+  gap: 2px;
+  padding: 7px 10px 7px 14px;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--notes-border) 58%, transparent);
+  border-radius: 0;
+  box-shadow: none;
+  transform: none;
+}
+
+.app-shell .tech-notes-migrated .notes-list-row:hover,
+.app-shell .tech-notes-migrated .notes-list-row.is-active {
+  background: color-mix(in srgb, var(--notes-accent-soft) 48%, transparent);
+}
+
+.app-shell .tech-notes-migrated .note-list-goal-label {
+  padding: 0;
+  color: var(--notes-muted);
+  background: transparent;
+}
+
+.app-shell .tech-notes-migrated .notes-notion-canvas .notion-editor-toolbar {
+  min-height: 52px;
+  padding: 6px 12px;
+  background: var(--notes-panel-soft);
+  border-bottom: 1px solid var(--notes-border);
+  box-shadow: none;
+}
+
+.app-shell .tech-notes-migrated .notes-notion-canvas .notion-toolbar-scroll {
+  width: auto;
+  max-width: 100%;
+  min-height: 40px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.app-shell .tech-notes-migrated .note-document-heading {
+  width: min(980px, calc(100% - 32px));
+  min-height: 64px;
+  gap: 12px;
+  padding: 7px 0;
+}
+
+.app-shell .tech-notes-migrated .note-title-editor {
+  min-height: 48px;
+}
+
+.app-shell .tech-notes-migrated .note-title-editor-icon {
+  width: 28px;
+  height: 28px;
+  color: var(--notes-accent);
+  background: transparent;
+  border-radius: 0;
+}
+
+.app-shell .tech-notes-migrated .note-title-editor .note-title-input {
+  height: 48px;
+  font-size: clamp(20px, 1.8vw, 25px);
+}
+
+.app-shell .tech-notes-migrated .note-save-state {
+  color: var(--notes-muted);
+  background: transparent;
+  border-radius: 0;
+}
+
+.app-shell .tech-notes-migrated .note-goal-assignment {
+  position: relative;
+  flex: none;
+}
+
+.app-shell .tech-notes-migrated .note-goal-assignment-trigger {
+  max-width: 132px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 7px;
+  color: var(--notes-muted);
+  font-size: 10px;
+  font-weight: 620;
+  background: transparent;
+  border: 0;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: color 160ms ease, background 160ms ease;
+}
+
+.app-shell .tech-notes-migrated .note-goal-assignment-trigger:hover,
+.app-shell .tech-notes-migrated .note-goal-assignment-trigger[aria-expanded="true"] {
+  color: var(--notes-accent);
+  background: transparent;
+}
+
+.app-shell .tech-notes-migrated .note-goal-assignment-trigger[aria-expanded="true"] {
+  outline: 0;
+  box-shadow: none;
+}
+
+.app-shell .tech-notes-migrated .note-goal-assignment-trigger:focus-visible {
+  color: var(--notes-accent);
+  background: transparent;
+  outline: 0;
+  box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--notes-accent) 52%, transparent);
+}
+
+.app-shell .tech-notes-migrated .note-goal-assignment-trigger span {
+  overflow: hidden;
+  color: var(--notes-text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-shell .tech-notes-migrated .note-goal-assignment-trigger > svg:last-child {
+  flex: none;
+  transition: transform 160ms ease;
+}
+
+.app-shell .tech-notes-migrated .note-goal-assignment-trigger > svg:last-child.is-open {
+  transform: rotate(180deg);
+}
+
+.app-shell .tech-notes-migrated .note-goal-assignment-popover {
+  top: calc(100% + 8px);
+  right: 0;
+  left: auto;
+  width: 246px;
+  text-align: left;
+}
+
+.app-shell .tech-notes-migrated .note-editor.is-fullscreen {
+  inset: 0 0 0 220px !important;
+  z-index: 200;
+  min-height: 100dvh !important;
+  border: 0 !important;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.app-shell .app-main:has(.tech-notes-migrated .note-editor.is-fullscreen) {
+  z-index: 50;
+}
+
+.app-shell .tech-notes-migrated .note-fullscreen-topbar {
+  height: 58px;
+  display: grid;
+  flex: none;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  padding: 0 20px;
+  background: color-mix(in srgb, var(--notes-panel) 94%, var(--notes-accent-soft));
+  border-bottom: 1px solid var(--notes-border);
+  box-shadow: 0 5px 18px color-mix(in srgb, var(--notes-text) 5%, transparent);
+}
+
+.app-shell .tech-notes-migrated .note-fullscreen-topbar button {
+  width: fit-content;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 12px 0 7px;
+  color: var(--notes-text);
+  font-size: 13px;
+  font-weight: 700;
+  background: color-mix(in srgb, var(--notes-panel) 84%, var(--notes-accent-soft));
+  border: 1px solid color-mix(in srgb, var(--notes-accent) 20%, var(--notes-border));
+  border-radius: 10px;
+  box-shadow: 0 3px 10px color-mix(in srgb, var(--notes-text) 6%, transparent);
+  cursor: pointer;
+}
+
+.app-shell .tech-notes-migrated .note-fullscreen-back-icon {
+  width: 28px;
+  height: 28px;
+  display: inline-grid;
+  place-items: center;
+  color: var(--notes-accent);
+  background: color-mix(in srgb, var(--notes-accent-soft) 72%, transparent);
+  border-radius: 8px;
+}
+
+.app-shell .tech-notes-migrated .note-fullscreen-topbar button:hover {
+  color: var(--notes-accent-strong, var(--notes-accent));
+  background: color-mix(in srgb, var(--notes-accent-soft) 62%, var(--notes-panel));
+  border-color: color-mix(in srgb, var(--notes-accent) 34%, var(--notes-border));
+  transform: translateY(-1px);
+}
+
+.app-shell .tech-notes-migrated .note-fullscreen-focus {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  color: var(--notes-text);
+  font-size: 13px;
+  font-weight: 720;
+  letter-spacing: .03em;
+  background: color-mix(in srgb, var(--notes-muted) 6%, transparent);
+  border-radius: 999px;
+}
+
+.app-shell .tech-notes-migrated .note-fullscreen-focus > i {
+  width: 7px;
+  height: 7px;
+  background: var(--notes-mint, #63ddbd);
+  border-radius: 50%;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--notes-mint, #63ddbd) 15%, transparent), 0 0 10px color-mix(in srgb, var(--notes-mint, #63ddbd) 30%, transparent);
+  animation: notes-focus-status-breathe 3.2s ease-in-out infinite;
+}
+
+@keyframes notes-focus-status-breathe {
+  0%, 100% { opacity: .65; transform: scale(.9); }
+  50% { opacity: 1; transform: scale(1.08); }
+}
+
+.app-shell .tech-notes-migrated .note-editor.is-fullscreen .notes-notion-canvas {
+  width: 100% !important;
+  min-height: 0;
+  flex: 1;
+}
+
+.app-shell .tech-notes-migrated .note-editor.is-fullscreen :is(.note-document-heading, .notion-prosemirror) {
+  width: min(1120px, calc(100% - 40px));
+}
+
+/* Keyboard focus stays visible, while pointer focus never creates an inner frame. */
+.app-shell .tech-notes-migrated button:focus-visible,
+.app-shell .tech-notes-migrated summary:focus-visible,
+.app-shell .tech-notes-migrated select:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--notes-accent) 56%, transparent);
+  outline-offset: 2px;
+}
+
+.app-shell .tech-notes-migrated .notes-command-search input:focus,
+.app-shell .tech-notes-migrated .notes-command-search input:focus-visible,
+.app-shell .tech-notes-migrated .note-title-editor .note-title-input:focus,
+.app-shell .tech-notes-migrated .note-title-editor .note-title-input:focus-visible {
+  outline: 0;
+  box-shadow: none;
+}
+
+.app-shell .brand-mark-fallback {
+  color: var(--workspace-accent);
+  filter: drop-shadow(0 0 8px color-mix(in srgb, var(--workspace-accent) 38%, transparent));
+}
+
+@media (max-width: 960px) {
+  .app-shell .tech-notes-migrated .notes-reference-actions {
+    justify-content: flex-start;
+  }
+
+  .app-shell .tech-notes-migrated .notes-reference-tools {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
+  .app-shell .tech-notes-migrated .notes-workspace {
+    grid-template-columns: 1fr !important;
+  }
+
+  .app-shell .tech-notes-migrated .notes-workspace.is-index-collapsed {
+    grid-template-columns: 1fr !important;
+  }
+
+  .app-shell .tech-notes-migrated .notes-workspace.is-index-collapsed .notes-list > header,
+  .app-shell .tech-notes-migrated .notes-workspace.is-index-collapsed .notes-list-scroll {
+    visibility: visible;
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .app-shell .tech-notes-migrated .notes-index-collapse {
+    display: none;
+  }
+
+  .app-shell .tech-notes-migrated .notes-list > header {
+    padding-right: 12px;
+  }
+
+  .app-shell .tech-notes-migrated .notes-list {
+    min-height: 260px;
+  }
+
+  .app-shell .tech-notes-migrated .notes-list-scroll {
+    display: block;
+    max-height: 260px;
+    padding-right: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  .app-shell .tech-notes-migrated .notes-list-row {
+    width: 100%;
+  }
+
+  .app-shell .tech-notes-migrated .note-editor {
+    min-height: 620px;
+    border-top: 1px solid color-mix(in srgb, var(--notes-border) 72%, transparent);
+    border-left: 0;
+  }
+
+  .app-shell .tech-notes-migrated .note-editor.is-fullscreen {
+    inset: 0 !important;
+    min-height: 100dvh !important;
+  }
+}
+
+@media (max-width: 620px) {
+  .app-shell .tech-notes-migrated .notes-reference-tools {
+    display: contents;
+  }
+
+  .app-shell .tech-notes-migrated .notes-reference-actions {
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .app-shell .tech-notes-migrated .notes-reference-header > .note-editor-controls,
+  .app-shell .tech-notes-migrated .notes-reference-tools > .note-editor-controls {
+    justify-content: flex-end;
+  }
+
+  .app-shell .tech-notes-migrated .notes-command-search {
+    width: 100%;
+  }
+
+  .app-shell .tech-notes-migrated .notes-create-action {
+    min-height: 44px;
+  }
+
+  .app-shell .tech-notes-migrated .notes-list > header {
+    padding-right: 0;
+  }
+
+  .app-shell .tech-notes-migrated .notes-list-scroll {
+    padding-right: 0;
+  }
+
+  .app-shell .tech-notes-migrated .notes-list-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .app-shell .tech-notes-migrated .note-list-goal-picker,
+  .app-shell .tech-notes-migrated .note-list-goal-label {
+    justify-self: start;
+  }
+
+  .app-shell .tech-notes-migrated .notes-date-filter summary {
+    width: 44px;
+    min-height: 44px;
+  }
+
+  .app-shell .tech-notes-migrated .notes-date-popover {
+    position: fixed;
+    top: 50%;
+    right: 16px;
+    left: 16px;
+    width: auto;
+    transform: translateY(-50%);
+  }
+
+  .app-shell .tech-notes-migrated .note-title-editor {
+    width: calc(100% - 32px);
+    min-height: 68px;
+    padding-top: 14px;
+  }
+
+  .app-shell .tech-notes-migrated .note-document-heading {
+    width: calc(100% - 32px);
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding-inline: 0;
+    padding-bottom: 14px;
+  }
+
+  .app-shell .tech-notes-migrated .note-document-heading .note-title-editor {
+    width: 100%;
+    padding-top: 0;
+  }
+
+  .app-shell .tech-notes-migrated .note-title-editor .note-title-input {
+    font-size: 19px;
+  }
+
+  .app-shell .tech-notes-migrated .note-editor-controls {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
+  .app-shell .tech-notes-migrated .note-editor-actions button {
+    width: 38px;
+    height: 38px;
+    display: grid !important;
+  }
+
+  .app-shell .tech-notes-migrated .note-save-state span,
+  .app-shell .tech-notes-migrated :is(.note-head-cancel, .note-head-save) span {
+    display: inline;
+  }
+
+  .app-shell .tech-notes-migrated .note-save-state {
+    width: auto !important;
+    min-width: 58px;
+  }
+
+  .app-shell .tech-notes-migrated .notes-notion-canvas {
+    padding: 0 0 26px;
+  }
+
+  .app-shell .tech-notes-migrated .notes-notion-canvas .notion-editor-toolbar {
+    border-radius: 0;
+  }
+
+  .app-shell .tech-notes-migrated .notes-notion-canvas .notion-toolbar-scroll {
+    padding-left: 10px;
+  }
+
+  .app-shell .tech-notes-migrated .notes-notion-canvas .notion-prosemirror {
+    width: calc(100% - 32px);
+  }
+}
+
+/* Final toolbar ownership: mode selection returns to its standalone capsule;
+   fullscreen is a separate icon action. */
+.app-shell .tech-notes-migrated .notes-notion-canvas .notion-editor-toolbar {
+  padding-right: 8px;
+}
+
+.app-shell .tech-notes-migrated .notion-toolbar-end {
+  align-self: center;
+  gap: 6px;
+  margin-block: 0;
+  padding-left: 6px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+
+.app-shell .tech-notes-migrated .note-toolbar-save-as {
+  order: -1;
+  box-sizing: border-box;
+  height: 32px;
+  min-width: 72px;
+  min-height: 32px;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 0 9px;
+  color: color-mix(in srgb, var(--notes-accent) 58%, var(--notes-muted));
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 680;
+  background: color-mix(in srgb, var(--notes-muted) 7%, var(--notes-panel));
+  border: 1px solid color-mix(in srgb, var(--notes-border) 66%, transparent);
+  border-radius: 9px;
+  box-shadow: none;
+  cursor: pointer;
+  transition: color 170ms ease, background-color 170ms ease, border-color 170ms ease;
+}
+
+.app-shell .tech-notes-migrated .note-toolbar-save-as:hover,
+.app-shell .tech-notes-migrated .note-toolbar-save-as:focus-visible {
+  color: var(--notes-accent-strong, var(--notes-accent));
+  background: color-mix(in srgb, var(--notes-accent-soft) 68%, var(--notes-panel));
+  border-color: color-mix(in srgb, var(--notes-accent) 30%, var(--notes-border));
+}
+
+.app-shell .tech-notes-migrated .notion-view-switch {
+  height: 32px;
+  align-self: center;
+  padding: 2px;
+  background: color-mix(in srgb, var(--notes-muted) 7%, var(--notes-panel)) !important;
+  border: 1px solid color-mix(in srgb, var(--notes-border) 66%, transparent);
+  border-radius: 9px;
+}
+
+.app-shell .tech-notes-migrated .notion-view-switch-summary {
+  min-width: 72px !important;
+  height: 26px !important;
+  gap: 4px !important;
+  padding-inline: 7px !important;
+  color: color-mix(in srgb, var(--notes-accent) 58%, var(--notes-muted)) !important;
+  font-size: 10px !important;
+  font-weight: 680 !important;
+  background: transparent !important;
+  border-radius: 6px !important;
+}
+
+.app-shell .tech-notes-migrated .notion-view-switch-summary > svg:first-child {
+  display: block;
+  width: 13px;
+  height: 13px;
+}
+
+.app-shell .tech-notes-migrated .notion-toolbar-end .note-toolbar-fullscreen {
+  width: 34px;
+  min-width: 34px;
+  height: 34px;
+  align-self: center;
+  margin: 0;
+  padding: 0;
+  color: color-mix(in srgb, var(--notes-accent) 74%, var(--notes-muted));
+  background: color-mix(in srgb, var(--notes-accent-soft) 52%, var(--notes-panel));
+  border: 1px solid color-mix(in srgb, var(--notes-accent) 18%, var(--notes-border));
+  border-radius: 10px;
+  animation: notes-fullscreen-icon-breathe 4.8s ease-in-out infinite;
+}
+
+.app-shell .tech-notes-migrated .notion-toolbar-end .note-toolbar-fullscreen:hover {
+  color: var(--notes-accent-strong, var(--notes-accent));
+  background: color-mix(in srgb, var(--notes-accent-soft) 82%, var(--notes-panel));
+  border-color: color-mix(in srgb, var(--notes-accent) 34%, var(--notes-border));
+}
+
+.app-shell .tech-notes-migrated .notion-toolbar-end .note-toolbar-fullscreen::after {
+  display: none;
+}
+
+@media (max-width: 620px) {
+  .app-shell .tech-notes-migrated .notion-view-switch-summary {
+    min-width: 38px !important;
+    padding-inline: 6px !important;
+  }
+
+  .app-shell .tech-notes-migrated .note-toolbar-save-as {
+    min-width: 64px;
+    padding-inline: 7px;
+  }
+
+  .app-shell .tech-notes-migrated .notion-view-switch-summary span {
+    display: none;
+  }
+
+  .app-shell .tech-notes-migrated .notion-toolbar-end .note-toolbar-fullscreen {
+    width: 34px;
+    min-width: 34px;
+    padding: 0;
+  }
+}
+
+/* Independent editor-mode and fullscreen controls. They are neighboring
+   utilities, not one segmented control. */
+.app-shell .tech-notes-migrated .notes-notion-canvas .notion-editor-toolbar {
+  padding-right: 8px;
+}
+
+.app-shell .tech-notes-migrated .notion-toolbar-end {
+  align-self: center;
+  gap: 6px;
+  margin-block: 0;
+  padding-left: 6px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+
+.app-shell .tech-notes-migrated .notion-view-switch {
+  height: 32px;
+  align-self: center;
+  padding: 2px;
+  background: color-mix(in srgb, var(--notes-muted) 7%, var(--notes-panel)) !important;
+  border: 1px solid color-mix(in srgb, var(--notes-border) 66%, transparent);
+  border-radius: 9px;
+}
+
+.app-shell .tech-notes-migrated .notion-view-switch-summary {
+  min-width: 72px !important;
+  height: 26px !important;
+  gap: 4px !important;
+  padding-inline: 7px !important;
+  color: color-mix(in srgb, var(--notes-accent) 58%, var(--notes-muted)) !important;
+  font-size: 10px !important;
+  font-weight: 680 !important;
+  background: transparent !important;
+  border-radius: 6px !important;
+}
+
+.app-shell .tech-notes-migrated .notion-view-switch-summary > svg:first-child {
+  display: block;
+  width: 13px;
+  height: 13px;
+}
+
+.app-shell .tech-notes-migrated .notion-toolbar-end .note-toolbar-fullscreen {
+  width: 34px;
+  min-width: 34px;
+  height: 34px;
+  align-self: center;
+  margin: 0;
+  padding: 0;
+  color: color-mix(in srgb, var(--notes-accent) 74%, var(--notes-muted));
+  background: color-mix(in srgb, var(--notes-accent-soft) 52%, var(--notes-panel));
+  border: 1px solid color-mix(in srgb, var(--notes-accent) 18%, var(--notes-border));
+  border-radius: 10px;
+  animation: notes-fullscreen-icon-breathe 4.8s ease-in-out infinite;
+}
+
+.app-shell .tech-notes-migrated .notion-toolbar-end .note-toolbar-fullscreen:hover {
+  color: var(--notes-accent-strong, var(--notes-accent));
+  background: color-mix(in srgb, var(--notes-accent-soft) 82%, var(--notes-panel));
+  border-color: color-mix(in srgb, var(--notes-accent) 34%, var(--notes-border));
+}
+
+@keyframes notes-fullscreen-icon-breathe {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--notes-accent) 0%, transparent); }
+  50% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--notes-accent) 7%, transparent); }
+}
+
+.app-shell .tech-notes-migrated .notion-editor-toolbar .notion-font-size-trigger {
+  width: 48px;
+  min-width: 48px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 0 3px;
+  color: color-mix(in srgb, var(--notes-text) 68%, var(--notes-muted));
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 670;
+  white-space: nowrap;
+}
+
+.app-shell .tech-notes-migrated .notion-prosemirror > h2:first-child {
+  margin: 5px 0 3px;
+  color: var(--notes-text);
+  font-size: 18px;
+  font-weight: 740;
+  line-height: 1.45;
+}
+
+.app-shell .tech-notes-migrated .notion-prosemirror > h2:first-child + p {
+  margin: 0 0 22px;
+  color: var(--notes-muted);
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.app-shell .tech-notes-migrated .note-fullscreen-topbar {
+  height: 52px;
+  display: flex;
+  justify-content: space-between;
+  padding-inline: 18px;
+  background: color-mix(in srgb, var(--notes-panel) 97%, var(--notes-accent-soft));
+  box-shadow: none;
+}
+
+.app-shell .tech-notes-migrated .note-fullscreen-topbar .note-fullscreen-back {
+  height: 36px;
+  gap: 6px;
+  padding: 0 7px;
+  color: color-mix(in srgb, var(--notes-accent) 70%, var(--notes-text));
+  font-size: 14px;
+  font-weight: 720;
+  background: transparent;
+  border: 0;
+  border-radius: 7px;
+  box-shadow: none;
+  animation: notes-back-link-breathe 4.6s ease-in-out infinite;
+}
+
+.app-shell .tech-notes-migrated .note-fullscreen-back-icon {
+  width: 22px;
+  height: 22px;
+  color: inherit;
+  background: transparent;
+  border-radius: 0;
+}
+
+.app-shell .tech-notes-migrated .note-fullscreen-topbar .note-fullscreen-back:hover {
+  color: var(--notes-accent-strong, var(--notes-accent));
+  background: color-mix(in srgb, var(--notes-accent-soft) 38%, transparent);
+  border-color: transparent;
+  transform: translateX(-1px);
+}
+
+.app-shell .tech-notes-migrated .note-fullscreen-actions {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.app-shell .tech-notes-migrated .note-fullscreen-actions .notion-toolbar-end {
+  gap: 4px;
+  padding: 0;
+}
+
+.app-shell .tech-notes-migrated .note-fullscreen-actions .notion-view-switch-summary,
+.app-shell .tech-notes-migrated .note-fullscreen-actions .note-toolbar-save-as {
+  height: 32px !important;
+  min-height: 32px;
+  padding-inline: 8px !important;
+  color: color-mix(in srgb, var(--notes-text) 76%, var(--notes-accent)) !important;
+  font-size: 13px !important;
+  font-weight: 680 !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 8px !important;
+}
+
+.app-shell .tech-notes-migrated .note-fullscreen-actions .notion-view-switch-summary:hover,
+.app-shell .tech-notes-migrated .note-fullscreen-actions .note-toolbar-save-as:hover {
+  color: var(--notes-accent) !important;
+  background: color-mix(in srgb, var(--notes-accent-soft) 52%, transparent) !important;
+}
+
+.app-shell .tech-notes-migrated .note-fullscreen-actions .note-toolbar-fullscreen {
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+}
+
+@keyframes notes-back-link-breathe {
+  0%, 100% { opacity: .78; }
+  50% { opacity: 1; }
+}
+
+@media (max-width: 620px) {
+  .app-shell .tech-notes-migrated .notion-view-switch-summary {
+    min-width: 38px !important;
+    padding-inline: 6px !important;
+  }
+
+  .app-shell .tech-notes-migrated .notion-view-switch-summary span {
+    display: none;
+  }
+
+  .app-shell .tech-notes-migrated .notion-editor-toolbar .notion-font-size-trigger {
+    width: 42px;
+    min-width: 42px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-shell .tech-notes-migrated .note-toolbar-fullscreen,
+  .app-shell .tech-notes-migrated .note-fullscreen-topbar .note-fullscreen-back {
+    animation: none;
+  }
+}
+
+/* Format-native document editing: CodeMirror owns source text while the
+   existing renderer owns preview. The split view stays one continuous canvas. */
+.app-shell .tech-notes-migrated .notion-editor-body:is(.is-markdown, .is-plain, .is-split, .is-preview) {
+  overflow: auto;
+  padding: 18px 24px 52px;
+}
+
+.app-shell .tech-notes-migrated .notion-editor-body.is-split {
+  padding-inline: 18px;
+}
+
+.app-shell .tech-notes-migrated .notion-markdown-source > header,
+.app-shell .tech-notes-migrated .notion-markdown-preview > header {
+  min-height: 30px;
+  display: flex;
+  align-items: center;
+  padding: 0 4px 8px;
+  color: color-mix(in srgb, var(--notes-text) 70%, var(--notes-muted));
+  font-size: 12px;
+  font-weight: 720;
+  letter-spacing: .02em;
+}
+
+.app-shell .tech-notes-migrated .notion-source-editor-shell {
+  min-height: 390px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--notes-panel) 94%, transparent);
+  border: 1px solid color-mix(in srgb, var(--notes-border) 76%, transparent);
+  border-radius: 10px;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.app-shell .tech-notes-migrated .notion-source-editor-shell:focus-within {
+  border-color: color-mix(in srgb, var(--notes-accent) 46%, var(--notes-border));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--notes-accent) 9%, transparent);
+}
+
+.app-shell .tech-notes-migrated .notion-markdown-actions {
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px 6px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  border-bottom: 1px solid color-mix(in srgb, var(--notes-border) 68%, transparent);
+}
+
+.app-shell .tech-notes-migrated .notion-markdown-actions button {
+  width: 30px;
+  min-width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: color-mix(in srgb, var(--notes-text) 68%, var(--notes-muted));
+  background: transparent;
+  border: 0;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: color 150ms ease, background 150ms ease, transform 150ms ease;
+}
+
+.app-shell .tech-notes-migrated .notion-markdown-actions button:hover,
+.app-shell .tech-notes-migrated .notion-markdown-actions button:focus-visible {
+  color: var(--notes-accent-strong, var(--notes-accent));
+  background: color-mix(in srgb, var(--notes-accent-soft) 56%, transparent);
+  outline: 0;
+}
+
+.app-shell .tech-notes-migrated .notion-markdown-actions button:active {
+  transform: translateY(1px);
+}
+
+.app-shell .tech-notes-migrated .notion-source-code-editor {
+  min-height: 390px;
+  flex: 1;
+  color: var(--notes-text);
+  background: transparent;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.72;
+}
+
+.app-shell .tech-notes-migrated .notion-source-code-editor .cm-editor,
+.app-shell .tech-notes-migrated .notion-source-code-editor .cm-scroller {
+  min-height: 390px;
+  background: transparent;
+  font: inherit;
+}
+
+.app-shell .tech-notes-migrated .notion-source-code-editor .cm-content {
+  padding: 13px 4px 28px;
+  caret-color: var(--notes-accent);
+}
+
+.app-shell .tech-notes-migrated .notion-source-code-editor .cm-line {
+  padding-inline: 8px 16px;
+}
+
+.app-shell .tech-notes-migrated .notion-source-code-editor .cm-gutters {
+  color: color-mix(in srgb, var(--notes-muted) 66%, transparent);
+  background: color-mix(in srgb, var(--notes-muted) 5%, transparent);
+  border-right: 1px solid color-mix(in srgb, var(--notes-border) 54%, transparent);
+}
+
+.app-shell .tech-notes-migrated .notion-source-code-editor .cm-activeLine,
+.app-shell .tech-notes-migrated .notion-source-code-editor .cm-activeLineGutter {
+  background: color-mix(in srgb, var(--notes-accent-soft) 34%, transparent);
+}
+
+.app-shell .tech-notes-migrated .notion-source-code-editor .cm-selectionBackground,
+.app-shell .tech-notes-migrated .notion-source-code-editor .cm-content ::selection {
+  background: color-mix(in srgb, var(--notes-accent) 22%, transparent) !important;
+}
+
+.app-shell .tech-notes-migrated .notion-source-code-editor .cm-focused {
+  outline: 0;
+}
+
+.app-shell .tech-notes-migrated .notion-markdown-split {
+  width: min(1120px, 100%);
+  min-height: 430px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  margin-inline: auto;
+  background: color-mix(in srgb, var(--notes-panel) 72%, transparent);
+  border: 1px solid color-mix(in srgb, var(--notes-border) 72%, transparent);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+/* Fullscreen split editing is one continuous canvas: the center rule, not
+   nested cards, separates source from preview. */
+.app-shell .tech-notes-migrated .note-editor.is-fullscreen .notion-editor-toolbar.is-end-portaled:not(.is-rich) {
+  display: none;
+}
+
+.app-shell .tech-notes-migrated .note-editor.is-fullscreen .notion-editor-body.is-split {
+  padding: 0;
+}
+
+.app-shell .tech-notes-migrated .note-editor.is-fullscreen .notion-markdown-split {
+  width: min(1180px, 100%);
+  min-height: 100%;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  overflow: visible;
+}
+
+.app-shell .tech-notes-migrated .note-editor.is-fullscreen .notion-markdown-split > section {
+  padding: 22px 28px 40px;
+}
+
+.app-shell .tech-notes-migrated .note-editor.is-fullscreen .notion-markdown-split .notion-source-editor-shell,
+.app-shell .tech-notes-migrated .note-editor.is-fullscreen .notion-markdown-split .notion-source-editor-shell:focus-within {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.app-shell .tech-notes-migrated .notion-markdown-split > section {
+  width: auto;
+  min-width: 0;
+  min-height: 430px;
+  margin: 0;
+  padding: 12px 14px 24px;
+}
+
+.app-shell .tech-notes-migrated .notion-markdown-split > .notion-markdown-preview {
+  border-left: 1px solid color-mix(in srgb, var(--notes-border) 76%, transparent);
+}
+
+.app-shell .tech-notes-migrated .notion-markdown-split .notion-source-editor-shell {
+  min-height: 372px;
+  border-color: transparent;
+  border-radius: 8px;
+}
+
+.app-shell .tech-notes-migrated .notion-markdown-preview-content {
+  min-width: 0;
+}
+
+@media (max-width: 760px) {
+  .app-shell .tech-notes-migrated .notion-editor-body:is(.is-markdown, .is-plain, .is-split, .is-preview) {
+    padding: 14px 10px 46px;
+  }
+
+  .app-shell .tech-notes-migrated .notion-markdown-split {
+    display: block;
+    border-radius: 10px;
+  }
+
+  .app-shell .tech-notes-migrated .notion-markdown-split > section {
+    min-height: 320px;
+    padding: 10px 10px 18px;
+  }
+
+  .app-shell .tech-notes-migrated .notion-markdown-split > .notion-markdown-preview {
+    border-top: 1px solid color-mix(in srgb, var(--notes-border) 76%, transparent);
+    border-left: 0;
+  }
+
+  .app-shell .tech-notes-migrated .notion-source-code-editor,
+  .app-shell .tech-notes-migrated .notion-source-code-editor .cm-editor,
+  .app-shell .tech-notes-migrated .notion-source-code-editor .cm-scroller {
+    min-height: 320px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-shell .tech-notes-migrated .notion-source-editor-shell,
+  .app-shell .tech-notes-migrated .notion-markdown-actions button {
+    transition: none;
+  }
+}
+
+/* Portalled font-size picker. */
+.notion-font-size-menu {
+  position: fixed;
+  z-index: 1400;
+  width: 142px;
+  display: grid;
+  gap: 2px;
+  padding: 6px;
+  color: var(--workspace-text, #172038);
+  background: color-mix(in srgb, var(--workspace-panel, #fff) 97%, transparent);
+  border: 1px solid color-mix(in srgb, var(--workspace-border, #d9ddea) 86%, transparent);
+  border-radius: 12px;
+  box-shadow: 0 14px 34px color-mix(in srgb, #10162b 14%, transparent);
+  backdrop-filter: blur(18px);
+}
+
+.notion-font-size-menu > button {
+  width: 100%;
+  min-height: 34px;
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) 14px;
+  align-items: center;
+  gap: 7px;
+  padding: 0 8px;
+  color: var(--workspace-secondary, #6f7891);
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.notion-font-size-menu > button:hover,
+.notion-font-size-menu > button:focus-visible,
+.notion-font-size-menu > button.is-selected {
+  color: var(--workspace-accent, #705cff);
+  background: var(--workspace-hover, rgba(111, 92, 255, .08));
+  outline: 0;
+}
+
+.notion-font-size-menu > button > span {
+  color: var(--workspace-text, #172038);
+  line-height: 1;
+}
+
+.notion-font-size-menu > button > strong {
+  font-size: 11px;
+  font-weight: 680;
+}
+
+/* Portalled text-style picker: it sits outside the Notes page DOM, so it uses
+   workspace tokens instead of page-local --notes-* variables. */
+.notion-style-menu {
+  position: fixed;
+  z-index: 1400;
+  display: grid;
+  gap: 2px;
+  padding: 6px;
+  color: var(--workspace-text, #172038);
+  background: color-mix(in srgb, var(--workspace-panel, #fff) 96%, transparent);
+  border: 1px solid color-mix(in srgb, var(--workspace-border, #d9ddea) 86%, transparent);
+  border-radius: 12px;
+  box-shadow: 0 14px 34px color-mix(in srgb, #10162b 14%, transparent);
+  backdrop-filter: blur(18px);
+}
+
+.notion-style-menu > button {
+  width: 100%;
+  height: 36px;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  padding: 0 9px;
+  color: var(--workspace-secondary, #6f7891);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 640;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: color 150ms ease, background-color 150ms ease;
+}
+
+.notion-style-menu > button svg {
+  opacity: 0;
+}
+
+.notion-style-menu > button:hover,
+.notion-style-menu > button:focus-visible {
+  color: var(--workspace-text, #172038);
+  background: var(--workspace-hover, rgba(111, 92, 255, .08));
+  outline: 0;
+}
+
+.notion-style-menu > button.is-selected {
+  color: var(--workspace-accent, #705cff);
+  background: color-mix(in srgb, var(--workspace-accent, #705cff) 9%, transparent);
+}
+
+.notion-style-menu > button.is-selected svg {
+  opacity: 1;
+}
+
+.notion-color-menu {
+  position: fixed;
+  z-index: 1400;
+  width: 226px;
+  padding: 10px;
+  color: var(--workspace-text, #172038);
+  background: color-mix(in srgb, var(--workspace-panel, #fff) 97%, transparent);
+  border: 1px solid color-mix(in srgb, var(--workspace-border, #d9ddea) 84%, transparent);
+  border-radius: 13px;
+  box-shadow: 0 16px 38px color-mix(in srgb, #10162b 15%, transparent);
+  backdrop-filter: blur(18px);
+}
+
+.notion-color-menu > strong {
+  display: block;
+  padding: 2px 4px 8px;
+  font-size: 12px;
+  font-weight: 720;
+}
+
+.notion-color-menu > div {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.notion-color-menu button {
+  min-width: 0;
+  height: 52px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--workspace-secondary, #6f7891);
+  font-family: inherit;
+  background: transparent;
+  border: 0;
+  border-radius: 9px;
+  cursor: pointer;
+}
+
+.notion-color-menu button > span {
+  width: 19px;
+  height: 19px;
+  border: 2px solid color-mix(in srgb, var(--workspace-panel, #fff) 88%, transparent);
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--workspace-border, #d9ddea) 88%, transparent);
+}
+
+.notion-color-menu button > small {
+  overflow: hidden;
+  max-width: 100%;
+  font-size: 10px;
+  font-weight: 620;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.notion-color-menu button > svg {
+  position: absolute;
+  top: 5px;
+  right: 7px;
+  color: var(--workspace-accent, #705cff);
+}
+
+.notion-color-menu button:hover,
+.notion-color-menu button:focus-visible,
+.notion-color-menu button.is-selected {
+  color: var(--workspace-text, #172038);
+  background: var(--workspace-hover, rgba(111, 92, 255, .08));
+  outline: 0;
+}
+
+/* Historical restoration: exact title-card and note-index geometry from the
+   shared Goals/Knowledge generation. Editor-only refinements remain separate. */
+.app-shell .tech-notes-migrated .notes-reference-header {
+  height: 100px;
+  min-height: 100px;
+  margin-bottom: 16px;
+  padding: 14px 16px;
+}
+
+.app-shell .tech-notes-migrated .notes-reference-header .workspace-page-title {
+  gap: normal;
+}
+
+.app-shell .tech-notes-migrated .notes-reference-header .workspace-page-title h1 {
+  margin: 2px 0 0;
+}
+
+.app-shell .tech-notes-migrated .notes-reference-header .workspace-page-title > span {
+  margin-top: 5px;
+  line-height: 1.5;
+}
+
+.app-shell .tech-notes-migrated .notes-list > header {
+  height: 50px;
+  min-height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 0 38px 0 10px;
+}
+
+.app-shell .tech-notes-migrated .notes-goal-control {
+  width: max-content;
+  max-width: 100%;
+  flex: 0 1 auto;
+}
+
+.app-shell .tech-notes-migrated .notes-goal-trigger {
+  width: max-content;
+  height: 40px;
+  margin-inline: 0;
+  justify-content: flex-start;
+}
+
+.app-shell .tech-notes-migrated .notes-filter-meta {
+  height: 34px;
+  min-width: 56px;
+  display: inline-grid;
+  grid-template-rows: 20px 12px;
+  justify-items: center;
+  align-items: center;
+  align-self: center;
+  row-gap: 1px;
+}
+
+.app-shell .tech-notes-migrated .notes-filter-meta .notes-filter-count {
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  line-height: 20px;
+  transform: none;
+}
+
+.app-shell .tech-notes-migrated .notes-filter-meta > svg {
+  width: 13px;
+  height: 13px;
+  margin-top: 0;
+  color: var(--notes-accent);
+  transition: transform 160ms ease, color 160ms ease;
+}
+
+.app-shell .tech-notes-migrated .notes-filter-meta > svg.is-open {
+  transform: rotate(180deg);
+}
+
+.app-shell .tech-notes-migrated .notes-index-collapse {
+  top: 9px;
+  right: 10px;
+  width: 22px;
+  height: 32px;
+  color: var(--notes-muted);
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  opacity: .7;
+  transform: none;
+}
+
+.app-shell .tech-notes-migrated .notes-index-collapse:hover,
+.app-shell .tech-notes-migrated .notes-index-collapse:focus-visible {
+  color: var(--notes-accent);
+  background: transparent;
+  opacity: 1;
+  transform: none;
+}
+
+.app-shell .tech-notes-migrated .notes-list-scroll {
+  padding: 8px 10px 16px;
+}
+
+.app-shell .tech-notes-migrated .notes-list-row,
+.app-shell .tech-notes-migrated .notes-list-row:hover,
+.app-shell .tech-notes-migrated .notes-list-row.is-active {
+  margin: 0;
+  padding: 11px 10px 11px 14px;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--notes-border) 58%, transparent);
+  border-radius: 0;
+  box-shadow: none;
+  transform: none;
+}
+
+.app-shell .tech-notes-migrated .notes-list-row:hover,
+.app-shell .tech-notes-migrated .notes-list-row.is-active {
+  background: color-mix(in srgb, var(--notes-accent-soft) 48%, transparent);
+}
+
+.app-shell .tech-notes-migrated .notes-list-row::before {
+  inset: 8px auto 8px 0;
+  width: 2px;
+}
+
+.app-shell .tech-notes-migrated .note-list-topline {
+  position: relative;
+  min-height: 14px;
+  padding-right: 28px;
+}
+
+.app-shell .tech-notes-migrated .note-list-select strong {
+  margin-top: 0 !important;
+}
+
+.app-shell .tech-notes-migrated .note-list-select .note-list-preview {
+  margin-top: 1px;
+  line-height: 1.4;
+}
+
+.app-shell .tech-notes-migrated .note-list-footer {
+  position: relative;
+  min-height: 22px;
+  padding-right: 28px;
+}
+
+.app-shell .tech-notes-migrated .note-card-download,
+.app-shell .tech-notes-migrated .note-card-delete {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  flex: 0 0 24px;
+  transform: translateY(-50%);
+}
+
+/* Restore the original Notes/Goals/Knowledge page family while keeping the
+   improved note data and editor behavior. */
+.app-shell .tech-notes-migrated .notes-reference-header {
+  min-height: unset;
+  padding-block: unset;
+}
+
+.app-shell .tech-notes-migrated .notes-reference-header .workspace-page-title {
+  gap: unset;
+}
+
+.app-shell .tech-notes-migrated .notes-list > header {
+  min-height: 56px;
+  padding: 5px 38px 5px 10px;
+}
+
+.app-shell .tech-notes-migrated .notes-goal-trigger {
+  height: 46px;
+}
+
+.app-shell .tech-notes-migrated .notes-filter-copy {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 6px !important;
+}
+
+.app-shell .tech-notes-migrated .notes-filter-copy > strong,
+.app-shell .tech-notes-migrated .notes-filter-count,
+.app-shell .tech-notes-migrated .notes-filter-copy > svg {
+  grid-column: auto;
+  grid-row: auto;
+}
+
+.app-shell .tech-notes-migrated .notes-filter-copy > strong {
+  min-height: 24px !important;
+  font-size: 17px !important;
+  line-height: 24px !important;
+}
+
+.app-shell .tech-notes-migrated .notes-filter-count {
+  padding: 0 6px;
+  background: color-mix(in srgb, var(--notes-accent-soft) 68%, transparent);
+  transform: translateY(1px);
+}
+
+.app-shell .tech-notes-migrated .notes-filter-copy > svg {
+  transform: translateY(2px);
+}
+
+.app-shell .tech-notes-migrated .notes-filter-copy > svg.is-open {
+  transform: translateY(2px) rotate(180deg);
+}
+
+.app-shell .tech-notes-migrated .notes-index-collapse {
+  top: 18px;
+  right: 12px;
+  width: 36px;
+  height: 36px;
+  color: var(--notes-muted);
+  background: transparent;
+  border-color: transparent;
+  border-radius: 10px;
+  box-shadow: none;
+  opacity: .72;
+}
+
+.app-shell .tech-notes-migrated .notes-list-scroll {
+  padding: 5px 12px 18px;
+}
+
+.app-shell .tech-notes-migrated .notes-list-row,
+.app-shell .tech-notes-migrated .notes-list-row:hover,
+.app-shell .tech-notes-migrated .notes-list-row.is-active {
+  margin: 12px 0;
+  padding: 11px 11px 11px 15px;
+  border-radius: 10px;
+  box-shadow: none;
+  transform: none;
+}
+
+.app-shell .tech-notes-migrated .notes-list-row {
+  background: color-mix(in srgb, var(--notes-panel-soft) 58%, transparent);
+  border: 1px solid transparent;
+}
+
+.app-shell .tech-notes-migrated .notes-list-row:hover {
+  background: color-mix(in srgb, var(--notes-panel-soft) 90%, var(--notes-panel));
+  border-color: transparent;
+}
+
+.app-shell .tech-notes-migrated .notes-list-row.is-active {
+  background: color-mix(in srgb, var(--notes-accent-soft) 55%, var(--notes-panel));
+  border-color: color-mix(in srgb, var(--notes-accent) 28%, var(--notes-border));
+  box-shadow: 0 5px 14px color-mix(in srgb, var(--notes-accent) 6%, transparent);
+}
+
+.app-shell .tech-notes-migrated .notes-list-row::before {
+  display: block;
+  inset: 10px auto 10px 4px;
+  width: 3px;
+  opacity: 0;
+}
+
+.app-shell .tech-notes-migrated .notes-list-row.is-active::before {
+  opacity: 1;
+}
+
+.app-shell .tech-notes-migrated .notes-notion-canvas .notion-editor-toolbar {
+  gap: 8px;
+  overflow: hidden;
+}
+
+.app-shell .tech-notes-migrated .notes-notion-canvas .notion-toolbar-scroll {
+  min-width: 0;
+  flex: 1;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.app-shell .tech-notes-migrated .notion-toolbar-end {
+  display: flex;
+  flex: none;
+  align-items: center;
+  margin-left: auto;
+  padding-left: 8px;
+}
+
+.app-shell .tech-notes-migrated .notion-toolbar-end .note-save-state {
+  height: 28px;
+  padding: 0 4px;
+  color: var(--notes-muted);
+  font-size: 9px;
+  background: transparent;
+  border: 0;
+}
+
+.app-shell .tech-notes-migrated .notion-toolbar-end .note-save-state.is-dirty {
+  color: #a85e21;
+  background: transparent;
+}
+
+.app-shell .tech-notes-migrated .note-document-heading {
+  min-height: 64px;
+  align-items: center;
+  padding-block: 7px;
+}
+
+.app-shell .tech-notes-migrated .note-document-main {
+  justify-content: center;
+}
+
+.app-shell .tech-notes-migrated .note-editor-controls {
+  min-height: 0;
+  margin: 0 0 0 38px;
+}
+
+.app-shell .tech-notes-migrated .note-editor-actions button {
+  color: var(--notes-muted);
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+}
+
+.app-shell .tech-notes-migrated .note-editor-actions button:hover {
+  color: var(--notes-accent);
+  background: var(--notes-accent-soft);
+}
+
+.app-shell .tech-notes-migrated .notion-quick-start {
+  width: min(980px, calc(100% - 48px));
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px auto 0;
+  padding: 0 8px;
+}
+
+.app-shell .tech-notes-migrated .notion-quick-start-label {
+  flex: none;
+  color: var(--notes-muted);
+  font-size: 9px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.app-shell .tech-notes-migrated .notion-quick-start-actions {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 5px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.app-shell .tech-notes-migrated .notion-quick-start-actions > button {
+  width: auto;
+  min-width: max-content;
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 9px;
+  color: var(--notes-muted);
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--notes-border) 72%, transparent);
+  border-radius: 7px;
+  box-shadow: none;
+}
+
+.app-shell .tech-notes-migrated .notion-quick-start-actions > button:hover,
+.app-shell .tech-notes-migrated .notion-quick-start-actions > button:focus-visible {
+  color: var(--notes-accent);
+  background: color-mix(in srgb, var(--notes-accent-soft) 50%, transparent);
+  border-color: color-mix(in srgb, var(--notes-accent) 18%, var(--notes-border));
+  transform: none;
+}
+
+.app-shell .tech-notes-migrated .notion-quick-start-actions > button > svg {
+  flex: none;
+  color: currentColor;
+}
+
+.app-shell .tech-notes-migrated .notion-quick-start-actions strong {
+  color: inherit;
+  font-size: 9px;
+  font-weight: 650;
+}
+
+.app-shell .tech-notes-migrated .notion-quick-start-actions small {
+  display: none;
+}
+
+/* Task items use one shared first-line box so the native checkbox and body
+   copy stay on the same horizontal axis across browsers. */
+.app-shell .tech-notes-migrated .notion-prosemirror ul[data-type="taskList"] {
+  padding-left: 0;
+  list-style: none;
+}
+
+.app-shell .tech-notes-migrated .notion-prosemirror li[data-type="taskItem"] {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
+  padding-left: 0;
+}
+
+.app-shell .tech-notes-migrated .notion-prosemirror li[data-type="taskItem"] > label {
+  width: 18px;
+  height: 1.8em;
+  display: grid;
+  flex: none;
+  place-items: center;
+  margin: 0;
+  padding: 0;
+}
+
+.app-shell .tech-notes-migrated .notion-prosemirror li[data-type="taskItem"] > label input {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+}
+
+.app-shell .tech-notes-migrated .notion-prosemirror li[data-type="taskItem"] > div {
+  min-width: 0;
+}
+
+.app-shell .tech-notes-migrated .notion-prosemirror li[data-type="taskItem"] > div > p {
+  margin: 0;
+  line-height: 1.8;
+}
+
+.app-shell .tech-notes-migrated .notes-notion-canvas .notion-prosemirror {
+  padding-top: 14px;
+}
+
+@media (max-width: 620px) {
+  .app-shell .tech-notes-migrated .notes-reference-header {
+    padding-block: unset;
+  }
+
+  .app-shell .tech-notes-migrated .notes-list-row,
+  .app-shell .tech-notes-migrated .notes-list-row:hover,
+  .app-shell .tech-notes-migrated .notes-list-row.is-active {
+    margin-block: 9px;
+  }
+
+  .app-shell .tech-notes-migrated .notion-quick-start {
+    width: calc(100% - 32px);
+    margin-top: 10px;
+    padding-inline: 0;
+  }
+
+  .app-shell .tech-notes-migrated .notion-quick-start-actions {
+    grid-template-columns: none;
+  }
+}
+
+/* Note-card action placement: date + download on the first baseline, goal tag
+ * + delete on the last baseline. This structure is shared by every goal
+ * filter so a filtered list never loses the note's goal context. */
+.app-shell .tech-notes-migrated .notes-list-row,
+.app-shell .tech-notes-migrated .notes-list-row:hover,
+.app-shell .tech-notes-migrated .notes-list-row.is-active {
+  gap: 2px;
+  padding: 6px 10px 6px 14px;
+}
+
+.app-shell .tech-notes-migrated .note-list-select strong {
+  margin-top: 0;
+  line-height: 1.3;
+}
+
+.app-shell .tech-notes-migrated .note-list-select .note-list-preview {
+  margin-top: 1px;
+  line-height: 1.4;
+}
+
+.app-shell .tech-notes-migrated .note-list-topline,
+.app-shell .tech-notes-migrated .note-list-footer {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+}
+
+.app-shell .tech-notes-migrated .note-list-topline {
+  position: relative;
+  justify-content: space-between;
+  gap: 4px;
+  padding-right: 28px;
+}
+
+.app-shell .tech-notes-migrated .note-list-topline .note-list-meta {
+  justify-content: flex-start;
+  gap: 6px;
+}
+
+.app-shell .tech-notes-migrated .note-list-footer {
+  position: relative;
+  justify-content: space-between;
+  gap: 4px;
+  min-height: 20px;
+  padding-right: 28px;
+}
+
+.app-shell .tech-notes-migrated .note-list-goal-label {
+  min-width: 0;
+  min-height: 20px;
+  align-items: center;
+  overflow: hidden;
+  font-size: 10px;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-shell .tech-notes-migrated .note-card-action {
+  display: inline-grid;
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  min-height: 24px;
+  flex: 0 0 24px;
+  padding: 0;
+  place-items: center;
+  color: var(--notes-muted);
+  background: transparent;
+  border: 0;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: color 160ms ease, background-color 160ms ease;
+}
+
+.app-shell .tech-notes-migrated .note-card-download:hover,
+.app-shell .tech-notes-migrated .note-card-download:focus-visible {
+  color: var(--notes-accent);
+  background: var(--notes-accent-soft);
+}
+
+.app-shell .tech-notes-migrated .note-card-download,
+.app-shell .tech-notes-migrated .note-card-delete {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
+}
+
+.app-shell .tech-notes-migrated .note-card-delete:hover,
+.app-shell .tech-notes-migrated .note-card-delete:focus-visible {
+  color: var(--workspace-danger, #c45d67);
+  background: transparent;
+}
+
+.app-shell .tech-notes-migrated .note-card-download {
+  color: var(--notes-accent);
+}
+
+.app-shell .tech-notes-migrated .note-card-delete {
+  color: var(--workspace-danger, #c45d67);
+  background: transparent;
+}
+
+@media (min-width: 961px) {
+  .app-shell .tech-notes-migrated {
+    height: calc(100dvh - 42px);
+    min-height: 0;
+    max-height: calc(100dvh - 42px);
+    overflow: hidden;
+  }
+
+  .app-shell .tech-notes-migrated .notes-reference-header {
+    flex: 0 0 auto;
+  }
+
+  .app-shell .tech-notes-migrated .notes-workspace {
+    height: auto;
+    min-height: 0;
+    flex: 1 1 auto;
+  }
+
+  .app-shell .tech-notes-migrated .notes-list,
+  .app-shell .tech-notes-migrated .note-editor {
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .app-shell .tech-notes-migrated .notes-list-scroll,
+  .app-shell .tech-notes-migrated .notes-notion-canvas {
+    min-height: 0;
+    max-height: none;
+    flex: 1 1 auto;
+    overscroll-behavior: contain;
+    overflow-x: hidden;
+    overflow-y: auto;
+    scrollbar-color: color-mix(in srgb, var(--notes-accent) 36%, transparent) transparent;
+    scrollbar-width: thin;
+  }
+
+  .app-shell .tech-notes-migrated .notes-list-scroll {
+    /* Reserve the scrollbar track before overflow begins, so inserting a note
+       never changes the width of the navigation rows. */
+    overflow-y: auto;
+    scrollbar-gutter: stable;
+  }
+
+  .app-shell .tech-notes-migrated .notes-list-scroll::-webkit-scrollbar,
+  .app-shell .tech-notes-migrated .notes-notion-canvas::-webkit-scrollbar {
+    width: 5px;
+  }
+
+  .app-shell .tech-notes-migrated .notes-list-scroll::-webkit-scrollbar-track,
+  .app-shell .tech-notes-migrated .notes-notion-canvas::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .app-shell .tech-notes-migrated .notes-list-scroll::-webkit-scrollbar-thumb,
+  .app-shell .tech-notes-migrated .notes-notion-canvas::-webkit-scrollbar-thumb {
+    background: color-mix(in srgb, var(--notes-accent) 36%, transparent);
+    border-radius: 99px;
+  }
+}
+
+.app-shell .tech-notes-migrated .note-card-action:focus-visible {
+  outline: 2px solid var(--notes-accent);
+  outline-offset: 1px;
+}
+
+@media (max-width: 620px) {
+  .app-shell .tech-notes-migrated .note-card-action {
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    min-height: 36px;
+    flex-basis: 36px;
+  }
+
+  .app-shell .tech-notes-migrated .note-list-footer {
+    min-height: 36px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-shell .tech-notes-migrated *,
+  .app-shell .tech-notes-migrated *::before,
+  .app-shell .tech-notes-migrated *::after {
+    scroll-behavior: auto !important;
+    transition-duration: .01ms !important;
+    animation-duration: .01ms !important;
+  }
+}
+
+/* Notes information architecture refresh: titles, retrieval cues and actions. */
+.app-shell .tech-notes-migrated .notes-reference-header {
+  min-height: 104px;
+  padding-block: 18px;
+}
+
+.app-shell .tech-notes-migrated .notes-reference-header .workspace-page-title {
+  gap: 4px;
+}
+
+.app-shell .tech-notes-migrated .notes-reference-header .workspace-page-title h1 {
+  margin: 0;
+}
+
+.app-shell .tech-notes-migrated .notes-reference-header .workspace-page-title > span {
+  line-height: 1.45;
+}
+
+.app-shell .tech-notes-migrated .notes-list > header {
+  min-height: 68px;
+  padding: 6px 38px 6px 10px;
+}
+
+.app-shell .tech-notes-migrated .notes-goal-trigger {
+  height: 56px;
+}
+
+.app-shell .tech-notes-migrated .notes-filter-copy {
+  display: grid !important;
+  grid-template-columns: minmax(0, auto) auto 15px;
+  grid-template-rows: 15px 26px;
+  column-gap: 7px !important;
+  row-gap: 0 !important;
+  align-items: center !important;
+  justify-content: start !important;
+}
+
+.app-shell .tech-notes-migrated .notes-filter-kicker {
+  grid-column: 1 / -1;
+  color: var(--notes-muted);
+  font-size: 9px;
+  font-weight: 650;
+  line-height: 15px;
+  letter-spacing: .08em;
+}
+
+.app-shell .tech-notes-migrated .notes-filter-copy > strong {
+  grid-column: 1;
+  grid-row: 2;
+  min-height: 26px !important;
+  font-size: 16px !important;
+  line-height: 26px !important;
+}
+
+.app-shell .tech-notes-migrated .notes-filter-count {
+  grid-column: 2;
+  grid-row: 2;
+  padding: 0;
+  background: transparent;
+  transform: none;
+}
+
+.app-shell .tech-notes-migrated .notes-filter-copy > svg {
+  grid-column: 3;
+  grid-row: 2;
+  transform: none;
+}
+
+.app-shell .tech-notes-migrated .notes-filter-copy > svg.is-open {
+  transform: rotate(180deg);
+}
+
+.app-shell .tech-notes-migrated .notes-index-collapse {
+  top: 18px;
+  right: -15px;
+  width: 30px;
+  height: 30px;
+  background: var(--notes-panel);
+  border: 1px solid var(--notes-border);
+  border-radius: 999px;
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--notes-text) 5%, transparent);
+  opacity: .74;
+}
+
+.app-shell .tech-notes-migrated .notes-list-row,
+.app-shell .tech-notes-migrated .notes-list-row:hover,
+.app-shell .tech-notes-migrated .notes-list-row.is-active {
+  gap: 4px;
+  margin: 7px 0;
+  padding: 10px 11px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  box-shadow: none;
+  transform: none;
+}
+
+.app-shell .tech-notes-migrated .notes-list-row:hover {
+  background: color-mix(in srgb, var(--notes-panel-soft) 76%, transparent);
+  border-color: color-mix(in srgb, var(--notes-border) 48%, transparent);
+}
+
+.app-shell .tech-notes-migrated .notes-list-row.is-active {
+  background: color-mix(in srgb, var(--notes-panel-soft) 88%, var(--notes-panel));
+  border-color: color-mix(in srgb, var(--notes-accent) 13%, var(--notes-border));
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--notes-text) 4%, transparent);
+}
+
+.app-shell .tech-notes-migrated .notes-list-row::before {
+  display: none;
+}
+
+.app-shell .tech-notes-migrated .note-list-topline {
+  min-height: 26px;
+  padding-right: 0;
+}
+
+.app-shell .tech-notes-migrated .note-list-meta small {
+  font-size: 9px;
+  font-weight: 570;
+}
+
+.app-shell .tech-notes-migrated .note-card-actions {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 2px;
+  opacity: .48;
+  transition: opacity 160ms ease;
+}
+
+.app-shell .tech-notes-migrated .notes-list-row:is(:hover, :focus-within, .is-active) .note-card-actions {
+  opacity: 1;
+}
+
+.app-shell .tech-notes-migrated .note-card-download,
+.app-shell .tech-notes-migrated .note-card-delete {
+  position: static;
+  transform: none;
+  color: var(--notes-muted);
+}
+
+.app-shell .tech-notes-migrated .note-card-delete:hover,
+.app-shell .tech-notes-migrated .note-card-delete:focus-visible {
+  color: var(--workspace-danger, #c45d67);
+  background: color-mix(in srgb, var(--workspace-danger, #c45d67) 9%, transparent);
+}
+
+.app-shell .tech-notes-migrated .note-list-select strong {
+  font-size: 12px;
+  font-weight: 710;
+}
+
+.app-shell .tech-notes-migrated .note-list-select strong.is-placeholder {
+  color: color-mix(in srgb, var(--notes-text) 66%, var(--notes-muted));
+  font-style: normal;
+  font-weight: 620;
+}
+
+.app-shell .tech-notes-migrated .note-list-select .note-list-preview {
+  margin-top: 3px;
+  font-size: 10px;
+  line-height: 1.45;
+  -webkit-line-clamp: 2;
+}
+
+.app-shell .tech-notes-migrated .note-list-footer {
+  min-height: 18px;
+  padding-right: 0;
+}
+
+.app-shell .tech-notes-migrated .note-list-goal-label {
+  min-height: 18px;
+  color: color-mix(in srgb, var(--notes-accent) 62%, var(--notes-muted));
+  font-size: 9px;
+  font-weight: 630;
+}
+
+.app-shell .tech-notes-migrated .note-document-heading {
+  flex: none;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+.app-shell .tech-notes-migrated .note-document-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-shell .tech-notes-migrated .note-title-editor .note-title-input::placeholder {
+  color: color-mix(in srgb, var(--notes-muted) 68%, transparent);
+  font-weight: 620;
+}
+
+.app-shell .tech-notes-migrated .note-editor-controls {
+  min-height: 25px;
+  justify-content: flex-start;
+  gap: 8px;
+  margin: -3px 0 0 38px;
+}
+
+.app-shell .tech-notes-migrated .note-edit-head-actions {
+  min-height: 25px;
+}
+
+.app-shell .tech-notes-migrated .note-save-state {
+  height: 25px;
+  padding-inline: 2px;
+  font-size: 9px;
+}
+
+.app-shell .tech-notes-migrated .note-head-cancel,
+.app-shell .tech-notes-migrated .note-head-save {
+  min-height: 28px;
+  height: 28px;
+}
+
+.app-shell .tech-notes-migrated .note-editor-actions {
+  align-self: start;
+  padding-left: 0;
+  border-left: 0;
+}
+
+.app-shell .tech-notes-migrated .note-editor-actions button {
+  color: var(--notes-muted);
+  background: var(--notes-panel-soft);
+  border: 1px solid color-mix(in srgb, var(--notes-border) 78%, transparent);
+}
+
+.app-shell .tech-notes-migrated .notes-notion-canvas .notion-editor-toolbar {
+  min-height: 50px;
+  padding: 5px 14px;
+  background: color-mix(in srgb, var(--notes-panel-soft) 72%, var(--notes-panel));
+}
+
+.app-shell .tech-notes-migrated .notion-editor-toolbar button {
+  width: 30px;
+  height: 30px;
+  color: var(--notes-muted);
+  border-radius: 7px;
+}
+
+.app-shell .tech-notes-migrated .notion-editor-toolbar .notion-color-trigger {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.app-shell .tech-notes-migrated .notion-editor-toolbar .notion-color-trigger > i {
+  width: 14px;
+  height: 2px;
+  position: absolute;
+  right: 8px;
+  bottom: 4px;
+  border-radius: 999px;
+}
+
+.app-shell .tech-notes-migrated .notion-editor-toolbar select {
+  height: 30px;
+  color: var(--notes-text);
+  font-size: 10px;
+  font-weight: 630;
+  background-color: transparent;
+}
+
+.app-shell .tech-notes-migrated .notion-toolbar-divider {
+  height: 16px;
+  margin-inline: 5px;
+  opacity: .72;
+}
+
+.app-shell .tech-notes-migrated .notion-editor-footer {
+  position: absolute;
+  z-index: 4;
+  right: 14px;
+  bottom: -22px;
+  min-height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  max-width: calc(100% - 28px);
+  padding: 0 10px;
+  color: var(--notes-muted);
+  font-size: 10px;
+  background: color-mix(in srgb, var(--notes-muted) 8%, var(--notes-panel));
+  border: 1px solid color-mix(in srgb, var(--notes-border) 68%, transparent);
+  border-radius: 999px;
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--notes-text) 7%, transparent);
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.app-shell .tech-notes-migrated .notes-notion-canvas .notion-resource-editor {
+  position: relative;
+}
+
+.app-shell .tech-notes-migrated .notion-editor-footer-hint {
+  overflow: hidden;
+  color: color-mix(in srgb, var(--notes-text) 48%, var(--notes-muted));
+  font-size: 10px;
+  text-overflow: ellipsis;
+}
+
+.app-shell .tech-notes-migrated .notion-editor-footer > i {
+  width: 1px;
+  height: 11px;
+  flex: none;
+  background: color-mix(in srgb, var(--notes-border) 82%, transparent);
+}
+
+.app-shell .tech-notes-migrated .notion-editor-footer-count {
+  flex: none;
+  color: var(--notes-muted);
+  font-size: 10px;
+}
+
+.app-shell .tech-notes-migrated .notion-quick-start {
+  box-sizing: border-box;
+  width: min(980px, calc(100% - 48px));
+  display: grid;
+  gap: 14px;
+  margin: 24px auto 2px;
+  padding: 18px 8px 8px;
+}
+
+.app-shell .tech-notes-migrated .notion-quick-start > div:first-child {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.app-shell .tech-notes-migrated .notion-quick-start > div:first-child strong {
+  color: var(--notes-text);
+  font-size: 13px;
+  font-weight: 720;
+}
+
+.app-shell .tech-notes-migrated .notion-quick-start > div:first-child span {
+  color: var(--notes-muted);
+  font-size: 10px;
+}
+
+.app-shell .tech-notes-migrated .notion-quick-start-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.app-shell .tech-notes-migrated .notion-quick-start-actions > button {
+  min-width: 0;
+  min-height: 62px;
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  padding: 9px 11px;
+  color: var(--notes-text);
+  text-align: left;
+  background: color-mix(in srgb, var(--notes-panel-soft) 78%, transparent);
+  border: 1px solid transparent;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: color 170ms ease, background 170ms ease, border-color 170ms ease, transform 170ms cubic-bezier(.16, 1, .3, 1);
+}
+
+.app-shell .tech-notes-migrated .notion-quick-start-actions > button:hover,
+.app-shell .tech-notes-migrated .notion-quick-start-actions > button:focus-visible {
+  color: var(--notes-accent);
+  background: color-mix(in srgb, var(--notes-accent-soft) 64%, var(--notes-panel));
+  border-color: color-mix(in srgb, var(--notes-accent) 18%, var(--notes-border));
+  transform: translateY(-1px);
+}
+
+.app-shell .tech-notes-migrated .notion-quick-start-actions > button > span {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  color: var(--notes-accent);
+  background: var(--notes-accent-soft);
+  border-radius: 8px;
+}
+
+.app-shell .tech-notes-migrated .notion-quick-start-actions > button > div {
+  min-width: 0;
+}
+
+.app-shell .tech-notes-migrated .notion-quick-start-actions strong,
+.app-shell .tech-notes-migrated .notion-quick-start-actions small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-shell .tech-notes-migrated .notion-quick-start-actions strong {
+  font-size: 11px;
+  font-weight: 690;
+}
+
+.app-shell .tech-notes-migrated .notion-quick-start-actions small {
+  margin-top: 3px;
+  color: var(--notes-muted);
+  font-size: 9px;
+}
+
+@media (max-width: 620px) {
+  .app-shell .tech-notes-migrated .notes-reference-header {
+    min-height: auto;
+    padding-block: 14px;
+  }
+
+  .app-shell .tech-notes-migrated .notes-list-row,
+  .app-shell .tech-notes-migrated .notes-list-row:hover,
+  .app-shell .tech-notes-migrated .notes-list-row.is-active {
+    padding: 10px 12px;
+  }
+
+  .app-shell .tech-notes-migrated .note-card-actions {
+    opacity: 1;
+  }
+
+  .app-shell .tech-notes-migrated .note-document-heading {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .app-shell .tech-notes-migrated .note-editor-controls {
+    margin-left: 38px;
+  }
+
+  .app-shell .tech-notes-migrated .notion-quick-start {
+    width: calc(100% - 32px);
+    margin-top: 18px;
+    padding-inline: 0;
+  }
+
+  .app-shell .tech-notes-migrated .notion-quick-start-actions {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Final cascade for the restored Notes layout. Kept last intentionally so
+   earlier polish passes cannot re-expand the compact template row. */
+.app-shell .tech-notes-migrated .notes-reference-header {
+  min-height: unset;
+  padding-block: unset;
+}
+
+.app-shell .tech-notes-migrated .notes-list > header {
+  min-height: 56px;
+  padding: 5px 38px 5px 10px;
+}
+
+.app-shell .tech-notes-migrated .notes-goal-trigger {
+  height: 46px;
+}
+
+.app-shell .tech-notes-migrated .notes-filter-copy {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+}
+
+.app-shell .tech-notes-migrated .notes-filter-copy > strong,
+.app-shell .tech-notes-migrated .notes-filter-count,
+.app-shell .tech-notes-migrated .notes-filter-copy > svg {
+  grid-column: auto;
+  grid-row: auto;
+}
+
+.app-shell .tech-notes-migrated .notes-filter-copy > strong {
+  min-height: 24px !important;
+  font-size: 17px !important;
+  line-height: 24px !important;
+}
+
+.app-shell .tech-notes-migrated .notes-filter-count {
+  padding: 0 6px;
+  background: color-mix(in srgb, var(--notes-accent-soft) 68%, transparent);
+  transform: translateY(1px);
+}
+
+.app-shell .tech-notes-migrated .notes-index-collapse {
+  top: 18px;
+  right: 12px;
+  width: 36px;
+  height: 36px;
+  background: transparent;
+  border-color: transparent;
+  border-radius: 10px;
+  box-shadow: none;
+  opacity: .72;
+}
+
+.app-shell .tech-notes-migrated .notes-list-scroll {
+  padding: 5px 12px 18px;
+}
+
+.app-shell .tech-notes-migrated .notes-list-row,
+.app-shell .tech-notes-migrated .notes-list-row:hover,
+.app-shell .tech-notes-migrated .notes-list-row.is-active {
+  margin: 12px 0;
+  padding: 11px 11px 11px 15px;
+  border-radius: 10px;
+  transform: none;
+}
+
+.app-shell .tech-notes-migrated .notes-list-row {
+  background: color-mix(in srgb, var(--notes-panel-soft) 58%, transparent);
+  border: 1px solid transparent;
+  box-shadow: none;
+}
+
+.app-shell .tech-notes-migrated .notes-list-row:hover {
+  background: color-mix(in srgb, var(--notes-panel-soft) 90%, var(--notes-panel));
+  border-color: transparent;
+}
+
+.app-shell .tech-notes-migrated .notes-list-row.is-active {
+  background: color-mix(in srgb, var(--notes-accent-soft) 55%, var(--notes-panel));
+  border-color: color-mix(in srgb, var(--notes-accent) 28%, var(--notes-border));
+  box-shadow: 0 5px 14px color-mix(in srgb, var(--notes-accent) 6%, transparent);
+}
+
+.app-shell .tech-notes-migrated .notes-list-row::before {
+  display: block;
+  inset: 10px auto 10px 4px;
+  width: 3px;
+  opacity: 0;
+}
+
+.app-shell .tech-notes-migrated .notes-list-row.is-active::before {
+  opacity: 1;
+}
+
+.app-shell .tech-notes-migrated .notes-notion-canvas .notion-editor-toolbar {
+  gap: 8px;
+  overflow: hidden;
+}
+
+.app-shell .tech-notes-migrated .notes-notion-canvas .notion-toolbar-scroll {
+  min-width: 0;
+  flex: 1;
+  overflow-x: auto;
+}
+
+.app-shell .tech-notes-migrated .notion-toolbar-end {
+  display: flex;
+  flex: none;
+  align-items: center;
+  margin-left: auto;
+}
+
+.app-shell .tech-notes-migrated .notion-toolbar-end .note-save-state,
+.app-shell .tech-notes-migrated .notion-toolbar-end .note-save-state.is-dirty {
+  height: 28px;
+  padding: 0 4px;
+  color: var(--notes-muted);
+  font-size: 9px;
+  background: transparent;
+  border: 0;
+}
+
+.app-shell .tech-notes-migrated .notion-toolbar-end .note-save-state.is-dirty {
+  color: #a85e21;
+}
+
+.app-shell .tech-notes-migrated .note-document-heading {
+  min-height: 64px;
+  align-items: center;
+  padding-block: 7px;
+}
+
+.app-shell .tech-notes-migrated .note-editor-controls {
+  min-height: 0;
+  margin: 0 0 0 38px;
+}
+
+.app-shell .tech-notes-migrated .note-editor-actions button {
+  color: var(--notes-muted);
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+}
+
+.app-shell .tech-notes-migrated .notion-quick-start {
+  position: absolute;
+  z-index: 6;
+  display: flex;
+  width: max-content;
+  max-width: calc(100% - 16px);
+  align-items: center;
+  gap: 2px;
+  margin: 0;
+  padding: 3px 5px 3px 3px;
+  background: color-mix(in srgb, var(--notes-panel) 92%, transparent);
+  border: 1px solid color-mix(in srgb, var(--notes-border) 76%, transparent);
+  border-radius: 9px;
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--notes-text) 10%, transparent);
+  backdrop-filter: blur(12px);
+  transition: width 180ms ease, box-shadow 180ms ease;
+}
+
+.app-shell .tech-notes-migrated .notion-quick-start.is-collapsed {
+  padding-right: 3px;
+}
+
+.app-shell .tech-notes-migrated .notion-quick-start-drag,
+.app-shell .tech-notes-migrated .notion-quick-start-toggle {
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  color: var(--notes-muted);
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+}
+
+.app-shell .tech-notes-migrated .notion-quick-start-drag {
+  width: 24px;
+  justify-content: center;
+  cursor: grab;
+  touch-action: none;
+}
+
+.app-shell .tech-notes-migrated .notion-quick-start-drag:active {
+  cursor: grabbing;
+}
+
+.app-shell .tech-notes-migrated .notion-quick-start-toggle {
+  gap: 4px;
+  padding: 0 5px;
+  cursor: pointer;
+}
+
+.app-shell .tech-notes-migrated :is(.notion-quick-start-drag, .notion-quick-start-toggle):hover {
+  color: var(--notes-accent);
+  background: color-mix(in srgb, var(--notes-accent-soft) 44%, transparent);
+}
+
+.app-shell .tech-notes-migrated .notion-editor-body {
+  position: relative;
+  min-height: 0;
+  flex: 1;
+}
+
+.app-shell .tech-notes-migrated .notion-quick-start-label {
+  flex: none;
+  color: color-mix(in srgb, var(--notes-text) 46%, var(--notes-muted));
+  font-size: 10px;
+  font-weight: 680;
+  letter-spacing: .02em;
+}
+
+.app-shell .tech-notes-migrated .notion-quick-start .notion-quick-start-actions {
+  display: flex;
+  min-width: 0;
+  flex-direction: row;
+  align-items: center;
+  max-width: 560px;
+  gap: 3px;
+  overflow: hidden;
+  opacity: 1;
+  transition: max-width 180ms ease, opacity 120ms ease;
+}
+
+.app-shell .tech-notes-migrated .notion-quick-start.is-collapsed .notion-quick-start-actions {
+  max-width: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.app-shell .tech-notes-migrated .notion-quick-start .notion-quick-start-actions > button {
+  width: auto;
+  min-width: max-content;
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 7px;
+  color: var(--notes-muted);
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  box-shadow: none;
+  cursor: pointer;
+}
+
+.app-shell .tech-notes-migrated .notion-quick-start .notion-quick-start-actions > button:hover,
+.app-shell .tech-notes-migrated .notion-quick-start .notion-quick-start-actions > button:focus-visible {
+  color: var(--notes-accent);
+  background: color-mix(in srgb, var(--notes-accent-soft) 48%, transparent);
+  transform: none;
+}
+
+.app-shell .tech-notes-migrated .notion-quick-start .notion-quick-start-actions > button + button::before {
+  width: 1px;
+  height: 12px;
+  margin-left: -8px;
+  margin-right: 1px;
+  content: "";
+  background: color-mix(in srgb, var(--notes-border) 64%, transparent);
+}
+
+.app-shell .tech-notes-migrated .notion-quick-start-actions strong {
+  color: inherit;
+  font-size: 10px;
+  font-weight: 630;
+}
+
+.app-shell .tech-notes-migrated .notion-quick-start-actions small {
+  display: none;
+}
+
+.app-shell .tech-notes-migrated .notes-notion-canvas .notion-prosemirror {
+  padding-top: 14px;
+}
+
+/* Templates remain ordinary editable document nodes, but read as a guided
+   worksheet instead of three oversized, disconnected headings. */
+.app-shell .tech-notes-migrated .notion-prosemirror blockquote {
+  margin: 4px 0 24px;
+  padding: 12px 15px;
+  color: var(--notes-text);
+  background: linear-gradient(110deg, color-mix(in srgb, var(--notes-accent-soft) 58%, transparent), transparent 86%);
+  border: 0;
+  border-left: 3px solid color-mix(in srgb, var(--notes-accent) 72%, transparent);
+  border-radius: 0 10px 10px 0;
+}
+
+.app-shell .tech-notes-migrated .notion-prosemirror blockquote p {
+  margin: 0;
+  line-height: 1.55;
+}
+
+.app-shell .tech-notes-migrated .notion-prosemirror blockquote strong {
+  font-size: 15px;
+  font-weight: 740;
+  letter-spacing: .01em;
+}
+
+.app-shell .tech-notes-migrated .notion-prosemirror blockquote span:last-child {
+  font-size: 12px;
+  font-style: normal;
+}
+
+.app-shell .tech-notes-migrated .notion-prosemirror h3 {
+  margin: 24px 0 5px;
+  color: var(--notes-text);
+  font-size: 16px;
+  font-weight: 720;
+  line-height: 1.45;
+}
+
+.app-shell .tech-notes-migrated .notion-prosemirror h3 span:first-child {
+  display: inline-block;
+  min-width: 27px;
+  margin-right: 7px;
+  font-size: 11px;
+  font-weight: 780;
+  letter-spacing: .05em;
+}
+
+.app-shell .tech-notes-migrated .notion-prosemirror h3 + p {
+  min-height: 22px;
+  margin: 0 0 2px 34px;
+  line-height: 1.55;
+}
+
+.app-shell .tech-notes-migrated .notion-prosemirror h3 + p em {
+  font-size: 12px;
+  font-style: normal;
+}
+
+.app-shell .tech-notes-migrated .notion-prosemirror h3 + p + p {
+  min-height: 34px;
+  margin: 3px 0 0 34px;
+  border-bottom: 1px solid color-mix(in srgb, var(--notes-border) 62%, transparent);
+}
+
+@media (max-width: 620px) {
+  .app-shell .tech-notes-migrated .notion-prosemirror blockquote {
+    margin-bottom: 18px;
+    padding: 10px 12px;
+  }
+
+  .app-shell .tech-notes-migrated .notion-prosemirror h3 {
+    margin-top: 20px;
+    font-size: 15px;
+  }
+}
+
+@media (max-width: 620px) {
+  .app-shell .tech-notes-migrated .notion-quick-start {
+    max-width: calc(100% - 16px);
+  }
+
+  .app-shell .tech-notes-migrated .notion-quick-start .notion-quick-start-actions {
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+
+  .app-shell .tech-notes-migrated .notion-quick-start .notion-quick-start-actions::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* The restored index is a continuous rail, not a stack of cards. */
+.app-shell .tech-notes-migrated .notes-list-scroll {
+  padding: 0 10px 16px;
+}
+
+.app-shell .tech-notes-migrated .notes-list-row,
+.app-shell .tech-notes-migrated .notes-list-row:hover,
+.app-shell .tech-notes-migrated .notes-list-row.is-active {
+  margin: 0;
+  padding: 11px 10px 11px 14px;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--notes-border) 58%, transparent);
+  border-radius: 0;
+  box-shadow: none;
+  transform: none;
+}
+
+.app-shell .tech-notes-migrated .notes-list-row:hover,
+.app-shell .tech-notes-migrated .notes-list-row.is-active {
+  background: color-mix(in srgb, var(--notes-accent-soft) 48%, transparent);
+}
+
+.app-shell .tech-notes-migrated .notes-list-row.is-active {
+  border-bottom-color: transparent;
+}
+
+.app-shell .tech-notes-migrated .notes-list-row::before {
+  display: block;
+  inset: 10px auto 10px 0;
+  width: 3px;
+  opacity: 0;
+}
+
+.app-shell .tech-notes-migrated .notes-list-row.is-active::before {
+  opacity: 1;
+}
+
+@media (max-width: 620px) {
+  .app-shell .tech-notes-migrated .notes-list-scroll {
+    padding-inline: 0;
+  }
+
+  .app-shell .tech-notes-migrated .notes-list-row,
+  .app-shell .tech-notes-migrated .notes-list-row:hover,
+  .app-shell .tech-notes-migrated .notes-list-row.is-active {
+    margin: 0;
+    padding: 11px 12px 11px 16px;
+  }
+}
+
+/* Keep the note workspace on the same outer-card system as Knowledge Space.
+   The grid itself is deliberately unboxed: the index and editor are the two
+   equal-height surfaces, using Knowledge Space's measured desktop geometry. */
+.app-shell .tech-notes-migrated .notes-workspace {
+  grid-template-columns: minmax(220px, 228px) minmax(0, 1fr) !important;
+  gap: 12px;
+  overflow: visible;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0;
+  box-shadow: none !important;
+}
+
+.app-shell .tech-notes-migrated .notes-workspace.is-index-collapsed {
+  grid-template-columns: 44px minmax(0, 1fr) !important;
+}
+
+.app-shell .tech-notes-migrated .notes-workspace > .notes-list,
+.app-shell .tech-notes-migrated .notes-workspace > .note-editor:not(.is-fullscreen) {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--notes-panel) !important;
+  border: 1px solid var(--notes-border);
+  border-radius: 13px;
+  box-shadow: none;
+}
+
+.app-shell .tech-notes-migrated .notes-workspace > .note-editor:not(.is-fullscreen) {
+  border-left: 1px solid var(--notes-border);
+}
+
+.app-shell .tech-notes-migrated .notes-reference-header {
+  min-height: 100px;
+  margin-bottom: 16px;
+  padding: 14px 16px;
+}
+
+.app-shell .tech-notes-migrated .notes-reference-header .workspace-page-title {
+  gap: normal;
+}
+
+.app-shell .tech-notes-migrated .notes-reference-header .workspace-page-title h1 {
+  margin: 2px 0 0;
+}
+
+.app-shell .tech-notes-migrated .notes-reference-header .workspace-page-title > span {
+  margin-top: 5px;
+  line-height: 1.5;
+}
+
+.app-shell .tech-notes-migrated .notes-list > header {
+  height: 50px;
+  min-height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 0 38px 0 10px;
+}
+
+.app-shell .tech-notes-migrated .notes-goal-control {
+  width: max-content;
+  max-width: 100%;
+  flex: 0 1 auto;
+}
+
+.app-shell .tech-notes-migrated .notes-goal-trigger {
+  width: max-content;
+  height: 40px;
+  margin-inline: 0;
+  justify-content: flex-start;
+}
+
+.app-shell .tech-notes-migrated .notes-index-collapse {
+  top: 6.5px;
+  right: 10px;
+  width: 22px;
+  height: 32px;
+  color: var(--notes-muted);
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  opacity: .7;
+  transform: none;
+}
+
+.app-shell .tech-notes-migrated .notes-index-collapse:hover,
+.app-shell .tech-notes-migrated .notes-index-collapse:focus-visible {
+  color: var(--notes-accent);
+  background: transparent;
+  opacity: 1;
+  transform: none;
+}
+
+.app-shell .tech-notes-migrated .notes-list-scroll {
+  padding: 8px 0 16px 10px;
+}
+
+.app-shell .tech-notes-migrated .notes-list-row,
+.app-shell .tech-notes-migrated .notes-list-row:hover,
+.app-shell .tech-notes-migrated .notes-list-row.is-active {
+  gap: 5px;
+  margin: 0;
+  padding: 9px 10px 9px 14px;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--notes-border) 58%, transparent);
+  border-radius: 0;
+  box-shadow: none;
+  transform: none;
+}
+
+.app-shell .tech-notes-migrated .notes-list-row:hover,
+.app-shell .tech-notes-migrated .notes-list-row.is-active {
+  background: color-mix(in srgb, var(--notes-accent-soft) 48%, transparent);
+  box-shadow: 16px 0 0 color-mix(in srgb, var(--notes-accent-soft) 48%, transparent);
+}
+
+.app-shell .tech-notes-migrated .notes-list-row::before {
+  inset: 8px auto 8px 0;
+  width: 2px;
+}
+
+.app-shell .tech-notes-migrated .note-list-topline {
+  position: relative;
+  height: 17px;
+  min-height: 17px;
+  padding-right: 0;
+}
+
+.app-shell .tech-notes-migrated .note-list-meta {
+  min-width: 0;
+  gap: 15px;
+  line-height: 1;
+}
+
+.app-shell .tech-notes-migrated .note-list-meta small,
+.app-shell .tech-notes-migrated .note-list-meta em {
+  line-height: 1.2;
+}
+
+.app-shell .tech-notes-migrated .note-list-meta small {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  color: color-mix(in srgb, var(--notes-accent) 48%, var(--notes-muted));
+  font-size: 11px;
+  font-weight: 620;
+}
+
+.app-shell .tech-notes-migrated .note-list-meta small > span {
+  font-size: 11px;
+}
+
+.app-shell .tech-notes-migrated .note-list-meta small time {
+  color: color-mix(in srgb, var(--notes-muted) 88%, transparent);
+  font-size: 11px;
+  font-weight: 560;
+  letter-spacing: .01em;
+}
+
+.app-shell .tech-notes-migrated .note-list-save-state {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: 6px;
+  color: var(--notes-muted);
+  font-size: 8px;
+  font-style: normal;
+  white-space: nowrap;
+}
+
+.app-shell .tech-notes-migrated .note-list-save-state em,
+.app-shell .tech-notes-migrated .note-list-save-state.is-pending em,
+.app-shell .tech-notes-migrated .note-list-save-state.is-saving em {
+  color: color-mix(in srgb, var(--notes-text) 54%, var(--notes-muted));
+  font-weight: 610;
+}
+
+.app-shell .tech-notes-migrated .note-list-save-state i {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  background: #63d6b9;
+  border-radius: 50%;
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--workspace-success, #63ddbd) 38%, transparent);
+  animation: notes-save-breathe 2.4s ease-in-out infinite;
+}
+
+.app-shell .tech-notes-migrated .note-list-save-state.is-pending {
+  color: var(--notes-muted);
+}
+
+.app-shell .tech-notes-migrated .note-list-save-state.is-pending i {
+  background: #63d6b9;
+}
+
+.app-shell .tech-notes-migrated .note-list-save-state.is-saving i {
+  animation-duration: 1.15s;
+}
+
+@keyframes notes-save-breathe {
+  0%, 100% { opacity: .66; box-shadow: 0 0 0 0 color-mix(in srgb, var(--workspace-success, #63ddbd) 30%, transparent); }
+  50% { opacity: 1; box-shadow: 0 0 0 4px color-mix(in srgb, var(--workspace-success, #63ddbd) 0%, transparent); }
+}
+
+.app-shell .tech-notes-migrated .notes-notion-canvas .notion-editor-toolbar {
+  box-sizing: border-box;
+  height: 50px;
+  min-height: 50px;
+  padding: 4px 12px;
+}
+
+.app-shell .tech-notes-migrated .notes-notion-canvas .notion-toolbar-scroll {
+  min-height: 40px;
+}
+
+.app-shell .tech-notes-migrated .notion-editor-toolbar .notion-style-trigger {
+  width: 70px;
+  height: 34px;
+  display: inline-flex;
+  flex: 0 0 70px;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
+  padding: 0 7px;
+  color: color-mix(in srgb, var(--notes-text) 86%, #3f4654);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 680;
+  background: transparent;
+  border: 0;
+  border-radius: 7px;
+  box-shadow: none;
+}
+
+.app-shell .tech-notes-migrated .notion-editor-toolbar .notion-style-trigger:hover,
+.app-shell .tech-notes-migrated .notion-editor-toolbar .notion-style-trigger[aria-expanded="true"] {
+  color: var(--notes-accent);
+  background: color-mix(in srgb, var(--notes-accent-soft) 50%, var(--notes-panel));
+  transform: none;
+}
+
+.app-shell .tech-notes-migrated .notion-toolbar-end .note-toolbar-fullscreen {
+  position: relative;
+  width: auto;
+  min-width: 76px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 10px;
+  color: color-mix(in srgb, var(--notes-text) 80%, var(--notes-accent));
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 720;
+  letter-spacing: .03em;
+  background: transparent;
+  border: 0;
+  border-radius: 5px;
+  box-shadow: none;
+  animation: none;
+}
+
+.app-shell .tech-notes-migrated .notion-toolbar-end .note-toolbar-fullscreen::after {
+  position: absolute;
+  right: 12px;
+  bottom: 3px;
+  left: 12px;
+  height: 2px;
+  content: "";
+  background: linear-gradient(90deg, transparent, var(--notes-accent), transparent);
+  border-radius: 999px;
+  animation: notes-fullscreen-line-breathe 3.6s ease-in-out infinite;
+}
+
+.app-shell .tech-notes-migrated .notion-toolbar-end .note-toolbar-fullscreen:hover {
+  color: var(--notes-accent-strong, var(--notes-accent));
+  background: color-mix(in srgb, var(--notes-muted) 7%, transparent);
+  box-shadow: none;
+  transform: none;
+}
+
+@keyframes notes-fullscreen-line-breathe {
+  0%, 100% { opacity: .34; transform: scaleX(.72); filter: blur(.15px); }
+  50% { opacity: 1; transform: scaleX(1); filter: drop-shadow(0 0 4px color-mix(in srgb, var(--notes-accent) 38%, transparent)); }
+}
+
+.app-shell .tech-notes-migrated .note-document-heading {
+  min-height: 50px;
+  grid-template-columns: minmax(0, 1fr);
+  padding-block: 4px;
+}
+
+.app-shell .tech-notes-migrated .note-title-editor {
+  min-height: 40px;
+}
+
+.app-shell .tech-notes-migrated .note-title-editor-icon {
+  width: 24px;
+  height: 24px;
+}
+
+.app-shell .tech-notes-migrated .note-title-editor .note-title-input {
+  height: 40px;
+  font-size: clamp(18px, 1.55vw, 21px);
+  line-height: 1.25;
+}
+
+.app-shell .tech-notes-migrated .note-list-select {
+  min-height: 0;
+  line-height: normal;
+}
+
+.app-shell .tech-notes-migrated .note-list-select strong {
+  margin-top: 0 !important;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.app-shell .tech-notes-migrated .note-list-select .note-list-preview {
+  display: block;
+  width: 100%;
+  overflow: hidden;
+  margin-top: 2px;
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  -webkit-line-clamp: unset;
+}
+
+.app-shell .tech-notes-migrated .note-list-select .note-list-preview.is-empty {
+  padding-left: 7px;
+}
+
+.app-shell .tech-notes-migrated .note-list-footer {
+  position: relative;
+  min-height: 18px;
+  margin-top: 1px;
+  padding-right: 28px;
+}
+
+.app-shell .tech-notes-migrated .note-list-goal-label {
+  min-height: 18px;
+  font-size: 10px;
+  line-height: 1;
+}
+
+.app-shell .tech-notes-migrated .note-card-download,
+.app-shell .tech-notes-migrated .note-card-delete {
+  position: absolute;
+  top: 50%;
+  right: 0;
+}
+
+.app-shell .tech-notes-migrated .note-card-download {
+  color: var(--notes-accent);
+  transform: translateY(calc(-50% + 1.5px));
+}
+
+.app-shell .tech-notes-migrated .note-card-delete {
+  color: var(--workspace-danger, #c45d67);
+  opacity: .52;
+  transform: translateY(calc(-50% - 1.5px));
+  transition: color 160ms ease, background-color 160ms ease, opacity 160ms ease;
+}
+
+.app-shell .tech-notes-migrated .notes-list-row:hover .note-card-delete,
+.app-shell .tech-notes-migrated .note-card-delete:focus-visible {
+  opacity: 1;
+}
+
+.app-shell .tech-notes-migrated .notes-notion-canvas {
+  scrollbar-color: transparent transparent;
+  scrollbar-width: thin;
+}
+
+.app-shell .tech-notes-migrated .notes-notion-canvas::-webkit-scrollbar {
+  width: 6px;
+}
+
+.app-shell .tech-notes-migrated .notes-notion-canvas::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.app-shell .tech-notes-migrated .notes-notion-canvas::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 999px;
+  transition: background-color 160ms ease;
+}
+
+.app-shell .tech-notes-migrated .notes-notion-canvas.is-scrolling {
+  scrollbar-color: color-mix(in srgb, var(--notes-accent) 42%, transparent) transparent;
+}
+
+.app-shell .tech-notes-migrated .notes-notion-canvas.is-scrolling::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--notes-accent) 42%, transparent);
+}
+
+/* Rich text nodes must read as real document structure, not toolbar-only state. */
+.app-shell .tech-notes-migrated .notion-prosemirror > ul:not([data-type="taskList"]),
+.app-shell .tech-notes-migrated .notion-markdown-preview > ul {
+  padding-left: 25px;
+  list-style: disc outside;
+}
+
+.app-shell .tech-notes-migrated .notion-prosemirror > ol,
+.app-shell .tech-notes-migrated .notion-markdown-preview > ol {
+  padding-left: 27px;
+  list-style: decimal outside;
+}
+
+.app-shell .tech-notes-migrated .notion-prosemirror :is(ul, ol):not([data-type="taskList"]),
+.app-shell .tech-notes-migrated .notion-markdown-preview :is(ul, ol) {
+  margin: 8px 0 12px;
+}
+
+.app-shell .tech-notes-migrated .notion-prosemirror :is(ul, ol):not([data-type="taskList"]) li,
+.app-shell .tech-notes-migrated .notion-markdown-preview :is(ul, ol) li {
+  margin: 3px 0;
+  padding-left: 3px;
+}
+
+.app-shell .tech-notes-migrated .notion-prosemirror code,
+.app-shell .tech-notes-migrated .notion-markdown-preview code {
+  padding: 2px 5px;
+  color: color-mix(in srgb, var(--notes-accent) 78%, var(--notes-text));
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: .88em;
+  background: color-mix(in srgb, var(--notes-accent-soft) 62%, var(--notes-panel));
+  border: 1px solid color-mix(in srgb, var(--notes-accent) 18%, transparent);
+  border-radius: 5px;
+}
+
+.app-shell .tech-notes-migrated .notion-prosemirror pre,
+.app-shell .tech-notes-migrated .notion-markdown-preview pre {
+  overflow-x: auto;
+  margin: 14px 0;
+  padding: 14px 16px;
+  color: var(--notes-text);
+  background: color-mix(in srgb, var(--notes-text) 5%, var(--notes-panel));
+  border-left: 3px solid color-mix(in srgb, var(--notes-accent) 60%, transparent);
+  border-radius: 4px 10px 10px 4px;
+}
+
+.app-shell .tech-notes-migrated .notion-prosemirror pre code,
+.app-shell .tech-notes-migrated .notion-markdown-preview pre code {
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  border: 0;
+}
+
+.app-shell .tech-notes-migrated .notion-highlight-trigger {
+  position: relative;
+}
+
+.app-shell .tech-notes-migrated .notion-highlight-trigger > i {
+  width: 14px;
+  height: 3px;
+  position: absolute;
+  right: 7px;
+  bottom: 3px;
+  border-radius: 999px;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--notes-text) 8%, transparent);
+}
+
+.notion-highlight-menu {
+  position: fixed;
+  z-index: 1400;
+  width: 246px;
+  padding: 10px;
+  color: var(--workspace-text, #172038);
+  background: color-mix(in srgb, var(--workspace-panel, #fff) 97%, transparent);
+  border: 1px solid color-mix(in srgb, var(--workspace-border, #d9ddea) 84%, transparent);
+  border-radius: 13px;
+  box-shadow: 0 16px 38px color-mix(in srgb, #10162b 15%, transparent);
+  backdrop-filter: blur(18px);
+}
+
+.notion-highlight-menu > strong {
+  display: block;
+  padding: 2px 4px 8px;
+  font-size: 12px;
+  font-weight: 720;
+}
+
+.notion-highlight-menu > div {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.notion-highlight-menu button {
+  min-width: 0;
+  height: 54px;
+  position: relative;
+  display: grid;
+  place-items: center;
+  gap: 3px;
+  padding: 5px 3px;
+  color: var(--workspace-secondary, #6f7891);
+  background: transparent;
+  border: 0;
+  border-radius: 9px;
+  cursor: pointer;
+}
+
+.notion-highlight-menu button:hover,
+.notion-highlight-menu button:focus-visible,
+.notion-highlight-menu button[aria-selected="true"] {
+  color: var(--workspace-text, #172038);
+  background: var(--workspace-hover, rgba(111, 92, 255, .08));
+  outline: 0;
+}
+
+.notion-highlight-menu button > span {
+  width: 28px;
+  height: 12px;
+  border-radius: 4px;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--workspace-text, #172038) 10%, transparent);
+}
+
+.notion-highlight-menu button > span.is-clear {
+  background: linear-gradient(135deg, transparent 46%, #c66 47%, #c66 53%, transparent 54%);
+  border: 1px dashed color-mix(in srgb, var(--workspace-secondary, #6f7891) 55%, transparent);
+  box-shadow: none;
+}
+
+.notion-highlight-menu button small {
+  overflow: hidden;
+  max-width: 100%;
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.notion-highlight-menu button svg {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  color: var(--workspace-accent, #705cff);
+}
+
+.app-shell .tech-notes-migrated .notion-view-switch {
+  height: 30px;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  padding: 2px;
+  background: color-mix(in srgb, var(--notes-muted) 7%, transparent);
+  border-radius: 8px;
+}
+
+.app-shell .tech-notes-migrated .notion-rich-controls {
+  display: flex;
+  min-width: max-content;
+  align-items: center;
+  gap: 4px;
+}
+
+.app-shell .tech-notes-migrated .notion-mode-caption {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+  padding-left: 4px;
+  color: var(--notes-muted);
+  font-size: 10px;
+  font-weight: 620;
+  white-space: nowrap;
+}
+
+.app-shell .tech-notes-migrated .notion-mode-caption svg {
+  color: var(--notes-accent);
+}
+
+.app-shell .tech-notes-migrated .notion-toolbar-end {
+  gap: 6px;
+}
+
+.app-shell .tech-notes-migrated .notion-view-switch button {
+  width: auto;
+  min-width: 30px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 7px;
+  color: var(--notes-muted);
+  font-size: 9px;
+  font-weight: 650;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.app-shell .tech-notes-migrated .notion-view-switch button.is-active {
+  color: var(--notes-accent-strong, var(--notes-accent));
+  background: var(--notes-panel);
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--notes-text) 8%, transparent);
+}
+
+.app-shell .tech-notes-migrated .notion-editor-body:is(.is-markdown, .is-preview) {
+  overflow: auto;
+  padding: 18px 24px 52px;
+}
+
+.app-shell .tech-notes-migrated .notion-markdown-source,
+.app-shell .tech-notes-migrated .notion-markdown-preview {
+  width: min(920px, 100%);
+  min-height: 390px;
+  margin-inline: auto;
+}
+
+.app-shell .tech-notes-migrated .notion-markdown-source {
+  display: flex;
+  flex-direction: column;
+}
+
+.app-shell .tech-notes-migrated .notion-markdown-source > label {
+  padding: 0 2px 9px;
+  color: var(--notes-muted);
+  font-size: 10px;
+  font-weight: 680;
+  letter-spacing: .04em;
+}
+
+.app-shell .tech-notes-migrated .notion-markdown-source > textarea {
+  min-height: 390px;
+  flex: 1;
+  resize: none;
+  padding: 16px 18px;
+  color: var(--notes-text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.75;
+  background: color-mix(in srgb, var(--notes-panel) 94%, transparent);
+  border: 1px solid color-mix(in srgb, var(--notes-border) 76%, transparent);
+  border-radius: 10px;
+  outline: 0;
+}
+
+.app-shell .tech-notes-migrated .notion-markdown-source > textarea:focus {
+  border-color: color-mix(in srgb, var(--notes-accent) 46%, var(--notes-border));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--notes-accent) 9%, transparent);
+}
+
+.app-shell .tech-notes-migrated .notion-markdown-preview {
+  padding: 4px 8px 32px;
+  color: var(--notes-text);
+  font-size: 14px;
+  line-height: 1.8;
+}
+
+.app-shell .tech-notes-migrated .notion-markdown-preview :is(h1, h2, h3) {
+  margin: 22px 0 8px;
+  color: var(--notes-text);
+  line-height: 1.35;
+}
+
+.app-shell .tech-notes-migrated .notion-markdown-preview h1 { font-size: 24px; }
+.app-shell .tech-notes-migrated .notion-markdown-preview h2 { font-size: 19px; }
+.app-shell .tech-notes-migrated .notion-markdown-preview h3 { font-size: 16px; }
+
+.app-shell .tech-notes-migrated .notion-markdown-preview .is-empty {
+  color: var(--notes-muted);
+}
+
+.app-shell .tech-notes-migrated .notion-editor-footer {
+  bottom: -28px;
+}
+
+@media (max-width: 960px) {
+  .app-shell .page-content:has(> .tech-notes-migrated) {
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
+  }
+
+  .app-shell .tech-notes-migrated .notes-workspace,
+  .app-shell .tech-notes-migrated .notes-workspace.is-index-collapsed {
+    grid-template-columns: 1fr !important;
+    gap: 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-shell .tech-notes-migrated .notion-quick-start,
+  .app-shell .tech-notes-migrated .notion-quick-start-actions,
+  .app-shell .tech-notes-migrated .notion-view-switch-menu,
+  .app-shell .tech-notes-migrated .note-fullscreen-focus > i,
+  .app-shell .tech-notes-migrated .note-toolbar-fullscreen,
+  .app-shell .tech-notes-migrated .note-toolbar-fullscreen::after {
+    transition: none;
+    animation: none;
+  }
+}
+
+@media (max-width: 620px) {
+  .app-shell .tech-notes-migrated .notes-list-scroll {
+    padding-inline: 0;
+  }
+
+  .app-shell .tech-notes-migrated .notes-list-row,
+  .app-shell .tech-notes-migrated .notes-list-row:hover,
+  .app-shell .tech-notes-migrated .notes-list-row.is-active {
+    padding: 11px 12px 11px 16px;
+  }
+
+  .app-shell .tech-notes-migrated .notion-view-switch button {
+    padding-inline: 6px;
+  }
+
+  .app-shell .tech-notes-migrated .notion-view-switch-summary span {
+    display: none;
+  }
+
+  .app-shell .tech-notes-migrated .notion-editor-body:is(.is-markdown, .is-preview) {
+    padding-inline: 14px;
+  }
+}
+
+/* Notes workspace controls: keep the writing surface primary, with compact
+   tools that can be recalled without occupying a permanent toolbar row. */
+.app-shell .tech-notes-migrated .note-editor {
+  position: relative;
+}
+
+.app-shell .tech-notes-migrated .notion-editor-footer {
+  z-index: 9;
+  right: 14px;
+  bottom: 7px;
+}
+
+.app-shell .tech-notes-migrated .notion-quick-start {
+  min-height: 36px;
+  gap: 3px;
+  padding: 4px 6px 4px 4px;
+  background:
+    linear-gradient(105deg, color-mix(in srgb, var(--notes-accent-soft) 30%, var(--notes-panel)) 0 46px, var(--notes-panel) 96px),
+    var(--notes-panel);
+  border-color: color-mix(in srgb, var(--notes-accent) 22%, var(--notes-border));
+  border-radius: 11px;
+  box-shadow:
+    0 10px 24px color-mix(in srgb, var(--notes-text) 10%, transparent),
+    inset 0 1px 0 color-mix(in srgb, white 56%, transparent);
+}
+
+.app-shell .tech-notes-migrated .notion-quick-start::before {
+  width: 3px;
+  height: 19px;
+  flex: none;
+  content: "";
+  background: linear-gradient(180deg, var(--notes-accent), color-mix(in srgb, var(--notes-mint) 80%, var(--notes-accent)));
+  border-radius: 999px;
+  box-shadow: 0 0 9px color-mix(in srgb, var(--notes-accent) 26%, transparent);
+}
+
+.app-shell .tech-notes-migrated .notion-quick-start.is-collapsed {
+  padding-right: 4px;
+  border-color: color-mix(in srgb, var(--notes-accent) 34%, var(--notes-border));
+  box-shadow: 0 7px 18px color-mix(in srgb, var(--notes-accent) 13%, transparent);
+}
+
+.app-shell .tech-notes-migrated .notion-quick-start-drag,
+.app-shell .tech-notes-migrated .notion-quick-start-toggle {
+  height: 28px;
+}
+
+.app-shell .tech-notes-migrated .notion-quick-start-drag {
+  width: 22px;
+  color: color-mix(in srgb, var(--notes-accent) 62%, var(--notes-muted));
+}
+
+.app-shell .tech-notes-migrated .notion-quick-start-toggle {
+  gap: 6px;
+  padding-inline: 6px;
+  color: var(--notes-text);
+  background: color-mix(in srgb, var(--notes-panel) 72%, transparent);
+}
+
+.app-shell .tech-notes-migrated .notion-quick-start-label {
+  color: var(--notes-text);
+  font-size: 11px;
+  font-weight: 720;
+}
+
+.app-shell .tech-notes-migrated .notion-quick-start-toggle kbd {
+  padding: 2px 5px;
+  color: color-mix(in srgb, var(--notes-muted) 88%, var(--notes-text));
+  font-family: inherit;
+  font-size: 8px;
+  font-weight: 680;
+  line-height: 1;
+  background: color-mix(in srgb, var(--notes-muted) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--notes-border) 72%, transparent);
+  border-radius: 5px;
+}
+
+.app-shell .tech-notes-migrated .notion-quick-start .notion-quick-start-actions {
+  gap: 5px;
+}
+
+.app-shell .tech-notes-migrated .notion-quick-start .notion-quick-start-actions > button {
+  min-height: 28px;
+  padding-inline: 8px;
+  color: color-mix(in srgb, var(--notes-text) 72%, var(--notes-muted));
+  font-weight: 650;
+}
+
+.app-shell .tech-notes-migrated .notion-quick-start .notion-quick-start-actions > button + button::before {
+  display: none;
+}
+
+.app-shell .tech-notes-migrated .notion-quick-start-actions strong {
+  font-size: 11px;
+}
+
+.app-shell .tech-notes-migrated .notion-view-switch {
+  position: relative;
+  z-index: 42;
+  height: 32px;
+  padding: 2px;
+  background: color-mix(in srgb, var(--notes-muted) 7%, var(--notes-panel));
+  border: 1px solid color-mix(in srgb, var(--notes-border) 66%, transparent);
+  border-radius: 9px;
+  box-shadow: none;
+}
+
+.app-shell .tech-notes-migrated .notes-notion-canvas .notion-editor-toolbar {
+  overflow: visible;
+}
+
+.app-shell .tech-notes-migrated .notion-view-switch.is-collapsed {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--notes-muted) 6%, transparent);
+}
+
+.app-shell .tech-notes-migrated .notion-view-switch button {
+  height: 26px;
+  font-size: 10px;
+}
+
+.app-shell .tech-notes-migrated .notion-view-switch-summary {
+  min-width: 72px !important;
+  justify-content: center;
+}
+
+.app-shell .tech-notes-migrated .notion-view-switch:not(.is-collapsed) .notion-view-switch-chevron {
+  transform: rotate(180deg);
+}
+
+.app-shell .tech-notes-migrated .notion-view-switch-menu {
+  width: 158px;
+  position: absolute;
+  top: calc(100% + 9px);
+  right: 0;
+  display: grid;
+  gap: 3px;
+  padding: 6px;
+  color: var(--notes-text);
+  background: color-mix(in srgb, var(--notes-panel) 96%, transparent);
+  border: 1px solid color-mix(in srgb, var(--notes-accent) 18%, var(--notes-border));
+  border-radius: 11px;
+  box-shadow: 0 14px 32px color-mix(in srgb, var(--notes-text) 14%, transparent);
+  backdrop-filter: blur(16px);
+  animation: notes-mode-menu-down 150ms ease-out both;
+}
+
+.app-shell .tech-notes-migrated .notion-view-switch .notion-view-switch-menu > button {
+  width: 100%;
+  min-width: 0;
+  height: 42px;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) 14px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 9px;
+  color: var(--notes-muted);
+  text-align: left;
+  border-radius: 8px;
+}
+
+.app-shell .tech-notes-migrated .notion-view-switch .notion-view-switch-menu > button > span {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+
+.app-shell .tech-notes-migrated .notion-view-switch .notion-view-switch-menu strong {
+  color: var(--notes-text);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.app-shell .tech-notes-migrated .notion-view-switch .notion-view-switch-menu small {
+  color: var(--notes-muted);
+  font-size: 9px;
+  font-weight: 560;
+}
+
+.app-shell .tech-notes-migrated .notion-view-switch .notion-view-switch-menu > button.is-active {
+  color: var(--notes-accent);
+  background: color-mix(in srgb, var(--notes-accent-soft) 50%, transparent);
+  box-shadow: none;
+}
+
+@keyframes notes-mode-menu-down {
+  from { opacity: 0; transform: translateY(-5px) scale(.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.app-shell .tech-notes-migrated .notion-view-switch button:hover,
+.app-shell .tech-notes-migrated .notion-view-switch button:focus-visible {
+  color: var(--notes-accent-strong, var(--notes-accent));
+  background: color-mix(in srgb, var(--notes-accent-soft) 38%, transparent);
+}
+
+.app-shell .tech-notes-migrated .notes-notion-canvas .notion-prosemirror,
+.app-shell .tech-notes-migrated .notion-markdown-source,
+.app-shell .tech-notes-migrated .notion-markdown-preview {
+  width: min(860px, calc(100% - 72px));
+  margin-inline: auto;
+}
+
+@media (max-width: 620px) {
+  .app-shell .tech-notes-migrated .notion-editor-footer {
+    right: 9px;
+    bottom: 6px;
+    max-width: calc(100% - 18px);
+  }
+
+  .app-shell .tech-notes-migrated .notion-editor-footer-hint {
+    max-width: 170px;
+  }
+
+  .app-shell .tech-notes-migrated .notion-quick-start {
+    min-height: 34px;
+  }
+
+  .app-shell .tech-notes-migrated .notion-quick-start-toggle kbd {
+    display: none;
+  }
+
+  .app-shell .tech-notes-migrated .notes-notion-canvas .notion-prosemirror,
+  .app-shell .tech-notes-migrated .notion-markdown-source,
+  .app-shell .tech-notes-migrated .notion-markdown-preview {
+    width: min(100%, calc(100% - 28px));
+  }
+}
+
+/* Compact control geometry must remain the final cascade layer. */
+.app-shell .tech-notes-migrated .notion-editor-toolbar .notion-style-trigger {
+  width: 52px;
+  height: 30px;
+  min-height: 30px;
+  flex-basis: 52px;
+  justify-content: center;
+  gap: 1px;
+  padding-inline: 1px;
+}
+
+.app-shell .tech-notes-migrated .notion-editor-toolbar .notion-style-trigger svg {
+  flex: none;
+  margin-left: -1px;
+}
+
+.app-shell .tech-notes-migrated .notion-quick-start {
+  /* The panel is intentionally draggable into the title/toolbar band. Keep it
+     above that band so its collapse and template actions remain reachable. */
+  z-index: 40;
+  min-height: 32px;
+  gap: 1px;
+  padding: 2px 5px 2px 1px;
+  background: linear-gradient(100deg, color-mix(in srgb, var(--notes-accent-soft) 48%, var(--notes-panel)), var(--notes-panel) 48%);
+  border-color: color-mix(in srgb, var(--notes-accent) 28%, var(--notes-border));
+  border-radius: 9px;
+}
+
+.app-shell .tech-notes-migrated .notion-quick-start::before {
+  display: none;
+}
+
+.app-shell .tech-notes-migrated .notion-quick-start-drag {
+  width: 18px;
+  height: 26px;
+  min-height: 26px;
+  margin-left: -1px;
+}
+
+.app-shell .tech-notes-migrated .notion-quick-start-toggle {
+  height: 26px;
+  min-height: 26px;
+  gap: 3px;
+  padding-inline: 4px;
+  background: transparent;
+}
+
+.app-shell .tech-notes-migrated .notion-quick-start-label {
+  font-size: 12px;
+  font-weight: 740;
+}
+
+.app-shell .tech-notes-migrated .notion-quick-start .notion-quick-start-actions {
+  min-height: 20px;
+  margin-left: 3px;
+  padding-left: 5px;
+  border-left: 1px solid color-mix(in srgb, var(--notes-accent) 28%, var(--notes-border));
+}
+
+.app-shell .tech-notes-migrated .notion-quick-start .notion-quick-start-actions > button {
+  min-height: 26px;
+  padding-inline: 7px;
+}
+
+.app-shell .tech-notes-migrated .notion-quick-start.is-collapsed {
+  padding-right: 2px;
+}
+
+.app-shell .tech-notes-migrated .notion-quick-start.is-collapsed .notion-quick-start-actions {
+  margin-left: 0;
+  padding-left: 0;
+  border-left: 0;
+}
+
+.app-shell .tech-notes-migrated .notion-quick-start[data-dragging="true"] {
+  box-shadow:
+    0 14px 28px color-mix(in srgb, var(--notes-accent) 18%, transparent),
+    inset 0 1px 0 color-mix(in srgb, white 56%, transparent);
+}
+
+/* Toolbar density and edge alignment: preserve every formatting action while
+   giving the text-style label a stable single-line footprint. */
+.app-shell .tech-notes-migrated .notes-notion-canvas .notion-editor-toolbar {
+  padding-right: 0;
+}
+
+.app-shell .tech-notes-migrated .notion-rich-controls {
+  gap: 3px;
+}
+
+.app-shell .tech-notes-migrated .notion-rich-controls > .notion-toolbar-group:first-child {
+  gap: 0;
+}
+
+.app-shell .tech-notes-migrated .notion-rich-controls > .notion-toolbar-group:first-child > button {
+  width: 26px;
+}
+
+.app-shell .tech-notes-migrated .notion-editor-toolbar .notion-style-trigger {
+  width: 64px;
+  flex-basis: 64px;
+  gap: 2px;
+  padding-inline: 4px 2px;
+  color: color-mix(in srgb, var(--notes-text) 70%, var(--notes-muted));
+  font-size: 12px;
+  font-weight: 670;
+  white-space: nowrap;
+}
+
+.app-shell .tech-notes-migrated .notion-editor-toolbar .notion-style-trigger > span {
+  min-width: 0;
+  overflow: visible;
+  white-space: nowrap;
+}
+
+.app-shell .tech-notes-migrated .notion-toolbar-end {
+  align-self: stretch;
+  gap: 0;
+  margin-block: -4px;
+  padding-left: 0;
+  background: color-mix(in srgb, var(--notes-accent-soft) 42%, var(--notes-panel));
+  border-left: 1px solid color-mix(in srgb, var(--notes-accent) 14%, var(--notes-border));
+  border-radius: 10px 15px 0 0;
+}
+
+.app-shell .tech-notes-migrated .notion-view-switch {
+  height: 100%;
+  align-self: stretch;
+  padding: 0;
+  background: transparent !important;
+  border: 0;
+  border-radius: 0;
+}
+
+.app-shell .tech-notes-migrated .notion-view-switch-summary {
+  min-width: 68px !important;
+  height: 100% !important;
+  gap: 4px !important;
+  padding-inline: 10px !important;
+  color: color-mix(in srgb, var(--notes-accent) 62%, var(--notes-muted)) !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  background: transparent !important;
+  border-radius: 9px 0 0 0 !important;
+}
+
+.app-shell .tech-notes-migrated .notion-view-switch-summary > svg:first-child {
+  display: none;
+}
+
+.app-shell .tech-notes-migrated .notion-view-switch-summary > .notion-view-switch-chevron {
+  width: 11px;
+  height: 11px;
+}
+
+.app-shell .tech-notes-migrated .notion-view-switch-summary:hover,
+.app-shell .tech-notes-migrated .notion-view-switch-summary:focus-visible {
+  background: color-mix(in srgb, var(--notes-accent-soft) 68%, transparent) !important;
+}
+
+.app-shell .tech-notes-migrated .notion-toolbar-end .note-toolbar-fullscreen {
+  align-self: stretch;
+  min-width: 108px;
+  height: auto;
+  margin: 0;
+  padding: 0 16px;
+  color: color-mix(in srgb, var(--notes-accent) 78%, var(--notes-text));
+  font-size: 13px;
+  background: transparent;
+  border-left: 1px solid color-mix(in srgb, var(--notes-accent) 16%, var(--notes-border));
+  border-radius: 0 15px 0 0;
+  animation: notes-fullscreen-surface-breathe 4.8s ease-in-out infinite;
+}
+
+.app-shell .tech-notes-migrated .notion-toolbar-end .note-toolbar-fullscreen:hover {
+  color: var(--notes-accent-strong, var(--notes-accent));
+  background: color-mix(in srgb, var(--notes-accent-soft) 70%, var(--notes-panel));
+}
+
+.app-shell .tech-notes-migrated .notion-toolbar-end .note-toolbar-fullscreen::after {
+  display: none;
+}
+
+@keyframes notes-fullscreen-surface-breathe {
+  0%, 100% { box-shadow: inset 0 0 0 0 transparent; }
+  50% { box-shadow: inset 0 0 18px color-mix(in srgb, var(--notes-accent) 8%, transparent); }
+}
+
+.app-shell .tech-notes-migrated .notion-quick-start-toggle,
+.app-shell .tech-notes-migrated .notion-quick-start-label {
+  color: color-mix(in srgb, var(--notes-accent) 72%, var(--notes-text));
+}
+
+@media (max-width: 620px) {
+  .app-shell .tech-notes-migrated .notion-toolbar-end .note-toolbar-fullscreen {
+    min-width: 92px;
+    padding-inline: 10px;
+  }
+
+  .app-shell .tech-notes-migrated .notion-view-switch-summary {
+    min-width: 52px !important;
+    padding-inline: 7px !important;
+  }
+}
+
+/* Final toolbar ownership: mode selection is a standalone capsule and
+   fullscreen remains a separate icon action. */
+/* The count stays quiet at rest; hover/focus reveals the dropdown affordance. */
+.app-shell .tech-notes-migrated .notes-filter-meta {
+  position: relative;
+  width: 56px;
+  height: 34px;
+  min-width: 56px;
+  display: block;
+}
+
+.app-shell .tech-notes-migrated .notes-filter-meta .notes-filter-count {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  line-height: 20px;
+  transform: translate(-50%, -50%);
+  transition: transform 180ms cubic-bezier(.16, 1, .3, 1), color 180ms ease;
+}
+
+.app-shell .tech-notes-migrated .notes-filter-meta > svg {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  width: 13px;
+  height: 13px;
+  margin: 0;
+  color: var(--notes-accent);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 4px);
+  transition: opacity 150ms ease, transform 180ms cubic-bezier(.16, 1, .3, 1);
+}
+
+.app-shell .tech-notes-migrated .notes-goal-trigger:hover .notes-filter-count,
+.app-shell .tech-notes-migrated .notes-goal-trigger:focus-visible .notes-filter-count,
+.app-shell .tech-notes-migrated .notes-goal-trigger[aria-expanded="true"] .notes-filter-count {
+  transform: translate(-50%, -82%);
+}
+
+.app-shell .tech-notes-migrated .notes-goal-trigger:hover .notes-filter-meta > svg,
+.app-shell .tech-notes-migrated .notes-goal-trigger:focus-visible .notes-filter-meta > svg,
+.app-shell .tech-notes-migrated .notes-goal-trigger[aria-expanded="true"] .notes-filter-meta > svg {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.app-shell .tech-notes-migrated .notes-goal-trigger[aria-expanded="true"] .notes-filter-meta > svg.is-open {
+  transform: translate(-50%, 0) rotate(180deg);
+}
+
+.app-shell .tech-notes-migrated .note-list-meta small,
+.app-shell .tech-notes-migrated .note-list-meta small > span,
+.app-shell .tech-notes-migrated .note-list-meta small time {
+  font-size: 9px;
+  line-height: 1.2;
+}
+
+.app-shell .tech-notes-migrated .note-list-select .note-list-preview,
+.app-shell .tech-notes-migrated .note-list-select .note-list-preview.is-empty {
+  box-sizing: border-box;
+  padding-left: 7px;
+}
+
+.app-shell .notes-page-redesign.tech-notes-migrated .notion-editor-toolbar .notion-style-trigger,
+.app-shell .notes-page-redesign.tech-notes-migrated .notion-editor-toolbar .notion-font-size-trigger {
+  height: 30px;
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 0 4px;
+  color: color-mix(in srgb, var(--notes-text) 70%, var(--notes-muted));
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 670;
+  line-height: 1;
+  white-space: nowrap;
+  background: transparent;
+  border: 0;
+  border-radius: 7px;
+  box-shadow: none;
+}
+
+.app-shell .notes-page-redesign.tech-notes-migrated .notion-editor-toolbar .notion-format-selectors {
+  height: 30px;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+}
+
+.app-shell .notes-page-redesign.tech-notes-migrated .notion-editor-toolbar .notion-style-trigger {
+  width: 56px;
+  min-width: 56px;
+  flex: 0 0 56px;
+  padding-inline: 2px;
+}
+
+.app-shell .notes-page-redesign.tech-notes-migrated .notion-editor-toolbar .notion-font-size-trigger {
+  width: 44px;
+  min-width: 44px;
+  flex: 0 0 44px;
+  padding-inline: 2px;
+}
+
+.app-shell .notes-page-redesign.tech-notes-migrated .notion-editor-toolbar .notion-toolbar-divider.is-format-edge {
+  height: 18px;
+  margin-inline: 0;
+}
+
+.app-shell .notes-page-redesign.tech-notes-migrated .notion-editor-toolbar .notion-toolbar-divider.is-format-inner {
+  height: 18px;
+  margin-inline: 1px;
+}
+
+.app-shell .notes-page-redesign.tech-notes-migrated .notion-editor-toolbar .notion-style-trigger:hover,
+.app-shell .notes-page-redesign.tech-notes-migrated .notion-editor-toolbar .notion-style-trigger[aria-expanded="true"],
+.app-shell .notes-page-redesign.tech-notes-migrated .notion-editor-toolbar .notion-font-size-trigger:hover,
+.app-shell .notes-page-redesign.tech-notes-migrated .notion-editor-toolbar .notion-font-size-trigger[aria-expanded="true"] {
+  color: var(--notes-accent);
+  background: color-mix(in srgb, var(--notes-accent-soft) 50%, var(--notes-panel));
+}
+
+.app-shell .notes-page-redesign.tech-notes-migrated .notion-editor-toolbar :is(.notion-style-trigger, .notion-font-size-trigger) > span {
+  min-width: 0;
+  overflow: visible;
+  white-space: nowrap;
+}
+
+.app-shell .notes-page-redesign.tech-notes-migrated .notion-editor-toolbar :is(.notion-style-trigger, .notion-font-size-trigger) > svg {
+  width: 12px;
+  height: 12px;
+  flex: none;
+  margin: 0;
+}
+
+.app-shell .tech-notes-migrated .notes-notion-canvas .notion-editor-toolbar {
+  padding-right: 8px;
+}
+
+.app-shell .tech-notes-migrated .notion-toolbar-end {
+  align-self: center;
+  gap: 6px;
+  margin-block: 0;
+  padding-left: 6px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+
+.app-shell .tech-notes-migrated .notion-view-switch {
+  height: 32px;
+  align-self: center;
+  padding: 2px;
+  background: color-mix(in srgb, var(--notes-muted) 7%, var(--notes-panel)) !important;
+  border: 1px solid color-mix(in srgb, var(--notes-border) 66%, transparent);
+  border-radius: 9px;
+}
+
+.app-shell .tech-notes-migrated .notion-view-switch-summary {
+  min-width: 72px !important;
+  height: 26px !important;
+  gap: 4px !important;
+  padding-inline: 7px !important;
+  color: color-mix(in srgb, var(--notes-accent) 58%, var(--notes-muted)) !important;
+  font-size: 10px !important;
+  font-weight: 680 !important;
+  background: transparent !important;
+  border-radius: 6px !important;
+}
+
+.app-shell .tech-notes-migrated .notion-view-switch-summary > svg:first-child {
+  display: block;
+  width: 13px;
+  height: 13px;
+}
+
+.app-shell .tech-notes-migrated .notion-toolbar-end .note-toolbar-fullscreen {
+  width: 34px;
+  min-width: 34px;
+  height: 34px;
+  align-self: center;
+  margin: 0;
+  padding: 0;
+  color: color-mix(in srgb, var(--notes-accent) 74%, var(--notes-muted));
+  background: color-mix(in srgb, var(--notes-accent-soft) 52%, var(--notes-panel));
+  border: 1px solid color-mix(in srgb, var(--notes-accent) 18%, var(--notes-border));
+  border-radius: 10px;
+  animation: notes-fullscreen-icon-breathe 4.8s ease-in-out infinite;
+}
+
+.app-shell .tech-notes-migrated .notion-toolbar-end .note-toolbar-fullscreen:hover {
+  color: var(--notes-accent-strong, var(--notes-accent));
+  background: color-mix(in srgb, var(--notes-accent-soft) 82%, var(--notes-panel));
+  border-color: color-mix(in srgb, var(--notes-accent) 34%, var(--notes-border));
+}
+
+.app-shell .tech-notes-migrated .notion-toolbar-end .note-toolbar-fullscreen::after {
+  display: none;
+}
+
+@media (max-width: 620px) {
+  .app-shell .notes-page-redesign.tech-notes-migrated .notion-editor-toolbar .notion-style-trigger {
+    width: 54px;
+    min-width: 54px;
+    flex-basis: 54px;
+  }
+
+  .app-shell .notes-page-redesign.tech-notes-migrated .notion-editor-toolbar .notion-font-size-trigger {
+    width: 42px;
+    min-width: 42px;
+    flex-basis: 42px;
+  }
+
+  .app-shell .tech-notes-migrated .notion-view-switch-summary {
+    min-width: 38px !important;
+    padding-inline: 6px !important;
+  }
+
+  .app-shell .tech-notes-migrated .notion-view-switch-summary span {
+    display: none;
+  }
+
+  .app-shell .tech-notes-migrated .notion-toolbar-end .note-toolbar-fullscreen {
+    width: 34px;
+    min-width: 34px;
+    padding: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-shell .tech-notes-migrated .notes-filter-meta .notes-filter-count,
+  .app-shell .tech-notes-migrated .notes-filter-meta > svg {
+    transition: none;
+  }
+}
+
+/* Collapsible Word-like ribbon for lower-frequency layout and insert tools. */
+.app-shell .tech-notes-migrated .notes-notion-canvas .notion-editor-toolbar {
+  z-index: 32;
+  overflow: visible;
+}
+
+.app-shell .tech-notes-migrated .notes-notion-canvas .notion-editor-toolbar.is-tools-expanded {
+  margin-bottom: 58px;
+}
+
+.app-shell .tech-notes-migrated .notion-secondary-toggle {
+  width: 32px;
+  height: 32px;
+  display: inline-grid;
+  flex: 0 0 32px;
+  place-items: center;
+  color: color-mix(in srgb, var(--notes-accent) 60%, var(--notes-muted));
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+}
+
+.app-shell .tech-notes-migrated .notion-secondary-toggle:hover,
+.app-shell .tech-notes-migrated .notion-secondary-toggle.is-active {
+  color: var(--notes-accent);
+  background: color-mix(in srgb, var(--notes-accent-soft) 62%, transparent);
+}
+
+.app-shell .tech-notes-migrated .notion-secondary-toolbar {
+  position: absolute;
+  top: calc(100% - 1px);
+  right: 0;
+  left: 0;
+  min-height: 58px;
+  display: flex;
+  align-items: stretch;
+  gap: 5px;
+  padding: 6px 10px;
+  color: var(--notes-text);
+  background: color-mix(in srgb, var(--notes-panel) 96%, var(--notes-accent-soft));
+  border-top: 1px solid color-mix(in srgb, var(--notes-border) 54%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--notes-accent) 16%, var(--notes-border));
+  box-shadow: 0 16px 28px color-mix(in srgb, #121a30 12%, transparent);
+  backdrop-filter: blur(18px);
+  animation: notion-ribbon-enter 180ms cubic-bezier(.16, 1, .3, 1);
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scrollbar-width: thin;
+}
+
+@keyframes notion-ribbon-enter {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.app-shell .tech-notes-migrated .notion-secondary-heading {
+  width: 90px;
+  min-width: 90px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2px;
+  padding: 0 2px 0 0;
+  color: color-mix(in srgb, var(--notes-accent) 72%, var(--notes-text));
+}
+
+.app-shell .tech-notes-migrated .notion-secondary-heading strong {
+  font-size: 11px;
+  font-weight: 760;
+  white-space: nowrap;
+}
+
+.app-shell .tech-notes-migrated .notion-secondary-heading button {
+  width: 24px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  color: var(--notes-muted);
+  background: transparent;
+  border: 0;
+  border-radius: 7px;
+}
+
+.app-shell .tech-notes-migrated .notion-secondary-heading button:hover {
+  color: var(--notes-accent);
+  background: var(--notes-accent-soft);
+}
+
+.app-shell .tech-notes-migrated .notion-ribbon-group {
+  min-width: max-content;
+  display: flex;
+  align-items: center;
+}
+
+.app-shell .tech-notes-migrated .notion-ribbon-group > div {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.app-shell .tech-notes-migrated .notion-ribbon-button {
+  width: 46px;
+  height: 40px;
+  display: inline-flex;
+  flex: 0 0 46px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 2px;
+  color: color-mix(in srgb, var(--notes-text) 72%, var(--notes-muted));
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+}
+
+.app-shell .tech-notes-migrated .notion-ribbon-button > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  font-size: 10px;
+  font-weight: 650;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.app-shell .tech-notes-migrated .notion-ribbon-button:hover,
+.app-shell .tech-notes-migrated .notion-ribbon-button:focus-visible,
+.app-shell .tech-notes-migrated .notion-ribbon-button.is-active {
+  color: var(--notes-accent);
+  background: color-mix(in srgb, var(--notes-accent-soft) 66%, transparent);
+  outline: 0;
+}
+
+.app-shell .tech-notes-migrated .notion-ribbon-button.is-active {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--notes-accent) 24%, transparent);
+}
+
+.app-shell .tech-notes-migrated .notion-ribbon-divider {
+  width: 1px;
+  height: 34px;
+  align-self: center;
+  flex: 0 0 1px;
+  background: color-mix(in srgb, var(--notes-border) 76%, transparent);
+}
+
+.notion-compact-tool-menu,
+.notion-table-menu {
+  position: fixed;
+  z-index: 1700;
+  box-sizing: border-box;
+  color: var(--workspace-text, #172038);
+  background: color-mix(in srgb, var(--workspace-panel, #fff) 98%, transparent);
+  border: 1px solid color-mix(in srgb, var(--workspace-border, #d9ddea) 84%, transparent);
+  border-radius: 12px;
+  box-shadow: 0 16px 38px color-mix(in srgb, #11182d 16%, transparent);
+  backdrop-filter: blur(18px);
+  animation: notion-popover-enter 160ms cubic-bezier(.16, 1, .3, 1);
+}
+
+.notion-compact-tool-menu {
+  width: 232px;
+  display: grid;
+  gap: 2px;
+  padding: 6px;
+}
+
+.notion-compact-tool-menu > button {
+  min-height: 48px;
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) 18px;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  color: var(--workspace-text, #172038);
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+}
+
+.notion-compact-tool-menu > button:hover,
+.notion-compact-tool-menu > button:focus-visible {
+  background: var(--workspace-hover, #f2f3f8);
+  outline: 0;
+}
+
+.notion-compact-tool-menu > button > span {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  color: var(--workspace-accent, #705cff);
+  background: color-mix(in srgb, var(--workspace-accent-soft, #eeeaff) 64%, transparent);
+  border-radius: 8px;
+}
+
+.notion-compact-tool-menu strong,
+.notion-compact-tool-menu small {
+  display: block;
+}
+
+.notion-compact-tool-menu strong {
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.notion-compact-tool-menu small {
+  margin-top: 2px;
+  color: var(--workspace-secondary, #717990);
+  font-size: 10px;
+  line-height: 1.3;
+}
+
+.notion-table-menu {
+  width: 242px;
+  padding: 10px;
+}
+
+.notion-table-menu > header {
+  min-height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.notion-table-menu > header strong {
+  font-size: 12px;
+  font-weight: 740;
+}
+
+.notion-table-menu > header span {
+  color: var(--workspace-accent, #705cff);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.notion-table-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 4px;
+}
+
+.notion-table-grid > button {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background: color-mix(in srgb, var(--workspace-secondary, #717990) 5%, var(--workspace-panel, #fff));
+  border: 1px solid color-mix(in srgb, var(--workspace-border, #d9ddea) 90%, transparent);
+  border-radius: 5px;
+}
+
+.notion-table-grid > button.is-selected {
+  background: color-mix(in srgb, var(--workspace-accent-soft, #eeeaff) 84%, var(--workspace-panel, #fff));
+  border-color: color-mix(in srgb, var(--workspace-accent, #705cff) 54%, var(--workspace-border, #d9ddea));
+}
+
+.notion-table-grid > button:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--workspace-accent, #705cff) 42%, transparent);
+  outline-offset: 1px;
+}
+
+.notion-table-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+}
+
+.notion-table-actions > button {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  padding: 0 8px;
+  color: color-mix(in srgb, var(--workspace-text, #172038) 82%, var(--workspace-secondary, #717990));
+  font: inherit;
+  font-size: 10px;
+  font-weight: 650;
+  background: color-mix(in srgb, var(--workspace-hover, #f2f3f8) 66%, transparent);
+  border: 0;
+  border-radius: 7px;
+}
+
+.notion-table-actions > button:hover,
+.notion-table-actions > button:focus-visible {
+  color: var(--workspace-accent, #705cff);
+  background: var(--workspace-hover, #f2f3f8);
+  outline: 0;
+}
+
+.notion-table-actions > button.is-danger {
+  min-height: 36px;
+  grid-column: 1 / -1;
+  justify-content: center;
+  color: var(--workspace-danger, #c45d67);
+  background: color-mix(in srgb, var(--workspace-danger, #c45d67) 7%, transparent);
+}
+
+.notion-insert-popover {
+  position: fixed;
+  z-index: 1700;
+  width: 320px;
+  box-sizing: border-box;
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  color: var(--workspace-text, #172038);
+  background: color-mix(in srgb, var(--workspace-panel, #fff) 97%, transparent);
+  border: 1px solid color-mix(in srgb, var(--workspace-border, #d9ddea) 82%, transparent);
+  border-radius: 14px;
+  box-shadow: 0 18px 46px color-mix(in srgb, #11182d 18%, transparent);
+  backdrop-filter: blur(18px);
+  animation: notion-popover-enter 160ms cubic-bezier(.16, 1, .3, 1);
+}
+
+.notion-image-popover {
+  width: 340px;
+}
+
+@keyframes notion-popover-enter {
+  from { opacity: 0; transform: translateY(-5px) scale(.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.notion-insert-popover > header {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) 28px;
+  align-items: center;
+  gap: 8px;
+}
+
+.notion-insert-popover > header > span {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  color: var(--workspace-accent, #705cff);
+  background: color-mix(in srgb, var(--workspace-accent, #705cff) 10%, transparent);
+  border-radius: 9px;
+}
+
+.notion-insert-popover > header > div {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.notion-insert-popover > header strong {
+  font-size: 13px;
+  font-weight: 760;
+}
+
+.notion-insert-popover > header small {
+  color: var(--workspace-secondary, #717990);
+  font-size: 10px;
+}
+
+.notion-insert-popover > header > button {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  color: var(--workspace-secondary, #717990);
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+}
+
+.notion-insert-popover > header > button:hover {
+  color: var(--workspace-text, #172038);
+  background: var(--workspace-hover, #f2f3f8);
+}
+
+.notion-insert-popover > label {
+  display: grid;
+  gap: 5px;
+}
+
+.notion-insert-popover > label > span {
+  color: color-mix(in srgb, var(--workspace-text, #172038) 78%, var(--workspace-secondary, #717990));
+  font-size: 11px;
+  font-weight: 690;
+}
+
+.notion-insert-popover input:not([type="file"]) {
+  width: 100%;
+  height: 36px;
+  box-sizing: border-box;
+  padding: 0 10px;
+  color: var(--workspace-text, #172038);
+  font: inherit;
+  font-size: 12px;
+  background: color-mix(in srgb, var(--workspace-panel, #fff) 90%, var(--workspace-hover, #f2f3f8));
+  border: 1px solid var(--workspace-border, #d9ddea);
+  border-radius: 9px;
+  outline: 0;
+}
+
+.notion-insert-popover input:focus {
+  border-color: color-mix(in srgb, var(--workspace-accent, #705cff) 58%, var(--workspace-border, #d9ddea));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--workspace-accent, #705cff) 10%, transparent);
+}
+
+.notion-insert-popover > footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  min-height: 34px;
+}
+
+.notion-insert-popover > footer button {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 11px;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 9px;
+}
+
+.notion-insert-popover > footer .is-primary {
+  color: #fff;
+  background: var(--workspace-accent, #705cff);
+  border: 1px solid transparent;
+}
+
+.notion-insert-popover > footer .is-quiet {
+  margin-right: auto;
+  color: var(--workspace-secondary, #717990);
+  background: transparent;
+  border: 1px solid transparent;
+}
+
+.notion-insert-popover > footer .is-quiet:hover {
+  color: var(--workspace-accent, #705cff);
+  background: var(--workspace-hover, #f2f3f8);
+}
+
+.notion-insert-error {
+  color: var(--workspace-danger, #c45d67);
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+.notion-image-picker {
+  width: 100%;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 10px;
+  color: var(--workspace-accent, #705cff);
+  text-align: left;
+  background: color-mix(in srgb, var(--workspace-accent, #705cff) 7%, transparent);
+  border: 1px dashed color-mix(in srgb, var(--workspace-accent, #705cff) 34%, var(--workspace-border, #d9ddea));
+  border-radius: 10px;
+}
+
+.notion-image-picker > span {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.notion-image-picker strong {
+  max-width: 250px;
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.notion-image-picker small {
+  color: var(--workspace-secondary, #717990);
+  font-size: 9px;
+}
+
+.notion-insert-or {
+  height: 1px;
+  position: relative;
+  margin: 2px 0;
+  background: var(--workspace-border, #d9ddea);
+}
+
+.notion-insert-or span {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  padding: 0 7px;
+  color: var(--workspace-secondary, #717990);
+  font-size: 9px;
+  background: var(--workspace-panel, #fff);
+  transform: translate(-50%, -50%);
+}
+
+.app-shell .tech-notes-migrated .notion-prosemirror a {
+  color: var(--notes-accent);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--notes-accent) 46%, transparent);
+  text-underline-offset: 3px;
+  cursor: text;
+}
+
+.app-shell .tech-notes-migrated .notion-prosemirror .tableWrapper {
+  max-width: 100%;
+  margin: 18px 0;
+  overflow-x: auto;
+}
+
+.app-shell .tech-notes-migrated .notion-prosemirror table {
+  width: 100%;
+  min-width: 420px;
+  table-layout: fixed;
+  border-collapse: collapse;
+}
+
+.app-shell .tech-notes-migrated .notion-prosemirror :is(th, td) {
+  position: relative;
+  min-width: 90px;
+  padding: 8px 10px;
+  vertical-align: top;
+  border: 1px solid color-mix(in srgb, var(--notes-border) 88%, transparent);
+}
+
+.app-shell .tech-notes-migrated .notion-prosemirror .column-resize-handle {
+  position: absolute;
+  top: 0;
+  right: -2px;
+  bottom: -1px;
+  z-index: 3;
+  width: 4px;
+  background: color-mix(in srgb, var(--notes-accent) 56%, transparent);
+  pointer-events: none;
+}
+
+.app-shell .tech-notes-migrated .notion-prosemirror.resize-cursor {
+  cursor: col-resize;
+}
+
+.app-shell .tech-notes-migrated .notion-prosemirror th {
+  color: color-mix(in srgb, var(--notes-text) 88%, var(--notes-accent));
+  font-weight: 720;
+  background: color-mix(in srgb, var(--notes-accent-soft) 44%, var(--notes-panel));
+}
+
+.app-shell .tech-notes-migrated .notion-prosemirror .selectedCell::after {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  content: "";
+  pointer-events: none;
+  background: color-mix(in srgb, var(--notes-accent) 9%, transparent);
+}
+
+.app-shell .tech-notes-migrated .notion-prosemirror .notion-document-image {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 18px auto;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px color-mix(in srgb, #11182d 10%, transparent);
+}
+
+.app-shell .tech-notes-migrated .notion-prosemirror .notion-document-image.ProseMirror-selectednode {
+  outline: 2px solid color-mix(in srgb, var(--notes-accent) 72%, transparent);
+  outline-offset: 3px;
+}
+
+.app-shell .tech-notes-migrated .notion-markdown-preview a {
+  color: var(--notes-accent);
+  text-underline-offset: 3px;
+}
+
+.app-shell .tech-notes-migrated .notion-markdown-preview table {
+  width: 100%;
+  margin: 16px 0;
+  border-collapse: collapse;
+}
+
+.app-shell .tech-notes-migrated .notion-markdown-preview :is(th, td) {
+  padding: 8px 10px;
+  border: 1px solid var(--notes-border);
+}
+
+.app-shell .tech-notes-migrated .notion-markdown-preview th {
+  background: color-mix(in srgb, var(--notes-accent-soft) 44%, var(--notes-panel));
+}
+
+.app-shell .tech-notes-migrated .notion-markdown-preview img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 16px auto;
+  border-radius: 12px;
+}
+
+@media (max-width: 620px) {
+  .app-shell .tech-notes-migrated .notion-secondary-toolbar {
+    min-height: 56px;
+    padding-inline: 8px;
+  }
+
+  .app-shell .tech-notes-migrated .notes-notion-canvas .notion-editor-toolbar.is-tools-expanded {
+    margin-bottom: 58px;
+  }
+
+  .app-shell .tech-notes-migrated .notion-secondary-heading {
+    width: 82px;
+    min-width: 82px;
+  }
+
+  .notion-insert-popover,
+  .notion-image-popover {
+    width: min(340px, calc(100vw - 24px));
+  }
+
+  .notion-compact-tool-menu {
+    width: min(232px, calc(100vw - 24px));
+  }
+
+  .notion-table-menu {
+    width: min(242px, calc(100vw - 24px));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-shell .tech-notes-migrated .notion-secondary-toolbar,
+  .notion-insert-popover,
+  .notion-compact-tool-menu,
+  .notion-table-menu {
+    animation: none;
+  }
+}
+
+/* Keep the note-level export beside the editor mode control, rather than
+   repeating file actions inside every narrow index row. */
+.app-shell .tech-notes-migrated .notes-notion-canvas .notion-editor-toolbar .note-toolbar-save-as {
+  border-radius: 9px;
+}
+
+/* Final compact-toolbar alignment: count metadata is progressive disclosure;
+   the insert affordance owns the separator; edit and export share one scale. */
+.app-shell .tech-notes-migrated .notes-filter-meta .notes-filter-count {
+  opacity: 0;
+  transition: opacity 150ms ease, transform 180ms cubic-bezier(.16, 1, .3, 1), color 180ms ease;
+}
+
+.app-shell .tech-notes-migrated .notes-goal-trigger:hover .notes-filter-count,
+.app-shell .tech-notes-migrated .notes-goal-trigger:focus-visible .notes-filter-count,
+.app-shell .tech-notes-migrated .notes-goal-trigger[aria-expanded="true"] .notes-filter-count {
+  opacity: 1;
+}
+
+.app-shell .tech-notes-migrated .notion-secondary-toggle {
+  position: relative;
+  box-sizing: border-box;
+  width: 30px;
+  height: 30px;
+  min-height: 30px;
+  flex-basis: 30px;
+  margin-right: 7px;
+  color: color-mix(in srgb, var(--notes-accent) 72%, var(--notes-muted));
+  background: color-mix(in srgb, var(--notes-accent-soft) 36%, transparent);
+  border: 1px solid color-mix(in srgb, var(--notes-accent) 14%, var(--notes-border));
+  border-radius: 7px;
+  box-shadow: 0 0 11px color-mix(in srgb, var(--notes-accent) 10%, transparent);
+  transition: color 170ms ease, background-color 170ms ease, border-color 170ms ease, box-shadow 170ms ease;
+}
+
+.app-shell .tech-notes-migrated .notion-secondary-toggle::after {
+  position: absolute;
+  top: 5px;
+  right: -6px;
+  width: 1px;
+  height: 20px;
+  content: "";
+  background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--notes-text) 58%, var(--notes-border)) 22% 78%, transparent);
+  border-radius: 999px;
+  box-shadow: 1px 0 0 color-mix(in srgb, white 22%, transparent);
+}
+
+.app-shell .tech-notes-migrated .notion-secondary-toggle:hover,
+.app-shell .tech-notes-migrated .notion-secondary-toggle:focus-visible,
+.app-shell .tech-notes-migrated .notion-secondary-toggle.is-active {
+  color: var(--notes-accent);
+  background: color-mix(in srgb, var(--notes-accent-soft) 70%, var(--notes-panel));
+  border-color: color-mix(in srgb, var(--notes-accent) 30%, var(--notes-border));
+  box-shadow: 0 0 14px color-mix(in srgb, var(--notes-accent) 18%, transparent);
+}
+
+.app-shell .tech-notes-migrated .notion-toolbar-end {
+  gap: 2px;
+  padding-left: 2px;
+}
+
+.app-shell .tech-notes-migrated .notion-view-switch {
+  width: auto;
+  height: 30px;
+  padding: 0;
+  background: transparent !important;
+  border: 0;
+  border-radius: 7px;
+}
+
+.app-shell .tech-notes-migrated .notion-view-switch-summary,
+.app-shell .tech-notes-migrated .notes-notion-canvas .notion-editor-toolbar .note-toolbar-save-as {
+  box-sizing: border-box;
+  width: auto;
+  min-width: 0 !important;
+  height: 30px !important;
+  min-height: 30px;
+  gap: 3px !important;
+  padding: 0 6px !important;
+  color: color-mix(in srgb, var(--notes-text) 72%, var(--notes-accent)) !important;
+  font-size: 13px !important;
+  font-weight: 670 !important;
+  line-height: 1 !important;
+  white-space: nowrap;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 7px !important;
+  box-shadow: none;
+}
+
+.app-shell .tech-notes-migrated .notion-view-switch-summary:hover,
+.app-shell .tech-notes-migrated .notion-view-switch-summary:focus-visible,
+.app-shell .tech-notes-migrated .notes-notion-canvas .notion-editor-toolbar .note-toolbar-save-as:hover,
+.app-shell .tech-notes-migrated .notes-notion-canvas .notion-editor-toolbar .note-toolbar-save-as:focus-visible {
+  color: var(--notes-accent) !important;
+  background: color-mix(in srgb, var(--notes-accent-soft) 58%, transparent) !important;
+}
+
+@media (max-width: 620px) {
+  .app-shell .tech-notes-migrated .notion-view-switch-summary span {
+    display: inline;
+  }
+
+  .app-shell .tech-notes-migrated .notion-view-switch-summary,
+  .app-shell .tech-notes-migrated .notes-notion-canvas .notion-editor-toolbar .note-toolbar-save-as {
+    padding-inline: 5px !important;
+    font-size: 12px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-shell .tech-notes-migrated .notion-secondary-toggle,
+  .app-shell .tech-notes-migrated .notes-filter-meta .notes-filter-count {
+    transition: none;
+  }
+}
+
+/* The goal title and its count share one centered reel position. Hover/focus
+   replaces the title with count + arrow; opening the picker keeps that state. */
+.app-shell .tech-notes-migrated .notes-goal-control,
+.app-shell .tech-notes-migrated .notes-goal-trigger {
+  width: 100%;
+}
+
+.app-shell .tech-notes-migrated .notes-goal-trigger {
+  gap: 0;
+}
+
+.app-shell .tech-notes-migrated .notes-goal-trigger > svg:first-child {
+  transform: translateX(14px);
+}
+
+.app-shell .tech-notes-migrated .notes-goal-trigger:hover > svg:first-child,
+.app-shell .tech-notes-migrated .notes-goal-trigger[aria-expanded="true"] > svg:first-child {
+  transform: translateX(14px) scale(1.08);
+}
+
+.app-shell .tech-notes-migrated .note-list-select .note-list-preview,
+.app-shell .tech-notes-migrated .note-list-select .note-list-preview.is-empty {
+  padding-left: 0;
+}
+
+.app-shell .tech-notes-migrated .notes-filter-copy {
+  position: relative;
+  width: 100%;
+  height: 38px;
+  display: block !important;
+  grid-template: none !important;
+  overflow: visible;
+}
+
+.app-shell .notes-page-redesign.tech-notes-migrated .notes-list .notes-goal-trigger .notes-filter-copy > strong {
+  position: absolute;
+  inset: 50% 0 auto;
+  grid-area: auto !important;
+  width: 100%;
+  max-width: none;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: visible;
+  text-align: center;
+  text-overflow: clip;
+  white-space: nowrap;
+  transform: translateY(-50%);
+  transition: opacity 130ms ease-out, transform 210ms cubic-bezier(.16, 1, .3, 1), filter 180ms ease;
+}
+
+.app-shell .tech-notes-migrated .notes-filter-meta {
+  position: absolute;
+  inset: 50% 0 auto;
+  grid-area: auto !important;
+  width: 100%;
+  height: 24px;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  overflow: visible;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(calc(-50% + 5px));
+  transition: opacity 130ms ease-out, transform 220ms cubic-bezier(.16, 1, .3, 1);
+}
+
+.app-shell .tech-notes-migrated .notes-filter-meta .notes-filter-count {
+  position: static;
+  width: auto;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0;
+  color: color-mix(in srgb, var(--notes-accent) 62%, var(--notes-muted));
+  font-size: 15px !important;
+  font-weight: 680;
+  line-height: 16px;
+  background: transparent;
+  border-radius: 0;
+  opacity: 0;
+  transform: none;
+  transition: opacity 120ms ease-out, color 180ms ease;
+}
+
+.app-shell .tech-notes-migrated .notes-filter-count > b {
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  color: var(--notes-accent);
+  font: inherit;
+  font-weight: 760;
+  font-variant-numeric: tabular-nums;
+  line-height: 16px;
+  margin: 0;
+  transform: translateY(1px);
+}
+
+.app-shell .tech-notes-migrated .notes-filter-count > span {
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  font: inherit;
+  font-size: inherit !important;
+  font-weight: inherit;
+  line-height: 16px;
+  margin: 0 !important;
+}
+
+.app-shell .tech-notes-migrated .notes-filter-meta > svg {
+  position: static;
+  width: 12px;
+  height: 12px;
+  margin: 0;
+  color: var(--notes-accent);
+  opacity: 1;
+  pointer-events: none;
+  transform: none;
+  transition: transform 190ms cubic-bezier(.16, 1, .3, 1);
+}
+
+.app-shell .notes-page-redesign.tech-notes-migrated .notes-list .notes-goal-trigger:hover .notes-filter-copy > strong,
+.app-shell .notes-page-redesign.tech-notes-migrated .notes-list .notes-goal-trigger:focus-visible .notes-filter-copy > strong,
+.app-shell .notes-page-redesign.tech-notes-migrated .notes-list .notes-goal-trigger[aria-expanded="true"] .notes-filter-copy > strong {
+  opacity: 0;
+  transform: translateY(calc(-50% - 9px));
+  filter: blur(.35px);
+}
+
+.app-shell .tech-notes-migrated .notes-goal-trigger:hover .notes-filter-meta,
+.app-shell .tech-notes-migrated .notes-goal-trigger:focus-visible .notes-filter-meta,
+.app-shell .tech-notes-migrated .notes-goal-trigger[aria-expanded="true"] .notes-filter-meta {
+  opacity: 1;
+  transform: translateY(calc(-50% - 4px));
+}
+
+.app-shell .tech-notes-migrated .notes-goal-trigger:hover .notes-filter-count,
+.app-shell .tech-notes-migrated .notes-goal-trigger:focus-visible .notes-filter-count,
+.app-shell .tech-notes-migrated .notes-goal-trigger[aria-expanded="true"] .notes-filter-count {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.app-shell .tech-notes-migrated .notes-goal-trigger[aria-expanded="true"] .notes-filter-meta > svg.is-open {
+  transform: rotate(180deg);
+}
+
+/* Canonical quick-template chooser. The launcher floats above the writing
+   surface and can be repositioned; the expanded template content stays intact. */
+.app-shell .tech-notes-migrated .notion-template-launcher {
+  position: absolute;
+  z-index: 40;
+  width: max-content;
+  max-width: calc(100% - 16px);
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: stretch;
+  margin: 0;
+  filter: drop-shadow(0 12px 24px color-mix(in srgb, var(--notes-text) 9%, transparent));
+  transition: filter 180ms ease;
+}
+
+.app-shell .tech-notes-migrated .notion-template-launcher.is-expanded {
+  width: min(560px, calc(100% - 16px));
+}
+
+.app-shell .tech-notes-migrated .notion-template-launcher[data-dragging="true"] {
+  filter: drop-shadow(0 17px 30px color-mix(in srgb, var(--notes-accent) 18%, transparent));
+}
+
+.app-shell .tech-notes-migrated .notion-template-head {
+  width: 100%;
+  display: flex;
+  align-items: stretch;
+}
+
+.app-shell .tech-notes-migrated .notion-template-drag {
+  width: 28px;
+  min-width: 28px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  color: color-mix(in srgb, var(--notes-accent) 70%, var(--notes-muted));
+  background: color-mix(in srgb, var(--notes-accent-soft) 42%, var(--notes-panel));
+  border: 1px solid color-mix(in srgb, var(--notes-accent) 24%, var(--notes-border));
+  border-right: 0;
+  border-radius: 11px 0 0 11px;
+  cursor: grab;
+  touch-action: none;
+  transition: color 180ms ease, background 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.app-shell .tech-notes-migrated .notion-template-drag:hover,
+.app-shell .tech-notes-migrated .notion-template-drag:focus-visible {
+  color: var(--notes-accent-strong, var(--notes-accent));
+  background: color-mix(in srgb, var(--notes-accent-soft) 72%, var(--notes-panel));
+  border-color: color-mix(in srgb, var(--notes-accent) 44%, var(--notes-border));
+  outline: 0;
+  box-shadow: inset 2px 0 0 color-mix(in srgb, var(--notes-accent) 54%, transparent);
+}
+
+.app-shell .tech-notes-migrated .notion-template-drag:active,
+.app-shell .tech-notes-migrated .notion-template-launcher[data-dragging="true"] .notion-template-drag {
+  cursor: grabbing;
+}
+
+.app-shell .tech-notes-migrated .notion-template-trigger {
+  flex: 1;
+  min-width: 138px;
+  min-height: 38px;
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) 16px;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px 4px 6px;
+  color: var(--notes-text);
+  text-align: left;
+  background: color-mix(in srgb, var(--notes-panel) 94%, transparent);
+  border: 1px solid color-mix(in srgb, var(--notes-accent) 24%, var(--notes-border));
+  border-radius: 0 11px 11px 0;
+  box-shadow: none;
+  cursor: pointer;
+  transition: width 210ms cubic-bezier(.16, 1, .3, 1), color 180ms ease, background 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.app-shell .tech-notes-migrated .notion-template-trigger:hover,
+.app-shell .tech-notes-migrated .notion-template-trigger:focus-visible {
+  color: var(--notes-accent-strong, var(--notes-accent));
+  background: color-mix(in srgb, var(--notes-accent-soft) 52%, var(--notes-panel));
+  border-color: color-mix(in srgb, var(--notes-accent) 42%, var(--notes-border));
+  box-shadow: 0 9px 22px color-mix(in srgb, var(--notes-accent) 14%, transparent);
+}
+
+.app-shell .tech-notes-migrated .notion-template-trigger:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--notes-accent) 20%, transparent);
+  outline-offset: 2px;
+}
+
+.app-shell .tech-notes-migrated .notion-template-launcher.is-expanded .notion-template-trigger {
+  width: auto;
+  min-height: 50px;
+  padding: 7px 13px 7px 8px;
+  background: color-mix(in srgb, var(--notes-accent-soft) 36%, var(--notes-panel));
+  border-radius: 0 14px 0 0;
+  box-shadow: none;
+}
+
+.app-shell .tech-notes-migrated .notion-template-launcher.is-expanded .notion-template-drag {
+  border-radius: 14px 0 0 0;
+}
+
+.app-shell .tech-notes-migrated .notion-template-trigger-icon {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  color: var(--notes-accent);
+  background: color-mix(in srgb, var(--notes-accent-soft) 76%, transparent);
+  border-radius: 9px;
+}
+
+.app-shell .tech-notes-migrated .notion-template-trigger-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.app-shell .tech-notes-migrated .notion-template-trigger-copy strong {
+  font-size: 13px;
+  font-weight: 760;
+  line-height: 1.35;
+}
+
+.app-shell .tech-notes-migrated .notion-template-trigger-copy small {
+  overflow: hidden;
+  color: color-mix(in srgb, var(--notes-text) 58%, var(--notes-muted));
+  font-size: 11px;
+  font-weight: 540;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-shell .tech-notes-migrated .notion-template-options {
+  width: min(560px, 100%);
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-4px);
+  transition: grid-template-rows 220ms cubic-bezier(.16, 1, .3, 1), opacity 150ms ease, transform 220ms cubic-bezier(.16, 1, .3, 1);
+}
+
+.app-shell .tech-notes-migrated .notion-template-launcher.is-expanded .notion-template-options {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.app-shell .tech-notes-migrated .notion-template-options-inner {
+  min-height: 0;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--notes-panel) 97%, transparent);
+  border: 0 solid color-mix(in srgb, var(--notes-accent) 24%, var(--notes-border));
+  border-radius: 0 0 14px 14px;
+  box-shadow: 0 14px 30px color-mix(in srgb, var(--notes-text) 9%, transparent);
+}
+
+.app-shell .tech-notes-migrated .notion-template-launcher.is-expanded .notion-template-options-inner {
+  border-width: 0 1px 1px;
+}
+
+.app-shell .tech-notes-migrated .notion-template-options button {
+  width: 100%;
+  min-height: 62px;
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) 18px;
+  align-items: center;
+  gap: 11px;
+  padding: 9px 13px;
+  color: var(--notes-text);
+  text-align: left;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  transition: color 170ms ease, background 170ms ease, padding 210ms cubic-bezier(.16, 1, .3, 1);
+}
+
+.app-shell .tech-notes-migrated .notion-template-options button + button {
+  border-top: 1px solid color-mix(in srgb, var(--notes-border) 72%, transparent);
+}
+
+.app-shell .tech-notes-migrated .notion-template-options button:hover,
+.app-shell .tech-notes-migrated .notion-template-options button:focus-visible {
+  color: var(--notes-accent-strong, var(--notes-accent));
+  padding-left: 17px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--notes-accent-soft) 70%, transparent), transparent 82%);
+  outline: 0;
+}
+
+.app-shell .tech-notes-migrated .notion-template-options button:focus-visible {
+  box-shadow: inset 3px 0 0 var(--notes-accent);
+}
+
+.app-shell .tech-notes-migrated .notion-template-option-icon {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  color: var(--notes-accent);
+  background: color-mix(in srgb, var(--notes-accent-soft) 62%, transparent);
+  border-radius: 11px;
+}
+
+.app-shell .tech-notes-migrated .notion-template-option-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.app-shell .tech-notes-migrated .notion-template-option-copy strong {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 730;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-shell .tech-notes-migrated .notion-template-option-copy small {
+  overflow: hidden;
+  color: color-mix(in srgb, var(--notes-text) 56%, var(--notes-muted));
+  font-size: 12px;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Template prompts use one accent and a restrained writing line. Color no
+   longer implies a status that does not exist. */
+.app-shell .tech-notes-migrated .notion-prosemirror h3 span:first-child {
+  color: var(--notes-accent);
+}
+
+.app-shell .tech-notes-migrated .notion-prosemirror h3 + p em {
+  color: color-mix(in srgb, var(--notes-text) 62%, var(--notes-muted));
+  font-size: 13px;
+}
+
+.app-shell .tech-notes-migrated .notion-prosemirror h3 + p + p {
+  min-height: 42px;
+  border-bottom-color: color-mix(in srgb, var(--notes-accent) 16%, var(--notes-border));
+  transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.app-shell .tech-notes-migrated .notion-prosemirror.ProseMirror-focused h3 + p + p {
+  border-bottom-color: color-mix(in srgb, var(--notes-accent) 32%, var(--notes-border));
+  box-shadow: 0 7px 12px -12px color-mix(in srgb, var(--notes-accent) 36%, transparent);
+}
+
+@media (max-width: 620px) {
+  .app-shell .tech-notes-migrated .notion-template-launcher {
+    max-width: calc(100% - 16px);
+  }
+
+  .app-shell .tech-notes-migrated .notion-template-launcher.is-expanded {
+    width: min(560px, calc(100% - 16px));
+  }
+
+  .app-shell .tech-notes-migrated .notion-template-options {
+    width: 100%;
+  }
+
+  .app-shell .tech-notes-migrated .notion-template-options button {
+    min-height: 66px;
+    padding-inline: 11px;
+  }
+
+  .app-shell .tech-notes-migrated .notion-template-options button:hover,
+  .app-shell .tech-notes-migrated .notion-template-options button:focus-visible {
+    padding-left: 14px;
+  }
+
+  .app-shell .tech-notes-migrated .notion-template-option-copy strong {
+    font-size: 15px;
+  }
+
+  .app-shell .tech-notes-migrated .notion-template-option-copy small {
+    font-size: 13px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-shell .tech-notes-migrated .notion-template-launcher,
+  .app-shell .tech-notes-migrated .notion-template-drag,
+  .app-shell .tech-notes-migrated .notion-template-trigger,
+  .app-shell .tech-notes-migrated .notion-template-options,
+  .app-shell .tech-notes-migrated .notion-template-options button {
+    transition: none;
+  }
+}

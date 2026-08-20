@@ -57,7 +57,7 @@ const displayPlaceholder = intentPlaceholder || (INTENT_PLACEHOLDER[goalType] ??
 | 项目 | 旧值 | 新值 |
 |------|------|------|
 | 模型 | Qwen2.5-14B-Instruct-4bit | Qwen3.5-9B-MLX-4bit |
-| 模型路径 | `/Users/Admin/Downloads/models/Qwen2.5-14B-Instruct-4bit` | `/Users/Admin/Downloads/models/lmstudio-community/Qwen3.5-9B-MLX-4bit` |
+| 模型路径 | `/Users/Admin/Downloads/models/Qwen2.5-14B-Instruct-4bit` | `/Users/Admin/Downloads/models/PlanPilot/lmstudio-community/Qwen3.5-9B-MLX-4bit` |
 | 磁盘占用 | ~8 GB | ~5 GB |
 
 ### 受影响文件
@@ -65,7 +65,7 @@ const displayPlaceholder = intentPlaceholder || (INTENT_PLACEHOLDER[goalType] ??
 | 文件 | 改动 |
 |------|------|
 | `backend/.env` | `MODEL_NAME` 更新为新路径 |
-| `documents/PlanPilot_环境搭建与启动指南.md` | 模型对照表更新 |
+| `documents/06_运维与部署/PlanPilot_环境搭建与启动指南.md` | 模型对照表更新 |
 
 ### 变更原因
 

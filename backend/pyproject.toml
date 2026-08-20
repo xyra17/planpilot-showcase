@@ -1,6 +1,7 @@
 [tool.ruff]
 target-version = "py311"
 line-length = 100
+extend-exclude = ["fix_today_and_check.py", "test_seed.py"]
 
 [tool.ruff.lint]
 # Keep CI focused on syntax/undefined names, unused code, and deterministic imports.

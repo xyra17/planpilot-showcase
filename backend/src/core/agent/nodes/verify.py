@@ -22,16 +22,16 @@ async def node(state: AgentState) -> dict:
     if goal_id:
         try:
             async with AsyncSessionLocal() as db:
-                row = (await db.execute(
-                    select(Goal.title).where(Goal.id == goal_id)
-                )).first()
+                row = (await db.execute(select(Goal.title).where(Goal.id == goal_id))).first()
             if row:
                 goal_title = row.title
         except Exception:
             pass
 
     llm = create_routine_llm(max_tokens=200)
-    messages = [SystemMessage(content=_SYSTEM_TPL.format(goal_title=goal_title))] + list(state.get("messages", []))
+    messages = [SystemMessage(content=_SYSTEM_TPL.format(goal_title=goal_title))] + list(
+        state.get("messages", [])
+    )
     response = await llm.ainvoke(messages)
     response.content = compact_text(response.content, 55)
     return {"messages": [response]}

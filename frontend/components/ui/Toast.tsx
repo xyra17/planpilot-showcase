@@ -24,9 +24,9 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
   const value = useMemo(() => ({ showToast }), [showToast]);
   const toneClass: Record<ToastTone, string> = {
-    success: "border-emerald-200 text-emerald-700",
-    error: "border-red-200 text-red-600",
-    info: "border-gray-200 text-gray-600",
+    success: "pp-tone-success",
+    error: "pp-tone-danger",
+    info: "pp-tone-info",
   };
   const ToneIcon: Record<ToastTone, typeof Info> = {
     success: CheckCircle2,
@@ -41,8 +41,8 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         {items.map((item) => {
           const Icon = ToneIcon[item.tone];
           return (
-            <div key={item.id} className={`pointer-events-auto flex items-start gap-2 rounded-xl border bg-white px-3 py-2.5 shadow-xl ${toneClass[item.tone]}`}>
-              <Icon size={15} className="mt-0.5 flex-shrink-0" />
+            <div key={item.id} className={`pp-toast pointer-events-auto ${toneClass[item.tone]}`}>
+              <span className="pp-toast-icon"><Icon size={15} /></span>
               <p className="min-w-0 flex-1 text-sm leading-5">{item.message}</p>
               <button onClick={() => remove(item.id)} aria-label="关闭提示" className="rounded p-0.5 opacity-60 hover:opacity-100">
                 <X size={13} />

@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from datetime import date, timedelta
 from unittest.mock import AsyncMock, patch
 
+import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -10,6 +11,7 @@ from sqlalchemy.pool import StaticPool
 
 # ── 1. Patch src.database BEFORE importing src.main ──────────────
 import src.database as _db
+from src.config import settings as _settings
 
 _TEST_ENGINE = create_async_engine(
     "sqlite+aiosqlite:///:memory:",
@@ -33,6 +35,18 @@ async def _noop_lifespan(app):
 
 
 app.router.lifespan_context = _noop_lifespan
+
+
+@pytest.fixture(autouse=True)
+def _deterministic_agent_planner():
+    with (
+        patch(
+            "src.core.agent_v2.planner.create_structured_routine_llm",
+            side_effect=RuntimeError("model planner disabled in unit tests"),
+        ),
+        patch.object(_settings, "coach_agent_enabled", False),
+    ):
+        yield
 
 
 # ── 3. Create tables once per session ────────────────────────────
@@ -63,6 +77,10 @@ async def client(db: AsyncSession) -> AsyncClient:
     with (
         patch("src.tasks.knowledge.process_knowledge_item.apply_async", return_value=None),
         patch("src.tasks.agent_runs.execute_agent_run.apply_async", return_value=None),
+        patch(
+            "src.tasks.email_verification.send_email_verification.apply_async", return_value=None
+        ),
+        patch("src.tasks.password_recovery.send_password_reset.apply_async", return_value=None),
         patch("src.redis_client.get_redis", return_value=redis_mock),
     ):
         test_host = f"test-{uuid.uuid4().hex}"
@@ -84,7 +102,9 @@ def _rand_creds() -> dict:
 async def user_token(client: AsyncClient) -> str:
     r = await client.post("/api/v1/auth/register", json=_rand_creds())
     assert r.status_code == 201, r.text
-    return r.json()["access_token"]
+    token = client.cookies.get(_settings.auth_access_cookie_name)
+    assert token
+    return token
 
 
 @pytest_asyncio.fixture

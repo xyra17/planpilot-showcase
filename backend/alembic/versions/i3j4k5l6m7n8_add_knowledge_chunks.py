@@ -7,9 +7,10 @@ Create Date: 2026-07-25
 
 from typing import Sequence, Union
 
-from alembic import op
 import sqlalchemy as sa
 from pgvector.sqlalchemy import Vector
+
+from alembic import op
 
 revision: str = "i3j4k5l6m7n8"
 down_revision: Union[str, None] = "h2i3j4k5l6m7"

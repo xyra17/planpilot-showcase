@@ -1,16 +1,19 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import {
-  Send, Square, Loader2, Zap, BookOpen, X, Bookmark,
+  Send, Square, Loader2, Zap, Bot, BookOpen, X, Bookmark, ExternalLink,
   ListTodo, CheckCircle2, BarChart3, Target, RefreshCw, Search,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useChatStore, type ReplanOptions } from "@/lib/stores/chatStore";
+import { useChatStore } from "@/lib/stores/chatStore";
 import { PlanCard } from "./PlanCard";
-import { ReplanOptionsCard } from "./ReplanOptionsCard";
-import { api } from "@/lib/api";
+import { api, authFetch } from "@/lib/api";
 import type { KnowledgeNote } from "@/lib/knowledge-context";
 import TiptapEditor from "@/components/notes/TiptapEditor";
+import { InlineNotice } from "@/components/ui/InlineNotice";
+import { StatusBadge } from "@/components/ui/StatusBadge";
+import { clearPiloState, signalPiloAgentPhase } from "@/lib/technology/piloState";
 
 const TOOL_LABELS: Record<string, string> = {
   web_search:    "正在搜索资料...",
@@ -28,11 +31,13 @@ const QUICK_ACTIONS = [
 ] as const;
 
 export function ChatWindow({ goalId, className }: { goalId?: string; className?: string }) {
+  const notesHref = "/studio/work/notes";
   const [input, setInput] = useState("");
   const [checkinSaved, setCheckinSaved] = useState<{ goalId: string; rate: number } | null>(null);
   const [showNotePrompt, setShowNotePrompt] = useState(false);
   const [noteContent, setNoteContent] = useState("");
   const [noteSaving, setNoteSaving] = useState(false);
+  const [noteSaveResult, setNoteSaveResult] = useState<"saved" | "error" | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -40,7 +45,7 @@ export function ChatWindow({ goalId, className }: { goalId?: string; className?:
   const {
     messages, isStreaming, toolStatus, sessionId,
     addUserMessage, appendToken, setToolStatus,
-    setStructuredOutput, setConfirmationRequired, setReplanOptions,
+    setStructuredOutput, setConfirmationRequired,
     setStreaming, clearMessages, resetSession,
   } = useChatStore();
 
@@ -59,16 +64,18 @@ export function ChatWindow({ goalId, className }: { goalId?: string; className?:
     addUserMessage(text);
     setInput("");
     setStreaming(true);
+    const piloSource = "agent:chat-window";
+    signalPiloAgentPhase("thinking", { source: piloSource });
     if (textareaRef.current) textareaRef.current.style.height = "auto";
 
     abortRef.current = new AbortController();
+    let hasStartedGenerating = false;
+    let agentFinished = false;
     try {
-      const token = localStorage.getItem("access_token");
-      const res = await fetch("/api/stream", {
+      const res = await authFetch("/api/v1/agent/stream", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({ message: text, goal_id: goalId, session_id: sessionId }),
         signal: abortRef.current.signal,
@@ -76,6 +83,8 @@ export function ChatWindow({ goalId, className }: { goalId?: string; className?:
 
       if (!res.ok || !res.body) {
         appendToken("\n[连接失败，请确认后端服务已启动]");
+        signalPiloAgentPhase("failed", { source: piloSource, reason: "无法连接到 Agent 服务" });
+        agentFinished = true;
         return;
       }
 
@@ -99,19 +108,49 @@ export function ChatWindow({ goalId, className }: { goalId?: string; className?:
             if (!raw || raw === "{}") continue;
             try {
               const payload = JSON.parse(raw) as Record<string, unknown>;
-              if (currentEvent === "token") appendToken((payload.text as string) ?? "");
-              else if (currentEvent === "tool_start") setToolStatus(TOOL_LABELS[(payload.tool as string)] ?? "处理中...");
-              else if (currentEvent === "tool_end") setToolStatus("");
-              else if (currentEvent === "structured") setStructuredOutput(payload);
-              else if (currentEvent === "confirmation_required") setConfirmationRequired(payload);
-              else if (currentEvent === "replan_options") setReplanOptions(payload as unknown as ReplanOptions);
+              if (currentEvent === "token") {
+                appendToken((payload.text as string) ?? "");
+                if (!hasStartedGenerating) {
+                  hasStartedGenerating = true;
+                  signalPiloAgentPhase("generating", { source: piloSource });
+                }
+              }
+              else if (currentEvent === "tool_start") {
+                const tool = (payload.tool as string) ?? "工具";
+                setToolStatus(TOOL_LABELS[tool] ?? "处理中...");
+                signalPiloAgentPhase(tool === "web_search" || tool === "kb_search" ? "retrieving" : "tool", {
+                  source: piloSource,
+                  tool: TOOL_LABELS[tool]?.replace(/\.{3}$/, "") ?? tool,
+                });
+              }
+              else if (currentEvent === "tool_end") {
+                setToolStatus("");
+                signalPiloAgentPhase("verifying", { source: piloSource });
+              }
+              else if (currentEvent === "structured") {
+                setStructuredOutput(payload);
+                signalPiloAgentPhase("verifying", { source: piloSource, reason: "正在检查结构化结果" });
+              }
+              else if (currentEvent === "confirmation_required") {
+                setConfirmationRequired(payload);
+                signalPiloAgentPhase("waiting", { source: piloSource });
+              }
               else if (currentEvent === "checkin_saved") {
                 const gid = (payload.goal_id as string) ?? goalId ?? "";
                 const rate = (payload.completion_rate as number) ?? 1;
                 setCheckinSaved({ goalId: gid, rate });
               }
-              else if (currentEvent === "done") setToolStatus("");
-              else if (currentEvent === "error") appendToken(`\n[错误：${(payload.message as string) ?? "未知错误"}]`);
+              else if (currentEvent === "done") {
+                setToolStatus("");
+                signalPiloAgentPhase("done", { source: piloSource });
+                agentFinished = true;
+              }
+              else if (currentEvent === "error") {
+                const message = (payload.message as string) ?? "未知错误";
+                appendToken(`\n[错误：${message}]`);
+                signalPiloAgentPhase("failed", { source: piloSource, reason: message });
+                agentFinished = true;
+              }
             } catch { /* ignore malformed lines */ }
           }
         }
@@ -119,28 +158,50 @@ export function ChatWindow({ goalId, className }: { goalId?: string; className?:
     } catch (err: unknown) {
       if ((err as Error).name !== "AbortError") {
         appendToken("\n[请求中断]");
+        signalPiloAgentPhase("failed", { source: piloSource, reason: "Agent 请求意外中断" });
+        agentFinished = true;
+      } else {
+        clearPiloState(piloSource, "agent");
       }
     } finally {
+      if (!agentFinished) clearPiloState(piloSource, "agent");
       setStreaming(false);
       setToolStatus("");
     }
-  }, [isStreaming, goalId, sessionId, addUserMessage, appendToken, setToolStatus, setStructuredOutput, setConfirmationRequired, setReplanOptions, setStreaming]);
+  }, [isStreaming, goalId, sessionId, addUserMessage, appendToken, setToolStatus, setStructuredOutput, setConfirmationRequired, setStreaming]);
+
+  const persistNote = useCallback(async ({ content, title }: { content: string; title: string }) => {
+    try {
+      await api.post<KnowledgeNote>("/api/v1/knowledge/notes", {
+        goalId: goalId ?? null,
+        content,
+        noteType: "flash_card",
+        title,
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  }, [goalId]);
 
   const saveAiNote = useCallback(async (text: string) => {
-    await api.post("/api/v1/knowledge/notes", {
-      goalId: goalId ?? null,
-      content: `<p>${text.replace(/\n\n+/g, "</p><p>").replace(/\n/g, "<br>")}</p>`,
-      noteType: "flash_card",
-      title: text.slice(0, 60),
-    }).catch(() => null);
-  }, [goalId]);
+    setNoteSaveResult(null);
+    const escaped = text
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+    const saved = await persistNote({
+      content: `<p>${escaped.replace(/\n\n+/g, "</p><p>").replace(/\n/g, "<br>")}</p>`,
+      title: text.slice(0, 60) || "AI 助教笔记",
+    });
+    setNoteSaveResult(saved ? "saved" : "error");
+  }, [persistNote]);
 
   const handleConfirm = async (confirmed: boolean) => {
     setConfirmationRequired(null);
-    await fetch("/api/agent/confirm", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ confirmed, session_id: sessionId }),
+    await api.post("/api/v1/agent/confirm", {
+      confirmed,
+      session_id: sessionId,
     }).catch(() => null);
   };
 
@@ -161,19 +222,19 @@ export function ChatWindow({ goalId, className }: { goalId?: string; className?:
     <div className={cn("flex flex-col", className)}>
       <div className="goal-detail-scroll flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
         {messages.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-full text-center py-12 select-none px-4">
-            <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-3"
+          <div className="ai-chat-empty flex h-full select-none flex-col items-center justify-center px-4 py-12 text-center">
+            <div className="ai-chat-empty-icon mb-3 flex h-12 w-12 items-center justify-center rounded-2xl"
               style={{ backgroundColor: "var(--accent-light)" }}>
               <Zap size={22} style={{ color: "var(--accent)" }} />
             </div>
             <p className="text-sm font-semibold text-gray-700 mb-1">AI 助教</p>
             <p className="text-xs text-gray-400 mb-5">你的学习规划助手，随时可以开始</p>
-            <div className="flex items-center gap-2 w-full max-w-xs mb-4">
+            <div className="ai-chat-empty-divider mb-4 flex w-full max-w-xs items-center gap-2">
               <div className="flex-1 h-px bg-gray-200" />
               <span className="text-[10px] text-gray-400 whitespace-nowrap">我能帮你做这些</span>
               <div className="flex-1 h-px bg-gray-200" />
             </div>
-            <div className="grid grid-cols-3 gap-2 w-full max-w-xs">
+            <div className="ai-quick-grid grid w-full max-w-xs grid-cols-3 gap-2">
               {QUICK_ACTIONS.map((action) => {
                 const ActionIcon = action.icon;
                 return (
@@ -182,7 +243,7 @@ export function ChatWindow({ goalId, className }: { goalId?: string; className?:
                   type="button"
                   onClick={() => sendMessage(action.text)}
                   disabled={isStreaming}
-                  className="ai-quick-action flex flex-col items-center gap-1.5 rounded-xl border border-gray-100 bg-gray-50 px-2 py-2.5 transition hover:-translate-y-0.5 hover:border-gray-200 disabled:opacity-40"
+                  className="ai-quick-action flex flex-col items-center gap-1.5 rounded-xl border border-gray-200 bg-white px-2 py-2.5 shadow-sm transition hover:-translate-y-0.5 hover:border-[var(--accent-muted)] hover:bg-[var(--accent-light)] hover:shadow-md disabled:opacity-40"
                 >
                   <span className="ai-quick-icon flex h-6 w-6 items-center justify-center rounded-lg" style={{ backgroundColor: "var(--accent-light)", color: "var(--accent)" }}>
                     <ActionIcon size={15} strokeWidth={1.8} />
@@ -198,11 +259,14 @@ export function ChatWindow({ goalId, className }: { goalId?: string; className?:
         {messages.map((msg) => (
           <div key={msg.id} className={cn("flex", msg.role === "user" ? "justify-end" : "justify-start")}>
             <div className={cn(
-              "max-w-[85%] rounded-2xl px-4 py-3 text-sm group/msg",
+              "ai-chat-message max-w-[85%] rounded-2xl px-4 py-3 text-sm group/msg",
               msg.role === "user"
-                ? "text-white rounded-br-sm"
-                : "bg-gray-100 text-gray-900 rounded-bl-sm"
+                ? "is-user text-white rounded-br-sm"
+                : "is-assistant text-gray-900 rounded-bl-sm"
             )} style={msg.role === "user" ? { backgroundColor: "var(--accent)" } : {}}>
+              {msg.role === "assistant" && (
+                <span className="ai-message-source"><Bot size={11} /> PlanPilot 助教</span>
+              )}
               {msg.content && (
                 <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
               )}
@@ -219,10 +283,11 @@ export function ChatWindow({ goalId, className }: { goalId?: string; className?:
               )}
               {msg.structuredOutput && <PlanCard plan={msg.structuredOutput} />}
               {msg.confirmationRequired && (
-                <div className="ai-confirm-card mt-3 p-3 bg-amber-50 border border-amber-200 rounded-xl">
-                  <p className="ai-confirm-text text-xs font-medium text-amber-800 mb-2">
-                    {(msg.confirmationRequired as { message?: string }).message ?? "需要您确认"}
-                  </p>
+                <InlineNotice
+                  tone="warning"
+                  className="ai-confirm-card mt-3"
+                  title={(msg.confirmationRequired as { message?: string }).message ?? "需要您确认"}
+                >
                   <div className="flex gap-2">
                     <button onClick={() => handleConfirm(true)}
                       className="px-3 py-1.5 text-white text-xs rounded-lg transition"
@@ -234,10 +299,7 @@ export function ChatWindow({ goalId, className }: { goalId?: string; className?:
                       暂不调整
                     </button>
                   </div>
-                </div>
-              )}
-              {msg.replanOptions && (
-                <ReplanOptionsCard options={msg.replanOptions} />
+                </InlineNotice>
               )}
             </div>
           </div>
@@ -245,10 +307,9 @@ export function ChatWindow({ goalId, className }: { goalId?: string; className?:
 
         {toolStatus && (
           <div className="flex justify-start">
-            <div className="bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-xs text-gray-500 flex items-center gap-2">
-              <Loader2 size={11} className="animate-spin" style={{ color: "var(--accent)" }} />
+            <StatusBadge tone="progress" icon={<Loader2 size={11} className="animate-spin" />}>
               {toolStatus}
-            </div>
+            </StatusBadge>
           </div>
         )}
         <div ref={bottomRef} />
@@ -256,27 +317,30 @@ export function ChatWindow({ goalId, className }: { goalId?: string; className?:
 
       {/* 打卡后笔记提示 */}
       {checkinSaved && !showNotePrompt && (
-        <div className="ai-success-card shrink-0 mx-4 mb-2 flex items-center gap-3 bg-green-50 border border-green-100 rounded-xl px-4 py-3">
-          <BookOpen size={16} className="ai-success-icon text-green-500 flex-shrink-0" />
-          <p className="ai-success-text text-sm text-green-700 flex-1">
-            打卡成功！要记录一下今天的学习收获吗？
-          </p>
-          <button
-            onClick={() => setShowNotePrompt(true)}
-            className="text-xs px-3 py-1.5 rounded-lg text-white transition flex-shrink-0"
-            style={{ background: "var(--accent)" }}
-          >
-            写笔记
-          </button>
-          <button onClick={() => setCheckinSaved(null)} className="p-1 rounded text-gray-400 hover:text-gray-600 flex-shrink-0">
-            <X size={13} />
-          </button>
-        </div>
+        <InlineNotice
+          tone="info"
+          icon={<BookOpen size={16} />}
+          className="ai-success-card mx-4 mb-2 shrink-0"
+          action={(
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => setShowNotePrompt(true)}
+                className="rounded-lg px-3 py-1.5 text-xs text-white transition"
+                style={{ background: "var(--accent)" }}
+              >写笔记</button>
+              <button onClick={() => setCheckinSaved(null)} className="pp-icon-action rounded-lg p-1" aria-label="关闭打卡提示">
+                <X size={13} />
+              </button>
+            </div>
+          )}
+        >
+          打卡成功！要记录一下今天的学习收获吗？
+        </InlineNotice>
       )}
 
       {/* 笔记编辑弹层 */}
       {showNotePrompt && (
-        <div className="ai-note-prompt shrink-0 mx-4 mb-2 border border-blue-100 bg-blue-50/30 rounded-xl overflow-hidden">
+        <div className="ai-note-prompt shrink-0 mx-4 mb-2 border border-accent-muted bg-accent-light/30 rounded-xl overflow-hidden">
           <div className="flex items-center justify-between px-4 pt-3 pb-1">
             <span className="text-xs font-medium text-gray-500">记录今日收获</span>
             <button onClick={() => { setShowNotePrompt(false); setCheckinSaved(null); }}
@@ -287,7 +351,7 @@ export function ChatWindow({ goalId, className }: { goalId?: string; className?:
             onChange={setNoteContent}
             placeholder="今天学了什么？有什么收获或疑问？"
             showToolbar={false}
-            className="ai-note-editor border-0 border-t border-blue-100 rounded-none"
+            className="ai-note-editor border-0 border-t border-accent-muted rounded-none"
           />
           <div className="flex justify-end gap-2 px-4 pb-3 pt-1">
             <button onClick={() => { setShowNotePrompt(false); setCheckinSaved(null); }}
@@ -299,13 +363,13 @@ export function ChatWindow({ goalId, className }: { goalId?: string; className?:
               onClick={async () => {
                 if (!noteContent || noteContent === "<p></p>") return;
                 setNoteSaving(true);
-                await api.post<KnowledgeNote>("/api/v1/knowledge/notes", {
-                  goalId: checkinSaved?.goalId ?? goalId ?? null,
+                const saved = await persistNote({
                   content: noteContent,
-                  noteType: "flash_card",
                   title: `打卡收获 ${new Date().toLocaleDateString("zh-CN")}`,
-                }).catch(() => null);
+                });
                 setNoteSaving(false);
+                setNoteSaveResult(saved ? "saved" : "error");
+                if (!saved) return;
                 setShowNotePrompt(false);
                 setCheckinSaved(null);
                 setNoteContent("");
@@ -316,6 +380,20 @@ export function ChatWindow({ goalId, className }: { goalId?: string; className?:
               {noteSaving ? "保存中…" : "保存"}
             </button>
           </div>
+        </div>
+      )}
+
+      {noteSaveResult && (
+        <div className={`ai-note-save-result ${noteSaveResult === "error" ? "is-error" : "is-saved"}`} role={noteSaveResult === "error" ? "alert" : "status"}>
+          <span className="ai-note-save-result-icon"><BookOpen size={15} /></span>
+          <div>
+            <strong>{noteSaveResult === "saved" ? "已保存至笔记页面" : "笔记保存失败"}</strong>
+            <small>{noteSaveResult === "saved" ? "可以继续编辑、下载或关联目标。" : "请检查网络连接后重试。"}</small>
+          </div>
+          {noteSaveResult === "saved" && (
+            <Link href={notesHref}>打开笔记页面 <ExternalLink size={12} /></Link>
+          )}
+          <button type="button" aria-label="关闭笔记保存提示" onClick={() => setNoteSaveResult(null)}><X size={13} /></button>
         </div>
       )}
 
@@ -334,7 +412,7 @@ export function ChatWindow({ goalId, className }: { goalId?: string; className?:
             ))}
           </div>
         )}
-        <div className="flex gap-2 items-end px-4 pb-4 pt-2">
+        <div className="ai-chat-composer flex gap-2 items-end px-4 pb-4 pt-2">
           <textarea
             ref={textareaRef}
             value={input}
@@ -354,7 +432,7 @@ export function ChatWindow({ goalId, className }: { goalId?: string; className?:
           ) : (
             <button onClick={() => sendMessage(input)}
               disabled={!input.trim()}
-              className="shrink-0 w-9 h-9 rounded-xl flex items-center justify-center text-white disabled:opacity-40 transition"
+              className="ai-chat-send-button shrink-0 w-9 h-9 rounded-xl flex items-center justify-center text-white disabled:opacity-40 transition"
               style={{ backgroundColor: "var(--accent)" }}>
               <Send size={13} />
             </button>

@@ -20,8 +20,7 @@ async def web_search(query: str) -> str:
         if not results:
             return "未找到相关结果。"
         snippets = [
-            f"**{r['title']}**\n{r.get('body', '')[:400]}\n来源：{r['href']}"
-            for r in results
+            f"**{r['title']}**\n{r.get('body', '')[:400]}\n来源：{r['href']}" for r in results
         ]
         return "\n\n---\n\n".join(snippets)
     except Exception as e:

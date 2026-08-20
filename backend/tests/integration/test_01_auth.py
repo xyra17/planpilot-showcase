@@ -8,7 +8,8 @@ async def test_register_success(client: AsyncClient, shared: dict, seed: dict):
     r = await client.post("/api/v1/auth/register", json=seed["user"])
     assert r.status_code == 201, r.text
     data = r.json()
-    assert "access_token" in data
+    assert "access_token" not in data
+    assert r.cookies.get("pp_access")
     assert data["user"]["email"] == seed["user"]["email"]
     shared["user_id"] = data["user"]["id"]
 
@@ -22,7 +23,7 @@ async def test_register_duplicate_email(client: AsyncClient, seed: dict):
 async def test_register_second_user(client: AsyncClient, shared: dict, seed: dict):
     r = await client.post("/api/v1/auth/register", json=seed["user2"])
     assert r.status_code == 201
-    shared["user2_token"] = r.json()["access_token"]
+    shared["user2_token"] = r.cookies.get("pp_access")
 
 
 async def test_login_success(client: AsyncClient, seed: dict):
@@ -31,7 +32,8 @@ async def test_login_success(client: AsyncClient, seed: dict):
         json={"email": seed["user"]["email"], "password": seed["user"]["password"]},
     )
     assert r.status_code == 200
-    assert "access_token" in r.json()
+    assert "access_token" not in r.json()
+    assert r.cookies.get("pp_access")
 
 
 async def test_login_wrong_password(client: AsyncClient, seed: dict):
@@ -49,6 +51,7 @@ async def test_me_authenticated(client: AsyncClient, auth_headers: dict, seed: d
 
 
 async def test_me_unauthenticated(client: AsyncClient):
+    client.cookies.clear()
     r = await client.get("/api/v1/auth/me")
     assert r.status_code in (401, 403)
 

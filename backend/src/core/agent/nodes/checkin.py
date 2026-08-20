@@ -1,6 +1,7 @@
 from langchain_core.messages import SystemMessage
 from sqlalchemy import select
 
+from src.core.agent.preferences import pilo_preference_context
 from src.core.agent.state import AgentState
 from src.core.llm_router import create_routine_llm
 from src.database import AsyncSessionLocal
@@ -17,9 +18,9 @@ _SYSTEM_TPL = """你是 PlanPilot 学习助教，负责引导用户完成「{goa
 _RATE_KEYWORDS = {
     1.0: ["全部完成", "全做完", "都完成", "完成了所有", "100%"],
     0.75: ["大部分", "差不多", "基本完成", "大概完成", "75%"],
-    0.5:  ["一半", "50%", "完成一半", "部分完成"],
+    0.5: ["一半", "50%", "完成一半", "部分完成"],
     0.25: ["一点点", "很少", "没怎么", "几乎没", "25%"],
-    0.0:  ["没完成", "没做", "没有学", "0%"],
+    0.0: ["没完成", "没做", "没有学", "0%"],
 }
 
 
@@ -40,9 +41,7 @@ async def node(state: AgentState) -> dict:
     if goal_id:
         try:
             async with AsyncSessionLocal() as db:
-                row = (await db.execute(
-                    select(Goal.title).where(Goal.id == goal_id)
-                )).first()
+                row = (await db.execute(select(Goal.title).where(Goal.id == goal_id))).first()
             if row:
                 goal_title = row.title
         except Exception:
@@ -52,7 +51,7 @@ async def node(state: AgentState) -> dict:
         max_tokens=256,
         streaming=True,
     )
-    system = _SYSTEM_TPL.format(goal_title=goal_title)
+    system = _SYSTEM_TPL.format(goal_title=goal_title) + pilo_preference_context(state)
     messages = [SystemMessage(content=system)] + list(msgs)
     response = await llm.ainvoke(messages)
 

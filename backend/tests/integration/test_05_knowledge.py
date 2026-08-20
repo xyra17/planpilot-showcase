@@ -79,9 +79,9 @@ async def test_search_knowledge_keyword(client: AsyncClient, auth_headers: dict,
         headers=auth_headers,
     )
     async with database.AsyncSessionLocal() as db:
-        item = (await db.execute(
-            select(KnowledgeItem).where(KnowledgeItem.id == uploaded.json()["id"])
-        )).scalar_one()
+        item = (
+            await db.execute(select(KnowledgeItem).where(KnowledgeItem.id == uploaded.json()["id"]))
+        ).scalar_one()
         item.content = cpa_txt["content"]
         item.content_length = len(item.content)
         item.processing_status = "ready"

@@ -1,0 +1,257 @@
+/* Shared clock picker used by weekly availability and task scheduling. */
+.app-shell .task-dialog:has(.clock-time-picker) {
+  overflow: visible;
+}
+
+.app-shell .clock-time-picker {
+  position: relative;
+}
+
+.app-shell .clock-time-picker.is-form {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+}
+
+.app-shell .clock-time-picker.is-form .availability-time-control {
+  position: relative;
+  display: flex;
+  width: 100%;
+  height: 44px;
+  align-items: center;
+  border: 1px solid var(--workspace-border);
+  border-radius: 8px;
+  background: var(--workspace-panel-subtle);
+  transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+}
+
+.app-shell .clock-time-picker.is-form .availability-time-control:focus-within {
+  border-color: color-mix(in srgb, var(--workspace-accent) 68%, var(--workspace-border));
+  background: color-mix(in srgb, var(--workspace-accent) 3%, var(--workspace-panel-subtle));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--workspace-accent) 11%, transparent);
+}
+
+.app-shell .clock-time-picker.is-form .availability-time-control::after {
+  display: none;
+}
+
+.app-shell .clock-time-picker.is-form .availability-time-input {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0 46px 0 12px;
+}
+
+.app-shell .clock-time-picker.is-form .availability-time-input input {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  color: var(--workspace-text);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  font-size: 13px;
+  font-weight: 560;
+  font-variant-numeric: tabular-nums;
+  outline: 0;
+}
+
+.app-shell .clock-time-picker.is-form .availability-time-input input:focus {
+  border: 0;
+  box-shadow: none;
+  outline: 0;
+}
+
+.app-shell .clock-time-picker.is-form .availability-time-picker-trigger {
+  position: absolute;
+  z-index: 2;
+  right: 6px;
+  display: inline-flex;
+  width: 34px;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  color: var(--workspace-secondary);
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  transition: color 160ms ease, background-color 160ms ease, transform 160ms ease;
+}
+
+.app-shell .clock-time-picker.is-form .availability-time-picker-trigger:is(:hover, :focus-visible),
+.app-shell .clock-time-picker.is-form .availability-time-picker-trigger[aria-expanded="true"] {
+  color: var(--workspace-accent);
+  background: color-mix(in srgb, var(--workspace-accent) 8%, transparent);
+}
+
+.app-shell .clock-time-picker .availability-time-picker-trigger svg {
+  transition: transform 170ms ease;
+}
+
+.app-shell .clock-time-picker .availability-time-picker-trigger[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+
+.app-shell .clock-time-picker .availability-time-popover {
+  position: absolute;
+  z-index: 240;
+  top: calc(100% + 8px);
+  left: 0;
+  width: 248px;
+  overflow: hidden;
+  color: var(--workspace-text);
+  border: 1px solid color-mix(in srgb, var(--workspace-accent) 24%, var(--workspace-border));
+  border-radius: 12px;
+  background:
+    radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--workspace-accent) 10%, transparent), transparent 42%),
+    var(--workspace-panel);
+  box-shadow: 0 18px 40px color-mix(in srgb, var(--workspace-text) 16%, transparent);
+  animation: clock-time-picker-in 170ms ease both;
+}
+
+.app-shell .clock-time-picker.is-form .availability-time-popover,
+.app-shell .clock-time-picker.is-end .availability-time-popover {
+  right: 0;
+  left: auto;
+}
+
+.app-shell .clock-time-picker .availability-time-popover > header {
+  display: flex;
+  min-height: 43px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--workspace-border);
+}
+
+.app-shell .clock-time-picker .availability-time-popover > header span,
+.app-shell .clock-time-picker .availability-time-popover > header strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.app-shell .clock-time-picker .availability-time-popover > header span {
+  color: var(--workspace-secondary);
+  font-size: 11px;
+  font-weight: 680;
+}
+
+.app-shell .clock-time-picker .availability-time-popover > header strong {
+  color: var(--workspace-accent);
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: .04em;
+}
+
+.app-shell .clock-time-picker .availability-time-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 6px 10px 8px;
+}
+
+.app-shell .clock-time-picker .availability-time-columns section {
+  min-width: 0;
+}
+
+.app-shell .clock-time-picker .availability-time-columns section + section {
+  border-left: 1px solid var(--workspace-border);
+}
+
+.app-shell .clock-time-picker .availability-time-columns section > span {
+  display: block;
+  padding: 5px 8px;
+  color: var(--workspace-tertiary);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .08em;
+}
+
+.app-shell .clock-time-picker .availability-time-options {
+  max-height: 148px;
+  overflow-y: auto;
+  padding: 0 5px 5px;
+  scrollbar-color: color-mix(in srgb, var(--workspace-accent) 38%, transparent) transparent;
+  scrollbar-width: thin;
+}
+
+.app-shell .clock-time-picker .availability-time-options button {
+  display: flex;
+  width: 100%;
+  min-height: 32px;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 8px;
+  color: var(--workspace-secondary);
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 680;
+}
+
+.app-shell .clock-time-picker .availability-time-options button:is(:hover, :focus-visible) {
+  color: var(--workspace-accent);
+  background: color-mix(in srgb, var(--workspace-accent) 7%, transparent);
+}
+
+.app-shell .clock-time-picker .availability-time-options button.is-selected {
+  color: var(--workspace-accent);
+  background: color-mix(in srgb, var(--workspace-accent) 12%, var(--workspace-panel));
+  box-shadow: inset 2px 0 0 var(--workspace-accent);
+}
+
+.app-shell .clock-time-picker .availability-time-popover > footer {
+  display: flex;
+  min-height: 45px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-top: 1px solid var(--workspace-border);
+}
+
+.app-shell .clock-time-picker .availability-time-popover > footer small {
+  color: var(--workspace-tertiary);
+  font-size: 9px;
+}
+
+.app-shell .clock-time-picker .availability-time-popover > footer button {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 9px;
+  color: #fff;
+  border: 0;
+  border-radius: 8px;
+  background: var(--workspace-accent);
+  box-shadow: 0 7px 14px color-mix(in srgb, var(--workspace-accent) 20%, transparent);
+  font-size: 10px;
+  font-weight: 720;
+}
+
+@keyframes clock-time-picker-in {
+  from { opacity: 0; transform: translateY(-5px) scale(.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (max-width: 680px) {
+  .app-shell .task-dialog:has(.clock-time-picker) {
+    overflow-y: auto;
+  }
+
+  .app-shell .clock-time-picker .availability-time-popover {
+    width: min(248px, calc(100vw - 42px));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-shell .clock-time-picker .availability-time-popover {
+    animation: none;
+  }
+}

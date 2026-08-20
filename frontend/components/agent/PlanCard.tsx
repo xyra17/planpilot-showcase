@@ -34,7 +34,7 @@ interface Plan {
 }
 
 const TASK_TYPE_STYLE: Record<string, { icon: React.ReactNode; cls: string }> = {
-  study:    { icon: <BookOpen size={11} />,   cls: "bg-blue-50 text-blue-600" },
+  study:    { icon: <BookOpen size={11} />,   cls: "bg-accent-light text-accent" },
   review:   { icon: <RefreshCw size={11} />,  cls: "bg-purple-50 text-purple-600" },
   practice: { icon: <Dumbbell size={11} />,   cls: "bg-green-50 text-green-600" },
   rest:     { icon: <Coffee size={11} />,     cls: "bg-gray-50 text-gray-400" },

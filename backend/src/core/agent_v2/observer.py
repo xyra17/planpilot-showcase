@@ -7,9 +7,7 @@ from src.core.agent_v2.schemas import ChangeSet
 from src.models import Goal, Task
 
 
-async def verify_task_changes(
-    db: AsyncSession, user_id: str, change_set: ChangeSet
-) -> dict:
+async def verify_task_changes(db: AsyncSession, user_id: str, change_set: ChangeSet) -> dict:
     mismatches: list[dict[str, str]] = []
     for operation in change_set.operations:
         row = (

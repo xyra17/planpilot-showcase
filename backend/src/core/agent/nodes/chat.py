@@ -1,6 +1,7 @@
 from langchain_core.messages import SystemMessage
 from sqlalchemy import select
 
+from src.core.agent.preferences import pilo_preference_context
 from src.core.agent.state import AgentState
 from src.core.agent.tools import chat_tools
 from src.core.llm_quality import ensure_nonempty_text
@@ -32,10 +33,13 @@ async def _get_goal_context(goal_id: str | None) -> str:
         return ""
     try:
         async with AsyncSessionLocal() as db:
-            goal = (await db.execute(
-                select(Goal.title, Goal.type, Goal.daily_hours, Goal.deadline, Goal.status)
-                .where(Goal.id == goal_id)
-            )).first()
+            goal = (
+                await db.execute(
+                    select(
+                        Goal.title, Goal.type, Goal.daily_hours, Goal.deadline, Goal.status
+                    ).where(Goal.id == goal_id)
+                )
+            ).first()
         if not goal:
             return ""
         return (
@@ -62,13 +66,18 @@ async def _get_open_debts(state: AgentState) -> list[dict]:
 
     try:
         async with AsyncSessionLocal() as db:
-            rows = (await db.execute(
-                select(LearningDebt.content, LearningDebt.impact, LearningDebt.estimated_hours)
-                .where(LearningDebt.goal_id == goal_id, LearningDebt.status == "open")
-                .order_by(LearningDebt.created_at.desc())
-                .limit(5)
-            )).all()
-        return [{"content": r.content, "impact": r.impact, "estimated_hours": r.estimated_hours} for r in rows]
+            rows = (
+                await db.execute(
+                    select(LearningDebt.content, LearningDebt.impact, LearningDebt.estimated_hours)
+                    .where(LearningDebt.goal_id == goal_id, LearningDebt.status == "open")
+                    .order_by(LearningDebt.created_at.desc())
+                    .limit(5)
+                )
+            ).all()
+        return [
+            {"content": r.content, "impact": r.impact, "estimated_hours": r.estimated_hours}
+            for r in rows
+        ]
     except Exception:
         return []
 
@@ -77,11 +86,10 @@ async def node(state: AgentState) -> dict:
     goal_context = await _get_goal_context(state.get("goal_id"))
     debts = await _get_open_debts(state)
 
-    system_text = _SYSTEM_BASE + goal_context
+    system_text = _SYSTEM_BASE + goal_context + pilo_preference_context(state)
     if debts:
         debt_lines = "\n".join(
-            f"- [{d['impact'].upper()}] {d['content']}（约 {d['estimated_hours']}h）"
-            for d in debts
+            f"- [{d['impact'].upper()}] {d['content']}（约 {d['estimated_hours']}h）" for d in debts
         )
         system_text += f"\n\n【当前学习债务（未补欠账）】\n{debt_lines}\n在回答学习计划或进度问题时，适当提醒用户优先处理高影响债务。"
 

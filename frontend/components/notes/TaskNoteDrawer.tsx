@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { X } from "lucide-react";
+import Link from "next/link";
 import { api } from "@/lib/api";
 import TiptapEditor from "./TiptapEditor";
 import type { KnowledgeNote } from "@/lib/knowledge-context";
@@ -13,6 +14,7 @@ interface TaskNoteDrawerProps {
 }
 
 export default function TaskNoteDrawer({ task, onClose }: TaskNoteDrawerProps) {
+  const notesHref = "/studio/work/notes";
   const [content, setContent] = useState("");
   const [noteId, setNoteId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -32,6 +34,7 @@ export default function TaskNoteDrawer({ task, onClose }: TaskNoteDrawerProps) {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [task?.id]);
 
   const handleSave = async (html: string) => {
@@ -87,8 +90,9 @@ export default function TaskNoteDrawer({ task, onClose }: TaskNoteDrawerProps) {
         </div>
 
         {/* 底部提示 */}
-        <div className="px-5 py-3 border-t border-gray-100">
-          <p className="text-xs text-gray-400">自动保存，内容将同步至知识库</p>
+        <div className="flex items-center justify-between gap-3 px-5 py-3 border-t border-gray-100">
+          <p className="text-xs text-gray-400">自动保存至笔记页面</p>
+          <Link href={notesHref} className="text-xs font-medium" style={{ color: "var(--accent)" }}>打开笔记页面</Link>
         </div>
       </div>
     </>

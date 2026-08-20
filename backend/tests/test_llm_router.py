@@ -107,9 +107,24 @@ def test_structured_route_enforces_json_object():
         result = create_structured_routine_llm(max_tokens=200)
 
     assert result is routed
-    assert factory.call_args.kwargs["model_kwargs"]["response_format"] == {
-        "type": "json_object"
-    }
+    assert factory.call_args.kwargs["model_kwargs"]["response_format"] == {"type": "json_object"}
+
+
+def test_structured_route_can_pin_an_approved_smart_model_config():
+    configured = MagicMock()
+    with patch("src.core.llm_router.ChatOpenAI", return_value=configured) as factory:
+        result = create_structured_routine_llm(
+            provider="smart",
+            model_name="pinned-model-v2",
+            timeout_ms=45000,
+            temperature=0.1,
+            max_tokens=321,
+        )
+
+    assert result is configured
+    assert factory.call_args.kwargs["model"] == "pinned-model-v2"
+    assert factory.call_args.kwargs["timeout"] == 45
+    assert factory.call_args.kwargs["model_kwargs"]["response_format"] == {"type": "json_object"}
 
 
 @pytest.mark.asyncio

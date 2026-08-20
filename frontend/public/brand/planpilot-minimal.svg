@@ -1,0 +1,10 @@
+<svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- The same PlanPilot P reduced to one quiet, Apple-like gesture. -->
+  <path d="M14.5 37V25.2C14.5 18.9 18.9 14.5 25.2 14.5H28.4C34 14.5 37.5 17.9 37.5 22.8C37.5 28.2 33.2 32.2 27.6 32.2H22.5"
+        stroke="#F7FAF6" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="24.4" cy="24.2" r="3.2" fill="none" stroke="#F7FAF6" stroke-width="2.35"/>
+  <path d="M24.8 24C28.5 20 31.8 16.5 37.2 11.2" stroke="#BFCBC4" stroke-width="2.45"
+        stroke-linecap="round" stroke-dasharray="1.7 4"/>
+  <path d="M35.1 8.9L40.7 8.2L39.7 13.8L38 11L35.1 8.9Z" fill="#F7FAF6"/>
+  <circle cx="14.5" cy="37" r="2.4" fill="#F7FAF6"/>
+</svg>

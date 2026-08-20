@@ -19,7 +19,7 @@ interface DebtItem {
 const IMPACT_COLOR: Record<string, string> = {
   high:   "text-red-500 bg-red-50 border-red-100",
   medium: "text-amber-500 bg-amber-50 border-amber-100",
-  low:    "text-blue-400 bg-blue-50 border-blue-100",
+  low:    "text-accent bg-accent-light border-accent-muted",
 };
 const IMPACT_LABEL: Record<string, string> = {
   high: "高", medium: "中", low: "低",

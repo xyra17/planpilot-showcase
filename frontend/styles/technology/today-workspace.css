@@ -1,0 +1,635 @@
+/* Today workspace: functional states layered over the restored theme layouts. */
+
+.app-shell .dashboard-page {
+  min-width: 0;
+  padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  overflow-x: clip;
+}
+
+.app-shell .today-task-empty {
+  display: grid;
+  min-height: 148px;
+  align-content: center;
+  justify-items: center;
+  gap: 7px;
+  padding: 24px;
+  color: var(--workspace-secondary);
+  text-align: center;
+  border: 1px dashed var(--workspace-border-strong);
+  border-radius: 10px;
+}
+
+.app-shell .today-task-empty strong {
+  color: var(--workspace-text);
+  font-size: 14px;
+}
+
+.app-shell .today-task-empty span,
+.app-shell .task-submit-hint,
+.app-shell .task-submit-error {
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.app-shell .task-submit-error {
+  margin: 0 0 12px;
+  padding: 9px 11px;
+  color: var(--workspace-danger, #b84343);
+  background: color-mix(in srgb, var(--workspace-danger, #b84343) 9%, var(--workspace-panel));
+  border: 1px solid color-mix(in srgb, var(--workspace-danger, #b84343) 30%, var(--workspace-border));
+  border-radius: 8px;
+}
+
+.app-shell .task-submit-hint {
+  margin: 0 0 12px;
+  color: var(--workspace-secondary);
+}
+
+.app-shell .today-task-success {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 40;
+  display: inline-flex;
+  max-width: min(420px, calc(100vw - 32px));
+  min-height: 42px;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 10px 9px 13px;
+  color: var(--workspace-text);
+  background: var(--workspace-panel);
+  border: 1px solid color-mix(in srgb, var(--workspace-positive) 45%, var(--workspace-border));
+  border-radius: 10px;
+  box-shadow: 0 12px 30px color-mix(in srgb, var(--workspace-text) 12%, transparent);
+}
+
+.app-shell .today-task-success > svg {
+  flex: 0 0 auto;
+  color: var(--workspace-positive);
+}
+
+.app-shell .today-task-success span {
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.app-shell .today-task-success button,
+.app-shell .today-schedule-error button {
+  display: inline-grid;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  place-items: center;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.app-shell .today-task-success button:hover,
+.app-shell .today-task-success button:focus-visible,
+.app-shell .today-schedule-error button:hover,
+.app-shell .today-schedule-error button:focus-visible {
+  background: var(--workspace-hover);
+}
+
+.app-shell .today-schedule-error {
+  display: flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 9px 0;
+  padding: 6px 8px 6px 11px;
+  color: var(--workspace-danger, #b84343);
+  font-size: 12px;
+  line-height: 1.45;
+  background: color-mix(in srgb, var(--workspace-danger, #b84343) 8%, var(--workspace-panel));
+  border: 1px solid color-mix(in srgb, var(--workspace-danger, #b84343) 30%, var(--workspace-border));
+  border-radius: 8px;
+}
+
+.app-shell .today-schedule-error button {
+  width: auto;
+  min-width: 44px;
+  padding: 0 8px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.app-shell .today-schedule-sync {
+  margin: 8px 0 0;
+  color: var(--workspace-secondary);
+  font-size: 11px;
+}
+
+.app-shell .week-adjustment-dialog {
+  width: min(520px, calc(100vw - 32px));
+}
+
+.app-shell .week-adjustment-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 24px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  padding: 14px;
+  background: var(--workspace-panel-subtle);
+  border: 1px solid var(--workspace-border);
+  border-radius: 10px;
+}
+
+.app-shell .week-adjustment-summary > svg {
+  color: var(--workspace-accent);
+}
+
+.app-shell .week-adjustment-summary > div,
+.app-shell .week-adjustment-impact > span {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.app-shell .week-adjustment-summary small,
+.app-shell .week-adjustment-impact small {
+  color: var(--workspace-tertiary);
+  font-size: 10px;
+}
+
+.app-shell .week-adjustment-summary strong {
+  overflow-wrap: anywhere;
+  color: var(--workspace-text);
+  font-size: 13px;
+}
+
+.app-shell .week-adjustment-summary span {
+  color: var(--workspace-secondary);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.app-shell .week-adjustment-impact {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.app-shell .week-adjustment-impact > span {
+  padding: 10px;
+  background: var(--workspace-panel-subtle);
+  border: 1px solid var(--workspace-border);
+  border-radius: 8px;
+}
+
+.app-shell .week-adjustment-impact strong {
+  color: var(--workspace-text);
+  font-size: 13px;
+}
+
+.app-shell .week-adjustment-dialog > footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.app-shell .week-adjustment-dialog > footer button {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--workspace-border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.app-shell .week-adjustment-dialog > footer .is-primary {
+  color: var(--workspace-on-accent, #fff);
+  background: var(--workspace-accent);
+  border-color: var(--workspace-accent);
+}
+
+.app-shell .week-adjustment-dialog > footer button:disabled {
+  cursor: not-allowed;
+  opacity: .58;
+}
+
+/* A completed row uses the former time/priority slot for actual input. */
+.app-shell .task-meta.is-completed {
+  align-items: center;
+  justify-content: flex-end;
+}
+
+/* Actual-time entry is a secondary row action, not a second primary button. */
+.app-shell .dashboard-page .task-actual-button {
+  display: inline-flex;
+  min-height: 28px;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 1px 2px;
+  color: color-mix(in srgb, var(--workspace-accent) 82%, var(--workspace-text));
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--workspace-accent) 32%, var(--workspace-border));
+  border-radius: 0;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.app-shell .dashboard-page .task-actual-button:hover,
+.app-shell .dashboard-page .task-actual-button:focus-visible {
+  color: var(--workspace-accent);
+  background: transparent;
+  border-color: var(--workspace-accent);
+  outline: none;
+}
+
+.app-shell .dashboard-page .task-actual-editor {
+  gap: 7px;
+}
+
+.app-shell .dashboard-page .task-actual-editor .task-actual-input {
+  gap: 4px;
+  padding: 0 1px 2px;
+  border-bottom: 1px solid var(--workspace-border-strong, var(--workspace-border));
+}
+
+.app-shell .dashboard-page .task-actual-editor .task-actual-input:focus-within {
+  border-color: var(--workspace-accent);
+}
+
+.app-shell .dashboard-page .task-actual-editor input {
+  width: 34px;
+  min-height: 27px;
+  padding: 2px 0;
+  text-align: right;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.app-shell .dashboard-page .task-actual-editor input:focus {
+  border: 0;
+  box-shadow: none;
+}
+
+.app-shell .dashboard-page .task-actual-editor .task-actual-input > em {
+  color: var(--workspace-secondary);
+  font-size: 10px;
+}
+
+.app-shell .dashboard-page .task-actual-editor button,
+.app-shell .dashboard-page .task-actual-editor button[type="submit"] {
+  min-height: 28px;
+  padding: 2px 3px;
+  color: var(--workspace-accent);
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  border-radius: 0;
+  font-size: 10px;
+}
+
+.app-shell .dashboard-page .task-actual-editor button[type="submit"]:hover,
+.app-shell .dashboard-page .task-actual-editor button[type="submit"]:focus-visible {
+  border-bottom-color: var(--workspace-accent);
+  outline: none;
+}
+
+.app-shell .dashboard-page .task-actual-editor .task-actual-cancel {
+  width: 28px;
+  min-height: 28px;
+  padding: 0;
+  color: var(--workspace-tertiary);
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+}
+
+.app-shell .dashboard-page .task-actual-editor .task-actual-cancel:hover,
+.app-shell .dashboard-page .task-actual-editor .task-actual-cancel:focus-visible {
+  color: var(--workspace-text);
+  background: var(--workspace-hover);
+  border: 0;
+  outline: none;
+}
+
+/* Pilo is a page-level companion. On Today it must remain above the fixed
+ * navigation card while being dragged across the sidebar. */
+.app-shell:has(.dashboard-page) > .pilo-companion {
+  z-index: 240;
+  isolation: isolate;
+}
+
+/* Keep dark-theme primary actions readable on their accent surface. */
+[data-theme="dark"] .app-shell .today-plan-add {
+  color: #fff;
+  background: color-mix(in srgb, var(--workspace-accent) 72%, #17243b);
+  border-color: color-mix(in srgb, var(--workspace-accent) 52%, transparent);
+  box-shadow: 0 0 20px color-mix(in srgb, var(--workspace-accent) 13%, transparent);
+}
+
+[data-theme="dark"] .app-shell .today-plan-add:hover:not(:disabled),
+[data-theme="dark"] .app-shell .today-plan-add:focus-visible {
+  color: #fff;
+  background: color-mix(in srgb, var(--workspace-accent) 82%, #17243b);
+  border-color: color-mix(in srgb, var(--workspace-accent) 68%, transparent);
+}
+
+[data-theme="dark"] .app-shell .coach-strip .coach-avatar {
+  color: #fff;
+  background: color-mix(in srgb, var(--workspace-accent) 72%, #17243b);
+}
+
+/* Keep the two workspace headings and their first content blocks visually
+ * connected. These values intentionally override the broader dashboard
+ * density rules loaded earlier in the cascade. */
+[data-theme="default"] .app-shell .dashboard-page :is(.today-panel, .rhythm-panel) .panel-header {
+  margin-bottom: 6px;
+}
+
+[data-theme="default"] .app-shell .dashboard-page :is(.today-panel, .rhythm-panel) .panel-header > div:first-child {
+  display: grid;
+  gap: 1px;
+}
+
+[data-theme="default"] .app-shell .dashboard-page :is(.today-panel, .rhythm-panel) .panel-header > div:first-child > small {
+  margin: 0;
+  line-height: 1.1;
+}
+
+[data-theme="default"] .app-shell .dashboard-page :is(.today-panel, .rhythm-panel) .panel-header h2 {
+  margin: 0;
+  line-height: 1.15;
+}
+
+[data-theme="default"] .app-shell .dashboard-page .today-panel .plan-progress {
+  margin-top: 0;
+  margin-bottom: 4px;
+}
+
+[data-theme="default"] .app-shell .dashboard-page .today-panel .plan-progress > div {
+  margin-bottom: 4px;
+}
+
+[data-theme="default"] .app-shell .dashboard-page .today-panel .task-item > div > strong {
+  color: color-mix(in srgb, var(--workspace-text) 78%, var(--workspace-secondary));
+}
+
+[data-theme="default"] .app-shell .dashboard-page .today-panel .task-item > div > span {
+  margin-top: 3px;
+  font-size: 11px !important;
+}
+
+[data-theme="default"] .app-shell .dashboard-page .today-panel .task-meta > small {
+  top: -1px;
+  font-size: 11px !important;
+}
+
+[data-theme="default"] .app-shell .dashboard-page .rhythm-heatmap {
+  gap: 8px;
+}
+
+[data-theme="default"] .app-shell .dashboard-page .rhythm-heatmap-grid article > span {
+  font-size: 13px;
+}
+
+[data-theme="default"] .app-shell .dashboard-page .rhythm-heatmap-grid article > em {
+  font-size: 11px;
+}
+
+[data-theme="default"] .app-shell .dashboard-page .rhythm-heatmap-grid article:is(.is-light, .is-steady, .is-peak) {
+  color: var(--workspace-text);
+  background: linear-gradient(
+    155deg,
+    color-mix(in srgb, var(--workspace-accent) var(--rhythm-fill-start, 3%), var(--workspace-panel)) 0%,
+    color-mix(in srgb, var(--workspace-accent) var(--rhythm-fill, 7%), var(--workspace-panel)) 100%
+  );
+  border-color: color-mix(in srgb, var(--workspace-accent) var(--rhythm-border, 23%), var(--workspace-border));
+  box-shadow: 0 5px 14px color-mix(in srgb, var(--workspace-accent) var(--rhythm-shadow, 2%), transparent);
+}
+
+[data-theme="default"] .app-shell .dashboard-page .rhythm-heatmap-grid article:is(.is-light, .is-steady, .is-peak) > span,
+[data-theme="default"] .app-shell .dashboard-page .rhythm-heatmap-grid article:is(.is-light, .is-steady, .is-peak) > small {
+  color: var(--workspace-secondary);
+}
+
+[data-theme="default"] .app-shell .dashboard-page .rhythm-heatmap-grid article:is(.is-light, .is-steady, .is-peak) > strong {
+  color: var(--workspace-text);
+}
+
+[data-theme="default"] .app-shell .dashboard-page .rhythm-heatmap-grid article:is(.is-light, .is-steady, .is-peak) > em {
+  color: color-mix(in srgb, var(--workspace-accent) 68%, var(--workspace-text));
+  margin-top: 4px;
+  padding: 2px 0 0;
+  background: transparent;
+  border-radius: 0;
+  box-shadow: none;
+  font-weight: 650;
+  opacity: .78;
+}
+
+[data-theme="default"] .app-shell .dashboard-page .rhythm-heatmap-grid article.is-today {
+  border-width: 2px;
+  border-color: color-mix(in srgb, var(--workspace-accent) 42%, var(--workspace-border));
+  outline: none;
+}
+
+[data-theme="default"] .app-shell .dashboard-page .today-panel .task-list,
+[data-theme="default"] .app-shell .dashboard-page .rhythm-panel .rhythm-heatmap {
+  margin-top: 6px;
+}
+
+[data-theme="default"] .app-shell .dashboard-page > .theme-lead-tech {
+  margin-bottom: 12px;
+}
+
+/* On desktop the two work cards remain equal peers, but their row is sized by
+ * content rather than stretched to consume the entire viewport. */
+@media (min-width: 761px) {
+  .app-shell .page-content:has(> .dashboard-page) {
+    display: block;
+    min-height: 0;
+    padding-bottom: 24px;
+  }
+
+  .app-shell .dashboard-page {
+    display: block;
+    min-height: 0;
+    padding-bottom: 0;
+  }
+
+  .app-shell .dashboard-page > .workspace-grid {
+    min-height: 0;
+  }
+
+  [data-theme] .app-shell .dashboard-page > .workspace-grid > :is(.today-panel, .rhythm-panel) {
+    height: auto;
+    min-height: 0;
+    align-self: stretch;
+  }
+
+  [data-theme] .app-shell .dashboard-page .rhythm-panel {
+    display: flex;
+    overflow: hidden;
+    flex-direction: column;
+  }
+
+  [data-theme="default"] .app-shell .dashboard-page .today-panel .task-list {
+    max-height: 232px;
+  }
+
+  [data-theme] .app-shell .dashboard-page .rhythm-summary {
+    margin-top: 8px;
+  }
+
+  .app-shell .dashboard-page > .coach-strip-goal-advice {
+    margin-bottom: 0;
+  }
+}
+
+@media (max-width: 760px) {
+  [data-experience="technology"]:is([data-theme="notebook"], [data-theme="dark"]) .app-shell .app-main {
+    margin-left: 0;
+  }
+
+  [data-theme] .app-shell .sidebar {
+    transform: translateX(-102%);
+  }
+
+  [data-theme] .app-shell .sidebar.is-open {
+    transform: translateX(0);
+  }
+
+  [data-theme="dark"] .app-shell .workspace-grid,
+  [data-theme="notebook"] .app-shell .workspace-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .app-shell .dashboard-page {
+    padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .app-shell .dashboard-page .theme-lead {
+    order: 0 !important;
+  }
+
+  .app-shell .dashboard-page .workspace-grid {
+    order: 1 !important;
+  }
+
+  .app-shell .dashboard-page .coach-strip {
+    order: 2 !important;
+  }
+
+  [data-theme="default"] .app-shell .dashboard-page .tech-telemetry {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  [data-theme="default"] .app-shell .dashboard-page .tech-metric-arrow,
+  [data-theme="default"] .app-shell .dashboard-page .tech-metric-copy > small {
+    display: none;
+  }
+
+  .app-shell .dashboard-page .rhythm-heatmap-grid {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 3px;
+  }
+
+  .app-shell .dashboard-page .rhythm-heatmap-grid article {
+    min-width: 0;
+    padding-inline: 2px;
+  }
+
+  .app-shell .dashboard-page .rhythm-heatmap-grid article > strong {
+    font-size: 15px;
+  }
+
+  .app-shell .dashboard-page .rhythm-heatmap-grid article > em {
+    max-width: 100%;
+    overflow: hidden;
+    padding-inline: 2px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .app-shell .today-plan-actions {
+    flex-wrap: wrap;
+  }
+
+  .app-shell .today-plan-actions > button {
+    min-height: 40px;
+  }
+
+  .app-shell .today-schedule-row {
+    grid-template-columns: 5px minmax(0, auto) minmax(0, 1fr);
+    gap: 8px;
+    align-items: start;
+  }
+
+  .app-shell .today-schedule-divider {
+    display: none;
+  }
+
+  .app-shell .today-schedule-progress {
+    grid-column: 2 / -1;
+    width: 100%;
+    margin-top: 2px;
+  }
+
+  .app-shell .today-schedule-progress > span {
+    justify-content: flex-start;
+  }
+
+  .app-shell .week-adjustment-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .app-shell .week-adjustment-summary > svg {
+    justify-self: center;
+    transform: rotate(90deg);
+  }
+}
+
+@media (max-width: 420px) {
+  .app-shell .today-plan-actions > button {
+    flex: 1 1 100%;
+  }
+
+  .app-shell .task-item {
+    grid-template-columns: 38px minmax(0, 1fr) auto;
+    gap: 8px;
+  }
+
+  .app-shell .task-item .task-meta {
+    grid-column: 2 / -1;
+    justify-content: flex-start;
+    padding-left: 0;
+  }
+
+  .app-shell .task-open-button {
+    grid-column: 3;
+    grid-row: 1;
+  }
+
+  .app-shell .week-adjustment-impact {
+    grid-template-columns: 1fr;
+  }
+
+  .app-shell .today-task-success {
+    right: 16px;
+    bottom: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-shell .dashboard-page *,
+  .app-shell .dashboard-page *::before,
+  .app-shell .dashboard-page *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}

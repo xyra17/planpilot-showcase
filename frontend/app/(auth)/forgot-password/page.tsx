@@ -25,8 +25,8 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 w-full max-w-sm">
+    <div className="pp-auth-page">
+      <div className="pp-auth-card">
         <div className="mb-8 text-center">
           <h1 className="text-2xl font-bold text-gray-900">重置密码</h1>
           <p className="text-sm text-gray-500 mt-1">输入注册邮箱，我们将发送重置链接</p>
@@ -54,7 +54,7 @@ export default function ForgotPasswordPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 placeholder="you@example.com"
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition"
               />
             </div>
             {error && (
@@ -63,7 +63,7 @@ export default function ForgotPasswordPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-blue-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-60 transition mt-2"
+              className="w-full bg-accent text-white py-2 rounded-lg text-sm font-medium hover:bg-accent-dark disabled:opacity-60 transition mt-2"
             >
               {loading ? "发送中..." : "发送重置链接"}
             </button>
@@ -71,7 +71,7 @@ export default function ForgotPasswordPage() {
         )}
 
         <p className="text-sm text-center text-gray-500 mt-6">
-          <Link href="/login" className="text-blue-600 hover:underline">
+          <Link href="/login" className="text-accent hover:underline">
             返回登录
           </Link>
         </p>

@@ -37,7 +37,7 @@ function ResetPasswordForm() {
     return (
       <div className="text-center space-y-3">
         <p className="text-sm text-red-500">链接无效，请重新申请密码重置。</p>
-        <Link href="/forgot-password" className="text-sm text-blue-600 hover:underline">重新申请</Link>
+        <Link href="/forgot-password" className="text-sm text-accent hover:underline">重新申请</Link>
       </div>
     );
   }
@@ -68,7 +68,7 @@ function ResetPasswordForm() {
               onChange={(e) => setNewPassword(e.target.value)}
               required
               placeholder="至少 6 位"
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition"
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition"
             />
           </div>
           <div>
@@ -79,7 +79,7 @@ function ResetPasswordForm() {
               onChange={(e) => setConfirmPassword(e.target.value)}
               required
               placeholder="再次输入密码"
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition"
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition"
             />
           </div>
           {error && (
@@ -88,7 +88,7 @@ function ResetPasswordForm() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-60 transition mt-2"
+            className="w-full bg-accent text-white py-2 rounded-lg text-sm font-medium hover:bg-accent-dark disabled:opacity-60 transition mt-2"
           >
             {loading ? "重置中..." : "确认重置"}
           </button>
@@ -96,7 +96,7 @@ function ResetPasswordForm() {
       )}
 
       <p className="text-sm text-center text-gray-500 mt-6">
-        <Link href="/login" className="text-blue-600 hover:underline">返回登录</Link>
+        <Link href="/login" className="text-accent hover:underline">返回登录</Link>
       </p>
     </>
   );
@@ -104,8 +104,8 @@ function ResetPasswordForm() {
 
 export default function ResetPasswordPage() {
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 w-full max-w-sm">
+    <div className="pp-auth-page">
+      <div className="pp-auth-card">
         <Suspense fallback={<p className="text-sm text-center text-gray-400">加载中…</p>}>
           <ResetPasswordForm />
         </Suspense>

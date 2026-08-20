@@ -6,10 +6,8 @@ from langgraph.prebuilt import ToolNode, tools_condition
 
 from src.core.agent.nodes import chat as chat_node
 from src.core.agent.nodes import checkin as checkin_node
-from src.core.agent.nodes import confirm_replan as confirm_replan_node
 from src.core.agent.nodes import intent as intent_node
 from src.core.agent.nodes import planner as planner_node
-from src.core.agent.nodes import replan_chat as replan_chat_node
 from src.core.agent.nodes import verify as verify_node
 from src.core.agent.state import AgentState
 from src.core.agent.tools import chat_tools
@@ -32,8 +30,6 @@ def _build_structure() -> StateGraph:
     g.add_node("checkin", checkin_node.node)
     g.add_node("chat", chat_node.node)
     g.add_node("chat_tools", ToolNode(tools=chat_tools))
-    g.add_node("replan_chat", replan_chat_node.node)
-    g.add_node("confirm_replan", confirm_replan_node.node)
     g.add_node("verify", verify_node.node)
 
     g.add_edge(START, "identify_intent")
@@ -43,7 +39,7 @@ def _build_structure() -> StateGraph:
         {
             "goal_setup": "setup_goal",
             "checkin": "checkin",
-            "replan_request": "replan_chat",
+            "replan_request": "chat",
             "verification": "verify",
             "chat": "chat",
         },
@@ -53,8 +49,6 @@ def _build_structure() -> StateGraph:
     g.add_conditional_edges("chat", tools_condition, {"tools": "chat_tools", END: END})
     g.add_edge("chat_tools", "chat")
     g.add_edge("verify", END)
-    g.add_edge("replan_chat", "confirm_replan")
-    g.add_edge("confirm_replan", END)
 
     return g
 
@@ -66,19 +60,26 @@ async def get_agent():
 
     try:
         from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+        from psycopg.rows import dict_row
         from psycopg_pool import AsyncConnectionPool
 
         from src.config import settings
 
         pg_url = settings.database_url.replace("+asyncpg", "")
-        _pool = AsyncConnectionPool(conninfo=pg_url, max_size=5, open=False)
+        _pool = AsyncConnectionPool(
+            conninfo=pg_url,
+            max_size=5,
+            open=False,
+            kwargs={
+                "autocommit": True,
+                "prepare_threshold": 0,
+                "row_factory": dict_row,
+            },
+        )
         await _pool.open(wait=True, timeout=10.0)
         checkpointer = AsyncPostgresSaver(_pool)
         await checkpointer.setup()
-        _agent = _build_structure().compile(
-            checkpointer=checkpointer,
-            interrupt_before=["confirm_replan"],
-        )
+        _agent = _build_structure().compile(checkpointer=checkpointer)
         logger.info("Agent initialized with AsyncPostgresSaver")
     except Exception as e:
         logger.warning("AsyncPostgresSaver init failed (%s) — falling back to MemorySaver", e)

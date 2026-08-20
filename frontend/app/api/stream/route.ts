@@ -1,46 +1,33 @@
-import { NextRequest } from "next/server";
-import { cookies } from "next/headers";
+import { NextRequest, NextResponse } from "next/server";
 
 const API_URL = process.env.API_URL ?? "http://localhost:8000";
 
+/** Compatibility proxy for the legacy goal chat; it forwards the same
+ * HttpOnly-cookie and CSRF contract used by direct API calls. */
 export async function POST(req: NextRequest) {
-  const cookieStore = cookies();
-  const cookieToken = cookieStore.get("access_token")?.value;
-  const headerToken = req.headers.get("authorization")?.replace("Bearer ", "");
-  const token = cookieToken ?? headerToken;
-
-  const body = await req.json();
-
-  let upstream: Response;
+  const body = await req.text();
+  const cookie = req.headers.get("cookie");
+  const csrf = req.headers.get("x-csrf-token");
   try {
-    upstream = await fetch(`${API_URL}/api/v1/agent/stream`, {
+    const upstream = await fetch(`${API_URL}/api/v1/agent/stream`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(cookie ? { Cookie: cookie } : {}),
+        ...(csrf ? { "X-CSRF-Token": csrf } : {}),
       },
-      body: JSON.stringify(body),
+      body,
+      cache: "no-store",
+    });
+    return new Response(upstream.body, {
+      status: upstream.status,
+      headers: {
+        "Content-Type": upstream.headers.get("content-type") ?? "text/event-stream",
+        "Cache-Control": "no-cache, no-transform",
+        "X-Accel-Buffering": "no",
+      },
     });
   } catch {
-    return new Response(
-      `event: error\ndata: {"message":"无法连接到 AI 服务，请确认后端已启动"}\n\n`,
-      { status: 200, headers: { "Content-Type": "text/event-stream" } }
-    );
+    return NextResponse.json({ detail: "无法连接到 AI 服务" }, { status: 502 });
   }
-
-  if (!upstream.ok) {
-    return new Response(
-      `event: error\ndata: {"message":"服务异常 (${upstream.status})"}\n\n`,
-      { status: 200, headers: { "Content-Type": "text/event-stream" } }
-    );
-  }
-
-  return new Response(upstream.body, {
-    headers: {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-      Connection: "keep-alive",
-      "X-Accel-Buffering": "no",
-    },
-  });
 }

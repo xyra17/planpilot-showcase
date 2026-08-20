@@ -147,9 +147,7 @@ def main() -> int:
         print("  2. 其他 OpenAI-compatible 服务")
         print("  3. 纯本地，不配置云端回退")
         choice = ask("请输入序号", "1")
-        provider = {"1": "deepseek", "2": "compatible", "3": "local-only"}.get(
-            choice, "deepseek"
-        )
+        provider = {"1": "deepseek", "2": "compatible", "3": "local-only"}.get(choice, "deepseek")
 
     updates: dict[str, str] = {}
     local_default = current.get("LOCAL_MODEL_ENABLED", "true").lower() == "true"
@@ -199,7 +197,9 @@ def main() -> int:
             }
         )
         updates["SMART_BASE_URL"] = args.base_url or (
-            defaults["base_url"] if args.yes else ask("云端 OpenAI-compatible 地址", defaults["base_url"])
+            defaults["base_url"]
+            if args.yes
+            else ask("云端 OpenAI-compatible 地址", defaults["base_url"])
         )
         updates["SMART_MODEL_NAME"] = args.routine_model or (
             defaults["routine"] if args.yes else ask("日常／快速模型 ID", defaults["routine"])
@@ -217,7 +217,9 @@ def main() -> int:
     updates["EMBEDDING_BASE_URL"] = args.embedding_base_url or (
         current.get("EMBEDDING_BASE_URL", "http://localhost:1234/v1")
         if args.yes
-        else ask("独立 Embedding 地址", current.get("EMBEDDING_BASE_URL", "http://localhost:1234/v1"))
+        else ask(
+            "独立 Embedding 地址", current.get("EMBEDDING_BASE_URL", "http://localhost:1234/v1")
+        )
     )
     updates["EMBEDDING_MODEL_NAME"] = args.embedding_model or (
         current.get("EMBEDDING_MODEL_NAME", "qwen3-embedding-0.6b")

@@ -1,24 +1,96 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
-import { AlertTriangle, X } from "lucide-react";
+import { createContext, useCallback, useContext, useEffect, useId, useRef, useState } from "react";
+import { AlertTriangle, CircleHelp, X } from "lucide-react";
 
-type ConfirmOptions = {
+export type ConfirmTone = "danger" | "warning" | "primary";
+
+export type ConfirmOptions = {
   title: string;
   description: string;
   confirmLabel?: string;
   cancelLabel?: string;
-  tone?: "danger" | "primary";
+  kicker?: string;
+  tone?: ConfirmTone;
 };
 type PendingConfirm = ConfirmOptions & { resolve: (value: boolean) => void };
+
+type ConfirmationDialogProps = ConfirmOptions & {
+  onCancel: () => void;
+  onConfirm: () => void;
+};
 
 const ConfirmContext = createContext<{
   confirmAction: (options: ConfirmOptions) => Promise<boolean>;
 }>({ confirmAction: async () => false });
 
+export function ConfirmationDialog({
+  title,
+  description,
+  confirmLabel = "确认",
+  cancelLabel = "取消",
+  kicker,
+  tone = "primary",
+  onCancel,
+  onConfirm,
+}: ConfirmationDialogProps) {
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  const generatedId = useId().replace(/:/g, "");
+  const titleId = `confirm-title-${generatedId}`;
+  const descriptionId = `confirm-description-${generatedId}`;
+  const resolvedKicker = kicker ?? (tone === "danger" ? "删除确认" : tone === "warning" ? "请确认修改" : "操作确认");
+  const Icon = tone === "primary" ? CircleHelp : AlertTriangle;
+
+  useEffect(() => {
+    cancelRef.current?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onCancel();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onCancel]);
+
+  return (
+    <div className="pp-confirm-backdrop" onMouseDown={onCancel}>
+      <section
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={descriptionId}
+        className={`pp-confirm-dialog is-${tone}`}
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <button type="button" onClick={onCancel} aria-label="关闭确认窗口" className="pp-confirm-close">
+          <X size={18} />
+        </button>
+        <header className="pp-confirm-heading">
+          <span className="pp-confirm-icon">
+            <Icon size={19} />
+          </span>
+          <div>
+            <h2 className="pp-confirm-kicker">{resolvedKicker}</h2>
+            <p id={titleId} className="pp-confirm-title">{title}</p>
+          </div>
+        </header>
+        <p id={descriptionId} className="pp-confirm-description">{description}</p>
+        <footer className="pp-confirm-actions">
+          <button ref={cancelRef} onClick={onCancel} className="pp-confirm-cancel">
+            {cancelLabel}
+          </button>
+          <button
+            onClick={onConfirm}
+            className={`pp-confirm-submit ${tone === "danger" ? "pp-danger-button" : tone === "warning" ? "pp-warning-button" : ""}`}
+          >
+            {confirmLabel}
+          </button>
+        </footer>
+      </section>
+    </div>
+  );
+}
+
 export function ConfirmDialogProvider({ children }: { children: React.ReactNode }) {
   const [pending, setPending] = useState<PendingConfirm | null>(null);
-  const cancelRef = useRef<HTMLButtonElement>(null);
 
   const confirmAction = useCallback((options: ConfirmOptions) => (
     new Promise<boolean>((resolve) => setPending({ ...options, resolve }))
@@ -31,55 +103,20 @@ export function ConfirmDialogProvider({ children }: { children: React.ReactNode 
     });
   }, []);
 
-  useEffect(() => {
-    if (!pending) return;
-    cancelRef.current?.focus();
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") finish(false);
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [finish, pending]);
-
   return (
     <ConfirmContext.Provider value={{ confirmAction }}>
       {children}
       {pending && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/35 p-4 backdrop-blur-[1px]" onMouseDown={() => finish(false)}>
-          <div
-            role="alertdialog"
-            aria-modal="true"
-            aria-labelledby="global-confirm-title"
-            aria-describedby="global-confirm-description"
-            className="journal-dialog w-full max-w-sm rounded-2xl border border-gray-100 bg-white p-5 shadow-2xl"
-            onMouseDown={(event) => event.stopPropagation()}
-          >
-            <div className="flex items-start gap-3">
-              <span className="journal-dialog-icon journal-dialog-warning flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
-                <AlertTriangle size={17} />
-              </span>
-              <div className="min-w-0 flex-1">
-                <h2 id="global-confirm-title" className="text-base font-semibold text-gray-900">{pending.title}</h2>
-                <p id="global-confirm-description" className="mt-1.5 text-sm leading-6 text-gray-500">{pending.description}</p>
-              </div>
-              <button onClick={() => finish(false)} aria-label="关闭确认窗口" className="rounded-lg p-1 text-gray-400 hover:bg-gray-100">
-                <X size={14} />
-              </button>
-            </div>
-            <div className="mt-5 flex justify-end gap-2">
-              <button ref={cancelRef} onClick={() => finish(false)} className="rounded-xl border border-gray-200 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50">
-                {pending.cancelLabel ?? "取消"}
-              </button>
-              <button
-                onClick={() => finish(true)}
-                className={`rounded-xl px-4 py-2 text-sm font-medium text-white ${pending.tone === "danger" ? "bg-red-500 hover:bg-red-600" : ""}`}
-                style={pending.tone === "danger" ? undefined : { backgroundColor: "var(--accent)" }}
-              >
-                {pending.confirmLabel ?? "确认"}
-              </button>
-            </div>
-          </div>
-        </div>
+        <ConfirmationDialog
+          title={pending.title}
+          description={pending.description}
+          confirmLabel={pending.confirmLabel}
+          cancelLabel={pending.cancelLabel}
+          kicker={pending.kicker}
+          tone={pending.tone}
+          onCancel={() => finish(false)}
+          onConfirm={() => finish(true)}
+        />
       )}
     </ConfirmContext.Provider>
   );

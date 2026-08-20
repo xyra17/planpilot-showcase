@@ -1,5 +1,6 @@
 pytest==8.3.5
 pytest-asyncio==0.24.0
+pytest-cov==6.2.1
 pytest-html==4.1.1
 anyio[asyncio]
 aiosqlite>=0.20.0

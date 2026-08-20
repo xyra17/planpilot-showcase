@@ -1,0 +1,1518 @@
+/* Settings workspace — compact long-form control center.
+ * Kept fully scoped so legacy settings rules cannot leak into other pages. */
+
+.app-shell .settings-page-redesign {
+  width: 100%;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding-bottom: 42px;
+  color: var(--workspace-text);
+}
+
+.app-shell .settings-page-redesign .settings-redesign-heading {
+  display: flex;
+  min-height: 118px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin: 0 0 18px;
+  padding: 22px 26px;
+  border: 1px solid var(--workspace-border);
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at 92% 0%, color-mix(in srgb, var(--workspace-accent) 9%, transparent), transparent 34%),
+    var(--workspace-panel);
+  box-shadow: 0 12px 32px color-mix(in srgb, var(--workspace-text) 5%, transparent);
+}
+
+.app-shell .settings-page-redesign .settings-redesign-heading::after {
+  display: none;
+}
+
+.app-shell .settings-page-redesign .settings-redesign-heading > div:first-child {
+  min-width: 0;
+}
+
+.app-shell .settings-page-redesign .settings-redesign-heading p {
+  margin: 0 0 7px;
+  color: var(--workspace-accent);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .16em;
+}
+
+.app-shell .settings-page-redesign .settings-redesign-heading h1 {
+  margin: 0;
+  color: var(--workspace-text);
+  font-size: clamp(28px, 3vw, 38px);
+  font-weight: 760;
+  letter-spacing: -.045em;
+  line-height: 1.08;
+}
+
+.app-shell .settings-page-redesign .settings-redesign-heading > div:first-child > span {
+  display: block;
+  margin-top: 8px;
+  color: var(--workspace-secondary);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.app-shell .settings-page-redesign .settings-save-state {
+  display: inline-flex;
+  min-height: 32px;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  padding: 0 11px;
+  color: #237a64;
+  border: 1px solid #bde8dc;
+  border-radius: 999px;
+  background: #e8f8f3;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.app-shell .settings-workspace {
+  display: grid;
+  grid-template-columns: 176px minmax(0, 1fr);
+  align-items: start;
+  gap: 16px;
+}
+
+.app-shell .settings-section-nav {
+  position: sticky;
+  top: 20px;
+  display: grid;
+  gap: 4px;
+  padding: 8px;
+  border: 1px solid var(--workspace-border);
+  border-radius: 14px;
+  background: var(--workspace-panel);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--workspace-text) 4%, transparent);
+}
+
+.app-shell .settings-section-nav a {
+  position: relative;
+  display: flex;
+  min-height: 39px;
+  align-items: center;
+  gap: 9px;
+  padding: 0 10px;
+  color: var(--workspace-secondary);
+  border-radius: 9px;
+  font-size: 12px;
+  font-weight: 650;
+  text-decoration: none;
+  transition: color 180ms ease, background-color 180ms ease, transform 180ms ease;
+}
+
+.app-shell .settings-section-nav a:first-child {
+  color: var(--workspace-accent);
+  background: var(--workspace-accent-soft);
+}
+
+.app-shell .settings-section-nav a:first-child::before {
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: -8px;
+  width: 3px;
+  border-radius: 99px;
+  background: var(--workspace-accent);
+  content: "";
+}
+
+.app-shell .settings-section-nav a:hover {
+  color: var(--workspace-accent);
+  background: var(--workspace-accent-soft);
+  transform: translateX(2px);
+}
+
+.app-shell .settings-section-nav a:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--workspace-accent) 58%, transparent);
+  outline-offset: 2px;
+}
+
+.app-shell .settings-content-stack,
+.app-shell .settings-detail-stack {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.app-shell .settings-detail-stack {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.app-shell .settings-page-redesign :is(.appearance-card, .availability-card, .settings-detail-stack > .settings-card) {
+  min-width: 0;
+  margin: 0;
+  padding: 20px;
+  border: 1px solid var(--workspace-border) !important;
+  border-radius: 14px;
+  background: var(--workspace-panel) !important;
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--workspace-text) 4%, transparent) !important;
+  scroll-margin-top: 20px;
+  animation: settings-section-enter 360ms cubic-bezier(.2, .8, .2, 1) both;
+}
+
+.app-shell .settings-page-redesign .settings-content-stack > :nth-child(2) {
+  animation-delay: 45ms;
+}
+
+.app-shell .settings-page-redesign .settings-detail-stack > :nth-child(2) { animation-delay: 70ms; }
+.app-shell .settings-page-redesign .settings-detail-stack > :nth-child(3) { animation-delay: 95ms; }
+.app-shell .settings-page-redesign .settings-detail-stack > :nth-child(4) { animation-delay: 120ms; }
+
+.app-shell .settings-page-redesign .appearance-card {
+  display: grid;
+  grid-template-columns: 175px minmax(0, 1fr);
+  gap: 18px 22px;
+}
+
+.app-shell .settings-page-redesign .appearance-card > .settings-section-head:first-child {
+  grid-column: 1 / -1;
+  padding-bottom: 15px;
+  border-bottom: 1px solid var(--workspace-border);
+}
+
+.app-shell .settings-page-redesign .appearance-card > .settings-section-head.compact {
+  grid-column: 1;
+  align-self: start;
+  margin: 0;
+}
+
+.app-shell .settings-page-redesign .appearance-card > .style-options {
+  grid-column: 2;
+}
+
+.app-shell .settings-page-redesign .appearance-card > .color-scheme {
+  grid-column: 1 / -1;
+}
+
+.app-shell .settings-page-redesign .settings-section-head {
+  gap: 11px;
+  margin: 0 0 15px;
+}
+
+.app-shell .settings-page-redesign .settings-section-head > span {
+  width: 34px;
+  height: 34px;
+  color: var(--workspace-accent);
+  background: var(--workspace-accent-soft);
+  border-radius: 10px;
+}
+
+.app-shell .settings-page-redesign .settings-section-head h2 {
+  margin: 0 0 4px;
+  color: var(--workspace-text);
+  font-size: 16px;
+  font-weight: 730;
+  letter-spacing: -.02em;
+  line-height: 1.35;
+}
+
+.app-shell .settings-page-redesign .settings-section-head p {
+  margin: 0;
+  color: var(--workspace-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.app-shell .settings-page-redesign .surface-theme-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.app-shell .settings-page-redesign .style-option {
+  position: relative;
+  min-height: 126px;
+  padding: 10px;
+  border: 1px solid var(--workspace-border);
+  border-radius: 12px;
+  background: var(--workspace-panel-subtle);
+  box-shadow: none;
+  transition: transform 180ms ease, border-color 180ms ease, background-color 180ms ease, box-shadow 180ms ease;
+}
+
+.app-shell .settings-page-redesign .style-option:hover {
+  border-color: color-mix(in srgb, var(--workspace-accent) 42%, var(--workspace-border));
+  background: var(--workspace-panel);
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--workspace-accent) 9%, transparent);
+  transform: translateY(-2px);
+}
+
+.app-shell .settings-page-redesign .style-option.is-selected {
+  border-color: var(--workspace-accent);
+  background: var(--workspace-accent-soft);
+}
+
+.app-shell .settings-page-redesign .theme-preview {
+  height: 58px;
+  margin-bottom: 9px;
+  border-radius: 7px;
+}
+
+.app-shell .settings-page-redesign .style-option-copy strong {
+  color: var(--workspace-text);
+  font-size: 12px;
+}
+
+.app-shell .settings-page-redesign .style-option-copy small {
+  color: var(--workspace-secondary);
+  font-size: 11px !important;
+  line-height: 1.35;
+}
+
+.app-shell .settings-page-redesign .color-scheme {
+  display: grid;
+  grid-template-columns: 175px minmax(0, 1fr);
+  gap: 22px;
+  margin: 0;
+  padding-top: 17px;
+  border-top: 1px solid var(--workspace-border);
+}
+
+.app-shell .settings-page-redesign .color-scheme > div:first-child {
+  align-self: start;
+}
+
+.app-shell .settings-page-redesign .color-scheme > div:first-child strong {
+  color: var(--workspace-text);
+  font-size: 13px;
+}
+
+.app-shell .settings-page-redesign .color-scheme > div:first-child span {
+  margin-top: 5px;
+  color: var(--workspace-secondary);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.app-shell .settings-page-redesign .color-options {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.app-shell .settings-page-redesign .color-options button {
+  min-height: 42px;
+  padding: 0 10px;
+  border-radius: 9px;
+  transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+}
+
+.app-shell .settings-page-redesign .color-options button:hover {
+  border-color: color-mix(in srgb, var(--workspace-accent) 42%, var(--workspace-border));
+  box-shadow: 0 6px 14px color-mix(in srgb, var(--workspace-accent) 8%, transparent);
+  transform: translateY(-1px);
+}
+
+.app-shell .settings-page-redesign .weekly-availability-editor {
+  gap: 13px;
+}
+
+.app-shell .settings-page-redesign .availability-day-tabs {
+  gap: 5px;
+  padding: 5px;
+  border-radius: 10px;
+}
+
+.app-shell .settings-page-redesign .availability-day-tabs button {
+  min-height: 48px;
+  border-radius: 7px;
+  transition: color 170ms ease, background-color 170ms ease, box-shadow 170ms ease, transform 170ms ease;
+}
+
+.app-shell .settings-page-redesign .availability-day-tabs button:hover {
+  color: var(--workspace-accent);
+  background: color-mix(in srgb, var(--workspace-accent) 6%, transparent);
+  transform: translateY(-1px);
+}
+
+.app-shell .settings-page-redesign .availability-day-tabs button.is-active {
+  color: var(--workspace-accent);
+  border: 1px solid color-mix(in srgb, var(--workspace-accent) 28%, var(--workspace-border));
+  background: var(--workspace-accent-soft);
+  box-shadow: none;
+}
+
+.app-shell .settings-page-redesign .availability-day-tabs strong {
+  font-size: 11px;
+}
+
+.app-shell .settings-page-redesign .availability-day-tabs small,
+.app-shell .settings-page-redesign .availability-day-editor > header small {
+  font-size: 10px !important;
+}
+
+.app-shell .settings-page-redesign .availability-day-editor {
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--workspace-border);
+  border-radius: 11px;
+  background: var(--workspace-panel-subtle);
+}
+
+.app-shell .settings-page-redesign .availability-day-editor > header strong {
+  font-size: 13px;
+}
+
+.app-shell .settings-page-redesign .availability-day-editor button {
+  min-height: 32px;
+  font-size: 10px;
+  transition: color 170ms ease, border-color 170ms ease, background-color 170ms ease, transform 170ms ease;
+}
+
+.app-shell .settings-page-redesign .availability-day-editor button:hover {
+  color: var(--workspace-accent);
+  border-color: color-mix(in srgb, var(--workspace-accent) 36%, var(--workspace-border));
+  transform: translateY(-1px);
+}
+
+.app-shell .settings-page-redesign .availability-range-list {
+  gap: 0 18px;
+}
+
+.app-shell .settings-page-redesign .availability-range {
+  min-height: 54px;
+}
+
+.app-shell .settings-page-redesign .availability-range label > span,
+.app-shell .settings-page-redesign .availability-range input {
+  font-size: 11px;
+}
+
+.app-shell .settings-page-redesign .availability-day-editor > footer button.is-primary {
+  color: #fff;
+  background: var(--workspace-accent);
+  border-color: var(--workspace-accent);
+}
+
+.app-shell .settings-page-redesign .settings-detail-stack > .settings-card {
+  min-height: 210px;
+}
+
+.app-shell .settings-page-redesign .setting-row {
+  min-height: 54px;
+  padding: 9px 0;
+}
+
+.app-shell .settings-page-redesign .setting-row > div span {
+  color: var(--workspace-text);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.app-shell .settings-page-redesign .setting-row > div small {
+  margin-top: 3px;
+  color: var(--workspace-secondary);
+  font-size: 11px !important;
+  line-height: 1.4;
+}
+
+.app-shell .settings-page-redesign .setting-row :is(button, select) {
+  min-height: 32px;
+  border-radius: 8px;
+  font-size: 11px;
+}
+
+.app-shell .settings-page-redesign .setting-row :is(button, select):focus-visible,
+.app-shell .settings-page-redesign .style-option:focus-visible,
+.app-shell .settings-page-redesign .color-options button:focus-visible,
+.app-shell .settings-page-redesign .availability-day-tabs button:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--workspace-accent) 60%, transparent);
+  outline-offset: 2px;
+}
+
+.app-shell .settings-page-redesign .setting-toggle.is-on {
+  background: #42c7a5;
+  border-color: #42c7a5;
+}
+
+.app-shell .settings-page-redesign .setting-status.is-positive {
+  color: #237a64;
+  background: #e8f8f3;
+}
+
+.app-shell .settings-page-redesign .danger-quiet {
+  color: #b64957;
+  border-color: #efcbd0;
+  background: #fff7f8;
+}
+
+.app-shell .settings-page-redesign .danger-quiet:hover {
+  color: #983744;
+  border-color: #e7adb5;
+  background: #fff0f2;
+}
+
+@keyframes settings-section-enter {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 1080px) {
+  .app-shell .settings-page-redesign .settings-detail-stack {
+    grid-template-columns: 1fr;
+  }
+
+  .app-shell .settings-page-redesign .settings-detail-stack > .settings-card {
+    min-height: 0;
+  }
+}
+
+@media (max-width: 880px) {
+  .app-shell .settings-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .app-shell .settings-section-nav {
+    position: static;
+    display: flex;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .app-shell .settings-section-nav::-webkit-scrollbar { display: none; }
+
+  .app-shell .settings-section-nav a {
+    flex: 0 0 auto;
+  }
+
+  .app-shell .settings-section-nav a:first-child::before { display: none; }
+}
+
+@media (max-width: 680px) {
+  .app-shell .settings-page-redesign .settings-redesign-heading {
+    min-height: 0;
+    align-items: flex-start;
+    flex-direction: column;
+    padding: 20px;
+  }
+
+  .app-shell .settings-page-redesign .appearance-card {
+    display: block;
+  }
+
+  .app-shell .settings-page-redesign .appearance-card > * + * {
+    margin-top: 16px;
+  }
+
+  .app-shell .settings-page-redesign .surface-theme-options,
+  .app-shell .settings-page-redesign .color-options {
+    grid-template-columns: 1fr;
+  }
+
+  .app-shell .settings-page-redesign .color-scheme {
+    display: block;
+  }
+
+  .app-shell .settings-page-redesign .color-options {
+    margin-top: 12px;
+  }
+
+  .app-shell .settings-page-redesign .availability-day-tabs {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .app-shell .settings-page-redesign .availability-range-list {
+    grid-template-columns: 1fr;
+  }
+
+  .app-shell .settings-page-redesign :is(.appearance-card, .availability-card, .settings-detail-stack > .settings-card) {
+    padding: 16px;
+  }
+}
+
+/* Final appearance flow override must remain after the legacy compatibility
+ * block above: material heading, previews, then accent palette. */
+html[data-theme][data-theme][data-theme] .app-shell .settings-page-redesign #settings-appearance {
+  display: block;
+  grid-template-columns: none;
+  gap: 0;
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-page-redesign #settings-appearance > .settings-section-head:first-child,
+html[data-theme][data-theme][data-theme] .app-shell .settings-page-redesign #settings-appearance > .settings-section-head.compact {
+  grid-column: auto;
+  margin: 0 0 14px;
+  padding: 0;
+  border: 0;
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-page-redesign #settings-appearance > .style-options {
+  grid-column: auto;
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-page-redesign #settings-appearance > .color-scheme {
+  display: grid;
+  grid-column: auto;
+  grid-template-columns: minmax(210px, .85fr) minmax(0, 1.65fr);
+  align-items: center;
+  gap: 18px;
+  margin-top: 16px;
+  padding-top: 16px;
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-page-redesign #settings-appearance > .color-scheme .color-options {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 0;
+}
+
+/* Learning preference and weekly availability use one heading system. */
+.app-shell .settings-page-redesign .settings-unified-heading,
+.app-shell .settings-page-redesign .weekly-settings-heading.settings-unified-heading {
+  display: flex;
+  min-height: 34px;
+  align-items: center;
+  gap: 11px;
+}
+
+.app-shell .settings-page-redesign .settings-unified-heading > span,
+.app-shell .settings-page-redesign .weekly-settings-heading.settings-unified-heading > span {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  place-items: center;
+  color: var(--workspace-accent);
+  border-radius: 10px;
+  background: var(--workspace-accent-soft);
+}
+
+.app-shell .settings-page-redesign .settings-unified-heading :is(h2, h3) {
+  margin: 0 0 4px;
+  color: var(--workspace-text);
+  font-size: 16px;
+  font-weight: 730;
+  letter-spacing: -.02em;
+  line-height: 1.35;
+}
+
+.app-shell .settings-page-redesign .settings-unified-heading p {
+  margin: 0;
+  color: var(--workspace-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.app-shell .settings-page-redesign .weekly-settings-heading.settings-unified-heading {
+  margin: 0 0 11px;
+}
+
+/* Keep this at EOF: the legacy desktop compatibility block above still
+ * declares a three-column detail grid. The final settings structure is three
+ * compact full-width rows. */
+.app-shell .settings-page-redesign .settings-detail-stack {
+  grid-template-columns: 1fr;
+  gap: 9px;
+}
+
+.app-shell .settings-page-redesign .settings-detail-stack > .settings-card {
+  display: flex;
+  flex-wrap: wrap;
+  min-height: 0;
+  align-items: center;
+  padding: 15px 16px;
+  overflow: hidden;
+}
+
+.app-shell .settings-page-redesign .settings-detail-stack .settings-section-head {
+  min-height: 0;
+  flex: 0 0 100%;
+  align-items: center;
+  margin: 0;
+  padding: 0 0 12px;
+  border-right: 0;
+  border-bottom: 1px solid var(--workspace-border);
+}
+
+.app-shell .settings-page-redesign .settings-detail-stack > .settings-card > .setting-row {
+  min-width: 0;
+  min-height: 62px;
+  flex: 1 1 210px;
+  padding: 10px 13px;
+  border-top: 0;
+  border-left: 0;
+}
+
+.app-shell .settings-page-redesign .settings-detail-stack > .settings-card > .setting-row + .setting-row {
+  border-left: 1px solid var(--workspace-border);
+}
+
+.app-shell .settings-page-redesign .settings-detail-stack > .settings-card > .profile-edit-form {
+  min-width: 0;
+  flex: 0 0 100%;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 13px 0 0;
+}
+
+@media (max-width: 860px) {
+  .app-shell .settings-page-redesign .settings-detail-stack > .settings-card {
+    display: block;
+    padding: 15px;
+  }
+
+  .app-shell .settings-page-redesign .settings-detail-stack .settings-section-head {
+    padding: 0 0 12px;
+    border-right: 0;
+    border-bottom: 1px solid var(--workspace-border);
+  }
+
+  .app-shell .settings-page-redesign .settings-detail-stack > .settings-card > .setting-row,
+  .app-shell .settings-page-redesign .settings-detail-stack > .settings-card > .settings-section-head + .setting-row {
+    min-height: 54px;
+    padding-inline: 0;
+    border-left: 0;
+    border-top: 0;
+  }
+
+  .app-shell .settings-page-redesign .settings-detail-stack > .settings-card > .setting-row + .setting-row {
+    border-top: 1px solid var(--workspace-border);
+  }
+
+  .app-shell .settings-page-redesign #settings-appearance > .color-scheme {
+    grid-template-columns: 1fr;
+    gap: 11px;
+  }
+}
+
+/* Avoid the settings page adding its own large footer gutter on top of the
+ * shared page-content gutter. */
+.app-shell .page-content:has(> .settings-page-redesign) {
+  padding-bottom: 18px;
+}
+
+.app-shell .settings-page-redesign {
+  padding-bottom: 10px;
+}
+
+/* Keep this after every compatibility rule: the last three cards are three
+ * compact vertical rows. */
+.app-shell .settings-page-redesign .settings-detail-stack {
+  grid-template-columns: 1fr;
+  gap: 9px;
+}
+
+.app-shell .settings-page-redesign .settings-detail-stack > .settings-card {
+  display: flex;
+  min-height: 0;
+  align-items: stretch;
+  padding: 0 16px;
+  overflow: hidden;
+}
+
+.app-shell .settings-page-redesign .settings-detail-stack .settings-section-head {
+  min-height: 0;
+  flex: 0 0 220px;
+  align-items: center;
+  margin: 0;
+  padding: 13px 16px 13px 0;
+  border-right: 1px solid var(--workspace-border);
+}
+
+.app-shell .settings-page-redesign .settings-detail-stack > .settings-card > .setting-row {
+  min-width: 0;
+  min-height: 68px;
+  flex: 1 1 0;
+  padding: 9px 13px;
+  border-top: 0;
+  border-left: 1px solid var(--workspace-border);
+}
+
+.app-shell .settings-page-redesign .settings-detail-stack > .settings-card > .settings-section-head + .setting-row {
+  border-left: 0;
+}
+
+.app-shell .settings-page-redesign .settings-detail-stack > .settings-card > .profile-edit-form {
+  min-width: 0;
+  flex: 1;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 12px 0 12px 14px;
+}
+
+@media (max-width: 860px) {
+  .app-shell .settings-page-redesign .settings-detail-stack > .settings-card {
+    display: block;
+    padding: 15px;
+  }
+
+  .app-shell .settings-page-redesign .settings-detail-stack .settings-section-head {
+    padding: 0 0 12px;
+    border-right: 0;
+    border-bottom: 1px solid var(--workspace-border);
+  }
+
+  .app-shell .settings-page-redesign .settings-detail-stack > .settings-card > .setting-row,
+  .app-shell .settings-page-redesign .settings-detail-stack > .settings-card > .settings-section-head + .setting-row {
+    min-height: 54px;
+    padding-inline: 0;
+    border-left: 0;
+    border-top: 1px solid var(--workspace-border);
+  }
+
+  .app-shell .settings-page-redesign .settings-detail-stack > .settings-card > .settings-section-head + .setting-row {
+    border-top: 0;
+  }
+}
+
+/* Final detail layout: three full-width rows, not three columns. */
+.app-shell .settings-page-redesign .settings-detail-stack {
+  grid-template-columns: 1fr;
+  gap: 9px;
+}
+
+.app-shell .settings-page-redesign .settings-detail-stack > .settings-card {
+  display: flex;
+  min-height: 0;
+  align-items: stretch;
+  padding: 0 16px;
+  overflow: hidden;
+}
+
+.app-shell .settings-page-redesign .settings-detail-stack .settings-section-head {
+  min-height: 0;
+  flex: 0 0 220px;
+  align-items: center;
+  margin: 0;
+  padding: 13px 16px 13px 0;
+  border-right: 1px solid var(--workspace-border);
+}
+
+.app-shell .settings-page-redesign .settings-detail-stack > .settings-card > .setting-row {
+  min-width: 0;
+  min-height: 68px;
+  flex: 1 1 0;
+  padding: 9px 13px;
+  border-top: 0;
+  border-left: 1px solid var(--workspace-border);
+}
+
+.app-shell .settings-page-redesign .settings-detail-stack > .settings-card > .settings-section-head + .setting-row {
+  border-left: 0;
+}
+
+.app-shell .settings-page-redesign .settings-detail-stack > .settings-card > .profile-edit-form {
+  min-width: 0;
+  flex: 1;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 12px 0 12px 14px;
+}
+
+/* Compact range editor: time fields, delete, add and save share one row. */
+.app-shell .settings-page-redesign .availability-range-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+}
+
+.app-shell .settings-page-redesign .availability-range-list {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 4px;
+  border-top: 0;
+}
+
+.app-shell .settings-page-redesign .availability-range {
+  min-height: 46px;
+  grid-template-columns: minmax(150px, 1fr) 12px minmax(150px, 1fr) 32px;
+  gap: 7px;
+  padding: 5px 0;
+  border-bottom: 0;
+}
+
+.app-shell .settings-page-redesign .availability-time-field {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+}
+
+.app-shell .settings-page-redesign .availability-time-field > span:first-child {
+  color: var(--workspace-text);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.app-shell .settings-page-redesign .availability-time-input {
+  display: flex;
+  min-width: 0;
+  height: 34px;
+  align-items: center;
+  padding: 0 3px;
+  color: var(--workspace-secondary);
+  border: 0;
+  border-bottom: 1px solid var(--workspace-border-strong);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  transition: color 160ms ease, border-color 160ms ease;
+}
+
+.app-shell .settings-page-redesign .availability-time-input:hover {
+  border-color: color-mix(in srgb, var(--workspace-accent) 34%, var(--workspace-border));
+}
+
+.app-shell .settings-page-redesign .availability-time-input:focus-within {
+  color: var(--workspace-accent);
+  border-bottom-color: var(--workspace-accent);
+  background: transparent;
+  box-shadow: none;
+}
+
+.app-shell .settings-page-redesign .availability-time-input input {
+  width: 100%;
+  min-width: 0;
+  height: 32px;
+  margin: 0;
+  padding: 0;
+  color: var(--workspace-text);
+  border: 0;
+  outline: 0;
+  background: transparent;
+  font-size: 14px;
+  font-weight: 680;
+  font-variant-numeric: tabular-nums;
+}
+
+.app-shell .settings-page-redesign .availability-time-input input::-webkit-calendar-picker-indicator {
+  margin: 0;
+  opacity: .48;
+  cursor: pointer;
+}
+
+.app-shell .settings-page-redesign .availability-range > button {
+  width: 32px;
+  min-height: 32px;
+  align-self: center;
+  border-radius: 8px;
+}
+
+.app-shell .settings-page-redesign .availability-inline-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-top: 7px;
+}
+
+.app-shell .settings-page-redesign .availability-inline-actions button {
+  min-height: 32px;
+  padding-inline: 9px;
+  white-space: nowrap;
+}
+
+.app-shell .settings-page-redesign .availability-inline-actions .is-primary {
+  color: #fff;
+  border-color: var(--workspace-accent);
+  background: var(--workspace-accent);
+}
+
+@media (max-width: 860px) {
+  .app-shell .settings-page-redesign .settings-detail-stack > .settings-card {
+    display: block;
+    padding: 15px;
+  }
+
+  .app-shell .settings-page-redesign .settings-detail-stack .settings-section-head {
+    min-height: 0;
+    margin-bottom: 6px;
+    padding: 0 0 12px;
+    border-right: 0;
+    border-bottom: 1px solid var(--workspace-border);
+  }
+
+  .app-shell .settings-page-redesign .settings-detail-stack > .settings-card > .setting-row,
+  .app-shell .settings-page-redesign .settings-detail-stack > .settings-card > .settings-section-head + .setting-row {
+    min-height: 54px;
+    padding-inline: 0;
+    border-left: 0;
+    border-top: 1px solid var(--workspace-border);
+  }
+
+  .app-shell .settings-page-redesign .settings-detail-stack > .settings-card > .settings-section-head + .setting-row {
+    border-top: 0;
+  }
+
+  .app-shell .settings-page-redesign .availability-range-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .app-shell .settings-page-redesign .availability-inline-actions {
+    justify-content: flex-end;
+    padding-top: 0;
+  }
+}
+
+@media (max-width: 620px) {
+  .app-shell .settings-page-redesign .availability-range {
+    grid-template-columns: 1fr 10px 1fr 32px;
+  }
+
+  .app-shell .settings-page-redesign .availability-time-field {
+    display: block;
+  }
+
+  .app-shell .settings-page-redesign .availability-time-field > span:first-child {
+    display: block;
+    margin-bottom: 4px;
+  }
+
+  .app-shell .settings-page-redesign .availability-inline-actions {
+    flex-wrap: wrap;
+  }
+}
+
+/* Settings layout revision: one-column appearance flow, merged learning
+ * preferences, and a single 3-card detail row. */
+html[data-theme][data-theme][data-theme] .app-shell .settings-page-redesign #settings-appearance {
+  display: block;
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-page-redesign #settings-appearance > .settings-section-head:first-child,
+html[data-theme][data-theme][data-theme] .app-shell .settings-page-redesign #settings-appearance > .settings-section-head.compact {
+  margin: 0 0 14px;
+  padding: 0;
+  border: 0;
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-page-redesign #settings-appearance > .style-options {
+  grid-column: auto;
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-page-redesign #settings-appearance > .color-scheme {
+  display: block;
+  margin-top: 16px;
+  padding-top: 16px;
+}
+
+.app-shell .settings-page-redesign #settings-appearance .color-options {
+  margin-top: 11px;
+}
+
+.app-shell .settings-page-redesign .preferences-card {
+  min-width: 0;
+  margin: 0;
+  padding: 18px 20px;
+  border: 1px solid var(--workspace-border);
+  border-radius: 14px;
+  background: var(--workspace-panel);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--workspace-text) 4%, transparent);
+  scroll-margin-top: 20px;
+  animation: settings-section-enter 360ms cubic-bezier(.2, .8, .2, 1) 45ms both;
+}
+
+.app-shell .settings-page-redesign .preferences-card > .settings-section-head {
+  margin-bottom: 6px;
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.app-shell .settings-preference-controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.app-shell .settings-page-redesign .settings-preference-controls .setting-row {
+  min-height: 58px;
+  padding: 8px 11px;
+  border: 1px solid var(--workspace-border);
+  border-radius: 10px;
+  background: var(--workspace-panel-subtle);
+}
+
+.app-shell .weekly-settings-block {
+  padding-top: 12px;
+  border-top: 1px solid var(--workspace-border);
+  scroll-margin-top: 20px;
+}
+
+.app-shell .weekly-settings-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 11px;
+}
+
+.app-shell .weekly-settings-heading > span {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  place-items: center;
+  color: var(--workspace-accent);
+  border-radius: 9px;
+  background: var(--workspace-accent-soft);
+}
+
+.app-shell .weekly-settings-heading h3 {
+  margin: 0 0 3px;
+  color: var(--workspace-text);
+  font-size: 14px;
+  font-weight: 720;
+  line-height: 1.35;
+}
+
+.app-shell .weekly-settings-heading p {
+  margin: 0;
+  color: var(--workspace-secondary);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.app-shell .settings-page-redesign .weekly-availability-editor {
+  gap: 9px;
+}
+
+.app-shell .settings-page-redesign .availability-day-tabs {
+  gap: 4px;
+  padding: 4px;
+}
+
+.app-shell .settings-page-redesign .availability-day-tabs button {
+  position: relative;
+  min-height: 36px;
+  padding-block: 2px;
+}
+
+.app-shell .settings-page-redesign .availability-day-tabs button strong {
+  font-size: 13px;
+}
+
+.app-shell .settings-page-redesign .availability-day-tabs button.has-ranges strong {
+  color: var(--workspace-accent);
+  transition: transform 170ms ease, color 170ms ease;
+}
+
+.app-shell .settings-page-redesign .availability-day-tabs button.is-rest strong {
+  color: var(--workspace-tertiary);
+}
+
+.app-shell .settings-page-redesign .availability-day-tabs button.has-ranges::after {
+  position: absolute;
+  right: 0;
+  bottom: 3px;
+  left: 0;
+  color: var(--workspace-secondary);
+  content: attr(data-segment-count);
+  font-size: 9px;
+  font-weight: 650;
+  line-height: 1;
+  opacity: 0;
+  transform: translateY(3px);
+  transition: opacity 170ms ease, transform 170ms ease;
+}
+
+.app-shell .settings-page-redesign .availability-day-tabs button.has-ranges:hover strong,
+.app-shell .settings-page-redesign .availability-day-tabs button.has-ranges:focus-visible strong {
+  transform: translateY(-5px);
+}
+
+.app-shell .settings-page-redesign .availability-day-tabs button.has-ranges:hover::after,
+.app-shell .settings-page-redesign .availability-day-tabs button.has-ranges:focus-visible::after {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.app-shell .settings-page-redesign .availability-day-editor {
+  gap: 8px;
+  padding: 4px 0 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.app-shell .settings-page-redesign .availability-day-actions {
+  justify-content: flex-end;
+}
+
+.app-shell .settings-page-redesign .availability-range {
+  min-height: 46px;
+}
+
+.app-shell .settings-page-redesign .settings-detail-stack {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.app-shell .settings-page-redesign .settings-detail-stack > .settings-card {
+  min-height: 238px;
+  padding: 18px;
+}
+
+.app-shell .settings-page-redesign .settings-detail-stack .settings-section-head {
+  min-height: 54px;
+  margin-bottom: 10px;
+}
+
+@media (max-width: 1080px) {
+  .app-shell .settings-page-redesign .settings-detail-stack {
+    grid-template-columns: 1fr;
+  }
+
+  .app-shell .settings-page-redesign .settings-detail-stack > .settings-card {
+    min-height: 0;
+  }
+}
+
+@media (max-width: 680px) {
+  .app-shell .settings-preference-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .app-shell .settings-page-redesign .preferences-card {
+    padding: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-shell .settings-page-redesign *,
+  .app-shell .settings-page-redesign *::before,
+  .app-shell .settings-page-redesign *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}
+
+/* Legacy usability.css uses deliberately repeated theme attributes to flatten
+ * the old settings screen. Match that specificity here so the redesigned
+ * card surfaces and grid ownership remain authoritative. */
+html[data-theme][data-theme][data-theme] .app-shell .settings-page-redesign {
+  max-width: 1180px;
+  margin-inline: auto;
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-page-redesign .settings-redesign-heading {
+  margin: 0 0 18px;
+  padding: 22px 26px;
+  border: 1px solid var(--workspace-border);
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at 92% 0%, color-mix(in srgb, var(--workspace-accent) 9%, transparent), transparent 34%),
+    var(--workspace-panel);
+  box-shadow: 0 12px 32px color-mix(in srgb, var(--workspace-text) 5%, transparent);
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-page-redesign .settings-redesign-heading::after {
+  display: none;
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-page-redesign #settings-appearance {
+  display: grid;
+  grid-template-columns: 175px minmax(0, 1fr);
+  gap: 18px 22px;
+  margin: 0;
+  padding: 20px;
+  border: 1px solid var(--workspace-border) !important;
+  border-radius: 14px;
+  background: var(--workspace-panel) !important;
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--workspace-text) 4%, transparent) !important;
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-page-redesign #settings-appearance > .settings-section-head:first-child {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 0 0 15px;
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-page-redesign #settings-appearance > .settings-section-head.compact {
+  grid-column: 1;
+  margin: 0;
+  padding: 0;
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-page-redesign #settings-appearance > .style-options {
+  grid-column: 2;
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-page-redesign #settings-appearance > .color-scheme {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding-top: 17px;
+}
+
+@media (max-width: 680px) {
+  html[data-theme][data-theme][data-theme] .app-shell .settings-page-redesign .settings-redesign-heading {
+    padding: 20px;
+  }
+
+  html[data-theme][data-theme][data-theme] .app-shell .settings-page-redesign #settings-appearance {
+    display: block;
+    padding: 16px;
+  }
+}
+
+/* Keep this final: old high-specificity appearance rules above must not turn
+ * the material heading back into a left-hand column. */
+html[data-theme][data-theme][data-theme] .app-shell .settings-page-redesign #settings-appearance {
+  display: block;
+  grid-template-columns: none;
+  gap: 0;
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-page-redesign #settings-appearance > .settings-section-head:first-child,
+html[data-theme][data-theme][data-theme] .app-shell .settings-page-redesign #settings-appearance > .settings-section-head.compact {
+  grid-column: auto;
+  margin: 0 0 14px;
+  padding: 0;
+  border: 0;
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-page-redesign #settings-appearance > .style-options {
+  grid-column: auto;
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-page-redesign #settings-appearance > .color-scheme {
+  display: grid;
+  grid-column: auto;
+  grid-template-columns: minmax(210px, .85fr) minmax(0, 1.65fr);
+  align-items: center;
+  gap: 18px;
+  margin-top: 16px;
+  padding-top: 16px;
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-page-redesign #settings-appearance > .color-scheme .color-options {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 0;
+}
+
+/* Keep this at EOF: the three final settings cards are stacked full-width
+ * rows. This intentionally follows the legacy desktop compatibility rules. */
+html[data-theme][data-theme][data-theme] .app-shell .settings-page-redesign {
+  padding-bottom: 10px;
+}
+
+.app-shell .settings-page-redesign .settings-detail-stack {
+  grid-template-columns: 1fr;
+  gap: 9px;
+}
+
+.app-shell .settings-page-redesign .settings-detail-stack > .settings-card {
+  display: block;
+  min-height: 0;
+  padding: 13px 16px;
+  overflow: hidden;
+}
+
+.app-shell .settings-page-redesign .settings-detail-stack .settings-section-head {
+  min-height: 0;
+  align-items: center;
+  margin: 0;
+  padding: 0 0 10px;
+  border-right: 0;
+  border-bottom: 1px solid var(--workspace-border);
+}
+
+.app-shell .settings-page-redesign .settings-detail-stack > .settings-card > .setting-row {
+  width: 100%;
+  min-width: 0;
+  min-height: 50px;
+  padding: 8px 4px;
+  border-top: 0;
+  border-left: 0;
+}
+
+.app-shell .settings-page-redesign .settings-detail-stack > .settings-card > .setting-row + .setting-row {
+  border-top: 1px solid var(--workspace-border);
+}
+
+.app-shell .settings-page-redesign .settings-detail-stack > .settings-card > .profile-edit-form {
+  width: 100%;
+  min-width: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 11px 0 0;
+}
+
+@media (max-width: 860px) {
+  .app-shell .settings-page-redesign .settings-detail-stack > .settings-card {
+    display: block;
+    padding: 15px;
+  }
+
+  .app-shell .settings-page-redesign .settings-detail-stack .settings-section-head {
+    padding: 0 0 12px;
+    border-right: 0;
+    border-bottom: 1px solid var(--workspace-border);
+  }
+
+  .app-shell .settings-page-redesign .settings-detail-stack > .settings-card > .setting-row,
+  .app-shell .settings-page-redesign .settings-detail-stack > .settings-card > .settings-section-head + .setting-row {
+    min-height: 54px;
+    padding-inline: 0;
+    border-left: 0;
+    border-top: 0;
+  }
+
+  .app-shell .settings-page-redesign .settings-detail-stack > .settings-card > .setting-row + .setting-row {
+    border-top: 1px solid var(--workspace-border);
+  }
+
+  html[data-theme][data-theme][data-theme] .app-shell .settings-page-redesign #settings-appearance > .color-scheme {
+    grid-template-columns: 1fr;
+    gap: 11px;
+  }
+
+}
+
+@media (max-width: 680px) {
+  .app-shell .settings-page-redesign .availability-day-tabs button {
+    min-height: 44px;
+  }
+}
+
+/* Availability is one guided flow: choose a day, set its time, then density. */
+.app-shell .settings-page-redesign .weekly-settings-block {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.app-shell .settings-page-redesign .availability-day-tabs button {
+  display: grid;
+  min-height: 34px;
+  place-items: center;
+  padding: 2px 4px;
+  text-align: center;
+}
+
+.app-shell .settings-page-redesign .availability-day-tabs button strong {
+  display: block;
+  width: 100%;
+  font-size: 14px;
+  line-height: 1;
+  text-align: center;
+}
+
+.app-shell .settings-page-redesign .availability-day-tabs button.is-rest::after {
+  position: absolute;
+  right: 0;
+  bottom: 3px;
+  left: 0;
+  color: var(--workspace-tertiary);
+  content: attr(data-segment-count);
+  font-size: 9px;
+  font-weight: 650;
+  line-height: 1;
+  opacity: 0;
+  transform: translateY(3px);
+  transition: opacity 170ms ease, transform 170ms ease;
+}
+
+.app-shell .settings-page-redesign .availability-day-tabs button.is-rest:hover strong,
+.app-shell .settings-page-redesign .availability-day-tabs button.is-rest:focus-visible strong {
+  transform: translateY(-5px);
+}
+
+.app-shell .settings-page-redesign .availability-day-tabs button.is-rest:hover::after,
+.app-shell .settings-page-redesign .availability-day-tabs button.is-rest:focus-visible::after {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.app-shell .settings-page-redesign .availability-day-actions button {
+  padding-inline: 10px;
+  color: var(--workspace-secondary);
+  border-color: color-mix(in srgb, var(--workspace-accent) 18%, var(--workspace-border));
+  background: color-mix(in srgb, var(--workspace-accent) 4%, transparent);
+}
+
+.app-shell .settings-page-redesign .availability-intensity {
+  display: grid;
+  grid-template-columns: minmax(170px, .72fr) minmax(0, 1.55fr);
+  align-items: center;
+  gap: 18px;
+  margin-top: 7px;
+  padding-top: 12px;
+  border-top: 1px solid var(--workspace-border);
+}
+
+.app-shell .settings-page-redesign .availability-range-workspace {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.app-shell .settings-page-redesign .availability-inline-actions {
+  justify-content: flex-end;
+}
+
+.app-shell .settings-page-redesign .availability-intensity > div:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.app-shell .settings-page-redesign .availability-intensity > div:first-child strong {
+  color: var(--workspace-text);
+  font-size: 13px;
+  font-weight: 720;
+}
+
+.app-shell .settings-page-redesign .availability-intensity > div:first-child small {
+  color: var(--workspace-secondary);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.app-shell .settings-page-redesign .availability-intensity-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.app-shell .settings-page-redesign .availability-intensity-options button {
+  display: grid;
+  min-height: 42px;
+  align-content: center;
+  gap: 2px;
+  padding: 5px 10px;
+  color: var(--workspace-secondary);
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: var(--workspace-panel-subtle);
+  text-align: left;
+  transform: none;
+}
+
+.app-shell .settings-page-redesign .availability-intensity-options button:hover {
+  color: var(--workspace-text);
+  border-color: color-mix(in srgb, var(--workspace-accent) 24%, var(--workspace-border));
+  background: color-mix(in srgb, var(--workspace-accent) 5%, var(--workspace-panel-subtle));
+  transform: none;
+}
+
+.app-shell .settings-page-redesign .availability-intensity-options button.is-selected {
+  color: var(--workspace-accent);
+  border-color: color-mix(in srgb, var(--workspace-accent) 34%, var(--workspace-border));
+  background: var(--workspace-accent-soft);
+}
+
+.app-shell .settings-page-redesign .availability-intensity-options button strong {
+  font-size: 12px;
+  font-weight: 720;
+}
+
+.app-shell .settings-page-redesign .availability-intensity-options button small {
+  color: var(--workspace-secondary);
+  font-size: 9px;
+}
+
+@media (max-width: 680px) {
+  .app-shell .settings-page-redesign .availability-day-tabs button {
+    min-height: 42px;
+  }
+
+  .app-shell .settings-page-redesign .availability-intensity {
+    grid-template-columns: 1fr;
+    gap: 9px;
+  }
+
+  .app-shell .settings-page-redesign .availability-intensity-options {
+    grid-template-columns: 1fr;
+  }
+}

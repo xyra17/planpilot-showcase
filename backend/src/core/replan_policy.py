@@ -32,7 +32,4 @@ def should_suggest_replan(
 ) -> bool:
     """Suggest rescheduling only after consecutive low-execution study days."""
     dates = expected_study_dates(end_date, work_schedule, required_days)
-    return all(
-        day in rates_by_date and rates_by_date[day] < threshold
-        for day in dates
-    )
+    return all(day in rates_by_date and rates_by_date[day] < threshold for day in dates)

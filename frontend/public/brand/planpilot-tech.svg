@@ -1,0 +1,27 @@
+<svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="tech-p" x1="14" y1="14" x2="36" y2="36" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#DDE4FF"/>
+    </linearGradient>
+    <linearGradient id="tech-mint" x1="23" y1="29" x2="39" y2="8" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#49D9CB"/>
+      <stop offset="1" stop-color="#7AF2D9"/>
+    </linearGradient>
+    <filter id="tech-glow" x="-70%" y="-70%" width="240%" height="240%">
+      <feGaussianBlur stdDeviation="1.6" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- The open P is the shared PlanPilot brand shape: a plan becoming a route. -->
+  <path d="M14.5 37V25.2C14.5 18.9 18.9 14.5 25.2 14.5H28.4C34 14.5 37.5 17.9 37.5 22.8C37.5 28.2 33.2 32.2 27.6 32.2H22.5"
+        stroke="url(#tech-p)" stroke-width="3.8" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="24.4" cy="24.2" r="3.3" fill="#162047" stroke="#FFFFFF" stroke-width="2.4"/>
+
+  <!-- Mint guidance path and destination marker. -->
+  <path d="M24.8 24C28.4 20 31.4 16.8 36.8 11.5" stroke="url(#tech-mint)" stroke-width="2.7"
+        stroke-linecap="round" stroke-dasharray="2.2 4.2"/>
+  <path d="M34.5 8.9L41 8L39.8 14.4L37.9 11.2L34.5 8.9Z" fill="#5DE6D3" filter="url(#tech-glow)"/>
+  <circle cx="14.5" cy="37" r="2.4" fill="#52E1CF" stroke="#C7FFF4" stroke-width="0.9" filter="url(#tech-glow)"/>
+</svg>

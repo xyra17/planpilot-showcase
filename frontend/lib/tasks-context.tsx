@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useCallback, useEffect } from "react";
 import { api } from "@/lib/api";
+import { signalPiloState } from "@/lib/technology/piloState";
 
 export type Priority = "high" | "medium" | "low";
 
@@ -62,18 +63,29 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => { loadTasks(); }, [loadTasks]);
 
   const addTask = useCallback(async (t: Omit<Task, "id">) => {
-    const created = await api.post<Task>("/api/v1/tasks", t);
-    setTasks((prev) => [...prev, created]);
+    signalPiloState("working", { source: "tasks:add" });
+    try {
+      const created = await api.post<Task>("/api/v1/tasks", t);
+      setTasks((prev) => [...prev, created]);
+      signalPiloState("success", { source: "tasks:add", duration: 3_200 });
+    } catch (error) {
+      signalPiloState("failure", { source: "tasks:add", duration: 4_200 });
+      throw error;
+    }
   }, []);
 
   const updateTask = useCallback(async (id: string, patch: Partial<Omit<Task, "id">>) => {
+    signalPiloState("checking", { source: "tasks:update" });
     setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, ...patch } : t)));
     try {
       const updated = await api.patch<Task>(`/api/v1/tasks/${id}`, patch);
       setTasks((prev) => prev.map((t) => (t.id === id ? updated : t)));
     } catch {
       loadTasks(); // 失败时重新拉取
+      signalPiloState("failure", { source: "tasks:update", duration: 4_200 });
+      return;
     }
+    signalPiloState("success", { source: "tasks:update", duration: 3_000 });
   }, [loadTasks]);
 
   const deleteTask = useCallback(async (id: string) => {
@@ -95,10 +107,12 @@ export function TasksProvider({ children }: { children: React.ReactNode }) {
     });
     try {
       await api.patch<Task>(`/api/v1/tasks/${id}`, { done: !originalDone });
+      signalPiloState(originalDone ? "checking" : "success", { source: "tasks:toggle", duration: originalDone ? 2_800 : 3_200 });
     } catch {
       setTasks((prev) =>
         prev.map((t) => (t.id === id ? { ...t, done: originalDone ?? t.done } : t))
       );
+      signalPiloState("failure", { source: "tasks:toggle", duration: 4_200 });
     }
   }, []);
 

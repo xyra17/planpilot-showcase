@@ -1,6 +1,8 @@
 # ==== 环境变量（含密钥，绝不提交）====
 **/.env
+**/.env.*
 !**/.env.example
+!**/.env.*.example
 
 # ==== Python ====
 **/__pycache__/
@@ -13,6 +15,8 @@
 **/.venv/
 **/venv/
 **/.Python
+**/.pytest_cache/
+**/.ruff_cache/
 
 # ==== 用户上传文件 ====
 backend/uploads/
@@ -22,10 +26,18 @@ backend/celerybeat-schedule
 backend/celerybeat-schedule.db
 
 # ==== Node / 前端 ====
-frontend/node_modules/
-frontend/.next/
+**/node_modules/
+**/.next*/
 frontend/tsconfig.tsbuildinfo
 frontend/.env.local
+**/playwright-report/
+**/test-results/
+
+# ==== 本地生成输出 ====
+output/
+
+# ==== 独立站点仓库（单独维护 Git 历史）====
+website/
 
 # ==== 测试报告（本地生成）====
 backend/tests/integration/reports/*.html

@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { TrendingUp, TrendingDown, Minus, Flame, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { api } from "@/lib/api";
+import { StatusBadge, type StatusTone } from "@/components/ui/StatusBadge";
 
 interface ProgressData {
   goal_id: string;
@@ -18,19 +19,15 @@ interface ProgressData {
 type BadgeKind = "ok" | "warn" | "neutral";
 
 function Badge({ kind, label }: { kind: BadgeKind; label: string }) {
-  const styles: Record<BadgeKind, { text: string; bg: string }> = {
-    ok:      { text: "var(--ok-text,#5B8C74)",   bg: "var(--ok-bg,#EEF4F1)" },
-    warn:    { text: "var(--warn-text,#B07D4A)", bg: "var(--warn-bg,#F6F1EA)" },
-    neutral: { text: "var(--accent)",            bg: "var(--accent-light)" },
+  const tones: Record<BadgeKind, StatusTone> = {
+    ok: "success",
+    warn: "warning",
+    neutral: "info",
   };
-  const s = styles[kind];
   return (
-    <span
-      className={`goal-metric-badge goal-metric-badge-${kind} inline-flex min-w-[36px] items-center justify-center px-1.5 py-0.5 text-[10px] font-medium flex-shrink-0`}
-      style={{ color: s.text, backgroundColor: s.bg }}
-    >
+    <StatusBadge tone={tones[kind]} compact className={`goal-metric-badge goal-metric-badge-${kind}`}>
       {label}
-    </span>
+    </StatusBadge>
   );
 }
 
@@ -86,7 +83,7 @@ export function ProgressOverview({ goalId, refreshKey = 0 }: { goalId: string; r
   return (
     <div className="grid grid-cols-2 gap-2">
       {/* 整体进度 */}
-      <div className="bg-white rounded-xl border p-2.5" style={cardStyle}>
+      <div className="goal-metric-card goal-metric-card-progress bg-white rounded-xl border p-2.5" style={cardStyle}>
         <div className="flex items-center justify-between mb-1.5">
           <div className="flex items-center gap-1.5">
             <div className="goal-metric-icon w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "var(--accent-light)" }}>
@@ -109,7 +106,7 @@ export function ProgressOverview({ goalId, refreshKey = 0 }: { goalId: string; r
       </div>
 
       {/* 学习债务 */}
-      <div className="bg-white rounded-xl border p-2.5" style={cardStyle}>
+      <div className={`goal-metric-card goal-metric-card-debt ${data.debt_count > 0 ? "is-alert" : ""} bg-white rounded-xl border p-2.5`} style={cardStyle}>
         <div className="flex items-center justify-between mb-1.5">
           <div className="flex items-center gap-1.5">
             <div className="goal-metric-icon w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0"
@@ -128,7 +125,7 @@ export function ProgressOverview({ goalId, refreshKey = 0 }: { goalId: string; r
       </div>
 
       {/* 近7日 — 数值在右上角 */}
-      <div className="bg-white rounded-xl border p-2.5" style={cardStyle}>
+      <div className="goal-metric-card goal-metric-card-week bg-white rounded-xl border p-2.5" style={cardStyle}>
         <div className="flex items-center justify-between mb-1">
           <div className="flex items-center gap-1.5">
             <div className="goal-metric-icon w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "var(--accent-light)" }}>
@@ -146,7 +143,7 @@ export function ProgressOverview({ goalId, refreshKey = 0 }: { goalId: string; r
       </div>
 
       {/* 连续打卡 — 数值在右上角 */}
-      <div className="bg-white rounded-xl border p-2.5" style={cardStyle}>
+      <div className="goal-metric-card goal-metric-card-streak bg-white rounded-xl border p-2.5" style={cardStyle}>
         <div className="flex items-center justify-between mb-1">
           <div className="flex items-center gap-1.5">
             <div className="goal-metric-icon w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0"

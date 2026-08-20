@@ -1,0 +1,42 @@
+[
+  {
+    "id": "morning-learner",
+    "description": "稳定早间学习者不应被推荐到晚间",
+    "context": {
+      "profile": {"completion_rate_30d": 0.86},
+      "active_patterns": [
+        {
+          "pattern_type": "preferred_learning_time",
+          "pattern_value": {"peak_hours": [9, 10]},
+          "confidence": 0.82
+        }
+      ],
+      "goal_context": {"goal": {"id": "g1"}, "overdue_tasks": []}
+    },
+    "expected_action": "learning_nudge",
+    "expected_window_contains": "09:00"
+  },
+  {
+    "id": "overdue-work",
+    "description": "有逾期任务时优先生成可审核的改期建议",
+    "context": {
+      "profile": {"completion_rate_30d": 0.55},
+      "active_patterns": [{"pattern_type": "delay_pattern", "pattern_value": {}}],
+      "goal_context": {
+        "goal": {"id": "g1"},
+        "overdue_tasks": [{"id": "t1", "scheduled_date": "2026-07-01"}]
+      }
+    },
+    "expected_action": "reschedule_overdue_tasks"
+  },
+  {
+    "id": "low-completion",
+    "description": "低完成率且无逾期任务时降低负荷",
+    "context": {
+      "profile": {"completion_rate_30d": 0.41},
+      "active_patterns": [{"pattern_type": "completion_rate_trend", "pattern_value": {}}],
+      "goal_context": {"goal": {"id": "g1"}, "overdue_tasks": []}
+    },
+    "expected_action": "reduce_daily_load"
+  }
+]

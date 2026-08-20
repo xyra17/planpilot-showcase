@@ -19,6 +19,7 @@ from langchain_core.runnables import RunnableLambda
 from langchain_openai import ChatOpenAI
 
 from src.config import settings
+from src.core.model_gateway import gateway_status
 
 logger = logging.getLogger(__name__)
 
@@ -225,9 +226,7 @@ def create_routine_llm(*, tools: Sequence[Any] | None = None, **kwargs: Any) -> 
     """创建“本地优先、Flash 回退”的日常任务模型。"""
     candidates: list[Any] = []
     local_added = (
-        settings.local_model_enabled
-        and settings.openai_base_url
-        and local_circuit.allow_request()
+        settings.local_model_enabled and settings.openai_base_url and local_circuit.allow_request()
     )
     if local_added:
         candidates.append(_local_llm(**kwargs))
@@ -245,11 +244,48 @@ def create_routine_llm(*, tools: Sequence[Any] | None = None, **kwargs: Any) -> 
     return primary.with_fallbacks(fallbacks) if fallbacks else primary
 
 
-def create_structured_routine_llm(**kwargs: Any) -> Any:
-    """创建强制返回单个 JSON 对象的日常模型。"""
+def create_structured_routine_llm(
+    *,
+    provider: str | None = None,
+    model_name: str | None = None,
+    timeout_ms: int | None = None,
+    **kwargs: Any,
+) -> Any:
+    """创建强制 JSON 输出的版本化模型或兼容日常路由。"""
     model_kwargs = dict(kwargs.pop("model_kwargs", {}))
     model_kwargs["response_format"] = {"type": "json_object"}
-    return create_routine_llm(model_kwargs=model_kwargs, **kwargs)
+    if provider in {None, "configured-router"}:
+        return create_routine_llm(model_kwargs=model_kwargs, **kwargs)
+    timeout = timeout_ms / 1000 if timeout_ms else None
+    if provider == "local":
+        if not settings.openai_base_url:
+            raise RuntimeError("本地模型 Provider 未配置")
+        model = ChatOpenAI(
+            model=model_name or settings.model_name,
+            api_key=settings.openai_api_key or "local",
+            base_url=settings.openai_base_url,
+            timeout=timeout or settings.local_model_timeout_seconds,
+            max_retries=0,
+            extra_body={"chat_template_kwargs": {"enable_thinking": False}},
+            callbacks=[_RouteMetricsCallback("local")],
+            model_kwargs=model_kwargs,
+            **kwargs,
+        )
+        return _limit_local_concurrency(model)
+    if provider == "smart":
+        if not settings.smart_api_key:
+            raise RuntimeError("云端模型 Provider 未配置")
+        return ChatOpenAI(
+            model=model_name or settings.smart_model_name,
+            api_key=settings.smart_api_key,
+            base_url=settings.smart_base_url or None,
+            timeout=timeout or settings.cloud_routine_timeout_seconds,
+            max_retries=settings.cloud_model_max_retries,
+            callbacks=[_RouteMetricsCallback("flash")],
+            model_kwargs=model_kwargs,
+            **kwargs,
+        )
+    raise ValueError(f"不支持的模型 Provider: {provider}")
 
 
 def _json_payload(content: str, opening: str, closing: str) -> Any:
@@ -330,4 +366,5 @@ def get_llm_runtime_status() -> dict[str, Any]:
         "cloud_pro_model": settings.smart_pro_model_name,
         "circuit": local_circuit.snapshot(),
         "metrics": model_metrics.snapshot(),
+        "gateway_circuits": gateway_status(),
     }

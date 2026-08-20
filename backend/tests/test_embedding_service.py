@@ -17,9 +17,7 @@ def clear_embedding_client():
 async def test_embed_text_uses_dedicated_embedding_configuration():
     client = MagicMock()
     client.embeddings.create = AsyncMock(
-        return_value=SimpleNamespace(
-            data=[SimpleNamespace(embedding=[0.1] * 1024)]
-        )
+        return_value=SimpleNamespace(data=[SimpleNamespace(embedding=[0.1] * 1024)])
     )
     with patch("src.core.embedding.get_embedding_client", return_value=client):
         result = await embed_text("测试")

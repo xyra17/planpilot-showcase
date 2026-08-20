@@ -1,0 +1,2362 @@
+/* Settings task redesign
+ * This layer intentionally owns the final information architecture and
+ * interaction states without changing the shared workspace components. */
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign {
+  --settings-muted: color-mix(in srgb, var(--workspace-text) 68%, var(--workspace-panel));
+  --goal-tech-panel: var(--workspace-panel);
+  --goal-tech-border: var(--workspace-border);
+  --goal-tech-text: var(--workspace-text);
+  --goal-tech-muted: var(--workspace-secondary);
+  width: 100%;
+  max-width: 1280px;
+  margin-inline: auto;
+  padding-bottom: 16px;
+}
+
+/* Keep the settings interaction layer on a predictable utility-page plane. */
+.app-shell .settings-task-redesign :is(
+  .goals-redesign-heading,
+  .settings-section-nav,
+  .settings-card
+) {
+  position: relative;
+  z-index: 225;
+}
+
+/* Settings has its own contextual Pilo actions. Keep the companion above the
+ * utility cards; it remains draggable when a control needs more room. */
+body:has(.settings-task-redesign) .pilo-companion { z-index: 226; }
+
+.app-shell .settings-task-redesign .settings-section-head p,
+.app-shell .settings-task-redesign .setting-copy small,
+.app-shell .settings-task-redesign .guest-account-copy p {
+  color: var(--settings-muted);
+}
+
+.app-shell .settings-task-redesign .settings-save-state {
+  min-width: 118px;
+  justify-content: center;
+  color: var(--workspace-accent);
+  border-color: color-mix(in srgb, var(--workspace-accent) 24%, var(--workspace-border));
+  background: var(--workspace-accent-soft);
+}
+
+.app-shell .settings-task-redesign .settings-save-state.is-error {
+  color: var(--workspace-danger, #b64a5b);
+  border-color: color-mix(in srgb, var(--workspace-danger, #b64a5b) 26%, var(--workspace-border));
+  background: color-mix(in srgb, var(--workspace-danger, #b64a5b) 8%, var(--workspace-panel));
+}
+
+.app-shell .settings-task-redesign .is-spinning {
+  animation: settings-task-spin 720ms linear infinite;
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign .settings-workspace {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1024px);
+  align-items: start;
+  justify-content: center;
+  gap: 24px;
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign .settings-section-nav {
+  position: sticky;
+  top: 20px;
+  display: grid;
+  gap: 4px;
+  width: 220px;
+  padding: 12px;
+  border: 1px solid var(--workspace-border);
+  border-radius: 16px;
+  background: var(--workspace-panel);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--workspace-text) 3%, transparent);
+}
+
+.app-shell .settings-task-redesign .settings-nav-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 8px 10px;
+  border-bottom: 1px solid var(--workspace-border);
+  margin-bottom: 4px;
+}
+
+.app-shell .settings-task-redesign .settings-nav-heading strong {
+  color: var(--workspace-text);
+  font-size: 12px;
+  font-weight: 720;
+}
+
+.app-shell .settings-task-redesign .settings-nav-heading span {
+  color: var(--settings-muted);
+  font-size: 10px;
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign .settings-section-nav a {
+  position: relative;
+  display: flex;
+  min-height: 42px;
+  align-items: center;
+  gap: 10px;
+  padding: 0 11px;
+  color: var(--settings-muted);
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  box-shadow: none;
+  font-size: 13px;
+  font-weight: 620;
+  transition: color 160ms ease, border-color 160ms ease, background-color 160ms ease;
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign .settings-section-nav a::before,
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign .settings-section-nav a::after {
+  display: none;
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign .settings-section-nav a:hover {
+  color: var(--workspace-accent);
+  background: color-mix(in srgb, var(--workspace-accent) 6%, transparent);
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign .settings-section-nav a.is-active,
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign .settings-section-nav a[aria-current="location"] {
+  color: var(--workspace-accent);
+  border-color: color-mix(in srgb, var(--workspace-accent) 20%, var(--workspace-border));
+  background: var(--workspace-accent-soft);
+  box-shadow: none;
+}
+
+.app-shell .settings-task-redesign .settings-section-nav a:focus-visible,
+.app-shell .settings-task-redesign :is(button, a, select, input):focus-visible {
+  outline: 2px solid var(--workspace-accent);
+  outline-offset: 2px;
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign .settings-content-stack {
+  width: 100%;
+  max-width: 1024px;
+  gap: 14px;
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign :is(.appearance-card, .preferences-card, .settings-detail-stack > .settings-card) {
+  border: 1px solid var(--workspace-border) !important;
+  border-radius: 16px;
+  background: var(--workspace-panel) !important;
+  box-shadow: none !important;
+  scroll-margin-top: 88px;
+}
+
+.app-shell .settings-task-redesign .settings-section-head > span {
+  color: var(--workspace-accent);
+  background: var(--workspace-accent-soft);
+}
+
+.app-shell .settings-task-redesign .settings-section-head h2,
+.app-shell .settings-task-redesign .settings-section-head h3 {
+  color: var(--workspace-text);
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign .settings-detail-stack {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign .settings-detail-stack > .settings-task-card {
+  display: block;
+  min-height: 0;
+  padding: 22px 24px;
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign .settings-task-card > .settings-section-head {
+  display: flex;
+  min-height: 50px;
+  align-items: center;
+  margin: 0;
+  padding: 0 0 18px;
+  border-bottom: 1px solid var(--workspace-border);
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign .setting-row-grid {
+  position: relative;
+  display: grid;
+  width: 100%;
+  min-height: 86px;
+  grid-template-columns: minmax(240px, 1fr) minmax(180px, 248px) 128px;
+  align-items: center;
+  gap: 22px;
+  padding: 16px 0;
+  border-top: 0;
+  border-left: 0;
+  background: transparent;
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign .setting-row-grid + .setting-row-grid {
+  border-top: 1px solid var(--workspace-border);
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign #settings-reminders > .setting-row:not(.email-reminder-row) {
+  grid-template-columns: minmax(0, 1fr) minmax(172px, 315px);
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign #settings-reminders > .setting-row:not(.email-reminder-row) > .setting-current {
+  grid-column: 2;
+  justify-content: flex-end;
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign #settings-reminders > .setting-row-grid {
+  min-height: 72px;
+  padding-block: 10px;
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign .setting-row-grid::before,
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign .setting-row-grid::after {
+  display: none;
+}
+
+.app-shell .settings-task-redesign .setting-copy {
+  display: block;
+  min-width: 0;
+}
+
+.app-shell .settings-task-redesign .setting-copy span {
+  display: block;
+  color: var(--workspace-text);
+  font-size: 14px;
+  font-weight: 680;
+  line-height: 1.45;
+}
+
+.app-shell .settings-task-redesign .setting-copy small {
+  display: block;
+  margin-top: 5px;
+  font-size: 12px !important;
+  line-height: 1.45;
+}
+
+.app-shell .settings-task-redesign .setting-current {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+}
+
+.app-shell .settings-task-redesign .setting-current select {
+  width: 100%;
+  min-height: 40px;
+  padding-inline: 12px 34px;
+  color: var(--workspace-text);
+  border: 1px solid var(--workspace-border);
+  border-radius: 12px;
+  background-color: var(--workspace-panel-subtle);
+  font-size: 13px;
+  font-weight: 620;
+  transition: border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
+}
+
+.app-shell .settings-task-redesign #settings-timezone {
+  width: 154px;
+  max-width: 154px;
+  min-height: 36px;
+  margin-left: 0;
+  padding: 0 30px 0 13px;
+  color: color-mix(in srgb, var(--workspace-accent) 76%, var(--workspace-text));
+  border-color: color-mix(in srgb, var(--workspace-accent) 40%, var(--workspace-border));
+  border-radius: 9px;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--workspace-accent) 18%, var(--workspace-panel)), color-mix(in srgb, var(--workspace-accent) 8%, var(--workspace-panel)));
+  box-shadow: 0 7px 17px color-mix(in srgb, var(--workspace-accent) 15%, transparent), inset 0 1px 0 color-mix(in srgb, #fff 56%, transparent);
+  font-size: 12px;
+  font-weight: 730;
+}
+
+.app-shell .settings-task-redesign .setting-current select:hover,
+.app-shell .settings-task-redesign .setting-current select:focus-visible {
+  border-color: color-mix(in srgb, var(--workspace-accent) 48%, var(--workspace-border));
+  background-color: color-mix(in srgb, var(--workspace-accent) 4%, var(--workspace-panel-subtle));
+}
+
+.app-shell .settings-task-redesign #settings-timezone:focus-visible {
+  outline: 0 !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--workspace-accent) 11%, transparent), 0 7px 17px color-mix(in srgb, var(--workspace-accent) 15%, transparent);
+}
+
+.app-shell .settings-task-redesign .setting-value-text {
+  min-width: 0;
+  color: var(--workspace-text);
+  font-size: 12px;
+  font-weight: 620;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.app-shell .settings-task-redesign .setting-action {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.app-shell .settings-task-redesign .setting-action :is(button, .setting-action-link) {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 12px;
+  color: var(--workspace-accent);
+  border: 1px solid color-mix(in srgb, var(--workspace-accent) 22%, var(--workspace-border));
+  border-radius: 10px;
+  background: var(--workspace-accent-soft);
+  font-size: 12px;
+  font-weight: 680;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 160ms ease, border-color 160ms ease, background-color 160ms ease;
+}
+
+.app-shell .settings-task-redesign .setting-action :is(button, .setting-action-link):hover {
+  border-color: color-mix(in srgb, var(--workspace-accent) 48%, var(--workspace-border));
+  background: color-mix(in srgb, var(--workspace-accent) 14%, var(--workspace-panel));
+}
+
+.app-shell .settings-task-redesign .setting-action button:disabled {
+  color: var(--settings-muted);
+  border-color: var(--workspace-border);
+  background: var(--workspace-panel-subtle);
+  opacity: .55;
+  cursor: not-allowed;
+}
+
+.app-shell .settings-task-redesign .setting-action .danger-quiet {
+  color: var(--workspace-danger, #b64a5b);
+  border-color: color-mix(in srgb, var(--workspace-danger, #b64a5b) 22%, var(--workspace-border));
+  background: color-mix(in srgb, var(--workspace-danger, #b64a5b) 7%, var(--workspace-panel));
+}
+
+.app-shell .settings-task-redesign .setting-save-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--workspace-text);
+  font-size: 12px;
+  font-weight: 620;
+  white-space: nowrap;
+}
+
+.app-shell .settings-task-redesign .setting-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 28px;
+  padding: 0 9px;
+  color: var(--settings-muted);
+  border-radius: 999px;
+  background: var(--workspace-panel-subtle);
+  font-size: 11px;
+  font-weight: 680;
+  white-space: nowrap;
+}
+
+.app-shell .settings-task-redesign .setting-status.is-positive {
+  color: var(--workspace-success, #21866e);
+  background: color-mix(in srgb, var(--workspace-success, #21866e) 10%, var(--workspace-panel));
+}
+
+.app-shell .settings-task-redesign .settings-avatar-row {
+  display: grid;
+  min-height: 96px;
+  grid-template-columns: 76px minmax(0, 1fr) 128px;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 4px 14px;
+}
+
+.app-shell .settings-task-redesign .settings-avatar-preview {
+  position: relative;
+  width: 68px;
+  height: 68px;
+}
+
+.app-shell .settings-task-redesign .user-avatar {
+  display: grid;
+  overflow: hidden;
+  place-items: center;
+  color: #fff;
+  border: 1px solid color-mix(in srgb, var(--workspace-accent) 42%, var(--workspace-border));
+  border-radius: 50%;
+  background: linear-gradient(145deg, var(--workspace-accent), color-mix(in srgb, var(--workspace-accent) 62%, #53cdb4));
+  font-size: 22px;
+  font-weight: 760;
+  box-shadow: 0 10px 26px color-mix(in srgb, var(--workspace-accent) 17%, transparent);
+}
+
+.app-shell .settings-task-redesign .user-avatar > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.app-shell .settings-task-redesign .settings-avatar-status {
+  position: absolute;
+  right: 1px;
+  bottom: 3px;
+  width: 12px;
+  height: 12px;
+  border: 3px solid var(--workspace-panel);
+  border-radius: 50%;
+  background: var(--workspace-success, #58d2b5);
+}
+
+.app-shell .settings-task-redesign .settings-avatar-copy strong {
+  color: var(--workspace-text);
+  font-size: 13px;
+  font-weight: 720;
+}
+
+.app-shell .settings-task-redesign .settings-avatar-copy p,
+.app-shell .settings-task-redesign .settings-avatar-copy small {
+  display: block;
+  margin: 4px 0 0;
+  color: var(--settings-muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.app-shell .settings-task-redesign .settings-avatar-copy small { opacity: .78; }
+.app-shell .settings-task-redesign .settings-avatar-input { display: none; }
+
+/* Account avatar cropper: one focused editing surface, no nested cards. */
+.avatar-crop-overlay {
+  position: fixed;
+  z-index: 520;
+  inset: 0;
+  background: rgba(7, 12, 24, .58);
+  backdrop-filter: blur(9px) saturate(.84);
+  animation: avatar-crop-fade 180ms ease-out;
+}
+
+.avatar-crop-dialog {
+  position: fixed;
+  z-index: 521;
+  top: 50%;
+  left: 50%;
+  display: grid;
+  width: min(500px, calc(100vw - 32px));
+  max-height: min(720px, calc(100dvh - 32px));
+  gap: 14px;
+  padding: 20px;
+  overflow-y: auto;
+  color: #243047;
+  background: rgba(248, 250, 255, .985);
+  border: 1px solid rgba(114, 93, 220, .2);
+  border-radius: 18px;
+  box-shadow: 0 28px 80px rgba(5, 10, 24, .3), inset 0 1px 0 rgba(255, 255, 255, .72);
+  outline: 0;
+  transform: translate(-50%, -50%);
+  animation: avatar-crop-enter 220ms cubic-bezier(.22, 1, .36, 1);
+}
+
+html[data-surface-theme="dark"] .avatar-crop-dialog,
+html[data-theme="dark"] .avatar-crop-dialog {
+  color: #edf2f8;
+  background: rgba(13, 23, 42, .985);
+  border-color: rgba(166, 155, 255, .2);
+  box-shadow: 0 30px 86px rgba(0, 5, 18, .56), inset 0 1px 0 rgba(255, 255, 255, .045);
+}
+
+.avatar-crop-header {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+.avatar-crop-header > div { min-width: 0; }
+.avatar-crop-header h2 { margin: 0; color: inherit; font-size: 19px; font-weight: 760; line-height: 1.3; }
+.avatar-crop-header p { margin: 5px 0 0; color: #6f7d91; font-size: 12px; line-height: 1.5; }
+html[data-surface-theme="dark"] .avatar-crop-header p,
+html[data-theme="dark"] .avatar-crop-header p { color: #98a6b9; }
+.avatar-crop-header > button {
+  display: grid;
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  margin: -8px -8px 0 0;
+  padding: 0;
+  place-items: center;
+  color: #728097;
+  background: transparent;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+}
+.avatar-crop-header > button:hover,
+.avatar-crop-header > button:focus-visible { color: #5f4ed0; background: rgba(111, 91, 221, .08); outline: 0; }
+html[data-surface-theme="dark"] .avatar-crop-header > button:hover,
+html[data-theme="dark"] .avatar-crop-header > button:hover { color: #c8c0ff; background: rgba(142, 126, 240, .1); }
+
+.avatar-crop-stage {
+  position: relative;
+  width: min(300px, calc(100vw - 72px));
+  aspect-ratio: 1;
+  margin: 2px auto 0;
+  overflow: hidden;
+  background: #0a1220;
+  border-radius: 14px;
+  box-shadow: 0 14px 34px rgba(8, 15, 31, .22);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.avatar-crop-stage:active { cursor: grabbing; }
+.avatar-crop-stage:focus-visible { outline: 3px solid rgba(94, 205, 177, .42); outline-offset: 3px; }
+.avatar-crop-stage > img {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  left: 50%;
+  max-width: none;
+  object-fit: fill;
+  pointer-events: none;
+  will-change: transform;
+}
+.avatar-crop-stage::after {
+  position: absolute;
+  z-index: 3;
+  inset: 0;
+  background: radial-gradient(circle closest-side, transparent calc(100% - 3px), rgba(3, 8, 18, .66) 100%);
+  pointer-events: none;
+  content: "";
+}
+.avatar-crop-grid {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  background:
+    linear-gradient(90deg, transparent 33.1%, rgba(255, 255, 255, .2) 33.3%, transparent 33.55%, transparent 66.45%, rgba(255, 255, 255, .2) 66.7%, transparent 66.9%),
+    linear-gradient(transparent 33.1%, rgba(255, 255, 255, .2) 33.3%, transparent 33.55%, transparent 66.45%, rgba(255, 255, 255, .2) 66.7%, transparent 66.9%);
+  clip-path: circle(50% at 50% 50%);
+  opacity: .48;
+  pointer-events: none;
+}
+.avatar-crop-ring {
+  position: absolute;
+  z-index: 4;
+  inset: 1px;
+  border: 2px solid rgba(139, 229, 197, .82);
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .28), 0 0 18px rgba(100, 219, 190, .18);
+  pointer-events: none;
+}
+.avatar-crop-loading {
+  position: absolute;
+  z-index: 5;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: #dbe5f1;
+  font-size: 12px;
+}
+.avatar-crop-loading > svg,
+.avatar-crop-actions .is-primary > svg { animation: avatar-crop-spin 800ms linear infinite; }
+.avatar-crop-actions .is-primary > svg:not(.lucide-loader-circle) { animation: none; }
+
+.avatar-crop-tip {
+  display: flex;
+  margin: -2px 0 0;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: #748196;
+  font-size: 11px;
+  line-height: 1.45;
+  text-align: center;
+}
+html[data-surface-theme="dark"] .avatar-crop-tip,
+html[data-theme="dark"] .avatar-crop-tip { color: #8e9db1; }
+.avatar-crop-tip > svg { flex: 0 0 auto; color: #58bda4; }
+
+.avatar-crop-zoom {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) 18px 42px;
+  align-items: end;
+  gap: 8px;
+  padding: 2px 8px 4px;
+  color: #758298;
+}
+.avatar-crop-zoom > label { display: grid; min-width: 0; gap: 5px; }
+.avatar-crop-zoom > label > span { color: #56647a; font-size: 11px; font-weight: 700; }
+html[data-surface-theme="dark"] .avatar-crop-zoom > label > span,
+html[data-theme="dark"] .avatar-crop-zoom > label > span { color: #afbbca; }
+.avatar-crop-zoom input {
+  width: 100%;
+  height: 18px;
+  margin: 0;
+  accent-color: #6652d9;
+  cursor: pointer;
+}
+.avatar-crop-zoom output { color: #6554c7; font-size: 11px; font-weight: 720; text-align: right; }
+html[data-surface-theme="dark"] .avatar-crop-zoom output,
+html[data-theme="dark"] .avatar-crop-zoom output { color: #b6adff; }
+.avatar-crop-error { margin: -5px 8px 0; color: #c84c5a; font-size: 11px; text-align: center; }
+
+.avatar-crop-actions {
+  display: grid;
+  grid-template-columns: auto auto 1fr auto auto;
+  align-items: center;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(90, 104, 128, .12);
+}
+.avatar-crop-actions > button {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 14px;
+  color: #4c5970;
+  background: transparent;
+  border: 1px solid rgba(93, 105, 128, .18);
+  border-radius: 10px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 680;
+  cursor: pointer;
+  transition: color 160ms ease, border-color 160ms ease, background 160ms ease, transform 160ms ease;
+}
+.avatar-crop-actions > button:hover,
+.avatar-crop-actions > button:focus-visible { color: #5646bd; border-color: rgba(106, 86, 213, .34); outline: 0; transform: translateY(-1px); }
+.avatar-crop-actions > button:active { transform: translateY(0) scale(.98); }
+.avatar-crop-actions > button.is-quiet { padding-inline: 8px; border-color: transparent; }
+.avatar-crop-actions > button.is-primary {
+  color: #fff;
+  background: linear-gradient(135deg, #6955dd, #557fd7);
+  border-color: transparent;
+  box-shadow: 0 8px 20px rgba(91, 73, 197, .2);
+}
+.avatar-crop-actions > button:disabled { opacity: .55; cursor: not-allowed; transform: none; }
+html[data-surface-theme="dark"] .avatar-crop-actions,
+html[data-theme="dark"] .avatar-crop-actions { border-top-color: rgba(255, 255, 255, .07); }
+html[data-surface-theme="dark"] .avatar-crop-actions > button,
+html[data-theme="dark"] .avatar-crop-actions > button { color: #b8c3d1; border-color: rgba(183, 174, 255, .14); }
+html[data-surface-theme="dark"] .avatar-crop-actions > button.is-quiet,
+html[data-theme="dark"] .avatar-crop-actions > button.is-quiet { border-color: transparent; }
+html[data-surface-theme="dark"] .avatar-crop-actions > button.is-primary,
+html[data-theme="dark"] .avatar-crop-actions > button.is-primary { color: #fff; border-color: transparent; }
+
+@keyframes avatar-crop-fade { from { opacity: 0; } }
+@keyframes avatar-crop-enter { from { opacity: 0; transform: translate(-50%, -48%) scale(.97); } }
+@keyframes avatar-crop-spin { to { transform: rotate(360deg); } }
+
+@media (max-width: 560px) {
+  .avatar-crop-dialog { width: calc(100vw - 20px); max-height: calc(100dvh - 20px); gap: 11px; padding: 16px; border-radius: 16px; }
+  .avatar-crop-stage { width: min(278px, calc(100vw - 60px)); }
+  .avatar-crop-actions { grid-template-columns: 1fr 1fr; }
+  .avatar-crop-actions > span { display: none; }
+  .avatar-crop-actions > button { min-height: 44px; padding-inline: 10px; }
+  .avatar-crop-actions > button.is-quiet { grid-row: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .avatar-crop-overlay,
+  .avatar-crop-dialog { animation-duration: 0ms !important; }
+  .avatar-crop-actions > button { transition-duration: 0ms !important; }
+}
+
+@media (max-width: 720px) {
+  .app-shell .settings-task-redesign .settings-avatar-row {
+    grid-template-columns: 68px minmax(0, 1fr);
+  }
+  .app-shell .settings-task-redesign .settings-avatar-row > .setting-action {
+    grid-column: 2;
+    justify-content: flex-start;
+  }
+}
+
+.app-shell .settings-task-redesign .setting-action .setting-toggle {
+  position: relative;
+  width: 48px;
+  min-width: 48px;
+  min-height: 28px;
+  padding: 0;
+  border-color: var(--workspace-border);
+  border-radius: 999px;
+  background: var(--workspace-panel-subtle);
+}
+
+.app-shell .settings-task-redesign .setting-action .setting-toggle.is-on {
+  border-color: var(--workspace-accent);
+  background: var(--workspace-accent);
+}
+
+.app-shell .settings-task-redesign .setting-action .setting-toggle i {
+  width: 20px;
+  height: 20px;
+}
+
+/* Keep the reminder switch next to the setting it controls. Its surrounding
+ * button preserves an easy target while the visible track stays compact. */
+.app-shell .settings-task-redesign .email-reminder-title {
+  display: flex;
+  min-width: 0;
+  min-height: 26px;
+  align-items: center;
+  gap: 8px;
+}
+
+.app-shell .settings-task-redesign .email-reminder-title > span {
+  display: inline;
+}
+
+.app-shell .settings-task-redesign .email-reminder-title .setting-toggle {
+  position: relative;
+  width: 42px;
+  min-width: 42px;
+  height: 36px;
+  min-height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  box-shadow: none;
+  cursor: pointer;
+  margin-block: -4px;
+}
+
+.app-shell .settings-task-redesign .email-reminder-title .setting-toggle::before {
+  position: absolute;
+  top: 9px;
+  left: 5px;
+  width: 32px;
+  height: 18px;
+  border: 1px solid var(--workspace-border);
+  border-radius: 999px;
+  background: var(--workspace-panel-subtle);
+  content: "";
+  transition: background-color 180ms ease, border-color 180ms ease;
+}
+
+.app-shell .settings-task-redesign .email-reminder-title .setting-toggle.is-on::before {
+  border-color: var(--workspace-accent);
+  background: var(--workspace-accent);
+}
+
+.app-shell .settings-task-redesign .email-reminder-title .setting-toggle i {
+  top: 11px;
+  left: 7px;
+  width: 14px;
+  height: 14px;
+  z-index: 1;
+  transition: transform 180ms ease, box-shadow 180ms ease;
+}
+
+.app-shell .settings-task-redesign .email-reminder-title .setting-toggle.is-on i {
+  transform: translateX(16px);
+}
+
+.app-shell .settings-task-redesign .email-reminder-title .setting-toggle:disabled {
+  opacity: .56;
+  cursor: not-allowed;
+}
+
+.app-shell .settings-task-redesign .guest-account-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 20px;
+  margin-top: 8px;
+  padding: 16px;
+  border: 1px solid color-mix(in srgb, var(--workspace-accent) 18%, var(--workspace-border));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--workspace-accent) 5%, var(--workspace-panel));
+}
+
+.app-shell .settings-task-redesign .guest-account-copy {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 12px;
+}
+
+.app-shell .settings-task-redesign .guest-account-copy > span {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  place-items: center;
+  color: var(--workspace-accent);
+  border-radius: 10px;
+  background: var(--workspace-accent-soft);
+}
+
+.app-shell .settings-task-redesign .guest-account-copy strong {
+  color: var(--workspace-text);
+  font-size: 14px;
+}
+
+.app-shell .settings-task-redesign .guest-account-copy p {
+  margin: 4px 0 0;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.app-shell .settings-task-redesign .guest-account-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.app-shell .settings-task-redesign .guest-account-actions a {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 14px;
+  color: #fff;
+  border: 1px solid var(--workspace-accent);
+  border-radius: 10px;
+  background: var(--workspace-accent);
+  font-size: 12px;
+  font-weight: 680;
+  text-decoration: none;
+}
+
+.app-shell .settings-task-redesign .guest-account-actions a.is-secondary {
+  color: var(--workspace-accent);
+  background: transparent;
+}
+
+@media (max-width: 1080px) {
+  html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign .settings-workspace {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign .settings-section-nav {
+    position: sticky;
+    z-index: 20;
+    top: 8px;
+    display: flex;
+    width: 100%;
+    padding: 8px;
+    overflow-x: auto;
+  }
+
+  .app-shell .settings-task-redesign .settings-nav-heading {
+    display: none;
+  }
+
+  html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign .settings-section-nav a {
+    min-width: max-content;
+  }
+}
+
+@media (max-width: 760px) {
+  html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign .setting-row-grid {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px 12px;
+    padding-block: 12px;
+  }
+
+  .app-shell .settings-task-redesign .setting-copy {
+    grid-column: 1 / -1;
+  }
+
+  .app-shell .settings-task-redesign .setting-current {
+    grid-column: 1;
+  }
+
+  .app-shell .settings-task-redesign .setting-action {
+    grid-column: 2;
+  }
+
+  .app-shell .settings-task-redesign .guest-account-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .app-shell .settings-task-redesign .guest-account-actions {
+    justify-content: flex-start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-shell .settings-task-redesign .is-spinning {
+    animation-duration: 1.8s;
+  }
+}
+
+@keyframes settings-task-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Shared settings hierarchy: keep every card title noticeably above its
+ * explanation without changing the card geometry between themes. */
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign .settings-section-head > span {
+  width: 48px !important;
+  height: 48px !important;
+  flex: 0 0 48px !important;
+  border-radius: 14px;
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign .settings-section-head :is(h2, h3) {
+  margin: 0 0 4px;
+  font-size: 20px !important;
+  font-weight: 740;
+  line-height: 1.25;
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign .settings-section-head p {
+  font-size: 13px !important;
+  line-height: 1.5;
+}
+
+/* Weekdays are one segmented control: quiet separators, one active rail. */
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign .availability-day-tabs {
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--workspace-border);
+  border-radius: 10px;
+  background: var(--workspace-panel-subtle);
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign .availability-day-tabs button {
+  min-height: 46px !important;
+  padding: 3px 6px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign .availability-day-tabs button + button {
+  border-left: 1px solid color-mix(in srgb, var(--workspace-border) 76%, transparent);
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign .availability-day-tabs button:hover {
+  color: var(--workspace-accent);
+  background: color-mix(in srgb, var(--workspace-accent) 5%, transparent);
+  transform: none;
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign .availability-day-tabs button.is-active {
+  border: 0;
+  border-left: 1px solid color-mix(in srgb, var(--workspace-border) 76%, transparent);
+  color: var(--workspace-accent);
+  background: color-mix(in srgb, var(--workspace-accent) 8%, var(--workspace-panel));
+  box-shadow: inset 0 -2px 0 var(--workspace-accent);
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign .availability-day-tabs button:first-child.is-active {
+  border-left: 0;
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign .availability-day-tabs button strong {
+  font-size: 14px;
+  font-weight: 690;
+}
+
+/* Account actions share one material and motion language. */
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign .setting-action :is(button:not(.setting-toggle), .setting-action-link) {
+  min-width: 78px;
+  min-height: 42px;
+  padding-inline: 14px;
+  color: var(--workspace-accent);
+  border: 1px solid color-mix(in srgb, var(--workspace-accent) 34%, var(--workspace-border));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--workspace-accent) 8%, var(--workspace-panel));
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--workspace-accent) 7%, transparent);
+  font-size: 13px;
+  font-weight: 700;
+  transition: color 180ms ease, border-color 180ms ease, background-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign .settings-avatar-row .setting-action button {
+  min-width: 112px;
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign .setting-action :is(button:not(.setting-toggle), .setting-action-link):hover {
+  color: var(--workspace-accent);
+  border-color: color-mix(in srgb, var(--workspace-accent) 58%, var(--workspace-border));
+  background: color-mix(in srgb, var(--workspace-accent) 13%, var(--workspace-panel));
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--workspace-accent) 12%, transparent);
+  transform: translateY(-2px);
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign .setting-action button:not(.setting-toggle):active {
+  box-shadow: 0 3px 8px color-mix(in srgb, var(--workspace-accent) 8%, transparent);
+  transform: translateY(0) scale(.98);
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign .setting-action .danger-quiet {
+  color: var(--workspace-danger, #b64a5b) !important;
+  border-color: color-mix(in srgb, var(--workspace-danger, #b64a5b) 34%, var(--workspace-border)) !important;
+  background: color-mix(in srgb, var(--workspace-danger, #b64a5b) 7%, var(--workspace-panel)) !important;
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--workspace-danger, #b64a5b) 7%, transparent);
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign .setting-action .danger-quiet:hover {
+  color: var(--workspace-danger, #b64a5b) !important;
+  border-color: color-mix(in srgb, var(--workspace-danger, #b64a5b) 58%, var(--workspace-border)) !important;
+  background: color-mix(in srgb, var(--workspace-danger, #b64a5b) 12%, var(--workspace-panel)) !important;
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--workspace-danger, #b64a5b) 12%, transparent);
+}
+
+/* Account operations stay easy to hit without reading as a column of boxed buttons. */
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign #settings-account .setting-action button:not(.setting-toggle) {
+  position: relative;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 4px 3px;
+  border: 0 !important;
+  border-radius: 0;
+  background: transparent !important;
+  box-shadow: none !important;
+  transform: none;
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign #settings-account .settings-avatar-row .setting-action button {
+  min-width: 0;
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign #settings-account .setting-action button:not(.setting-toggle)::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 10px;
+  width: calc(100% - 8px);
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, var(--workspace-accent) 6%, color-mix(in srgb, var(--workspace-accent) 64%, #7ce4ce) 94%, transparent);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--workspace-accent) 18%, transparent);
+  opacity: .7;
+  transform: translateX(-50%) scaleX(1);
+  transform-origin: center;
+  transition: opacity 170ms ease, transform 170ms ease, box-shadow 170ms ease;
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign #settings-account .setting-action button:not(.setting-toggle):hover {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  transform: none;
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign #settings-account .setting-action button:not(.setting-toggle):hover::after {
+  opacity: 1;
+  transform: translateX(-50%) scaleX(1.04);
+  box-shadow: 0 3px 12px color-mix(in srgb, var(--workspace-accent) 34%, transparent);
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign #settings-account .setting-action button:not(.setting-toggle):focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--workspace-accent) 62%, transparent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign #settings-account .setting-action .danger-quiet::after {
+  background: linear-gradient(90deg, transparent, var(--workspace-danger, #c84255) 6%, var(--workspace-danger, #c84255) 94%, transparent) !important;
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--workspace-danger, #b64a5b) 18%, transparent);
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign #settings-account .setting-action .danger-quiet:hover {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign #settings-account .setting-action .danger-quiet:hover::after {
+  box-shadow: 0 3px 12px color-mix(in srgb, var(--workspace-danger, #b64a5b) 34%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign #settings-account .setting-action button:not(.setting-toggle)::after {
+    transition-duration: 0ms;
+  }
+}
+
+@media (max-width: 680px) {
+  html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign .settings-section-head > span {
+    width: 40px !important;
+    height: 40px !important;
+    flex-basis: 40px !important;
+  }
+
+  html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign .settings-section-head :is(h2, h3) {
+    font-size: 18px !important;
+  }
+
+  html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign .availability-day-tabs button {
+    min-height: 44px !important;
+  }
+}
+
+/* Availability follows the same single-card hierarchy as the appearance
+ * section: one heading, then flat controls separated by rhythm and dividers. */
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign .preferences-card {
+  position: relative;
+  padding: 18px 20px !important;
+  border: 1px solid var(--workspace-border) !important;
+  background: var(--workspace-panel) !important;
+  box-shadow: none !important;
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign .preferences-card:has(.availability-time-picker-trigger[aria-expanded="true"]) {
+  z-index: 227;
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign .weekly-settings-heading {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 12px;
+  margin: 0 0 16px;
+  padding: 0;
+}
+
+.app-shell .settings-task-redesign .availability-heading-save {
+  display: inline-flex;
+  min-width: 154px;
+  min-height: 36px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 7px 13px;
+  color: color-mix(in srgb, var(--workspace-accent) 76%, var(--workspace-text));
+  border: 1px solid color-mix(in srgb, var(--workspace-accent) 40%, var(--workspace-border));
+  border-radius: 9px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--workspace-accent) 18%, var(--workspace-panel)), color-mix(in srgb, var(--workspace-accent) 8%, var(--workspace-panel)));
+  box-shadow: 0 7px 17px color-mix(in srgb, var(--workspace-accent) 15%, transparent), inset 0 1px 0 color-mix(in srgb, #fff 56%, transparent);
+  font-size: 12px;
+  font-weight: 730;
+  white-space: nowrap;
+  transition: color 160ms ease, border-color 160ms ease, background 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.app-shell .settings-task-redesign .availability-heading-save:is(:hover, :focus-visible) {
+  color: color-mix(in srgb, var(--workspace-accent) 68%, var(--workspace-text));
+  border-color: color-mix(in srgb, var(--workspace-accent) 56%, var(--workspace-border));
+  background: linear-gradient(135deg, color-mix(in srgb, var(--workspace-accent) 23%, var(--workspace-panel)), color-mix(in srgb, var(--workspace-accent) 11%, var(--workspace-panel)));
+  box-shadow: 0 8px 19px color-mix(in srgb, var(--workspace-accent) 17%, transparent), inset 0 1px 0 color-mix(in srgb, #fff 62%, transparent);
+  transform: translateY(-1px);
+}
+
+.app-shell .settings-task-redesign .availability-heading-save:disabled {
+  color: var(--workspace-tertiary);
+  border-color: var(--workspace-border);
+  background: var(--workspace-panel-subtle);
+  box-shadow: none;
+  cursor: wait;
+  transform: none;
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign #settings-reminders:has(.availability-time-picker-trigger[aria-expanded="true"]) {
+  position: relative;
+  z-index: 227;
+  overflow: visible;
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign .email-reminder-row {
+  grid-template-columns: minmax(245px, .8fr) minmax(430px, 1.2fr);
+  align-items: center;
+  padding-block: 11px;
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign .email-reminder-row:has(.reminder-disabled-copy) {
+  grid-template-columns: minmax(220px, 1fr) minmax(250px, 315px);
+}
+
+.app-shell .settings-task-redesign .reminder-delivery-settings {
+  position: relative;
+  display: grid;
+  width: 100%;
+  max-width: 590px;
+  grid-template-columns: minmax(174px, .82fr) minmax(245px, 1.18fr);
+  align-items: stretch;
+  justify-self: end;
+  gap: 0;
+  overflow: visible;
+}
+
+.app-shell .settings-task-redesign .reminder-delivery-item {
+  display: grid;
+  min-width: 0;
+  grid-template-rows: 26px 30px;
+  align-content: center;
+  gap: 0;
+  padding-inline: 18px;
+}
+
+.app-shell .settings-task-redesign .reminder-delivery-item:first-child {
+  padding-left: 0;
+}
+
+.app-shell .settings-task-redesign .reminder-delivery-item + .reminder-delivery-item {
+  padding-left: 28px;
+  border-left: 1px solid color-mix(in srgb, var(--workspace-border) 82%, transparent);
+}
+
+.app-shell .settings-task-redesign .email-reminder-copy {
+  display: grid;
+  min-width: 0;
+  grid-template-rows: 26px 30px;
+  align-content: center;
+  gap: 0;
+}
+
+.app-shell .settings-task-redesign .email-reminder-copy > small {
+  display: flex;
+  height: 30px;
+  align-items: center;
+  align-self: start;
+  margin: 0 !important;
+}
+
+.app-shell .settings-task-redesign .reminder-delivery-label {
+  display: flex;
+  min-width: 0;
+  height: 26px;
+  align-items: center;
+  gap: 7px;
+  color: var(--workspace-text);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* Keep the label and its 136px time control on one visual center line. */
+.app-shell .settings-task-redesign .reminder-time-setting .reminder-delivery-label {
+  width: 136px;
+  justify-content: center;
+}
+
+.app-shell .settings-task-redesign .reminder-delivery-label svg {
+  flex: 0 0 auto;
+  color: var(--workspace-accent);
+}
+
+.app-shell .settings-task-redesign .reminder-delivery-label small {
+  margin-left: auto;
+  color: var(--workspace-tertiary);
+  font-size: 9px;
+  font-weight: 650;
+}
+
+.app-shell .settings-task-redesign .email-reminder-row .availability-time-field {
+  display: block;
+  width: 136px;
+}
+
+.app-shell .settings-task-redesign .email-reminder-row .availability-time-control {
+  width: 136px;
+  height: 30px;
+}
+
+.app-shell .settings-task-redesign .email-reminder-row .availability-time-input {
+  height: 30px;
+  padding-inline: 4px 28px;
+}
+
+.app-shell .settings-task-redesign .email-reminder-row .availability-time-input input {
+  height: 28px;
+  font-size: 15px;
+  letter-spacing: .03em;
+  text-align: center;
+}
+
+.app-shell .settings-task-redesign .email-reminder-row .availability-time-control::after {
+  right: 28px;
+  bottom: 1px;
+  left: 4px;
+}
+
+/* This control sits at the lower edge of the reminders card. Open its picker
+ * upward so the following account card and the viewport edge cannot crop it. */
+.app-shell .settings-task-redesign .email-reminder-row .clock-time-picker .availability-time-popover {
+  top: auto;
+  bottom: calc(100% + 8px);
+  transform-origin: bottom left;
+}
+
+.app-shell .settings-task-redesign .reminder-email-value,
+.app-shell .settings-task-redesign .reminder-email-editor {
+  display: flex;
+  min-width: 0;
+  height: 30px;
+  align-items: center;
+  gap: 8px;
+}
+
+.app-shell .settings-task-redesign .reminder-email-value strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--workspace-secondary);
+  font-size: 13px;
+  font-weight: 560;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-shell .settings-task-redesign .reminder-email-value button,
+.app-shell .settings-task-redesign .reminder-email-editor button {
+  display: inline-flex;
+  flex: 0 0 auto;
+  min-height: 30px;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 0 7px;
+  color: var(--workspace-accent);
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 680;
+  transition: color 160ms ease, background-color 160ms ease;
+}
+
+.app-shell .settings-task-redesign .reminder-email-value button:is(:hover, :focus-visible),
+.app-shell .settings-task-redesign .reminder-email-editor button:is(:hover, :focus-visible) {
+  color: color-mix(in srgb, var(--workspace-accent) 72%, var(--workspace-text));
+  background: var(--workspace-accent-soft);
+}
+
+.app-shell .settings-task-redesign .reminder-email-editor input {
+  width: 100%;
+  min-width: 0;
+  height: 34px;
+  padding: 0 4px;
+  color: var(--workspace-text);
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--workspace-accent) 55%, var(--workspace-border));
+  border-radius: 0;
+  background: transparent;
+  font-size: 12px;
+  outline: 0;
+}
+
+.app-shell .settings-task-redesign .reminder-disabled-copy {
+  min-width: 0;
+}
+
+.app-shell .settings-task-redesign .reminder-delivery-settings:has(.reminder-disabled-copy) {
+  display: flex;
+  max-width: none;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.app-shell .settings-task-redesign .reminder-disabled-copy {
+  display: flex;
+  width: auto;
+  min-height: 32px;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 0;
+  color: var(--workspace-accent) !important;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 620;
+  line-height: 1.4;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.app-shell .settings-task-redesign .reminder-disabled-copy svg {
+  flex: 0 0 auto;
+  color: var(--workspace-accent);
+}
+
+@media (max-width: 760px) {
+  html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign #settings-reminders > .setting-row:not(.email-reminder-row) {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign #settings-reminders > .setting-row:not(.email-reminder-row) > .setting-current {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+
+  html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign #settings-reminders > .setting-row-grid {
+    min-height: 72px;
+    padding-block: 10px;
+  }
+
+  .app-shell .settings-task-redesign #settings-timezone {
+    max-width: 100%;
+  }
+
+  html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign .email-reminder-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .app-shell .settings-task-redesign .reminder-delivery-settings {
+    max-width: none;
+    grid-template-columns: minmax(130px, .7fr) minmax(190px, 1.3fr);
+    justify-self: stretch;
+  }
+
+  .app-shell .settings-task-redesign .reminder-delivery-item {
+    padding-inline: 12px;
+  }
+
+  .app-shell .settings-task-redesign .reminder-disabled-copy {
+    min-height: 32px;
+    height: auto;
+    align-items: center;
+    padding-block: 0;
+    overflow: visible;
+    line-height: 1.4;
+    text-overflow: clip;
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 520px) {
+  .app-shell .settings-task-redesign .reminder-delivery-settings {
+    grid-template-columns: 1fr;
+  }
+
+  .app-shell .settings-task-redesign .reminder-delivery-item {
+    padding: 8px 0;
+  }
+
+  .app-shell .settings-task-redesign .reminder-delivery-item + .reminder-delivery-item {
+    border-top: 1px solid var(--workspace-border);
+    border-left: 0;
+  }
+
+  .app-shell .settings-task-redesign .reminder-disabled-copy {
+    white-space: normal;
+  }
+}
+
+@media (max-width: 520px) {
+  .app-shell .settings-task-redesign .availability-heading-save {
+    min-width: 104px;
+    padding-inline: 10px;
+  }
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign .weekly-availability-editor {
+  gap: 0;
+}
+
+.app-shell .settings-task-redesign :is(.availability-time-card, .availability-intensity-card) {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.app-shell .settings-task-redesign .availability-block-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.app-shell .settings-task-redesign .availability-block-heading strong {
+  color: var(--workspace-text);
+  font-size: 15px;
+  font-weight: 740;
+  line-height: 1.35;
+}
+
+.app-shell .settings-task-redesign .availability-block-heading p {
+  margin: 4px 0 0;
+  color: var(--workspace-secondary);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign .availability-day-tabs {
+  position: relative;
+  gap: 0;
+  padding: 0;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background:
+    linear-gradient(
+      90deg,
+      transparent 0,
+      color-mix(in srgb, var(--workspace-border) 82%, transparent) 5%,
+      color-mix(in srgb, var(--workspace-border) 82%, transparent) 95%,
+      transparent 100%
+    ) bottom / 100% 1px no-repeat;
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign .availability-day-tabs button,
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign .availability-day-tabs button + button {
+  min-height: 46px !important;
+  padding: 3px 6px 8px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign .availability-day-tabs button::before {
+  position: absolute;
+  right: 22%;
+  bottom: 0;
+  left: 22%;
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--workspace-accent), color-mix(in srgb, var(--workspace-accent) 62%, #6ee7cf));
+  box-shadow: 0 0 9px color-mix(in srgb, var(--workspace-accent) 28%, transparent);
+  content: "";
+  opacity: 0;
+  transform: scaleX(.42);
+  transition: opacity 170ms ease, transform 170ms ease;
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign .availability-day-tabs button:hover {
+  color: var(--workspace-accent);
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign .availability-day-tabs button.is-active,
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign .availability-day-tabs button:first-child.is-active {
+  color: var(--workspace-accent);
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign .availability-day-tabs button.is-active strong {
+  color: var(--workspace-accent);
+  text-shadow: 0 0 12px color-mix(in srgb, var(--workspace-accent) 18%, transparent);
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign .availability-day-tabs button.is-active::after {
+  color: var(--workspace-secondary);
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign .availability-day-tabs button:is(.has-ranges, .is-rest)::after {
+  bottom: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .01em;
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign .availability-day-tabs button:is(.is-active, :hover, :focus-visible)::before {
+  opacity: 1;
+  transform: scaleX(1);
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign .availability-day-tabs button:is(.has-ranges, .is-rest):is(:hover, :focus-visible) strong {
+  transform: translateY(-4px) !important;
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign .availability-day-tabs button:is(.has-ranges, .is-rest):is(:hover, :focus-visible)::after {
+  opacity: 1 !important;
+  transform: translateY(0) !important;
+}
+
+.app-shell .settings-task-redesign .availability-day-editor {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  column-gap: 24px;
+  align-items: start;
+  margin-top: 4px;
+  padding: 5px 0 0;
+  border: 0;
+  border-top: 1px solid var(--workspace-border);
+  border-radius: 0;
+  background: transparent;
+}
+
+.app-shell .settings-task-redesign .availability-editor-main {
+  --availability-time-field-width: 143px;
+  --availability-time-separator-width: 24px;
+  --availability-time-column-gap: 12px;
+  display: grid;
+  min-width: 0;
+  align-content: start;
+  padding-top: 13px;
+  padding-left: 36.5px;
+}
+
+.app-shell .settings-task-redesign .availability-empty-state {
+  display: flex;
+  min-width: 0;
+  min-height: 76px;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0 14px;
+  color: var(--workspace-secondary);
+}
+
+.app-shell .settings-task-redesign .availability-empty-icon {
+  display: inline-flex;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  color: var(--workspace-accent);
+  border: 1px solid color-mix(in srgb, var(--workspace-accent) 22%, var(--workspace-border));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--workspace-accent) 8%, var(--workspace-panel));
+  box-shadow: 0 6px 14px color-mix(in srgb, var(--workspace-accent) 8%, transparent);
+}
+
+.app-shell .settings-task-redesign .availability-empty-state > div {
+  min-width: 0;
+}
+
+.app-shell .settings-task-redesign .availability-empty-state strong {
+  display: block;
+  color: var(--workspace-text);
+  font-size: 13px;
+  font-weight: 720;
+}
+
+.app-shell .settings-task-redesign .availability-empty-state p {
+  max-width: 520px;
+  margin: 4px 0 0;
+  color: var(--workspace-secondary);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+
+.app-shell .settings-task-redesign .availability-editor-actions {
+  display: flex;
+  width: 154px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  margin-top: 5px;
+  padding: 0;
+  justify-self: end;
+}
+
+.app-shell .settings-task-redesign .availability-range-list {
+  display: grid;
+  min-width: 0;
+  max-height: 178px;
+  gap: 0;
+  padding-right: 5px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  justify-items: start;
+  overscroll-behavior: contain;
+  scrollbar-color: transparent transparent;
+  scrollbar-width: thin;
+}
+
+.app-shell .settings-task-redesign .availability-range-list:hover,
+.app-shell .settings-task-redesign .availability-range-list:focus-within {
+  scrollbar-color: color-mix(in srgb, var(--workspace-accent) 46%, transparent) transparent;
+}
+
+.app-shell .settings-task-redesign .availability-range-list:has(.availability-time-picker-trigger[aria-expanded="true"]) {
+  max-height: none;
+  overflow: visible;
+  scrollbar-color: transparent transparent;
+}
+
+.app-shell .settings-task-redesign .availability-range-list::-webkit-scrollbar {
+  width: 5px;
+}
+
+.app-shell .settings-task-redesign .availability-range-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.app-shell .settings-task-redesign .availability-range-list::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: transparent;
+}
+
+.app-shell .settings-task-redesign .availability-range-list:hover::-webkit-scrollbar-thumb,
+.app-shell .settings-task-redesign .availability-range-list:focus-within::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--workspace-accent) 46%, transparent);
+}
+
+.app-shell .settings-task-redesign .availability-range-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 7px;
+  width: 100%;
+  padding: 3px 0 7px;
+  border-bottom: 1px solid color-mix(in srgb, var(--workspace-border) 74%, transparent);
+}
+
+.app-shell .settings-task-redesign .availability-range {
+  flex: 0 1 auto;
+  grid-template-columns: var(--availability-time-field-width) var(--availability-time-separator-width) var(--availability-time-field-width);
+  justify-content: start;
+  align-items: center;
+  gap: var(--availability-time-column-gap);
+  width: fit-content;
+  min-height: 50px;
+  padding: 2px 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.app-shell .settings-task-redesign .availability-range-action {
+  position: relative;
+  display: inline-flex;
+  width: auto;
+  min-width: 0;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  font-size: 11px;
+  font-weight: 680;
+  transition: color 160ms ease, border-color 160ms ease, background-color 160ms ease, transform 160ms ease;
+}
+
+.app-shell .settings-task-redesign :is(.availability-range-action.is-revoke, .availability-editor-action) {
+  font-size: 12px;
+  font-weight: 710;
+}
+
+.app-shell .settings-task-redesign .availability-range-action.is-revoke {
+  min-width: 58px;
+  min-height: 34px;
+  flex: 0 0 auto;
+  padding: 5px 6px;
+  color: var(--workspace-danger, #c84255);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.app-shell .settings-task-redesign .availability-range-action.is-revoke:is(:hover, :focus-visible) {
+  color: color-mix(in srgb, var(--workspace-danger, #c84255) 82%, var(--workspace-text));
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  text-shadow: 0 0 10px color-mix(in srgb, var(--workspace-danger, #c84255) 22%, transparent);
+  transform: translateY(-1px);
+}
+
+.app-shell .settings-task-redesign .availability-time-field {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: auto 112px;
+  align-items: center;
+  gap: 7px;
+}
+
+.app-shell .settings-task-redesign .availability-time-label {
+  color: var(--workspace-text);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.app-shell .settings-task-redesign .availability-time-control {
+  position: relative;
+  display: flex;
+  width: 112px;
+  height: 38px;
+  align-items: center;
+}
+
+.app-shell .settings-task-redesign .availability-time-control::after {
+  position: absolute;
+  right: 24px;
+  bottom: 1px;
+  left: 12px;
+  height: 1px;
+  background: color-mix(in srgb, var(--workspace-accent) 34%, var(--workspace-border-strong));
+  content: "";
+  transition: background-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.app-shell .settings-task-redesign .availability-time-control:focus-within::after {
+  background: var(--workspace-accent);
+  box-shadow: 0 2px 7px color-mix(in srgb, var(--workspace-accent) 20%, transparent);
+  transform: scaleX(.94);
+}
+
+.app-shell .settings-task-redesign .availability-time-input {
+  width: 100%;
+  height: 36px;
+  padding: 0 24px 0 6px;
+  border: 0;
+  background: transparent;
+}
+
+.app-shell .settings-task-redesign .availability-time-input:focus-within {
+  border: 0;
+  box-shadow: none;
+}
+
+.app-shell .settings-task-redesign .availability-time-input input {
+  width: 100%;
+  height: 34px;
+  padding: 0;
+  color: color-mix(in srgb, var(--workspace-accent) 78%, var(--workspace-text));
+  font-size: 15px;
+  font-weight: 760;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: .02em;
+  text-align: center;
+  appearance: none;
+  -webkit-appearance: none;
+  outline: 0 !important;
+  box-shadow: none !important;
+}
+
+.app-shell .settings-task-redesign .availability-time-input input:focus,
+.app-shell .settings-task-redesign .availability-time-input input:focus-visible {
+  outline: 0 !important;
+  box-shadow: none !important;
+}
+
+.app-shell .settings-task-redesign .availability-time-picker-trigger {
+  position: absolute;
+  z-index: 2;
+  right: 0;
+  display: inline-flex;
+  width: 28px;
+  min-height: 32px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  color: var(--workspace-secondary);
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  transition: color 160ms ease, background-color 160ms ease, transform 160ms ease;
+}
+
+.app-shell .settings-task-redesign .availability-time-picker-trigger:is(:hover, :focus-visible),
+.app-shell .settings-task-redesign .availability-time-picker-trigger[aria-expanded="true"] {
+  color: var(--workspace-accent);
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.app-shell .settings-task-redesign .availability-time-picker-trigger svg {
+  transition: transform 170ms ease;
+}
+
+.app-shell .settings-task-redesign .availability-time-picker-trigger[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+
+.app-shell .settings-task-redesign .clock-time-picker .availability-time-popover {
+  position: absolute;
+  z-index: 24;
+  top: calc(100% + 8px);
+  left: 0;
+  width: 276px;
+  overflow: hidden;
+  color: var(--workspace-text);
+  border: 1px solid color-mix(in srgb, var(--workspace-accent) 34%, var(--workspace-border));
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--workspace-accent) 14%, transparent), transparent 46%),
+    linear-gradient(145deg, color-mix(in srgb, var(--workspace-accent) 4%, var(--workspace-panel)), var(--workspace-panel) 58%),
+    var(--workspace-panel);
+  box-shadow: 0 22px 52px color-mix(in srgb, var(--workspace-text) 18%, transparent), 0 0 0 4px color-mix(in srgb, var(--workspace-accent) 5%, transparent);
+  animation: availability-picker-in 170ms ease both;
+}
+
+.app-shell .settings-task-redesign .availability-time-field.is-end .clock-time-picker .availability-time-popover {
+  right: 0;
+  left: auto;
+}
+
+.app-shell .settings-task-redesign .clock-time-picker .availability-time-popover > header {
+  display: flex;
+  min-height: 52px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 14px;
+  border-bottom: 1px solid color-mix(in srgb, var(--workspace-accent) 14%, var(--workspace-border));
+}
+
+.app-shell .settings-task-redesign .clock-time-picker .availability-time-popover > header span,
+.app-shell .settings-task-redesign .clock-time-picker .availability-time-popover > header strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.app-shell .settings-task-redesign .clock-time-picker .availability-time-popover > header span {
+  color: color-mix(in srgb, var(--workspace-text) 74%, var(--workspace-secondary));
+  font-size: 12px;
+  font-weight: 720;
+}
+
+.app-shell .settings-task-redesign .clock-time-picker .availability-time-popover > header strong {
+  color: color-mix(in srgb, var(--workspace-accent) 78%, var(--workspace-text));
+  font-size: 18px;
+  font-weight: 780;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: .04em;
+}
+
+.app-shell .settings-task-redesign .clock-time-picker .availability-time-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 9px 11px 10px;
+}
+
+.app-shell .settings-task-redesign .clock-time-picker .availability-time-columns section {
+  min-width: 0;
+}
+
+.app-shell .settings-task-redesign .clock-time-picker .availability-time-columns section + section {
+  border-left: 1px solid color-mix(in srgb, var(--workspace-accent) 12%, var(--workspace-border));
+}
+
+.app-shell .settings-task-redesign .clock-time-picker .availability-time-columns section > span {
+  display: block;
+  padding: 4px 9px 7px;
+  color: var(--workspace-secondary);
+  font-size: 10.5px;
+  font-weight: 720;
+  letter-spacing: .06em;
+}
+
+.app-shell .settings-task-redesign .clock-time-picker .availability-time-options {
+  max-height: 172px;
+  overflow-y: auto;
+  padding: 0 5px 5px;
+  scrollbar-color: color-mix(in srgb, var(--workspace-accent) 38%, transparent) transparent;
+  scrollbar-width: thin;
+}
+
+.app-shell .settings-task-redesign .clock-time-picker .availability-time-options button {
+  display: flex;
+  width: 100%;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 8px;
+  color: var(--workspace-secondary);
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 680;
+}
+
+.app-shell .settings-task-redesign .clock-time-picker .availability-time-options button:is(:hover, :focus-visible) {
+  color: var(--workspace-accent);
+  background: color-mix(in srgb, var(--workspace-accent) 7%, transparent);
+}
+
+.app-shell .settings-task-redesign .clock-time-picker .availability-time-options button.is-selected {
+  color: color-mix(in srgb, var(--workspace-accent) 76%, var(--workspace-text));
+  background: linear-gradient(90deg, color-mix(in srgb, var(--workspace-accent) 16%, var(--workspace-panel)), color-mix(in srgb, var(--workspace-accent) 8%, var(--workspace-panel)));
+  box-shadow: inset 2px 0 0 var(--workspace-accent), 0 4px 11px color-mix(in srgb, var(--workspace-accent) 9%, transparent);
+  font-weight: 780;
+}
+
+.app-shell .settings-task-redesign .clock-time-picker .availability-time-popover > footer {
+  display: flex;
+  min-height: 50px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 11px 9px 14px;
+  border-top: 1px solid color-mix(in srgb, var(--workspace-accent) 14%, var(--workspace-border));
+}
+
+.app-shell .settings-task-redesign .clock-time-picker .availability-time-popover > footer small {
+  color: var(--workspace-secondary);
+  font-size: 10px;
+}
+
+.app-shell .settings-task-redesign .clock-time-picker .availability-time-popover > footer button {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 11px;
+  color: #fff;
+  border: 0;
+  border-radius: 8px;
+  background: var(--workspace-accent);
+  box-shadow: 0 7px 14px color-mix(in srgb, var(--workspace-accent) 20%, transparent);
+  font-size: 11.5px;
+  font-weight: 740;
+}
+
+@keyframes availability-picker-in {
+  from { opacity: 0; transform: translateY(-5px) scale(.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.app-shell .settings-task-redesign .availability-range > i {
+  width: 13px;
+  height: 1.5px;
+  justify-self: center;
+  border: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--workspace-accent) 62%, var(--workspace-secondary));
+}
+
+.app-shell .settings-task-redesign .availability-editor-action.is-add::after,
+.app-shell .settings-task-redesign .availability-intensity-options button::after {
+  position: absolute;
+  z-index: 4;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  width: max-content;
+  max-width: 260px;
+  padding: 7px 9px;
+  color: var(--workspace-panel);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--workspace-text) 92%, transparent);
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--workspace-text) 14%, transparent);
+  content: attr(data-hint);
+  font-size: 10px;
+  line-height: 1.4;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 4px);
+  transition: opacity 150ms ease, transform 150ms ease;
+}
+
+.app-shell .settings-task-redesign .availability-editor-action.is-add:is(:hover, :focus-visible)::after,
+.app-shell .settings-task-redesign .availability-intensity-options button:is(:hover, :focus-visible)::after {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.app-shell .settings-task-redesign .availability-day-editor button.availability-editor-action {
+  position: relative;
+  display: inline-flex;
+  width: 100%;
+  min-height: 34px;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 5px 8px 8px;
+  color: var(--workspace-accent);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 710;
+  text-align: left;
+  transition: color 160ms ease, border-color 160ms ease, background-color 160ms ease;
+}
+
+.app-shell .settings-task-redesign .availability-editor-action::before {
+  position: absolute;
+  right: 8px;
+  bottom: 3px;
+  left: 8px;
+  height: 1.5px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, var(--workspace-accent) 16%, color-mix(in srgb, var(--workspace-accent) 66%, #6ee7cf) 84%, transparent);
+  box-shadow: 0 2px 7px color-mix(in srgb, var(--workspace-accent) 16%, transparent);
+  content: "";
+  opacity: .62;
+  transform: scaleX(.82);
+  transition: opacity 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+}
+
+.app-shell .settings-task-redesign .availability-editor-action:is(:hover, :focus-visible) {
+  color: var(--workspace-accent);
+  border: 0;
+  background: transparent;
+  transform: none;
+}
+
+.app-shell .settings-task-redesign .availability-editor-action:is(:hover, :focus-visible)::before {
+  opacity: 1;
+  transform: scaleX(1);
+  box-shadow: 0 3px 10px color-mix(in srgb, var(--workspace-accent) 26%, transparent);
+}
+
+.app-shell .settings-task-redesign .availability-editor-action:disabled {
+  color: var(--workspace-tertiary);
+  background: transparent;
+  cursor: not-allowed;
+  opacity: .52;
+  transform: none;
+}
+
+.app-shell .settings-task-redesign .availability-editor-action:disabled::before {
+  background: var(--workspace-border);
+  box-shadow: none;
+  opacity: .48;
+}
+
+.app-shell .settings-task-redesign .availability-intensity {
+  display: grid;
+  grid-template-columns: minmax(150px, .62fr) minmax(0, 1.38fr);
+  align-items: center;
+  gap: 18px;
+  margin: 18px 0 0;
+  padding-top: 18px;
+  border-top: 1px solid var(--workspace-border);
+}
+
+.app-shell .settings-task-redesign .availability-intensity-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px 0 0;
+  border-top: 1px solid var(--workspace-border);
+}
+
+.app-shell .settings-task-redesign .availability-intensity-card > .availability-block-heading {
+  margin: 0;
+}
+
+.app-shell .settings-task-redesign .availability-intensity-card > .availability-block-heading > div {
+  max-width: 720px;
+}
+
+.app-shell .settings-task-redesign .availability-intensity-card > .availability-block-heading p {
+  font-size: 12px;
+}
+
+.app-shell .settings-task-redesign .availability-intensity-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid color-mix(in srgb, var(--workspace-border) 76%, transparent);
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--workspace-panel-subtle) 66%, transparent);
+}
+
+.app-shell .settings-task-redesign .availability-intensity-options button {
+  position: relative;
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 12px;
+  color: var(--workspace-secondary);
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  text-align: center;
+}
+
+.app-shell .settings-task-redesign .availability-intensity-options button:hover {
+  color: var(--workspace-text);
+  border-color: transparent;
+  background: color-mix(in srgb, var(--workspace-accent) 5%, var(--workspace-panel));
+  transform: none;
+}
+
+.app-shell .settings-task-redesign .availability-intensity-options button.is-selected {
+  color: var(--workspace-accent);
+  border-color: transparent;
+  background: linear-gradient(135deg, var(--workspace-panel), color-mix(in srgb, var(--workspace-accent) 7%, var(--workspace-panel)));
+  box-shadow: 0 5px 14px color-mix(in srgb, var(--workspace-accent) 10%, transparent);
+}
+
+.app-shell .settings-task-redesign .availability-intensity-options button strong {
+  color: currentColor;
+  font-size: 13px;
+  font-weight: 720;
+}
+
+.app-shell .settings-task-redesign .availability-inline-actions {
+  display: grid;
+  width: max-content;
+  grid-template-columns: var(--availability-time-field-width) var(--availability-time-separator-width) var(--availability-time-field-width);
+  column-gap: var(--availability-time-column-gap);
+  justify-content: start;
+  margin-top: 2px;
+  padding: 6px 0 2px;
+  border-top: 0;
+}
+
+.app-shell .settings-task-redesign .availability-inline-actions .is-primary {
+  position: relative;
+  display: inline-flex;
+  grid-column: 2;
+  min-width: 120px;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  justify-self: center;
+  gap: 8px;
+  padding: 6px 12px;
+  color: var(--workspace-accent);
+  border: 1px solid color-mix(in srgb, var(--workspace-accent) 25%, var(--workspace-border));
+  border-radius: 9px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--workspace-accent) 12%, var(--workspace-panel)), color-mix(in srgb, var(--workspace-accent) 5%, var(--workspace-panel)));
+  box-shadow: 0 6px 14px color-mix(in srgb, var(--workspace-accent) 10%, transparent), inset 0 1px 0 color-mix(in srgb, #fff 52%, transparent);
+  font-size: 12px;
+  font-weight: 720;
+  line-height: 1;
+  white-space: nowrap;
+  transition: color 160ms ease, border-color 160ms ease, background 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.app-shell .settings-task-redesign .availability-inline-actions .is-primary::after {
+  content: none;
+}
+
+.app-shell .settings-task-redesign .availability-inline-actions .is-primary:is(:hover, :focus-visible) {
+  color: var(--workspace-accent);
+  border-color: color-mix(in srgb, var(--workspace-accent) 42%, var(--workspace-border));
+  background: linear-gradient(135deg, color-mix(in srgb, var(--workspace-accent) 17%, var(--workspace-panel)), color-mix(in srgb, var(--workspace-accent) 8%, var(--workspace-panel)));
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--workspace-accent) 16%, transparent), inset 0 1px 0 color-mix(in srgb, #fff 60%, transparent);
+  text-shadow: none;
+  transform: translateY(-1px);
+}
+
+.app-shell .settings-task-redesign .availability-inline-actions .is-primary:active {
+  box-shadow: 0 3px 9px color-mix(in srgb, var(--workspace-accent) 10%, transparent);
+  transform: translateY(0) scale(.98);
+}
+
+.app-shell .settings-task-redesign .availability-inline-actions .is-primary:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--workspace-accent) 42%, transparent);
+  outline-offset: 2px;
+}
+
+.app-shell .settings-task-redesign .availability-inline-actions .is-primary:disabled {
+  color: var(--workspace-tertiary);
+  border-color: var(--workspace-border);
+  background: var(--workspace-panel-subtle);
+  box-shadow: none;
+  cursor: wait;
+  transform: none;
+}
+
+.app-shell .settings-task-redesign .availability-inline-actions .is-primary svg {
+  display: block;
+  flex: 0 0 auto;
+}
+
+@media (max-width: 680px) {
+  .app-shell .settings-task-redesign :is(.availability-time-card, .availability-intensity-card) {
+    padding-inline: 0;
+  }
+
+  html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign .availability-day-tabs {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0;
+  }
+
+  html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign .availability-day-tabs button,
+  html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign .availability-day-tabs button + button {
+    min-height: 42px !important;
+  }
+
+  .app-shell .settings-task-redesign .availability-day-editor {
+    grid-template-columns: 1fr;
+    row-gap: 4px;
+    padding: 10px 0 0;
+  }
+
+  .app-shell .settings-task-redesign .availability-editor-main {
+    min-width: 0;
+    padding-top: 13px;
+    padding-left: 0;
+  }
+
+  .app-shell .settings-task-redesign .availability-empty-state {
+    min-height: 68px;
+    padding: 8px 0 12px;
+  }
+
+  .app-shell .settings-task-redesign .availability-empty-state p {
+    font-size: 11px;
+  }
+
+  .app-shell .settings-task-redesign .availability-range-list {
+    grid-row: 1;
+    max-height: 186px;
+  }
+
+  .app-shell .settings-task-redesign .availability-range {
+    grid-template-columns: minmax(0, 1fr) 16px minmax(0, 1fr);
+    width: 100%;
+    gap: 7px;
+    padding-inline: 0;
+  }
+
+  .app-shell .settings-task-redesign .availability-range-row {
+    display: flex;
+    gap: 6px;
+    padding-left: 8px;
+  }
+
+  .app-shell .settings-task-redesign .availability-editor-actions {
+    width: min(154px, 100%);
+    grid-row: 2;
+    justify-self: end;
+    margin-top: 0;
+  }
+
+  .app-shell .settings-task-redesign .availability-inline-actions {
+    display: flex;
+    width: calc(100% - 77px);
+    justify-content: center;
+    margin-left: 8px;
+  }
+
+  .app-shell .settings-task-redesign .availability-time-field {
+    grid-template-columns: 1fr;
+    gap: 3px;
+  }
+
+  .app-shell .settings-task-redesign .availability-time-control {
+    width: 92px;
+  }
+
+  .app-shell .settings-task-redesign .availability-range-action.is-revoke {
+    min-width: 58px;
+    padding-inline: 8px;
+  }
+
+  .app-shell .settings-task-redesign :is(.availability-range-action, .availability-editor-action) {
+    min-width: 0;
+    font-size: 12px;
+  }
+
+  .app-shell .settings-task-redesign .clock-time-picker .availability-time-popover {
+    width: min(276px, calc(100vw - 42px));
+  }
+
+  .app-shell .settings-task-redesign .availability-intensity-options {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .app-shell .settings-task-redesign .availability-intensity {
+    grid-template-columns: 1fr;
+    gap: 9px;
+  }
+}

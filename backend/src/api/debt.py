@@ -36,7 +36,9 @@ def _to_out(d: LearningDebt) -> DebtOut:
         skip_reason=d.skip_reason,
         impact=d.impact,
         status=d.status,
-        created_at=d.created_at.isoformat() if isinstance(d.created_at, datetime) else str(d.created_at),
+        created_at=d.created_at.isoformat()
+        if isinstance(d.created_at, datetime)
+        else str(d.created_at),
     )
 
 
@@ -46,17 +48,23 @@ async def list_debts(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> list[DebtOut]:
-    goal = (await db.execute(
-        select(Goal).where(Goal.id == goal_id, Goal.user_id == current_user.id)
-    )).scalar_one_or_none()
+    goal = (
+        await db.execute(select(Goal).where(Goal.id == goal_id, Goal.user_id == current_user.id))
+    ).scalar_one_or_none()
     if not goal:
         raise HTTPException(404, "目标不存在")
 
-    debts = (await db.execute(
-        select(LearningDebt)
-        .where(LearningDebt.goal_id == goal_id, LearningDebt.status == "open")
-        .order_by(LearningDebt.created_at.desc())
-    )).scalars().all()
+    debts = (
+        (
+            await db.execute(
+                select(LearningDebt)
+                .where(LearningDebt.goal_id == goal_id, LearningDebt.status == "open")
+                .order_by(LearningDebt.created_at.desc())
+            )
+        )
+        .scalars()
+        .all()
+    )
     return [_to_out(d) for d in debts]
 
 
@@ -66,11 +74,13 @@ async def resolve_debt(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> DebtOut:
-    debt = (await db.execute(
-        select(LearningDebt)
-        .join(Goal, Goal.id == LearningDebt.goal_id)
-        .where(LearningDebt.id == debt_id, Goal.user_id == current_user.id)
-    )).scalar_one_or_none()
+    debt = (
+        await db.execute(
+            select(LearningDebt)
+            .join(Goal, Goal.id == LearningDebt.goal_id)
+            .where(LearningDebt.id == debt_id, Goal.user_id == current_user.id)
+        )
+    ).scalar_one_or_none()
     if not debt:
         raise HTTPException(404, "债务记录不存在")
     debt.status = "resolved"

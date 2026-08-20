@@ -1,6 +1,9 @@
 from datetime import date, timedelta
 
 from httpx import AsyncClient
+from sqlalchemy import select
+
+from src.models import LearningEvent, TaskMasteryRecord
 
 
 def _today() -> str:
@@ -71,3 +74,56 @@ async def test_delete_task(client: AsyncClient, auth: dict, goal_id: str):
     tid = r.json()["id"]
     r_del = await client.delete(f"/api/v1/tasks/{tid}", headers=auth)
     assert r_del.status_code == 204
+
+
+async def test_task_optimistic_version_and_complete_event(
+    client: AsyncClient, auth: dict, goal_id: str, db
+):
+    created = await client.post(
+        "/api/v1/tasks",
+        json={"title": "版本任务", "goalId": goal_id, "date": _today()},
+        headers=auth,
+    )
+    task = created.json()
+    assert task["version"] == 1
+
+    updated = await client.patch(
+        f"/api/v1/tasks/{task['id']}",
+        json={"done": True, "mastery_level": "L2", "expectedVersion": 1},
+        headers=auth,
+    )
+    assert updated.status_code == 200
+    assert updated.json()["version"] == 2
+
+    stale = await client.patch(
+        f"/api/v1/tasks/{task['id']}",
+        json={"priority": "high", "expectedVersion": 1},
+        headers=auth,
+    )
+    assert stale.status_code == 409
+    assert stale.json()["actual_version"] == 2
+
+    event_types = set(
+        (
+            await db.execute(
+                select(LearningEvent.event_type).where(
+                    LearningEvent.aggregate_id == task["id"]
+                )
+            )
+        ).scalars()
+    )
+    assert {"TaskCreated", "TaskCompleted", "MasteryRecorded"} <= event_types
+    mastery = await db.scalar(
+        select(TaskMasteryRecord).where(TaskMasteryRecord.task_id == task["id"])
+    )
+    assert mastery is not None
+    assert mastery.mastery_level == "L2"
+
+    stale_delete = await client.delete(
+        f"/api/v1/tasks/{task['id']}?expected_version=1", headers=auth
+    )
+    assert stale_delete.status_code == 409
+    current_delete = await client.delete(
+        f"/api/v1/tasks/{task['id']}?expected_version=2", headers=auth
+    )
+    assert current_delete.status_code == 204

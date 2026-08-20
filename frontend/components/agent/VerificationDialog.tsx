@@ -4,6 +4,8 @@ import { X, CheckCircle2, Loader2, Eye, EyeOff, BookOpen, AlertCircle } from "lu
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { useKnowledge } from "@/lib/knowledge-context";
+import { InlineNotice } from "@/components/ui/InlineNotice";
+import { StatusBadge, type StatusTone } from "@/components/ui/StatusBadge";
 
 interface VerificationDialogProps {
   goalId: string;
@@ -21,15 +23,11 @@ interface Message {
 }
 
 function ScoreBadge({ score }: { score: number }) {
-  const color =
-    score >= 90 ? "bg-green-100 text-green-700" :
-    score >= 70 ? "bg-blue-100 text-blue-700" :
-    score >= 60 ? "bg-yellow-100 text-yellow-700" :
-    "bg-red-100 text-red-700";
+  const tone: StatusTone = score >= 90 ? "success" : score >= 70 ? "info" : score >= 60 ? "warning" : "danger";
   return (
-    <span className={cn("inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full ml-2", color)}>
+    <StatusBadge tone={tone} compact className="ml-2">
       {score}分
-    </span>
+    </StatusBadge>
   );
 }
 
@@ -163,22 +161,18 @@ export function VerificationDialog({ goalId, taskId, taskTitle, onClose, onPasse
                     {showHint ? "隐藏参考答案" : "查看参考答案"}
                   </button>
                   {showHint && (
-                    <div className="mt-1.5 px-3 py-2.5 bg-amber-50 border border-amber-100 rounded-xl text-xs text-amber-800 leading-relaxed whitespace-pre-line">
+                    <InlineNotice tone="warning" className="mt-1.5 whitespace-pre-line">
                       {answerHint}
-                    </div>
+                    </InlineNotice>
                   )}
                 </div>
               )}
 
               {/* 复习建议 — 低分时显示 */}
               {msg.role === "ai" && msg.suggestion && (
-                <div className="ml-1 px-3 py-2.5 bg-orange-50 border border-orange-100 rounded-xl flex gap-2">
-                  <AlertCircle size={13} className="text-orange-400 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-xs font-semibold text-orange-700 mb-1">建议重新学习</p>
-                    <p className="text-xs text-orange-700 leading-relaxed whitespace-pre-line">{msg.suggestion}</p>
-                  </div>
-                </div>
+                <InlineNotice tone="warning" className="ml-1" icon={<AlertCircle size={14} />} title="建议重新学习">
+                  <p className="whitespace-pre-line">{msg.suggestion}</p>
+                </InlineNotice>
               )}
             </div>
           ))}
@@ -194,10 +188,7 @@ export function VerificationDialog({ goalId, taskId, taskTitle, onClose, onPasse
 
           {passed && (
             <div className="flex justify-center py-2">
-              <div className="flex items-center gap-2 px-4 py-2 bg-green-50 border border-green-200 rounded-xl text-sm text-green-700">
-                <CheckCircle2 size={16} />
-                验收通过！继续加油
-              </div>
+              <InlineNotice tone="success" icon={<CheckCircle2 size={16} />}>验收通过！继续加油</InlineNotice>
             </div>
           )}
           <div ref={bottomRef} />
@@ -211,7 +202,7 @@ export function VerificationDialog({ goalId, taskId, taskTitle, onClose, onPasse
               onKeyDown={(e) => e.key === "Enter" && sendAnswer()}
               placeholder="用自己的话回答..."
               disabled={isLoading}
-              className="flex-1 rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 disabled:opacity-50" />
+              className="flex-1 rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent-muted disabled:opacity-50" />
             <button onClick={sendAnswer} disabled={!input.trim() || isLoading}
               className="px-4 py-2 text-white text-sm rounded-xl disabled:opacity-40 transition"
               style={{ backgroundColor: "var(--accent)" }}>
@@ -229,7 +220,7 @@ export function VerificationDialog({ goalId, taskId, taskTitle, onClose, onPasse
                   type="checkbox"
                   checked={includeAnswer}
                   onChange={(e) => setIncludeAnswer(e.target.checked)}
-                  className="w-3.5 h-3.5 rounded accent-blue-500"
+                  className="w-3.5 h-3.5 rounded [accent-color:var(--accent)]"
                 />
                 包含我的回答
               </label>

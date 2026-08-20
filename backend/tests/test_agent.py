@@ -1,14 +1,53 @@
 import json
+import uuid
 from datetime import date
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from httpx import AsyncClient
+
+from src.config import settings
 
 
 def _mock_llm(content: str):
     m = MagicMock()
     m.ainvoke = AsyncMock(return_value=MagicMock(content=content))
     return m
+
+
+async def test_stream_uses_cookie_and_csrf_contract(client: AsyncClient):
+    uid = uuid.uuid4().hex[:8]
+    registered = await client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": f"{uid}@test.com",
+            "username": uid,
+            "password": "testpass123",
+        },
+    )
+    assert registered.status_code == 201
+    body = {"message": "测试流式认证", "session_id": f"session-{uid}"}
+
+    rejected = await client.post("/api/v1/agent/stream", json=body)
+    assert rejected.status_code == 403
+
+    class FakeAgent:
+        async def astream_events(self, *args, **kwargs):
+            if False:
+                yield None
+
+        async def aget_state(self, config):
+            return SimpleNamespace(next=[], values={})
+
+    csrf = client.cookies.get(settings.auth_csrf_cookie_name)
+    with patch("src.core.agent.graph.get_agent", new=AsyncMock(return_value=FakeAgent())):
+        accepted = await client.post(
+            "/api/v1/agent/stream",
+            json=body,
+            headers={"X-CSRF-Token": csrf},
+        )
+    assert accepted.status_code == 200
+    assert "event: done" in accepted.text
 
 
 async def test_daily_brief_no_checkins(client: AsyncClient, auth: dict):
@@ -133,13 +172,15 @@ async def test_verify_answer_fail_with_suggestion(client: AsyncClient, auth: dic
             headers=auth,
         )
 
-    eval_resp = json.dumps({
-        "score": 45,
-        "passed": False,
-        "feedback": "回答不够准确",
-        "suggestion": "重新阅读装饰器概念，并完成一个日志装饰器练习。",
-        "follow_up": None,
-    })
+    eval_resp = json.dumps(
+        {
+            "score": 45,
+            "passed": False,
+            "feedback": "回答不够准确",
+            "suggestion": "重新阅读装饰器概念，并完成一个日志装饰器练习。",
+            "follow_up": None,
+        }
+    )
     a_mock = _mock_llm(eval_resp)
     with patch("src.api.agent.create_pro_llm", return_value=a_mock):
         r = await client.post(
@@ -154,23 +195,6 @@ async def test_verify_answer_fail_with_suggestion(client: AsyncClient, auth: dic
     assert "follow_up" not in data
 
 
-async def test_manual_replan(client: AsyncClient, auth: dict, goal_id: str):
-    replan_tasks = json.dumps([
-        {"title": "简化任务1", "estimated_mins": 20, "type": "study"},
-        {"title": "简化任务2", "estimated_mins": 15, "type": "review"},
-    ])
-    mock = _mock_llm(replan_tasks)
-    with patch("src.api.agent.create_pro_llm", return_value=mock) as llm_factory:
-        r = await client.post(f"/api/v1/agent/replan/{goal_id}", headers=auth)
-    assert llm_factory.call_args.kwargs["max_tokens"] == 1024
-    assert r.status_code == 200
-    tasks = r.json()["tasks"]
-    assert len(tasks) == 2
-    assert tasks[0]["title"] == "简化任务1"
-
-
-async def test_manual_replan_unknown_goal(client: AsyncClient, auth: dict):
-    mock = _mock_llm("[]")
-    with patch("src.api.agent.create_pro_llm", return_value=mock):
-        r = await client.post("/api/v1/agent/replan/nonexistent", headers=auth)
-    assert r.status_code == 404
+async def test_legacy_direct_replan_endpoint_removed(client: AsyncClient, auth: dict, goal_id: str):
+    response = await client.post(f"/api/v1/agent/replan/{goal_id}", headers=auth)
+    assert response.status_code == 404

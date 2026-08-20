@@ -14,7 +14,9 @@ def _future(days: int = 1) -> str:
     return (date.today() + timedelta(days=days)).isoformat()
 
 
-async def test_create_tasks_batch(client: AsyncClient, auth_headers: dict, shared: dict, seed: dict):
+async def test_create_tasks_batch(
+    client: AsyncClient, auth_headers: dict, shared: dict, seed: dict
+):
     goal_id = shared["goal_id_1"]
     task_ids = []
     for t in seed["tasks"]:
@@ -88,7 +90,9 @@ async def test_schedule_get_empty(client: AsyncClient, auth_headers: dict):
     assert r.status_code == 200
 
 
-async def test_schedule_save_and_retrieve(client: AsyncClient, auth_headers: dict, shared: dict, seed: dict):
+async def test_schedule_save_and_retrieve(
+    client: AsyncClient, auth_headers: dict, shared: dict, seed: dict
+):
     blocks = seed["schedule_blocks"]
     r = await client.put(
         "/api/v1/schedule/today",

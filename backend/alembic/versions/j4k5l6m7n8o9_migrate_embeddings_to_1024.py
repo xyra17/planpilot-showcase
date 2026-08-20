@@ -31,26 +31,14 @@ def _recreate_indexes() -> None:
 def upgrade() -> None:
     op.execute("DROP INDEX IF EXISTS ix_knowledge_items_embedding_hnsw")
     op.execute("DROP INDEX IF EXISTS ix_knowledge_chunks_embedding_hnsw")
-    op.execute(
-        "ALTER TABLE knowledge_items ALTER COLUMN embedding "
-        "TYPE vector(1024) USING NULL"
-    )
-    op.execute(
-        "ALTER TABLE knowledge_chunks ALTER COLUMN embedding "
-        "TYPE vector(1024) USING NULL"
-    )
+    op.execute("ALTER TABLE knowledge_items ALTER COLUMN embedding TYPE vector(1024) USING NULL")
+    op.execute("ALTER TABLE knowledge_chunks ALTER COLUMN embedding TYPE vector(1024) USING NULL")
     _recreate_indexes()
 
 
 def downgrade() -> None:
     op.execute("DROP INDEX IF EXISTS ix_knowledge_items_embedding_hnsw")
     op.execute("DROP INDEX IF EXISTS ix_knowledge_chunks_embedding_hnsw")
-    op.execute(
-        "ALTER TABLE knowledge_items ALTER COLUMN embedding "
-        "TYPE vector(1536) USING NULL"
-    )
-    op.execute(
-        "ALTER TABLE knowledge_chunks ALTER COLUMN embedding "
-        "TYPE vector(1536) USING NULL"
-    )
+    op.execute("ALTER TABLE knowledge_items ALTER COLUMN embedding TYPE vector(1536) USING NULL")
+    op.execute("ALTER TABLE knowledge_chunks ALTER COLUMN embedding TYPE vector(1536) USING NULL")
     _recreate_indexes()

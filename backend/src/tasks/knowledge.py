@@ -1,26 +1,70 @@
-import asyncio
 import csv
 import io
 import re
 import uuid
-from datetime import UTC, datetime
 
 from src.celery_app import celery_app
+from src.core.time import utc_now
+from src.tasks.runtime import run_async
 
 MAX_EXTRACTED_CHARS = 50_000
-TEXT_EXTENSIONS = {"txt", "md", "pdf", "docx", "csv", "xlsx"}
+TEXT_EXTENSIONS = {"txt", "md", "json", "pdf", "docx", "csv", "xlsx", "pptx"}
 CHUNK_TARGET_CHARS = 1200
 CHUNK_OVERLAP_CHARS = 200
 EMBEDDING_BATCH_SIZE = 32
+MAX_URL_RESPONSE_BYTES = 2 * 1024 * 1024
+ALLOWED_URL_CONTENT_TYPES = {"application/json"}
 
 
 class KnowledgeProcessingError(RuntimeError):
     pass
 
 
-def utc_now() -> datetime:
-    """Return naive UTC for the project's existing timestamp columns."""
-    return datetime.now(UTC).replace(tzinfo=None)
+async def fetch_public_url_content(source_url: str) -> str:
+    import httpx
+
+    from src.services.ssrf_guard import UnsafeUrlError, normalize_public_http_url
+
+    try:
+        canonical_url = await normalize_public_http_url(source_url)
+    except UnsafeUrlError as exc:
+        raise KnowledgeProcessingError(str(exc)) from exc
+
+    timeout = httpx.Timeout(connect=5.0, read=20.0, write=5.0, pool=5.0)
+    try:
+        async with httpx.AsyncClient(
+            timeout=timeout,
+            follow_redirects=False,
+            trust_env=False,
+        ) as client:
+            async with client.stream(
+                "GET",
+                f"https://r.jina.ai/{canonical_url}",
+                headers={"Accept": "text/plain", "User-Agent": "PlanPilot-URL-Importer/1.0"},
+            ) as response:
+                if 300 <= response.status_code < 400:
+                    raise KnowledgeProcessingError("网址抓取不允许重定向")
+                response.raise_for_status()
+                content_type = response.headers.get("content-type", "").split(";", 1)[0].lower()
+                if content_type and not (
+                    content_type.startswith("text/") or content_type in ALLOWED_URL_CONTENT_TYPES
+                ):
+                    raise KnowledgeProcessingError("网址返回了不支持的内容类型")
+                declared_size = response.headers.get("content-length")
+                if declared_size and int(declared_size) > MAX_URL_RESPONSE_BYTES:
+                    raise KnowledgeProcessingError("网址内容超过 2 MB 限制")
+                chunks: list[bytes] = []
+                received = 0
+                async for chunk in response.aiter_bytes():
+                    received += len(chunk)
+                    if received > MAX_URL_RESPONSE_BYTES:
+                        raise KnowledgeProcessingError("网址内容超过 2 MB 限制")
+                    chunks.append(chunk)
+    except KnowledgeProcessingError:
+        raise
+    except (httpx.HTTPError, ValueError) as exc:
+        raise KnowledgeProcessingError("网址内容抓取失败") from exc
+    return b"".join(chunks).decode("utf-8", errors="replace")[:MAX_EXTRACTED_CHARS].strip()
 
 
 def chunk_text(
@@ -83,15 +127,13 @@ async def _embed_chunks(
             for offset in range(0, len(inputs), EMBEDDING_BATCH_SIZE):
                 response = await client.embeddings.create(
                     model=model,
-                    input=inputs[offset:offset + EMBEDDING_BATCH_SIZE],
+                    input=inputs[offset : offset + EMBEDDING_BATCH_SIZE],
                 )
                 batch = [row.embedding for row in response.data]
-                if len(batch) != len(inputs[offset:offset + EMBEDDING_BATCH_SIZE]):
+                if len(batch) != len(inputs[offset : offset + EMBEDDING_BATCH_SIZE]):
                     raise KnowledgeProcessingError("Embedding 返回数量与分块数量不一致")
                 if any(len(vector) != dimensions for vector in batch):
-                    raise KnowledgeProcessingError(
-                        f"Embedding 维度错误：期望 {dimensions}"
-                    )
+                    raise KnowledgeProcessingError(f"Embedding 维度错误：期望 {dimensions}")
                 embeddings.extend(batch)
             return embeddings
         except Exception as exc:
@@ -102,7 +144,7 @@ async def _embed_chunks(
 def extract_text(raw: bytes, ext: str) -> str:
     """Extract bounded text and raise a useful error instead of silently succeeding."""
     try:
-        if ext in {"txt", "md"}:
+        if ext in {"txt", "md", "json"}:
             content = raw.decode("utf-8", errors="replace")
         elif ext == "pdf":
             import pypdf
@@ -128,6 +170,21 @@ def extract_text(raw: bytes, ext: str) -> str:
                 for row in worksheet.iter_rows(values_only=True):
                     lines.append("\t".join("" if value is None else str(value) for value in row))
             content = "\n".join(lines)
+        elif ext == "pptx":
+            from pptx import Presentation
+
+            presentation = Presentation(io.BytesIO(raw))
+            slides: list[str] = []
+            for index, slide in enumerate(presentation.slides, start=1):
+                fragments = [f"幻灯片 {index}"]
+                for shape in slide.shapes:
+                    if hasattr(shape, "text") and shape.text.strip():
+                        fragments.append(shape.text.strip())
+                    if getattr(shape, "has_table", False):
+                        for row in shape.table.rows:
+                            fragments.append("\t".join(cell.text for cell in row.cells))
+                slides.append("\n".join(fragments))
+            content = "\n\n".join(slides)
         else:
             raise KnowledgeProcessingError("该文件仅作为附件保存，不需要建立索引")
     except KnowledgeProcessingError:
@@ -149,12 +206,12 @@ def extract_text(raw: bytes, ext: str) -> str:
 )
 def process_knowledge_item(self, item_id: str):
     try:
-        asyncio.run(_process(item_id))
+        run_async(_process(item_id))
     except Exception as exc:
         if self.request.retries >= self.max_retries:
-            asyncio.run(_mark_failed(item_id, exc, self.request.retries))
+            run_async(_mark_failed(item_id, exc, self.request.retries))
             raise
-        asyncio.run(_mark_retry(item_id, exc, self.request.retries + 1))
+        run_async(_mark_retry(item_id, exc, self.request.retries + 1))
         raise self.retry(exc=exc)
 
 
@@ -171,6 +228,11 @@ async def _process(item_id: str) -> None:
 
     from src.config import settings
     from src.models import KnowledgeChunk, KnowledgeItem
+    from src.services.object_storage import (
+        ObjectStorageError,
+        extension_for_reference,
+        get_object_storage,
+    )
 
     engine = create_async_engine(settings.database_url)
     session_factory = async_sessionmaker(engine, expire_on_commit=False)
@@ -183,26 +245,16 @@ async def _process(item_id: str) -> None:
                 return
 
             item.processing_error = None
-            ext = item.file_path.rsplit(".", 1)[-1].lower() if item.file_path and "." in item.file_path else ""
+            ext = extension_for_reference(item.file_path) if item.file_path else ""
 
             if item.source_type == "url" and item.source_url:
-                import httpx
-
                 item.processing_status = "parsing"
                 await db.commit()
-                try:
-                    async with httpx.AsyncClient(timeout=30) as client:
-                        response = await client.get(
-                            f"https://r.jina.ai/{item.source_url}",
-                            headers={"Accept": "text/plain"},
-                        )
-                        response.raise_for_status()
-                    item.content = response.text[:MAX_EXTRACTED_CHARS].strip()
-                except httpx.HTTPError as exc:
-                    raise KnowledgeProcessingError("网址内容抓取失败") from exc
+                item.content = await fetch_public_url_content(item.source_url)
                 if not item.content:
                     raise KnowledgeProcessingError("页面内容为空，无法导入")
                 item.content_length = len(item.content)
+                item.content_format = "markdown" if ext == "md" else "plain"
                 for line in item.content.splitlines():
                     if line.strip():
                         item.title = line.strip()[:120]
@@ -211,9 +263,10 @@ async def _process(item_id: str) -> None:
                 item.processing_status = "parsing"
                 await db.commit()
                 try:
-                    with open(item.file_path, "rb") as file_handle:
-                        item.content = extract_text(file_handle.read(), ext)
-                except FileNotFoundError as exc:
+                    item.content = extract_text(
+                        await get_object_storage().read(item.file_path), ext
+                    )
+                except ObjectStorageError as exc:
                     raise KnowledgeProcessingError("原始文件不存在") from exc
                 item.content_length = len(item.content)
             elif not item.content:
@@ -254,15 +307,17 @@ async def _process(item_id: str) -> None:
             for index, ((chunk, start_char, end_char), embedding) in enumerate(
                 zip(chunks, embeddings, strict=True)
             ):
-                db.add(KnowledgeChunk(
-                    id=str(uuid.uuid4()),
-                    item_id=item.id,
-                    chunk_index=index,
-                    content=chunk,
-                    start_char=start_char,
-                    end_char=end_char,
-                    embedding=embedding,
-                ))
+                db.add(
+                    KnowledgeChunk(
+                        id=str(uuid.uuid4()),
+                        item_id=item.id,
+                        chunk_index=index,
+                        content=chunk,
+                        start_char=start_char,
+                        end_char=end_char,
+                        embedding=embedding,
+                    )
+                )
 
             # Retain a document-level vector for backwards compatibility.
             item.embedding = embeddings[0]

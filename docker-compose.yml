@@ -31,10 +31,14 @@ services:
     build:
       context: ./backend
     command: celery -A src.celery_app.celery_app worker --loglevel=info --concurrency=2
+    # Development bind mounts use host ownership; production stays non-root.
+    user: root
     volumes:
       - ./backend:/app
+      # /app 已绑定到宿主机 backend；Worker 与 API 因此共用同一 uploads 目录。
     working_dir: /app
     environment:
+      TZ: Asia/Shanghai
       REDIS_URL: redis://redis:6379/0
       OPENAI_BASE_URL: http://host.docker.internal:8080/v1
       EMBEDDING_BASE_URL: http://host.docker.internal:1234/v1
@@ -46,15 +50,24 @@ services:
       redis:
         condition: service_healthy
     restart: on-failure
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A src.celery_app.celery_app inspect ping --timeout=5 >/dev/null 2>&1"]
+      interval: 30s
+      timeout: 10s
+      start_period: 20s
+      retries: 3
 
   beat:
     build:
       context: ./backend
-    command: celery -A src.celery_app.celery_app beat --loglevel=info
+    command: celery -A src.celery_app.celery_app beat --loglevel=info --schedule=/tmp/celerybeat-schedule
+    # Development bind mounts use host ownership; production stays non-root.
+    user: root
     volumes:
       - ./backend:/app
     working_dir: /app
     environment:
+      TZ: Asia/Shanghai
       REDIS_URL: redis://redis:6379/0
       OPENAI_BASE_URL: http://host.docker.internal:8080/v1
       EMBEDDING_BASE_URL: http://host.docker.internal:1234/v1
@@ -66,6 +79,8 @@ services:
       redis:
         condition: service_healthy
     restart: on-failure
+    healthcheck:
+      disable: true
 
   minio:
     image: minio/minio:latest
@@ -87,13 +102,19 @@ services:
   api:
     build:
       context: ./backend
-    command: uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
+    # Keep the local API stable while frontend and background jobs are running.
+    # Source changes are applied with an explicit container restart instead of
+    # exposing users to repeated WatchFiles shutdown windows.
+    command: uvicorn src.main:app --host 0.0.0.0 --port 8000
+    # Development bind mounts use host ownership; production stays non-root.
+    user: root
     ports:
       - "8000:8000"
     volumes:
       - ./backend:/app
     working_dir: /app
     environment:
+      TZ: Asia/Shanghai
       REDIS_URL: redis://redis:6379/0
       OPENAI_BASE_URL: http://host.docker.internal:8080/v1
       EMBEDDING_BASE_URL: http://host.docker.internal:1234/v1
@@ -105,16 +126,32 @@ services:
       redis:
         condition: service_healthy
     restart: on-failure
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/ready', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
 
   frontend:
     build:
+      # One canonical frontend contains both complete UI experiences.
       context: ./frontend
       args:
         NEXT_PUBLIC_API_URL: http://localhost:8000
+        API_URL: http://api:8000
     environment:
+      TZ: Asia/Shanghai
       API_URL: http://api:8000
+      HOSTNAME: 0.0.0.0
     ports:
       - "3000:3000"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:3000/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
     depends_on:
       - api
     restart: on-failure

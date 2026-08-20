@@ -1,4 +1,3 @@
-
 from datetime import date, timedelta
 
 from httpx import AsyncClient
@@ -92,12 +91,14 @@ async def test_daily_checkin_is_persisted_and_updated(
         f"/api/v1/checkin/{goal_id}",
         json={
             "mode": "daily",
-            "tasks": [{
-                "task_id": task_id,
-                "status": "pending",
-                "mastery": "L2",
-                "note": "还需要复习",
-            }],
+            "tasks": [
+                {
+                    "task_id": task_id,
+                    "status": "pending",
+                    "mastery": "L2",
+                    "note": "还需要复习",
+                }
+            ],
         },
         headers=auth,
     )
@@ -109,12 +110,14 @@ async def test_daily_checkin_is_persisted_and_updated(
         f"/api/v1/checkin/{goal_id}",
         json={
             "mode": "daily",
-            "tasks": [{
-                "task_id": task_id,
-                "status": "completed",
-                "mastery": "L3",
-                "note": "已经掌握",
-            }],
+            "tasks": [
+                {
+                    "task_id": task_id,
+                    "status": "completed",
+                    "mastery": "L3",
+                    "note": "已经掌握",
+                }
+            ],
         },
         headers=auth,
     )
@@ -128,32 +131,34 @@ async def test_daily_checkin_is_persisted_and_updated(
     data = loaded.json()
     assert data["stats"]["completion_rate"] == 1
     assert data["stats"]["mastery_rate"] == 1
-    assert data["tasks"] == [{
-        "task_id": task_id,
-        "status": "completed",
-        "mastery": "L3",
-        "actual_mins": None,
-        "note": "已经掌握",
-    }]
+    assert data["tasks"] == [
+        {
+            "task_id": task_id,
+            "status": "completed",
+            "mastery": "L3",
+            "actual_mins": None,
+            "note": "已经掌握",
+        }
+    ]
 
 
 async def test_replan_uses_three_distinct_study_days(
     client: AsyncClient, auth: dict, goal_id: str, db
 ):
-    goal = (await db.execute(
-        select(Goal).where(Goal.id == goal_id)
-    )).scalar_one()
+    goal = (await db.execute(select(Goal).where(Goal.id == goal_id))).scalar_one()
     today = date.today()
     for offset in (2, 1):
-        db.add(CheckinRecord(
-            goal_id=goal_id,
-            user_id=goal.user_id,
-            date=(today - timedelta(days=offset)).isoformat(),
-            mode="daily",
-            completion_rate=0.25,
-            stats={"total_tasks": 1},
-            feedback="",
-        ))
+        db.add(
+            CheckinRecord(
+                goal_id=goal_id,
+                user_id=goal.user_id,
+                date=(today - timedelta(days=offset)).isoformat(),
+                mode="daily",
+                completion_rate=0.25,
+                stats={"total_tasks": 1},
+                feedback="",
+            )
+        )
     await db.commit()
 
     created = await client.post(
@@ -172,11 +177,13 @@ async def test_replan_uses_three_distinct_study_days(
         f"/api/v1/checkin/{goal_id}",
         json={
             "mode": "daily",
-            "tasks": [{
-                "task_id": task_id,
-                "status": "pending",
-                "mastery": "L1",
-            }],
+            "tasks": [
+                {
+                    "task_id": task_id,
+                    "status": "pending",
+                    "mastery": "L1",
+                }
+            ],
         },
         headers=auth,
     )

@@ -14,5 +14,5 @@ class AgentState(TypedDict, total=False):
     user_confirmed: bool
     checkin_rate: float
     checkin_text: str
-    pending_replan: bool
     debt_items: list[dict[str, Any]]
+    pilo_preferences: dict[str, Any]

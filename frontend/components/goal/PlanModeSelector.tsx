@@ -1,8 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { X, BookOpen, BookMarked, Brain, ChevronLeft, Loader2, BookText, Zap } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
+import Link from "next/link";
+import {
+  X, ChevronLeft, Loader2, BookText, BookOpen, BookMarked, Brain,
+  Zap, Check, Link2, Search, SlidersHorizontal,
+} from "lucide-react";
 import { api } from "@/lib/api";
+import { productApi, type ApiKnowledgeFile } from "@/lib/technology/productApi";
 
 export type KbMode = "kb_only" | "kb_reference" | "no_kb";
 export type PacingMode = "auto" | "fixed";
@@ -25,30 +30,31 @@ interface PlanModeSelectorProps {
   goalType: "exam" | "certification" | "skill" | "reading" | "language" | "habit";
   goalTitle: string;
   onClose: () => void;
+  error?: string;
   onConfirm: (mode: KbMode, intentSupplement: string, pacingMode: PacingMode) => void;
 }
 
-const MODES: { value: KbMode; label: string; desc: string; icon: React.ReactNode; requiresKb: boolean }[] = [
+const MODES: { value: KbMode; label: string; desc: string; requiresKb: boolean; icon: typeof BookOpen }[] = [
   {
     value: "kb_only",
-    label: "仅从知识库生成",
-    desc: "AI 严格基于知识库内容制定计划，不引入库外知识",
-    icon: <BookOpen size={16} className="text-blue-600" />,
+    label: "仅从参考资料生成",
+    desc: "AI 严格基于已关联资料制定计划，不引入资料外知识",
     requiresKb: true,
+    icon: BookOpen,
   },
   {
     value: "kb_reference",
-    label: "参考知识库生成",
-    desc: "知识库作为补充参考，AI 结合外部知识生成更全面的计划",
-    icon: <BookMarked size={16} className="text-green-600" />,
+    label: "结合参考资料生成",
+    desc: "已关联资料作为补充参考，AI 结合通用知识生成更完整的计划",
     requiresKb: true,
+    icon: BookMarked,
   },
   {
     value: "no_kb",
-    label: "不参考知识库",
+    label: "暂不使用参考资料",
     desc: "AI 完全依据目标信息和通用知识生成计划",
-    icon: <Brain size={16} className="text-purple-600" />,
     requiresKb: false,
+    icon: Brain,
   },
 ];
 
@@ -101,7 +107,7 @@ const INTENT_PLACEHOLDER: Record<string, string> = {
 };
 
 export default function PlanModeSelector({
-  open, hasKb, goalId, goalType, goalTitle, onClose, onConfirm,
+  open, hasKb, goalId, goalType, goalTitle, onClose, error, onConfirm,
 }: PlanModeSelectorProps) {
   const [step, setStep] = useState<1 | 2>(1);
   const [selectedMode, setSelectedMode] = useState<KbMode | null>(null);
@@ -111,6 +117,12 @@ export default function PlanModeSelector({
   const [freeText, setFreeText] = useState("");
   const [pacingMode, setPacingMode] = useState<PacingMode>("fixed");
   const [intentPlaceholder, setIntentPlaceholder] = useState("");
+  const [referenceFiles, setReferenceFiles] = useState<ApiKnowledgeFile[]>([]);
+  const [selectedReferenceIds, setSelectedReferenceIds] = useState<Set<string>>(new Set());
+  const [referencesLoading, setReferencesLoading] = useState(false);
+  const [referencesError, setReferencesError] = useState("");
+  const [savingReferences, setSavingReferences] = useState(false);
+  const [referenceQuery, setReferenceQuery] = useState("");
 
   useEffect(() => {
     if (!open) {
@@ -121,8 +133,42 @@ export default function PlanModeSelector({
       setFreeText("");
       setPacingMode("fixed");
       setIntentPlaceholder("");
+      setReferenceFiles([]);
+      setSelectedReferenceIds(new Set());
+      setReferencesError("");
+      setSavingReferences(false);
+      setReferenceQuery("");
     }
   }, [open]);
+
+  useEffect(() => {
+    if (!open || !goalId) return;
+    let active = true;
+    setReferencesLoading(true);
+    setReferencesError("");
+    void productApi.listKnowledgeFiles()
+      .then((items) => {
+        if (!active) return;
+        setReferenceFiles(items.filter((item) => item.status !== "failed"));
+        setSelectedReferenceIds(new Set(items.filter((item) => item.goalIds.includes(goalId)).map((item) => item.id)));
+      })
+      .catch(() => {
+        if (!active) return;
+        setReferenceFiles([]);
+        setReferencesError("暂时无法读取参考资料，你仍可选择不使用资料生成。");
+      })
+      .finally(() => { if (active) setReferencesLoading(false); });
+    return () => { active = false; };
+  }, [goalId, open]);
+
+  function toggleReference(fileId: string) {
+    setSelectedReferenceIds((current) => {
+      const next = new Set(current);
+      if (next.has(fileId)) next.delete(fileId);
+      else next.add(fileId);
+      return next;
+    });
+  }
 
   async function handleNextStep(mode: KbMode) {
     setSelectedMode(mode);
@@ -136,8 +182,11 @@ export default function PlanModeSelector({
       const data = contextResult.status === "fulfilled"
         ? contextResult.value
         : { kb_overview: [], initial_understanding: "" };
-      setContextData(data);
-      if (data.kb_overview.length > 0) setPacingMode("auto");
+      const selectedOverview = referenceFiles
+        .filter((item) => selectedReferenceIds.has(item.id))
+        .map((item) => ({ title: item.name, char_count: item.contentLength, estimated_pages: Math.max(1, Math.ceil(item.contentLength / 600)) }));
+      setContextData({ ...data, kb_overview: selectedOverview.length ? selectedOverview : data.kb_overview });
+      if (selectedOverview.length > 0 || data.kb_overview.length > 0) setPacingMode("auto");
       if (placeholderResult.status === "fulfilled" && placeholderResult.value.placeholder) {
         setIntentPlaceholder(placeholderResult.value.placeholder);
       }
@@ -154,68 +203,118 @@ export default function PlanModeSelector({
     });
   }
 
-  function handleConfirm() {
+  async function handleConfirm() {
     if (!selectedMode) return;
+    setSavingReferences(true);
+    setReferencesError("");
+    try {
+      const changes = referenceFiles.filter((item) => item.goalIds.includes(goalId) !== selectedReferenceIds.has(item.id));
+      await Promise.all(changes.map((item) => productApi.updateKnowledgeFile(item.id, {
+        goal_ids: selectedReferenceIds.has(item.id)
+          ? Array.from(new Set([...item.goalIds, goalId]))
+          : item.goalIds.filter((id) => id !== goalId),
+      })));
+    } catch {
+      setReferencesError("资料关联保存失败，请重试后再生成计划。");
+      setSavingReferences(false);
+      return;
+    }
     const optionLines = Array.from(selectedOptions).map((o) => `- ${o}`).join("\n");
     const combined = [optionLines, freeText.trim()].filter(Boolean).join("\n");
     onConfirm(selectedMode, combined, pacingMode);
+    setSavingReferences(false);
   }
+
+  const visibleReferenceFiles = useMemo(() => {
+    const query = referenceQuery.trim().toLocaleLowerCase("zh-CN");
+    return referenceFiles
+      .filter((item) => !query || item.name.toLocaleLowerCase("zh-CN").includes(query))
+      .sort((a, b) => Number(selectedReferenceIds.has(b.id)) - Number(selectedReferenceIds.has(a.id)));
+  }, [referenceFiles, referenceQuery, selectedReferenceIds]);
 
   if (!open) return null;
 
   const intentOptions = INTENT_OPTIONS[goalType] ?? INTENT_OPTIONS.skill;
   const displayPlaceholder = intentPlaceholder || (INTENT_PLACEHOLDER[goalType] ?? INTENT_PLACEHOLDER.skill);
   const hasKbOverview = (contextData?.kb_overview?.length ?? 0) > 0;
-  const canConfirm = freeText.trim().length > 0 || selectedOptions.size > 0;
+  const hasSelectedReferences = selectedReferenceIds.size > 0 || hasKb;
+  const canConfirm = Boolean(selectedMode) && !savingReferences;
 
   return (
     <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4">
-      <div role="dialog" aria-modal="true" aria-label="选择计划生成方式" className="journal-dialog bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+      <div role="dialog" aria-modal="true" aria-label="选择计划生成方式" className="journal-dialog plan-mode-dialog bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <div className="flex items-center gap-2">
+          <div className="plan-mode-dialog-title flex items-center gap-2">
             {step === 2 && (
-              <button type="button" onClick={() => setStep(1)} className="p-1 rounded-lg hover:bg-gray-100 text-gray-400">
+              <button type="button" aria-label="返回资料使用方式" onClick={() => setStep(1)} className="p-1 rounded-lg hover:bg-gray-100 text-gray-400">
                 <ChevronLeft size={15} />
               </button>
             )}
-            <span className="text-sm font-semibold text-gray-800">
-              {step === 1 ? "步骤一：选择知识库模式" : "步骤二：描述学习意图"}
-            </span>
+            <strong className="plan-mode-dialog-title-copy text-gray-800">
+              {step === 1 ? "生成学习计划" : "补充学习意图"}
+            </strong>
           </div>
-          <button type="button" onClick={onClose} className="p-1 rounded-lg hover:bg-gray-100 text-gray-400">
+          <button type="button" aria-label="关闭计划设置" onClick={onClose} className="p-1 rounded-lg hover:bg-gray-100 text-gray-400">
             <X size={16} />
           </button>
         </div>
+        {error && <p className="mx-4 mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs leading-relaxed text-red-700" role="alert">{error}</p>}
 
         {step === 1 ? (
-          <div className="p-4 space-y-2">
-            {MODES.map((m) => {
-              const disabled = m.requiresKb && !hasKb;
-              return (
-                <button
-                  key={m.value}
-                  type="button"
-                  disabled={disabled}
-                  onClick={() => handleNextStep(m.value)}
-                  className={`w-full text-left px-4 py-3 rounded-xl border transition ${
-                    disabled
-                      ? "border-gray-100 bg-gray-50 opacity-40 cursor-not-allowed"
-                      : "border-gray-200 hover:border-blue-300 hover:bg-blue-50"
-                  }`}
-                >
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <span className="plan-mode-icon flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg">
-                      {m.icon}
-                    </span>
-                    <span className="text-sm font-medium text-gray-800">{m.label}</span>
-                    {m.requiresKb && !hasKb && (
-                      <span className="text-xs text-gray-400 ml-auto">需关联知识库</span>
-                    )}
-                  </div>
-                  <p className="text-xs text-gray-500 pl-6">{m.desc}</p>
-                </button>
-              );
-            })}
+          <div className="plan-mode-first-step p-4 space-y-3">
+            <section className="plan-mode-reference-section">
+              <header className="plan-mode-section-heading">
+                <span className="plan-mode-section-icon"><Link2 size={15} /></span>
+                <div><strong>关联参考资料</strong><small>为「{goalTitle || "当前目标"}」选择本次计划可使用的资料</small></div>
+                <span>{selectedReferenceIds.size ? `已选 ${selectedReferenceIds.size} 份` : "可选"}</span>
+              </header>
+              {referenceFiles.length > 4 && (
+                <label className="plan-mode-reference-search"><Search size={13} /><input value={referenceQuery} onChange={(event) => setReferenceQuery(event.target.value)} placeholder={`搜索 ${referenceFiles.length} 份资料`} /></label>
+              )}
+              {referencesLoading ? (
+                <p className="plan-mode-reference-empty"><Loader2 size={13} className="animate-spin" />正在读取资料…</p>
+              ) : referenceFiles.length ? (
+                <div className="plan-mode-reference-list">
+                  {visibleReferenceFiles.map((file) => {
+                    const selected = selectedReferenceIds.has(file.id);
+                    return <button key={file.id} type="button" className={selected ? "is-selected" : ""} aria-pressed={selected} onClick={() => toggleReference(file.id)}><span><BookText size={13} /><b>{file.name}</b></span><i>{selected && <Check size={12} />}</i></button>;
+                  })}
+                  {!visibleReferenceFiles.length && <p className="plan-mode-reference-no-result">没有匹配的资料</p>}
+                </div>
+              ) : (
+                <p className="plan-mode-reference-empty">暂无可选资料。<Link href="/studio/work/knowledge">前往知识库添加</Link></p>
+              )}
+              {referencesError && <p className="plan-mode-reference-error" role="alert">{referencesError}</p>}
+            </section>
+            <div className="plan-mode-section-heading plan-mode-choice-heading"><span className="plan-mode-section-icon"><SlidersHorizontal size={15} /></span><div><strong>选择生成方式</strong><small>确定参考资料在计划中的使用边界</small></div></div>
+            <ol className="plan-mode-option-list" aria-label="计划生成方式">
+              {MODES.map((m, index) => {
+                const disabled = m.requiresKb && !hasSelectedReferences;
+                const ModeIcon = m.icon;
+                return (
+                  <li key={m.value}>
+                    <button
+                      type="button"
+                      disabled={disabled}
+                      onClick={() => handleNextStep(m.value)}
+                      className={`plan-mode-option w-full text-left transition ${disabled ? "opacity-40 cursor-not-allowed" : ""}`}
+                    >
+                      <span className="plan-mode-option-index" aria-hidden="true">0{index + 1}</span>
+                      <span className="plan-mode-option-content">
+                        <span className="plan-mode-option-heading">
+                          <span className="plan-mode-option-icon" aria-hidden="true"><ModeIcon size={15} /></span>
+                          <strong className="plan-mode-option-title text-gray-800">{m.label}</strong>
+                        </span>
+                        <small className="plan-mode-option-description text-gray-500">{m.desc}</small>
+                      </span>
+                      {m.requiresKb && !hasSelectedReferences && (
+                        <span className="plan-mode-option-requirement text-gray-400 ml-auto">需先关联资料</span>
+                      )}
+                    </button>
+                  </li>
+                );
+              })}
+            </ol>
           </div>
         ) : contextLoading ? (
           <div className="flex items-center justify-center gap-2 py-10 text-gray-400 text-sm">
@@ -224,16 +323,16 @@ export default function PlanModeSelector({
         ) : (
           <div className="max-h-[70vh] overflow-y-auto p-4 space-y-4">
             {contextData?.initial_understanding && (
-              <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3">
-                <p className="text-xs font-medium text-blue-600 mb-1.5">AI 的初步理解</p>
-                <p className="text-xs text-blue-800 leading-relaxed">{contextData.initial_understanding}</p>
+              <div className="rounded-xl border border-accent-muted bg-accent-light px-4 py-3">
+                <p className="text-xs font-medium text-accent mb-1.5">AI 的初步理解</p>
+                <p className="text-xs text-accent-dark leading-relaxed">{contextData.initial_understanding}</p>
               </div>
             )}
 
             {hasKbOverview && (
               <div className="rounded-xl border border-gray-100 bg-gray-50 px-4 py-3">
                 <p className="text-xs font-medium text-gray-500 mb-1.5 flex items-center gap-1">
-                  <BookText size={12} />知识库文档
+                  <BookText size={12} />参考资料
                 </p>
                 <div className="space-y-1">
                   {contextData!.kb_overview.map((item, i) => (
@@ -256,7 +355,7 @@ export default function PlanModeSelector({
                     onClick={() => toggleOption(opt)}
                     className={`text-left text-xs px-3 py-2 rounded-lg border transition leading-snug ${
                       selectedOptions.has(opt)
-                        ? "border-blue-300 bg-blue-50 text-blue-700"
+                        ? "border-accent-muted bg-accent-light text-accent-dark"
                         : "border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50"
                     }`}
                   >
@@ -276,22 +375,23 @@ export default function PlanModeSelector({
                 onChange={(e) => setFreeText(e.target.value)}
                 placeholder={displayPlaceholder}
                 rows={3}
-                className="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none transition"
+                className="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-accent focus:border-transparent resize-none transition"
               />
             </div>
 
             {hasKbOverview && (
-              <div className="flex items-center justify-between px-3 py-2.5 rounded-xl border border-gray-100 bg-gray-50">
-                <div className="flex items-center gap-1.5">
-                  <Zap size={13} className="text-amber-500" />
-                  <span className="text-xs font-medium text-gray-700">自动估算学习节奏</span>
-                  <span className="text-xs text-gray-400">（按 KB 字数）</span>
+              <div className="plan-mode-pacing-row">
+                <div>
+                  <span className="plan-mode-pacing-icon"><Zap size={13} /></span>
+                  <span><strong>自动估算学习节奏</strong><small>根据所选资料的内容量调整阶段时长</small></span>
                 </div>
                 <button
                   type="button"
+                  aria-label="切换自动估算学习节奏"
+                  aria-pressed={pacingMode === "auto"}
                   onClick={() => setPacingMode((p) => (p === "auto" ? "fixed" : "auto"))}
                   className={`relative w-9 h-5 rounded-full transition-colors ${
-                    pacingMode === "auto" ? "bg-blue-600" : "bg-gray-300"
+                    pacingMode === "auto" ? "bg-accent" : "bg-gray-300"
                   }`}
                 >
                   <span
@@ -306,10 +406,10 @@ export default function PlanModeSelector({
             <button
               type="button"
               disabled={!canConfirm}
-              onClick={handleConfirm}
-              className="w-full py-2.5 rounded-xl text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
+              onClick={() => void handleConfirm()}
+              className="w-full py-2.5 rounded-xl text-sm font-medium bg-accent text-white hover:bg-accent-dark disabled:opacity-40 disabled:cursor-not-allowed transition"
             >
-              开始生成
+              {savingReferences ? <><Loader2 size={14} className="animate-spin inline mr-1" />正在保存资料关联…</> : "开始生成"}
             </button>
           </div>
         )}

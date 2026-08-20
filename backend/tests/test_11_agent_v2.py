@@ -4,7 +4,7 @@ import pytest
 from sqlalchemy import select
 
 from src.core.agent_v2.orchestrator import advance_run, claim_queued_run, create_run
-from src.core.agent_v2.planner import create_plan, parse_constraints
+from src.core.agent_v2.planner import deterministic_plan, parse_constraints
 from src.core.agent_v2.registry import build_registry
 from src.models import AgentRun
 
@@ -31,14 +31,14 @@ def test_planner_extracts_unavailable_weekday_and_time_granularity():
 
 def test_planner_retrieves_tools_for_analysis_and_knowledge():
     registry = build_registry()
-    _objective, analysis = create_plan(registry, "检查最近两周执行情况", None)
-    assert [step.tool_name for step in analysis] == [
+    analysis = deterministic_plan(registry, "检查最近两周执行情况", None)
+    assert [step.tool_name for step in analysis.steps] == [
         "context.load",
         "analytics.execution_summary",
     ]
-    objective, research = create_plan(registry, "搜索我的知识库里的线性代数资料", None)
-    assert objective["intent"] == "knowledge_research"
-    assert [step.tool_name for step in research] == ["knowledge.search"]
+    research = deterministic_plan(registry, "搜索我的知识库里的线性代数资料", None)
+    assert research.objective["intent"] == "knowledge_research"
+    assert [step.tool_name for step in research.steps] == ["knowledge.search"]
     assert all(tool["input_schema"] for tool in registry.public_catalog())
 
 
@@ -98,9 +98,7 @@ async def test_agent_run_approval_apply_and_undo(client, auth, goal_id, db):
     assert response.status_code == 201, response.text
     run = response.json()
     assert run["status"] == "queued"
-    stored = (
-        await db.execute(select(AgentRun).where(AgentRun.id == run["id"]))
-    ).scalar_one()
+    stored = (await db.execute(select(AgentRun).where(AgentRun.id == run["id"]))).scalar_one()
     await advance_run(db, user_id=stored.user_id, run_id=stored.id)
     run = (await client.get(f"/api/v2/agent/runs/{run['id']}", headers=auth)).json()
     assert run["status"] == "waiting_approval"
@@ -121,33 +119,29 @@ async def test_agent_run_approval_apply_and_undo(client, auth, goal_id, db):
         json={
             "approval_id": approval["id"],
             "change_hash": approval["change_hash"],
+            "change_set_version": approval["change_set_version"],
+            "run_state_version": approval["run_state_version"],
         },
     )
     assert approved.status_code == 200, approved.text
     assert approved.json()["status"] == "queued"
     await advance_run(db, user_id=stored.user_id, run_id=stored.id)
-    completed = (
-        await client.get(f"/api/v2/agent/runs/{run['id']}", headers=auth)
-    ).json()
+    completed = (await client.get(f"/api/v2/agent/runs/{run['id']}", headers=auth)).json()
     assert completed["status"] == "completed"
     assert completed["result"]["undo_available"] is True
 
     changed = await client.get("/api/v1/tasks", headers=auth)
     assert next(row for row in changed.json() if row["id"] == task_id)["date"] == operation["after"]
 
-    undone = await client.post(
-        f"/api/v2/agent/runs/{run['id']}/undo", headers=auth, json={}
-    )
+    undone = await client.post(f"/api/v2/agent/runs/{run['id']}/undo", headers=auth, json={})
     assert undone.status_code == 200, undone.text
-    assert undone.json()["status"] == "undone"
+    assert undone.json()["status"] == "rolled_back"
     restored = await client.get("/api/v1/tasks", headers=auth)
     assert next(row for row in restored.json() if row["id"] == task_id)["date"] == old_date
 
 
 @pytest.mark.asyncio
-async def test_agent_run_is_private_to_owner_and_deletable_when_stopped(
-    client, auth, goal_id, db
-):
+async def test_agent_run_is_private_to_owner_and_deletable_when_stopped(client, auth, goal_id, db):
     response = await client.post(
         "/api/v2/agent/runs",
         headers=auth,
@@ -162,35 +156,23 @@ async def test_agent_run_is_private_to_owner_and_deletable_when_stopped(
             "password": "testpass123",
         },
     )
-    other_auth = {"Authorization": f"Bearer {other.json()['access_token']}"}
-    hidden = await client.get(
-        f"/api/v2/agent/runs/{response.json()['id']}", headers=other_auth
-    )
+    other_auth = {"Authorization": f"Bearer {other.cookies.get('pp_access')}"}
+    hidden = await client.get(f"/api/v2/agent/runs/{response.json()['id']}", headers=other_auth)
     assert hidden.status_code == 404
-    active_delete = await client.delete(
-        f"/api/v2/agent/runs/{response.json()['id']}", headers=auth
-    )
+    active_delete = await client.delete(f"/api/v2/agent/runs/{response.json()['id']}", headers=auth)
     assert active_delete.status_code == 409
     stored = (
-        await db.execute(
-            select(AgentRun).where(AgentRun.id == response.json()["id"])
-        )
+        await db.execute(select(AgentRun).where(AgentRun.id == response.json()["id"]))
     ).scalar_one()
     await advance_run(db, user_id=stored.user_id, run_id=stored.id)
-    deleted = await client.delete(
-        f"/api/v2/agent/runs/{response.json()['id']}", headers=auth
-    )
+    deleted = await client.delete(f"/api/v2/agent/runs/{response.json()['id']}", headers=auth)
     assert deleted.status_code == 204
-    missing = await client.get(
-        f"/api/v2/agent/runs/{response.json()['id']}", headers=auth
-    )
+    missing = await client.get(f"/api/v2/agent/runs/{response.json()['id']}", headers=auth)
     assert missing.status_code == 404
 
 
 @pytest.mark.asyncio
-async def test_agent_can_edit_create_changeset_then_apply_and_undo(
-    client, auth, goal_id, db
-):
+async def test_agent_can_edit_create_changeset_then_apply_and_undo(client, auth, goal_id, db):
     response = await client.post(
         "/api/v2/agent/runs",
         headers=auth,
@@ -200,9 +182,7 @@ async def test_agent_can_edit_create_changeset_then_apply_and_undo(
         },
     )
     run = response.json()
-    stored = (
-        await db.execute(select(AgentRun).where(AgentRun.id == run["id"]))
-    ).scalar_one()
+    stored = (await db.execute(select(AgentRun).where(AgentRun.id == run["id"]))).scalar_one()
     await advance_run(db, user_id=stored.user_id, run_id=stored.id)
     run = (await client.get(f"/api/v2/agent/runs/{run['id']}", headers=auth)).json()
     approval = run["approvals"][0]
@@ -239,18 +219,14 @@ async def test_agent_can_edit_create_changeset_then_apply_and_undo(
     assert len(created) == 1
     assert not any(task["title"] == "复习章节 2" for task in tasks)
 
-    undone = await client.post(
-        f"/api/v2/agent/runs/{run['id']}/undo", headers=auth, json={}
-    )
+    undone = await client.post(f"/api/v2/agent/runs/{run['id']}/undo", headers=auth, json={})
     assert undone.status_code == 200
     tasks = (await client.get("/api/v1/tasks", headers=auth)).json()
     assert not any(task["title"] == "复习第一章" for task in tasks)
 
 
 @pytest.mark.asyncio
-async def test_agent_delete_task_is_approval_gated_and_reversible(
-    client, auth, goal_id, db
-):
+async def test_agent_delete_task_is_approval_gated_and_reversible(client, auth, goal_id, db):
     old_date = (date.today() + timedelta(days=2)).isoformat()
     task = (
         await client.post(
@@ -273,19 +249,29 @@ async def test_agent_delete_task_is_approval_gated_and_reversible(
         },
     )
     run = response.json()
-    stored = (
-        await db.execute(select(AgentRun).where(AgentRun.id == run["id"]))
-    ).scalar_one()
+    stored = (await db.execute(select(AgentRun).where(AgentRun.id == run["id"]))).scalar_one()
     await advance_run(db, user_id=stored.user_id, run_id=stored.id)
     run = (await client.get(f"/api/v2/agent/runs/{run['id']}", headers=auth)).json()
     approval = run["approvals"][0]
     assert approval["change_set"]["operations"][0]["field"] == "__delete__"
+    unconfirmed = await client.post(
+        f"/api/v2/agent/runs/{run['id']}/approve",
+        headers=auth,
+        json={
+            "approval_id": approval["id"],
+            "change_hash": approval["change_hash"],
+        },
+    )
+    assert unconfirmed.status_code == 409
     approved = await client.post(
         f"/api/v2/agent/runs/{run['id']}/approve",
         headers=auth,
         json={
             "approval_id": approval["id"],
             "change_hash": approval["change_hash"],
+            "change_set_version": approval["change_set_version"],
+            "run_state_version": approval["run_state_version"],
+            "high_risk_confirmed": True,
         },
     )
     assert approved.status_code == 200

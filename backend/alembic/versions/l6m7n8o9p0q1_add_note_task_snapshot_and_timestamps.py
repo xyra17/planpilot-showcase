@@ -5,11 +5,12 @@ Revises: k5l6m7n8o9p0
 Create Date: 2026-07-26
 """
 
-from typing import Sequence, Union
+from collections.abc import Sequence
+from typing import Union
 
-from alembic import op
 import sqlalchemy as sa
 
+from alembic import op
 
 revision: str = "l6m7n8o9p0q1"
 down_revision: Union[str, None] = "k5l6m7n8o9p0"
@@ -30,10 +31,7 @@ def upgrade() -> None:
             nullable=True,
         ),
     )
-    op.execute(
-        "UPDATE knowledge_items SET updated_at = created_at "
-        "WHERE updated_at IS NULL"
-    )
+    op.execute("UPDATE knowledge_items SET updated_at = created_at WHERE updated_at IS NULL")
     op.alter_column(
         "knowledge_items",
         "updated_at",
@@ -41,11 +39,7 @@ def upgrade() -> None:
         nullable=False,
         server_default=sa.text("now()"),
     )
-    op.drop_constraint(
-        "knowledge_items_task_id_fkey",
-        "knowledge_items",
-        type_="foreignkey",
-    )
+    op.execute("ALTER TABLE knowledge_items DROP CONSTRAINT IF EXISTS knowledge_items_task_id_fkey")
     op.create_foreign_key(
         "knowledge_items_task_id_fkey",
         "knowledge_items",
@@ -57,11 +51,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_constraint(
-        "knowledge_items_task_id_fkey",
-        "knowledge_items",
-        type_="foreignkey",
-    )
+    op.execute("ALTER TABLE knowledge_items DROP CONSTRAINT IF EXISTS knowledge_items_task_id_fkey")
     op.create_foreign_key(
         "knowledge_items_task_id_fkey",
         "knowledge_items",

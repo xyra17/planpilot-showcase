@@ -13,7 +13,9 @@ async def test_schedule_get_today_structure(client: AsyncClient, auth_headers: d
     assert isinstance(data["blocks"], list)
 
 
-async def test_schedule_blocks_saved_by_test_03(client: AsyncClient, auth_headers: dict, seed: dict):
+async def test_schedule_blocks_saved_by_test_03(
+    client: AsyncClient, auth_headers: dict, seed: dict
+):
     """test_03 已写入3个时间块，这里验证持久化结果。"""
     r = await client.get("/api/v1/schedule/today", headers=auth_headers)
     assert r.status_code == 200
@@ -77,3 +79,42 @@ async def test_schedule_empty_blocks_allowed(client: AsyncClient, auth_headers: 
     )
     assert r.status_code == 200
     assert r.json()["blocks"] == []
+
+
+@pytest.mark.parametrize(
+    "blocks",
+    [
+        [
+            {
+                "id": "cross-midnight",
+                "label": "late",
+                "startHour": 23.5,
+                "durationMinutes": 31,
+                "color": "#000",
+            }
+        ],
+        [
+            {
+                "id": "first",
+                "label": "first",
+                "startHour": 9,
+                "durationMinutes": 60,
+                "color": "#000",
+            },
+            {
+                "id": "second",
+                "label": "second",
+                "startHour": 9.5,
+                "durationMinutes": 60,
+                "color": "#000",
+            },
+        ],
+    ],
+)
+async def test_schedule_rejects_ambiguous_time_blocks(
+    client: AsyncClient, auth_headers: dict, blocks: list[dict]
+):
+    r = await client.put(
+        "/api/v1/schedule/today", json={"blocks": blocks}, headers=auth_headers
+    )
+    assert r.status_code == 422

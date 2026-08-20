@@ -103,9 +103,7 @@ async def evaluate_case(route: str, case: dict[str, Any]) -> dict[str, Any]:
     started = time.perf_counter()
     try:
         response_format = (
-            {"type": "json_object"}
-            if case["validator"]["type"] == "json_keys"
-            else None
+            {"type": "json_object"} if case["validator"]["type"] == "json_keys" else None
         )
         system_prompt = INTENT_SYSTEM if case["category"] == "intent" else _SYSTEM
         response = await client.chat.completions.create(
@@ -134,10 +132,7 @@ async def evaluate_case(route: str, case: dict[str, Any]) -> dict[str, Any]:
             )
         if case["validator"]["type"] == "max_chars":
             text = compact_text(text, case["validator"]["value"])
-        if any(
-            phrase in case["prompt"]
-            for phrase in ("只用中文", "纯中文", "禁止使用英文")
-        ):
+        if any(phrase in case["prompt"] for phrase in ("只用中文", "纯中文", "禁止使用英文")):
             text = enforce_chinese_only(text)
         try:
             passed = validate(text, case["validator"])
@@ -208,7 +203,11 @@ async def main() -> None:
         ),
         "results": results,
     }
-    print(json.dumps({key: value for key, value in report.items() if key != "results"}, ensure_ascii=False))
+    print(
+        json.dumps(
+            {key: value for key, value in report.items() if key != "results"}, ensure_ascii=False
+        )
+    )
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(json.dumps(report, ensure_ascii=False, indent=2))

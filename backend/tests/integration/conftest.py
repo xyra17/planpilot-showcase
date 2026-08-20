@@ -9,6 +9,7 @@ from httpx import ASGITransport, AsyncClient
 
 try:
     from dotenv import load_dotenv
+
     load_dotenv(Path(__file__).parent.parent.parent / ".env", override=False)
 except ImportError:
     pass
@@ -36,8 +37,13 @@ _PGSession = async_sessionmaker(_PG_ENGINE, expire_on_commit=False)
 _db.engine = _PG_ENGINE
 _db.AsyncSessionLocal = _PGSession
 
+from src.api.auth import limiter as auth_limiter  # noqa: E402
+from src.config import settings  # noqa: E402
 from src.database import Base  # noqa: E402
 from src.main import app  # noqa: E402
+
+app.state.limiter.enabled = False
+auth_limiter.enabled = False
 
 REPORTS_DIR = Path(__file__).parent / "reports"
 REPORTS_DIR.mkdir(exist_ok=True)
@@ -49,6 +55,7 @@ def _mock_celery():
     with (
         patch("src.tasks.deviation.check_all_deviations.apply_async", return_value=None),
         patch("src.tasks.knowledge.process_knowledge_item.apply_async", return_value=None),
+        patch("src.tasks.agent_runs.execute_agent_run.apply_async", return_value=None),
     ):
         yield
 
@@ -64,32 +71,24 @@ async def _close_redis_after_test():
 @pytest.fixture(scope="session", autouse=True)
 async def setup_db():
     from sqlalchemy import text
+
     async with _PG_ENGINE.begin() as conn:
         # pgvector 扩展必须在建表前存在
         await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+        # 集成测试库的数据本就会在每次运行时清空。重建 schema 可保证 typed ORM
+        # 与最新迁移阶段一致，避免 create_all 无法补列造成旧 schema 假失败。
+        await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
-        # create_all 不会更新已经存在的测试表；补齐最新学习记录 schema。
-        await conn.execute(text(
-            "ALTER TABLE knowledge_items "
-            "ADD COLUMN IF NOT EXISTS task_title_snapshot TEXT"
-        ))
-        await conn.execute(text(
-            "ALTER TABLE knowledge_items "
-            "ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITHOUT TIME ZONE "
-            "NOT NULL DEFAULT now()"
-        ))
-        await conn.execute(text(
-            "ALTER TABLE knowledge_items "
-            "DROP CONSTRAINT IF EXISTS knowledge_items_task_id_fkey"
-        ))
-        await conn.execute(text(
-            "ALTER TABLE knowledge_items "
-            "ADD CONSTRAINT knowledge_items_task_id_fkey "
-            "FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL"
-        ))
-        # 清空上次运行遗留数据（保留 schema），确保测试幂等
-        for table in reversed(Base.metadata.sorted_tables):
-            await conn.execute(table.delete())
+        # FetchedValue 让 SQLite 单测可建表；PostgreSQL 的真实 default 由迁移创建，
+        # 因此重建集成测试 schema 后补回对应 sequence/default。
+        await conn.execute(text("CREATE SEQUENCE IF NOT EXISTS agent_audit_event_sequence"))
+        await conn.execute(text("ALTER SEQUENCE agent_audit_event_sequence RESTART WITH 1"))
+        await conn.execute(
+            text(
+                "ALTER TABLE agent_audit_events ALTER COLUMN sequence "
+                "SET DEFAULT nextval('agent_audit_event_sequence')"
+            )
+        )
     yield
     # 不 drop tables，schema 保留
 
@@ -99,25 +98,19 @@ def shared():
     state = {}
     yield state
     snapshot = REPORTS_DIR / "test_data_snapshot.json"
-    snapshot.write_text(
-        json.dumps(state, indent=2, ensure_ascii=False), encoding="utf-8"
-    )
+    snapshot.write_text(json.dumps(state, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
 @pytest.fixture(scope="session")
 async def client(setup_db):
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as ac:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         yield ac
     await _PG_ENGINE.dispose()
 
 
 @pytest.fixture(scope="session")
 def seed():
-    return json.loads(
-        (Path(__file__).parent / "fixtures/seed_data.json").read_text()
-    )
+    return json.loads((Path(__file__).parent / "fixtures/seed_data.json").read_text())
 
 
 @pytest.fixture(scope="session")
@@ -130,7 +123,8 @@ async def auth_headers(client, shared, seed):
             json={"email": seed["user"]["email"], "password": seed["user"]["password"]},
         )
     assert r.status_code in (200, 201), r.text
-    token = r.json()["access_token"]
+    token = r.cookies.get(settings.auth_access_cookie_name)
+    assert token
     shared["user"] = r.json().get("user", {})
     shared["token"] = token
     return {"Authorization": f"Bearer {token}"}
