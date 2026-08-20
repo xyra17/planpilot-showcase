@@ -39,6 +39,11 @@ output/
 # ==== 独立站点仓库（单独维护 Git 历史）====
 website/
 
+# ==== 本地恢复快照（规范化源码归档除外）====
+archive/frontend-recovered-*/
+archive/frontend-snapshot-*/
+archive/*.zip
+
 # ==== 测试报告（本地生成）====
 backend/tests/integration/reports/*.html
 backend/tests/integration/reports/test_data_snapshot.json
