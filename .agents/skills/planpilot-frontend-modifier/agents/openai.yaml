@@ -1,0 +1,4 @@
+interface:
+  display_name: "PlanPilot 前端修改"
+  short_description: "按项目历史偏好安全修改并验收 PlanPilot 前端"
+  default_prompt: "Use $planpilot-frontend-modifier to modify and visually verify the requested PlanPilot frontend UI."
