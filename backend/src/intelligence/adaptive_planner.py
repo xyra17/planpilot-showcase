@@ -13,7 +13,7 @@ from src.intelligence.cognitive_model import CognitiveProfileBuilder
 from src.intelligence.decision_context import DecisionContextBuilder
 from src.intelligence.knowledge_graph import KnowledgeGraphService
 from src.models import DecisionProposal, Goal, Task
-from src.services import proposal_service
+from src.services import privacy_service, proposal_service
 from src.services.calibration_service import record_task_failure_prediction
 from src.services.proposal_service import ProposalCreate
 
@@ -123,7 +123,8 @@ class AdaptivePlanOptimizer:
                 daily_load.get(task.scheduled_date, 0) + task.estimated_mins
             )
         completion_rate = (context.get("profile") or {}).get("completion_rate_30d")
-        procrastination = cognitive.procrastination_score if cognitive else None
+        sensitive_allowed = await privacy_service.sensitive_inference_allowed(db, user_id)
+        procrastination = cognitive.procrastination_score if cognitive and sensitive_allowed else None
         risks = [
             FailurePredictor.predict(
                 task,

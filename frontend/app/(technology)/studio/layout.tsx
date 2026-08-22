@@ -16,6 +16,7 @@ import "@/styles/technology/clock-time-picker.css";
 import "@/styles/technology/quick-task-select.css";
 import "@/styles/technology/theme-coherence.css";
 import "@/styles/technology/today-workspace.css";
+import "@/styles/technology/personalization-workspace.css";
 
 export default function TechnologyWorkspaceLayout({
   children,

@@ -383,10 +383,10 @@ export default function WorkPage() {
   const [goalsLoaded, setGoalsLoaded] = useState(false);
   const [habitInsight, setHabitInsight] = useState<DashboardLeadData["habitInsight"]>({
     eyebrow: "LEARNING SIGNAL · LOADING",
-    title: "正在读取你的长期学习画像",
-    description: "这里只展示有长期行为记录支持的学习习惯。",
-    href: "/studio/coach/memory",
-    actionLabel: "打开学习记忆",
+    title: "正在读取与你有关的学习观察",
+    description: "这里只展示有具体记录支持、可由你纠正的观察。",
+    href: "/studio/coach",
+    actionLabel: "询问学习伙伴",
   });
   const [goalProgressRows, setGoalProgressRows] = useState<GoalProgress[]>([]);
   const [goalProgressStatus, setGoalProgressStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
@@ -447,10 +447,10 @@ export default function WorkPage() {
       setLearnerContextStatus("idle");
       setHabitInsight({
         eyebrow: "LEARNING SIGNAL · GUEST MODE",
-        title: "登录后开始形成长期学习画像",
-        description: "当前是访客模式；登录并持续完成任务后，Pilo 才会根据跨天记录识别你的学习习惯。",
+        title: "登录后启用个性化学习建议",
+        description: "当前是访客模式；登录后可选择是否让 Pilo 根据跨天记录形成可纠正的学习观察。",
         href: "/login?returnTo=%2Fstudio%2Fwork",
-        actionLabel: "登录并同步画像",
+        actionLabel: "登录并查看选择",
       });
       return;
     }
@@ -459,10 +459,10 @@ export default function WorkPage() {
     setLearnerContextStatus("loading");
     setHabitInsight({
       eyebrow: "LEARNING SIGNAL · LOADING",
-      title: "正在读取你的长期学习画像",
-      description: "这里只展示有长期行为记录支持的学习习惯。",
-      href: "/studio/coach/memory",
-      actionLabel: "打开学习记忆",
+      title: "正在读取与你有关的学习观察",
+      description: "这里只展示有具体记录支持、可由你纠正的观察。",
+      href: "/studio/coach",
+      actionLabel: "询问学习伙伴",
     });
     void learnerApi.getDecisionContext(null)
       .then((context) => {
@@ -478,11 +478,11 @@ export default function WorkPage() {
             || second.evidence_count - first.evidence_count;
         })[0];
         setHabitInsight(pattern ? habitInsightFromPattern(pattern) : {
-          eyebrow: "LEARNING SIGNAL · BUILDING PROFILE",
-          title: "Pilo 正在形成你的长期学习画像",
-          description: "继续完成任务并记录实际投入后，这里会出现有行为证据支持的长期习惯。",
-          href: "/studio/coach/memory",
-          actionLabel: "查看画像进度",
+          eyebrow: "LEARNING SIGNAL · OBSERVING",
+          title: "还没有需要你核对的学习观察",
+          description: "继续完成任务并记录实际投入后，具体观察会连同判断依据一起出现。",
+          href: "/studio/coach",
+          actionLabel: "询问学习伙伴",
         });
       })
       .catch(() => {
@@ -491,10 +491,10 @@ export default function WorkPage() {
         setLearnerContextStatus("error");
         setHabitInsight({
           eyebrow: "LEARNING SIGNAL · UNAVAILABLE",
-          title: "长期学习画像暂时无法读取",
-          description: "今日计划仍可正常使用；画像恢复后，这里才会展示真实的长期习惯。",
-          href: "/studio/coach/memory",
-          actionLabel: "打开学习记忆",
+          title: "个性化观察暂时无法读取",
+          description: "今日计划仍可正常使用；稍后可以向学习伙伴询问具体建议依据。",
+          href: "/studio/coach",
+          actionLabel: "询问学习伙伴",
         });
       });
     return () => { active = false; };
@@ -918,12 +918,12 @@ export default function WorkPage() {
           unit: authStatus === "authenticated" && learnerContextStatus === "ready" ? "项" : undefined,
           detail: authStatus !== "authenticated"
             ? "登录后读取真实知识缺口"
-            : learnerContextStatus === "error" ? "学习画像暂时无法读取" : learnerContextStatus === "ready"
+            : learnerContextStatus === "error" ? "知识复习状态暂时无法读取" : learnerContextStatus === "ready"
               ? lowRetentionGapCount ? `${lowRetentionGapCount} 项保持率低于 50%` : knowledgeGaps.length ? "当前没有高遗忘风险" : "目前没有识别到知识缺口"
               : "正在分析知识缺口",
           icon: BrainCircuit,
           tone: "amber",
-          href: "/studio/coach/memory",
+          href: "/studio/work/knowledge",
         },
       ],
     };

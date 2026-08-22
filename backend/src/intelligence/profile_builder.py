@@ -26,6 +26,9 @@ class ProfileBuilder:
         *,
         window_days: int = DEFAULT_WINDOW_DAYS,
     ) -> dict[str, int]:
+        consent = await db.get(UserDataConsent, user_id)
+        if consent is not None and not consent.personalization_enabled:
+            return {"goal_count": 0, "event_count": 0}
         now = utc_now()
         since = now - timedelta(days=window_days)
 

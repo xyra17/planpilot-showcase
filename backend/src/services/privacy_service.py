@@ -5,33 +5,57 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config import settings
+from src.core.privacy_fields import SENSITIVE_INFERENCE_FIELDS
 from src.core.time import utc_now
 from src.models import (
+    AgentApproval,
+    AgentAuditEvent,
     AgentFeedbackEvent,
     AgentInvocation,
+    AgentRun,
+    AgentStep,
     AgentTraceSpan,
     AuthSession,
     CheckinRecord,
+    CoachConversation,
+    CoachPreference,
     ConsentAuditEvent,
+    DailyBriefCache,
+    DailySchedule,
     DataExportAudit,
     DataQualitySnapshot,
     DecisionProposal,
     ExperimentAssignment,
+    ExperimentExposure,
     Goal,
+    GoalVersion,
+    KnowledgeBase,
+    KnowledgeChunk,
+    KnowledgeEdge,
+    KnowledgeItem,
+    KnowledgeItemFileVersion,
+    KnowledgeItemGoalLink,
+    KnowledgeItemLibraryLink,
     LearnerCognitiveProfile,
     LearnerPattern,
     LearnerPatternAudit,
     LearnerPatternSuppression,
     LearnerProfile,
+    LearningConcept,
+    LearningDebt,
     LearningEvent,
     LearningMemory,
+    PatternEvidence,
+    Plan,
     PredictionObservation,
+    ProductFeedbackSignal,
     ProposalFeedback,
     Task,
+    TaskMasteryRecord,
     User,
     UserDataConsent,
 )
@@ -39,6 +63,11 @@ from src.models import (
 POLICY_VERSION = "2026-08"
 EXPORT_SCHEMA_VERSION = "planpilot-user-export-v1"
 QUALITY_SCHEMA_VERSION = "learning-data-quality-v1"
+EXPORT_EXCLUSIONS = {
+    "authentication_secrets": "密码哈希、刷新令牌哈希、验证与重置令牌不导出",
+    "binary_and_search_indexes": "服务器文件路径、向量嵌入与可重建搜索索引不导出",
+    "internal_operations": "工作进程租约、内部 trace span 与全局运维/评测记录不导出",
+}
 
 
 def consent_dict(row: UserDataConsent) -> dict[str, Any]:
@@ -69,6 +98,12 @@ async def experiments_allowed(db: AsyncSession, user_id: str) -> bool:
 async def personalization_allowed(db: AsyncSession, user_id: str) -> bool:
     row = await db.get(UserDataConsent, user_id)
     return row is None or row.personalization_enabled
+
+
+async def sensitive_inference_allowed(db: AsyncSession, user_id: str) -> bool:
+    """Sensitive behavioral inference is opt-in and only usable with personalization."""
+    row = await db.get(UserDataConsent, user_id)
+    return bool(row and row.personalization_enabled and row.sensitive_inference_enabled)
 
 
 async def evidence_participation_status(
@@ -115,13 +150,24 @@ async def update_consent(
 ) -> dict[str, Any]:
     if request_id:
         prior = await db.scalar(
-            select(ConsentAuditEvent).where(ConsentAuditEvent.request_id == request_id)
+            select(ConsentAuditEvent).where(
+                ConsentAuditEvent.request_id == request_id,
+                ConsentAuditEvent.user_id == user_id,
+            )
         )
         if prior is not None:
-            return consent_dict(await get_or_create_consent(db, user_id))
+            current = await get_or_create_consent(db, user_id)
+            erased = False
+            if erase_derived_data and not current.personalization_enabled:
+                await erase_personalization_derivatives(db, user_id)
+                await db.commit()
+                erased = True
+            return {
+                **consent_dict(current),
+                "derived_data_erased": erased,
+            }
 
     row = await get_or_create_consent(db, user_id)
-    personalization_was_enabled = row.personalization_enabled
     for key, value in changes.items():
         setattr(row, key, value)
     row.policy_version = POLICY_VERSION
@@ -146,8 +192,10 @@ async def update_consent(
     )
     if not row.experiments_enabled:
         await db.execute(delete(ExperimentAssignment).where(ExperimentAssignment.user_id == user_id))
+    if "sensitive_inference_enabled" in changes and not row.sensitive_inference_enabled:
+        await erase_sensitive_inferences(db, user_id)
     erased = False
-    if personalization_was_enabled and not row.personalization_enabled and erase_derived_data:
+    if not row.personalization_enabled and erase_derived_data:
         await erase_personalization_derivatives(db, user_id)
         erased = True
     result = {**consent_dict(row), "derived_data_erased": erased}
@@ -169,6 +217,15 @@ async def erase_personalization_derivatives(db: AsyncSession, user_id: str) -> N
         await db.execute(delete(model).where(model.user_id == user_id))
 
 
+async def erase_sensitive_inferences(db: AsyncSession, user_id: str) -> None:
+    """Remove stored opt-in behavioral scores while preserving non-sensitive metrics."""
+    await db.execute(
+        update(LearnerCognitiveProfile)
+        .where(LearnerCognitiveProfile.user_id == user_id)
+        .values(**{field: None for field in SENSITIVE_INFERENCE_FIELDS})
+    )
+
+
 def _json_value(value: Any) -> Any:
     if isinstance(value, (datetime, date)):
         return value.isoformat()
@@ -180,9 +237,16 @@ def _json_value(value: Any) -> Any:
 
 
 def _public_row(row: Any, *, omit: set[str] | None = None) -> dict[str, Any]:
-    blocked = {"hashed_password", "refresh_token_hash", "token"} | (omit or set())
+    blocked = {
+        "hashed_password",
+        "refresh_token_hash",
+        "token",
+        "lease_token",
+    } | (omit or set())
     return {
-        column.key: _json_value(getattr(row, column.key))
+        column.key: _json_value(
+            getattr(row, row.__mapper__.get_property_by_column(column).key)
+        )
         for column in row.__table__.columns
         if column.key not in blocked
     }
@@ -194,30 +258,118 @@ async def build_user_export(db: AsyncSession, user: User) -> dict[str, Any]:
     tasks = list(
         (await db.execute(select(Task).where(Task.goal_id.in_(goal_ids)))).scalars()
     ) if goal_ids else []
+    plans = list(
+        (await db.execute(select(Plan).where(Plan.goal_id.in_(goal_ids)))).scalars()
+    ) if goal_ids else []
+    item_rows = list(
+        (await db.execute(select(KnowledgeItem).where(KnowledgeItem.user_id == user.id))).scalars()
+    )
+    item_ids = [row.id for row in item_rows]
     owned_models = {
-        "checkins": CheckinRecord,
-        "learning_events": LearningEvent,
-        "learner_profiles": LearnerProfile,
-        "learner_patterns": LearnerPattern,
-        "learner_pattern_audits": LearnerPatternAudit,
-        "learner_pattern_suppressions": LearnerPatternSuppression,
-        "cognitive_profiles": LearnerCognitiveProfile,
-        "learning_memories": LearningMemory,
-        "proposals": DecisionProposal,
-        "proposal_feedback": ProposalFeedback,
-        "prediction_observations": PredictionObservation,
-        "agent_feedback_events": AgentFeedbackEvent,
-        "consent_history": ConsentAuditEvent,
+        "coach_conversations": (CoachConversation, set()),
+        "coach_preferences": (CoachPreference, set()),
+        "knowledge_bases": (KnowledgeBase, set()),
+        "daily_briefs": (DailyBriefCache, set()),
+        "daily_schedules": (DailySchedule, set()),
+        "learning_debts": (LearningDebt, set()),
+        "checkins": (CheckinRecord, set()),
+        "learning_events": (LearningEvent, set()),
+        "learner_profiles": (LearnerProfile, set()),
+        "learner_patterns": (LearnerPattern, set()),
+        "learner_pattern_audits": (LearnerPatternAudit, set()),
+        "learner_pattern_suppressions": (LearnerPatternSuppression, set()),
+        "cognitive_profiles": (LearnerCognitiveProfile, set()),
+        "learning_memories": (LearningMemory, set()),
+        "learning_concepts": (LearningConcept, set()),
+        "knowledge_edges": (KnowledgeEdge, set()),
+        "task_mastery_records": (TaskMasteryRecord, set()),
+        "proposals": (DecisionProposal, {"agent_trace"}),
+        "proposal_feedback": (ProposalFeedback, set()),
+        "prediction_observations": (PredictionObservation, set()),
+        "agent_runs": (AgentRun, {"worker_id", "trace_context"}),
+        "agent_invocations": (
+            AgentInvocation,
+            {"input_context_hash", "prompt_render_hash"},
+        ),
+        "agent_feedback_events": (AgentFeedbackEvent, set()),
+        "product_feedback_signals": (ProductFeedbackSignal, set()),
+        "data_quality_snapshots": (DataQualitySnapshot, set()),
+        "data_export_history": (DataExportAudit, set()),
+        "experiment_assignments": (ExperimentAssignment, set()),
+        "consent_history": (ConsentAuditEvent, set()),
     }
     sections: dict[str, list[dict[str, Any]]] = {
         "goals": [_public_row(row) for row in goals],
         "tasks": [_public_row(row) for row in tasks],
+        "plans": [_public_row(row) for row in plans],
+        "knowledge_items": [
+            _public_row(row, omit={"file_path", "embedding"}) for row in item_rows
+        ],
     }
-    for name, model in owned_models.items():
+    for name, (model, omit) in owned_models.items():
         rows = list(
             (await db.execute(select(model).where(model.user_id == user.id))).scalars()
         )
-        sections[name] = [_public_row(row) for row in rows]
+        sections[name] = [_public_row(row, omit=omit) for row in rows]
+
+    async def linked_rows(model: Any, column: Any, ids: list[str]) -> list[Any]:
+        if not ids:
+            return []
+        return list((await db.execute(select(model).where(column.in_(ids)))).scalars())
+
+    pattern_ids = [row["id"] for row in sections["learner_patterns"]]
+    run_ids = [row["id"] for row in sections["agent_runs"]]
+    assignment_ids = [row["id"] for row in sections["experiment_assignments"]]
+    agent_steps = await linked_rows(AgentStep, AgentStep.run_id, run_ids)
+    sections.update(
+        {
+            "goal_versions": [
+                _public_row(row)
+                for row in await linked_rows(GoalVersion, GoalVersion.goal_id, goal_ids)
+            ],
+            "knowledge_item_goal_links": [
+                _public_row(row)
+                for row in await linked_rows(
+                    KnowledgeItemGoalLink, KnowledgeItemGoalLink.item_id, item_ids
+                )
+            ],
+            "knowledge_item_library_links": [
+                _public_row(row)
+                for row in await linked_rows(
+                    KnowledgeItemLibraryLink, KnowledgeItemLibraryLink.item_id, item_ids
+                )
+            ],
+            "knowledge_item_file_versions": [
+                _public_row(row, omit={"file_path"})
+                for row in await linked_rows(
+                    KnowledgeItemFileVersion, KnowledgeItemFileVersion.item_id, item_ids
+                )
+            ],
+            "knowledge_chunks": [
+                _public_row(row, omit={"embedding"})
+                for row in await linked_rows(KnowledgeChunk, KnowledgeChunk.item_id, item_ids)
+            ],
+            "pattern_evidence": [
+                _public_row(row)
+                for row in await linked_rows(PatternEvidence, PatternEvidence.pattern_id, pattern_ids)
+            ],
+            "agent_steps": [_public_row(row) for row in agent_steps],
+            "agent_approvals": [
+                _public_row(row)
+                for row in await linked_rows(AgentApproval, AgentApproval.run_id, run_ids)
+            ],
+            "agent_audit_events": [
+                _public_row(row)
+                for row in await linked_rows(AgentAuditEvent, AgentAuditEvent.run_id, run_ids)
+            ],
+            "experiment_exposures": [
+                _public_row(row, omit={"context_hash"})
+                for row in await linked_rows(
+                    ExperimentExposure, ExperimentExposure.assignment_id, assignment_ids
+                )
+            ],
+        }
+    )
 
     consent = await get_or_create_consent(db, user.id)
     account = _public_row(user, omit={"is_admin", "is_active"})
@@ -226,6 +378,10 @@ async def build_user_export(db: AsyncSession, user: User) -> dict[str, Any]:
         "generated_at": utc_now().isoformat(),
         "account": account,
         "consent": consent_dict(consent),
+        "scope": {
+            "description": "账号、用户创建内容、必要关联行及与该账号相关的系统生成数据",
+            "excluded": EXPORT_EXCLUSIONS,
+        },
         "data": sections,
     }
     counts = {name: len(rows) for name, rows in sections.items()}

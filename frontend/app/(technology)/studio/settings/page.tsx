@@ -20,6 +20,8 @@ import {
   PencilLine,
   Plus,
   Save,
+  ShieldCheck,
+  Trash2,
   Undo2,
   UserRound,
   X,
@@ -31,6 +33,8 @@ import { useAuth } from "@/components/technology/AuthProvider";
 import { AvatarCropDialog } from "@/components/technology/AvatarCropDialog";
 import { ClockTimePicker } from "@/components/technology/ClockTimePicker";
 import { UserAvatar } from "@/components/technology/UserAvatar";
+import { DataSyncNotice } from "@/components/ui/DataSyncNotice";
+import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
 import {
   type AccentColor,
   type SurfaceTheme,
@@ -45,6 +49,7 @@ import {
   type WeeklyAvailability,
 } from "@/lib/technology/dayScheduler";
 import { readScopedJson, scopedStorageKey, writeScopedJson } from "@/lib/technology/scopedStorage";
+import { privacyApi, type ConsentPatch, type PrivacyConsent, type PrivacyPurpose } from "@/lib/privacy-api";
 
 const WEEKDAY_LABELS: Record<WeekdayKey, string> = {
   mon: "周一", tue: "周二", wed: "周三", thu: "周四",
@@ -103,6 +108,7 @@ export default function SettingsPage() {
     setAccent,
     saveAppearance,
   } = useTheme();
+  const { confirmAction } = useConfirmDialog();
   const [timezone, setTimezone] = useState("Asia/Shanghai");
   const [reminderEnabled, setReminderEnabled] = useState(false);
   const [reminderTime, setReminderTime] = useState("21:30");
@@ -126,10 +132,39 @@ export default function SettingsPage() {
   const [busy, setBusy] = useState(false);
   const [syncBusy, setSyncBusy] = useState(false);
   const [exportBusy, setExportBusy] = useState(false);
+  const [localExportBusy, setLocalExportBusy] = useState(false);
+  const [privacyConsent, setPrivacyConsent] = useState<PrivacyConsent | null>(null);
+  const [privacyState, setPrivacyState] = useState<"loading" | "idle" | "saving" | "saved" | "error">("idle");
+  const [privacyError, setPrivacyError] = useState("");
+  const [failedConsentPatch, setFailedConsentPatch] = useState<ConsentPatch | null>(null);
+  const [privacyLoadAttempt, setPrivacyLoadAttempt] = useState(0);
+  const [showPersonalizationChoice, setShowPersonalizationChoice] = useState(false);
   const [avatarBusy, setAvatarBusy] = useState(false);
   const [avatarCropFile, setAvatarCropFile] = useState<File | null>(null);
   const [activeSection, setActiveSection] = useState("settings-appearance");
   const avatarInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (status !== "authenticated") {
+      setPrivacyConsent(null);
+      setPrivacyState("idle");
+      return;
+    }
+    let active = true;
+    setPrivacyState("loading");
+    setPrivacyError("");
+    setFailedConsentPatch(null);
+    void privacyApi.getConsent().then((consent) => {
+      if (!active) return;
+      setPrivacyConsent(consent);
+      setPrivacyState("idle");
+    }).catch((reason) => {
+      if (!active) return;
+      setPrivacyError(reason instanceof Error ? reason.message : "隐私选择加载失败");
+      setPrivacyState("error");
+    });
+    return () => { active = false; };
+  }, [privacyLoadAttempt, status]);
 
   useEffect(() => {
     if (user) {
@@ -224,7 +259,7 @@ export default function SettingsPage() {
   }, [notice]);
 
   useEffect(() => {
-    const sectionIds = ["settings-appearance", "settings-preferences", "settings-reminders", "settings-account"];
+    const sectionIds = ["settings-appearance", "settings-preferences", "settings-reminders", "settings-privacy", "settings-account"];
     let frame = 0;
     const updateActiveSection = () => {
       window.cancelAnimationFrame(frame);
@@ -382,11 +417,68 @@ export default function SettingsPage() {
     }
   }
 
+  async function updatePrivacyConsent(patch: ConsentPatch, successMessage = "隐私选择已保存") {
+    if (status !== "authenticated") { feedback("登录后才能同步隐私选择", true); return; }
+    setPrivacyState("saving");
+    setPrivacyError("");
+    setFailedConsentPatch(null);
+    try {
+      const next = await privacyApi.updateConsent({
+        ...patch,
+        request_id: `${Date.now()}-${crypto.randomUUID()}`,
+      });
+      setPrivacyConsent(next);
+      setPrivacyState("saved");
+      setShowPersonalizationChoice(false);
+      feedback(successMessage);
+    } catch (reason) {
+      const message = reason instanceof Error ? reason.message : "隐私选择保存失败";
+      setPrivacyError(message);
+      setFailedConsentPatch(patch);
+      setPrivacyState("error");
+      feedback(message, true);
+    }
+  }
+
+  async function togglePrivacyPurpose(purpose: PrivacyPurpose) {
+    if (!privacyConsent || privacyState === "saving") return;
+    if (purpose === "personalization_enabled" && privacyConsent.personalization_enabled) {
+      setShowPersonalizationChoice(true);
+      return;
+    }
+    await updatePrivacyConsent({ [purpose]: !privacyConsent[purpose] });
+  }
+
+  async function eraseDerivedData() {
+    const alreadyDisabled = privacyConsent?.personalization_enabled === false;
+    if (!await confirmAction({
+      title: alreadyDisabled ? "清除已保留的学习画像与派生数据？" : "关闭个性化并清除派生数据？",
+      description: `系统生成的学习观察、画像、认知推断和学习记忆会被清除。你创建的目标、任务、笔记和知识内容不会删除。此操作不可撤销${alreadyDisabled ? "；个性化会保持关闭" : "，并会关闭个性化建议"}。`,
+      confirmLabel: alreadyDisabled ? "清除已保留数据" : "关闭并清除",
+      tone: "danger",
+    })) return;
+    await updatePrivacyConsent(
+      { personalization_enabled: false, erase_derived_data: true },
+      alreadyDisabled ? "已保留的派生数据已清除，个性化保持关闭" : "个性化已关闭，系统生成的派生数据已清除",
+    );
+  }
+
   async function exportData() {
     setExportBusy(true);
     try {
-      await new Promise((resolve) => window.setTimeout(resolve, 220));
-      const data: Record<string, unknown> = { exported_at: new Date().toISOString(), user };
+      const size = await privacyApi.exportServerData();
+      feedback(`服务器端可携带数据已导出 · ${Math.max(1, Math.ceil(size / 1024))} KB`);
+    } catch (reason) {
+      feedback(reason instanceof Error ? reason.message : "服务器数据导出失败，请稍后重试", true);
+    } finally {
+      setExportBusy(false);
+    }
+  }
+
+  async function exportLocalCache() {
+    setLocalExportBusy(true);
+    try {
+      const data: Record<string, unknown> = { exported_at: new Date().toISOString(), scope: "this_device_cache", user_id: user?.id ?? null };
       const scopedPrefix = scopedStorageKey("", user?.id);
       const accountId = user?.id ?? "guest";
       const coachPrefixes = [
@@ -410,18 +502,12 @@ export default function SettingsPage() {
         const value = localStorage.getItem(key);
         try { data[key] = value ? JSON.parse(value) : value; } catch { data[key] = value; }
       }
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `planpilot-export-${new Date().toISOString().slice(0, 10)}.json`;
-      link.click();
-      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-      feedback(`JSON 数据副本已导出 · ${Math.max(1, Math.ceil(blob.size / 1024))} KB`);
+      const size = privacyApi.downloadLocalCache(data);
+      feedback(`本机缓存副本已导出 · ${Math.max(1, Math.ceil(size / 1024))} KB`);
     } catch {
-      feedback("数据副本生成失败，请稍后重试", true);
+      feedback("本机缓存导出失败，请稍后重试", true);
     } finally {
-      setExportBusy(false);
+      setLocalExportBusy(false);
     }
   }
 
@@ -430,7 +516,7 @@ export default function SettingsPage() {
   const reminderToggleOn = status === "authenticated" && reminderEnabled;
   const reminderToggleDisabled = status !== "authenticated"
     || (!reminderEnabled && (!emailReminderStatus?.configured || !emailReminderStatus.email_verified));
-  const saveIndicator = syncBusy || availabilityBusy || busy || avatarBusy
+  const saveIndicator = syncBusy || availabilityBusy || busy || avatarBusy || privacyState === "saving"
     ? { label: "正在保存…", icon: <LoaderCircle size={13} className="is-spinning" />, tone: "is-saving" }
     : notice && error
       ? { label: "保存失败", icon: <AlertCircle size={13} />, tone: "is-error" }
@@ -451,6 +537,7 @@ export default function SettingsPage() {
           <a href="#settings-appearance" className={activeSection === "settings-appearance" ? "is-active" : ""} aria-current={activeSection === "settings-appearance" ? "location" : undefined} onClick={() => setActiveSection("settings-appearance")}><Palette size={15} /><span>外观</span></a>
           <a href="#settings-preferences" className={activeSection === "settings-preferences" ? "is-active" : ""} aria-current={activeSection === "settings-preferences" ? "location" : undefined} onClick={() => setActiveSection("settings-preferences")}><CalendarClock size={15} /><span>可用时间</span></a>
           <a href="#settings-reminders" className={activeSection === "settings-reminders" ? "is-active" : ""} aria-current={activeSection === "settings-reminders" ? "location" : undefined} onClick={() => setActiveSection("settings-reminders")}><CalendarClock size={15} /><span>时间与提醒</span></a>
+          <a href="#settings-privacy" className={activeSection === "settings-privacy" ? "is-active" : ""} aria-current={activeSection === "settings-privacy" ? "location" : undefined} onClick={() => setActiveSection("settings-privacy")}><ShieldCheck size={15} /><span>AI 与隐私</span></a>
           <a href="#settings-account" className={activeSection === "settings-account" ? "is-active" : ""} aria-current={activeSection === "settings-account" ? "location" : undefined} onClick={() => setActiveSection("settings-account")}><UserRound size={15} /><span>账户</span></a>
         </nav>
 
@@ -564,6 +651,31 @@ export default function SettingsPage() {
           </div>
         </article>
 
+        <article id="settings-privacy" className="settings-card settings-task-card settings-privacy-card">
+          <header className="settings-section-head"><span><ShieldCheck size={17} /></span><div><h2>AI 与个性化 / 数据与隐私</h2><p>分别控制系统可用于建议、实验和分析的数据用途。你的选择会同步到账号。</p></div><span className={`privacy-save-state is-${privacyState}`} role="status" aria-live="polite">{privacyState === "loading" ? "加载中…" : privacyState === "saving" ? "保存中…" : privacyState === "saved" ? "已保存" : privacyState === "error" ? (privacyConsent ? "保存失败" : "加载失败") : "已同步"}</span></header>
+          {status !== "authenticated" ? <div className="privacy-login-note"><p>登录后可以管理账号级 AI 与数据选择。</p><Link href="/login?next=%2Fstudio%2Fsettings%23settings-privacy">登录管理</Link></div> : <>
+            {([
+              ["personalization_enabled", "个性化建议", "允许系统根据学习记录形成可纠正的观察，并用于调整建议。"],
+              ["experiments_enabled", "产品实验参与", "允许加入用于比较产品方案效果的实验；关闭后会退出实验分组。"],
+              ["product_analytics_enabled", "产品分析", "允许使用产品使用情况改进稳定性与功能体验。"],
+              ["sensitive_inference_enabled", "敏感推断", "明确开启后，系统才会生成和使用拖延、坚持、挑战与反馈倾向等行为推断；关闭时会停止使用并清除这些既有推断。默认关闭。"],
+            ] as Array<[PrivacyPurpose, string, string]>).map(([purpose, label, description]) => {
+              const enabled = privacyConsent?.[purpose] ?? false;
+              return <div className={`privacy-purpose-row ${purpose === "sensitive_inference_enabled" ? "is-sensitive" : ""}`} key={purpose}>
+                <div><strong>{label}</strong>{purpose === "sensitive_inference_enabled" && <em>默认关闭</em>}<p>{description}</p></div>
+                <button type="button" className={`setting-toggle ${enabled ? "is-on" : ""}`} aria-pressed={enabled} aria-label={`${label}：${enabled ? "已开启" : "已关闭"}`} disabled={!privacyConsent || privacyState === "loading" || privacyState === "saving"} onClick={() => void togglePrivacyPurpose(purpose)}><i /></button>
+              </div>;
+            })}
+            {showPersonalizationChoice && <div className="personalization-off-choice" role="group" aria-label="关闭个性化的方式"><div><strong>如何关闭个性化？</strong><p>两种方式都会停止新的个性化建议；你可以决定是否同时清除系统生成的派生数据。</p></div><div><button type="button" onClick={() => void updatePrivacyConsent({ personalization_enabled: false }, "个性化建议已关闭，现有派生数据已保留")}>仅关闭</button><button type="button" className="is-danger" onClick={() => void eraseDerivedData()}><Trash2 size={14} />关闭并清除派生数据</button><button type="button" className="is-quiet" onClick={() => setShowPersonalizationChoice(false)}>取消</button></div></div>}
+            {privacyState === "error" && <div className="privacy-inline-error" role="alert"><span>{privacyError}</span><button type="button" onClick={() => failedConsentPatch ? void updatePrivacyConsent(failedConsentPatch) : setPrivacyLoadAttempt((value) => value + 1)}>重试</button></div>}
+            <details className="privacy-data-actions"><summary>数据导出与清除</summary><div>
+              <div><strong>导出服务器端可携带数据</strong><p>包含账号资料、授权历史、目标与任务、笔记和知识正文及关联行、学习记录和账号相关的 Agent 交互数据；不包含密码或令牌、服务器文件路径、向量索引和内部运维 trace。</p><button type="button" disabled={exportBusy} onClick={() => void exportData()}>{exportBusy ? <LoaderCircle size={14} className="is-spinning" /> : <Download size={14} />}{exportBusy ? "生成中…" : "导出服务器数据"}</button></div>
+              <div><strong>导出本机缓存</strong><p>只导出当前浏览器中的离线缓存和界面偏好，不代表服务器端完整学习数据。</p><button type="button" disabled={localExportBusy} onClick={() => void exportLocalCache()}>{localExportBusy ? <LoaderCircle size={14} className="is-spinning" /> : <Download size={14} />}{localExportBusy ? "生成中…" : "导出本机缓存"}</button></div>
+              <div className="privacy-danger-action"><strong>清除系统生成的学习画像 / 派生数据</strong><p>{privacyConsent?.personalization_enabled === false ? "个性化已关闭；你仍可清除此前选择保留的" : "会关闭个性化并清除"}学习观察、画像、认知推断和学习记忆。不会删除你创建的目标、任务、笔记或知识内容。</p><button type="button" disabled={!privacyConsent || privacyState === "saving"} onClick={() => void eraseDerivedData()}><Trash2 size={14} />{privacyConsent?.personalization_enabled === false ? "清除已保留的派生数据" : "关闭并清除派生数据"}</button></div>
+            </div></details>
+          </>}
+        </article>
+
         <article id="settings-account" className="settings-card settings-task-card">
           <header className="settings-section-head"><span><UserRound size={17} /></span><div><h2>账户</h2><p>{status === "authenticated" ? "资料修改会自动同步到账号。" : "登录后可修改资料并跨设备同步。"}</p></div></header>
           {status !== "authenticated" || !user ? <div className="guest-account-panel">
@@ -583,7 +695,7 @@ export default function SettingsPage() {
             </div>
             <div className="setting-row setting-row-grid"><div className="setting-copy"><span>用户名</span><small>用于工作区中的身份展示</small></div><div className="setting-current"><span className="setting-value-text">{user.username}</span></div><div className="setting-action"><button type="button" onClick={() => setEditingProfile(true)}>编辑</button></div></div>
             <div className="setting-row setting-row-grid"><div className="setting-copy"><span>邮箱</span><small>用于登录、验证和重要账号通知</small></div><div className="setting-current"><span className="setting-value-text">{user.email}</span></div><div className="setting-action"><button type="button" onClick={() => setEditingProfile(true)}>修改</button></div></div>
-            <div className="setting-row setting-row-grid account-export-row"><div className="setting-copy"><span>导出学习数据</span><small>包含账户信息摘要、偏好与本机离线缓存副本</small></div><div className="setting-current"><span className="setting-value-text">JSON · 可迁移存档</span></div><div className="setting-action"><button type="button" disabled={exportBusy} onClick={() => void exportData()}>{exportBusy ? <LoaderCircle size={14} className="is-spinning" /> : <Download size={14} />}{exportBusy ? "生成中…" : "导出"}</button></div></div>
+            <div className="setting-row setting-row-grid account-export-row"><div className="setting-copy"><span>学习数据与隐私</span><small>完整导出、个性化选择与派生数据清除已集中到隐私区域</small></div><div className="setting-current"><span className="setting-value-text">账号级控制</span></div><div className="setting-action"><a className="setting-action-link" href="#settings-privacy">前往管理</a></div></div>
             <div className="setting-row setting-row-grid account-signout-row"><div className="setting-copy"><span>退出当前账号</span><small>只结束当前会话，本地学习数据不会被删除</small></div><div className="setting-current"><span className="setting-value-text">{user.username}</span></div><div className="setting-action"><button type="button" className="danger-quiet" onClick={() => { logout(); window.location.assign("/login"); }}><LogOut size={14} />退出</button></div></div>
           </>}
         </article>
@@ -591,7 +703,14 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {notice && <div className={`settings-toast ${error ? "is-error" : ""}`} role="status"><Check size={14} />{notice}</div>}
+      {notice && error ? (
+        <DataSyncNotice
+          title={/登录/.test(notice) ? "当前操作需要登录" : /同步|保存|更新|生成/.test(notice) ? "设置同步失败" : "当前操作未完成"}
+          message={notice}
+        />
+      ) : notice ? (
+        <div className="settings-toast" role="status"><Check size={14} />{notice}</div>
+      ) : null}
       {avatarCropFile && (
         <AvatarCropDialog
           key={`${avatarCropFile.name}-${avatarCropFile.lastModified}`}

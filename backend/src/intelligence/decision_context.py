@@ -8,6 +8,7 @@ from typing import Any
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.core.privacy_fields import SENSITIVE_INFERENCE_FIELDS
 from src.core.time import to_user_timezone
 from src.intelligence.cognitive_model import (
     CognitiveProfileBuilder,
@@ -26,6 +27,7 @@ from src.models import (
     Task,
     User,
 )
+from src.services import privacy_service
 
 MIN_GOAL_PROFILE_EVENTS = 5
 ACTIVE_PATTERN_CONFIDENCE = 0.5
@@ -64,11 +66,36 @@ class DecisionContextBuilder:
         goal = await cls._load_goal(db, user_id, goal_id)
         if goal_id is not None and goal is None:
             raise LookupError("goal does not exist")
+        timezone_name = (
+            await db.scalar(select(User.timezone).where(User.id == user_id)) or "Asia/Shanghai"
+        )
+        goal_context = await cls._load_goal_context(db, goal) if goal else None
+        if not await privacy_service.personalization_allowed(db, user_id):
+            return {
+                "profile": None,
+                "cognitive_profile": None,
+                "memories": {},
+                "knowledge_gaps": [],
+                "active_patterns": [],
+                "recent_events": [],
+                "user_timezone": timezone_name,
+                "goal_context": goal_context,
+                "data_quality": {
+                    "profile_event_count": 0,
+                    "profile_scope": "disabled",
+                    "pattern_count": 0,
+                    "memory_count": 0,
+                    "cognitive_confidence": 0.0,
+                    "knowledge_gap_count": 0,
+                    "low_confidence_fields": [],
+                    "level": "low",
+                    "personalization_enabled": False,
+                },
+            }
         profile, profile_scope = await cls._load_profile(db, user_id, goal_id)
         patterns = await cls._load_active_patterns(db, user_id, goal_id)
         recent_events = await cls._load_recent_events(db, user_id, goal_id, recent_event_limit)
         evidence = await cls._load_pattern_evidence(db, patterns)
-        goal_context = await cls._load_goal_context(db, goal) if goal else None
         cognitive = await CognitiveProfileBuilder.get_profile(db, user_id, goal_id)
         if cognitive is None and goal_id is not None:
             cognitive = await CognitiveProfileBuilder.get_profile(db, user_id, None)
@@ -77,9 +104,10 @@ class DecisionContextBuilder:
             db, user_id, goal_id=goal_id, limit=5
         )
 
-        timezone_name = (
-            await db.scalar(select(User.timezone).where(User.id == user_id)) or "Asia/Shanghai"
-        )
+        cognitive_data = cognitive_profile_to_dict(cognitive)
+        if cognitive_data and not await privacy_service.sensitive_inference_allowed(db, user_id):
+            for field in SENSITIVE_INFERENCE_FIELDS:
+                cognitive_data.pop(field, None)
         compatible_patterns = [
             pattern
             for pattern in patterns
@@ -125,7 +153,7 @@ class DecisionContextBuilder:
         event_count = profile.event_count if profile else 0
         return {
             "profile": profile_data,
-            "cognitive_profile": cognitive_profile_to_dict(cognitive),
+            "cognitive_profile": cognitive_data,
             "memories": memories,
             "knowledge_gaps": knowledge_gaps,
             "active_patterns": pattern_rows,

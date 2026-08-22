@@ -10,6 +10,7 @@ from typing import Any
 from sqlalchemy import distinct, not_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.core.privacy_fields import SENSITIVE_INFERENCE_FIELDS
 from src.core.time import utc_now
 from src.models import (
     DecisionProposal,
@@ -75,6 +76,10 @@ class CognitiveProfileBuilder:
         *,
         window_days: int = DEFAULT_WINDOW_DAYS,
     ) -> dict[str, int]:
+        consent = await db.get(UserDataConsent, user_id)
+        if consent is not None and not consent.personalization_enabled:
+            return {"goal_count": 0}
+        sensitive_enabled = bool(consent and consent.sensitive_inference_enabled)
         now = utc_now()
         goals = list(
             (
@@ -83,9 +88,23 @@ class CognitiveProfileBuilder:
                 )
             ).scalars()
         )
-        await cls._build_scope(db, user_id, None, now=now, window_days=window_days)
+        await cls._build_scope(
+            db,
+            user_id,
+            None,
+            now=now,
+            window_days=window_days,
+            sensitive_enabled=sensitive_enabled,
+        )
         for goal in goals:
-            await cls._build_scope(db, user_id, goal.id, now=now, window_days=window_days)
+            await cls._build_scope(
+                db,
+                user_id,
+                goal.id,
+                now=now,
+                window_days=window_days,
+                sensitive_enabled=sensitive_enabled,
+            )
         await db.flush()
         return {"goal_count": len(goals)}
 
@@ -133,6 +152,7 @@ class CognitiveProfileBuilder:
         *,
         now: datetime,
         window_days: int,
+        sensitive_enabled: bool,
     ) -> LearnerCognitiveProfile:
         since = now - timedelta(days=window_days)
         event_stmt = select(LearningEvent).where(
@@ -164,8 +184,9 @@ class CognitiveProfileBuilder:
         mastery = list((await db.execute(mastery_stmt)).scalars())
         proposals = list((await db.execute(proposal_stmt)).scalars())
         profile = (await db.execute(profile_stmt)).scalar_one_or_none()
-        feedback = (
-            list(
+        feedback: list[ProposalFeedback] = []
+        if sensitive_enabled and proposals:
+            feedback = list(
                 (
                     await db.execute(
                         select(ProposalFeedback).where(
@@ -174,17 +195,29 @@ class CognitiveProfileBuilder:
                     )
                 ).scalars()
             )
-            if proposals
-            else []
-        )
 
-        metrics = cls._calculate(events, tasks, mastery, proposals, feedback, profile, now)
+        metrics = cls._calculate(
+            events,
+            tasks,
+            mastery,
+            proposals,
+            feedback,
+            profile,
+            now,
+            sensitive_enabled=sensitive_enabled,
+        )
         row = await cls.get_profile(db, user_id, goal_id)
         if row is None:
             row = LearnerCognitiveProfile(user_id=user_id, goal_id=goal_id)
             db.add(row)
         for field in COGNITIVE_FIELDS:
-            setattr(row, field, metrics[field])
+            setattr(
+                row,
+                field,
+                metrics[field]
+                if sensitive_enabled or field not in SENSITIVE_INFERENCE_FIELDS
+                else None,
+            )
         row.observation_window_days = window_days
         row.sample_count = metrics["sample_count"]
         row.confidence = metrics["confidence"]
@@ -201,6 +234,8 @@ class CognitiveProfileBuilder:
         feedback: list[ProposalFeedback],
         profile: LearnerProfile | None,
         now: datetime,
+        *,
+        sensitive_enabled: bool = False,
     ) -> dict[str, float | int | None]:
         completed = [task for task in tasks if task.status == "completed"]
         attempted = [task for task in tasks if task.status not in {"abandoned"}]
@@ -239,6 +274,66 @@ class CognitiveProfileBuilder:
             elif event.event_type == "TaskCompleted" and event.aggregate_id in negative_by_task:
                 recovered.add(event.aggregate_id)
 
+        mastery_goal_count = len(
+            {row.goal_id for row in mastery if MASTERY_STRENGTH.get(row.mastery_level, 0.1) >= 0.75}
+        )
+        goal_count = len({task.goal_id for task in tasks})
+        session_reference = (
+            profile.avg_session_duration_mins
+            if profile and profile.avg_session_duration_mins
+            else 45.0
+        )
+        avg_completed_mins = (
+            sum(task.estimated_mins for task in completed) / len(completed) if completed else None
+        )
+        sample_count = len(events) + len(mastery) + len(feedback)
+        velocity = profile.mastery_velocity if profile else None
+        sensitive_metrics = (
+            CognitiveProfileBuilder._calculate_sensitive_metrics(
+                events,
+                attempted,
+                proposals,
+                feedback,
+                profile,
+                completed_rate,
+            )
+            if sensitive_enabled
+            else {}
+        )
+        return {
+            "learning_speed": clamp(float(velocity) / 5.0)
+            if velocity is not None
+            else completed_rate,
+            "retention_rate": round(sum(retained) / len(retained), 4) if retained else None,
+            "forgetting_rate": round(forgetting_rate, 4),
+            "transfer_score": round(mastery_goal_count / goal_count, 4) if goal_count else None,
+            "persistence_score": sensitive_metrics.get("persistence_score"),
+            "procrastination_score": sensitive_metrics.get("procrastination_score"),
+            "recovery_score": round(len(recovered) / len(negative_by_task), 4)
+            if negative_by_task
+            else None,
+            "difficulty_preference": round(
+                clamp(
+                    (avg_completed_mins or session_reference) / max(1.0, session_reference * 1.5)
+                ),
+                4,
+            ),
+            "challenge_tolerance": sensitive_metrics.get("challenge_tolerance"),
+            "feedback_acceptance": sensitive_metrics.get("feedback_acceptance"),
+            "sample_count": sample_count,
+            "confidence": round(clamp(sample_count / (sample_count + 20)), 4),
+        }
+
+    @staticmethod
+    def _calculate_sensitive_metrics(
+        events: list[LearningEvent],
+        attempted: list[Task],
+        proposals: list[DecisionProposal],
+        feedback: list[ProposalFeedback],
+        profile: LearnerProfile | None,
+        completed_rate: float | None,
+    ) -> dict[str, float | None]:
+        """Calculate opt-in behavioral tendencies only after consent is checked."""
         high_load = [task for task in attempted if task.estimated_mins >= 60]
         high_load_completed = sum(task.status == "completed" for task in high_load)
         reviewed = [row for row in proposals if row.status in {"accepted", "applied", "rejected"}]
@@ -252,56 +347,25 @@ class CognitiveProfileBuilder:
             if reviewed
             else None
         )
-        mastery_goal_count = len(
-            {row.goal_id for row in mastery if MASTERY_STRENGTH.get(row.mastery_level, 0.1) >= 0.75}
-        )
-        goal_count = len({task.goal_id for task in tasks})
         event_negative = sum(row.event_type in {"TaskSkipped", "TaskRescheduled"} for row in events)
         procrastination = (
             profile.debt_tendency
             if profile and profile.debt_tendency is not None
             else event_negative / max(1, len(events))
         )
-        session_reference = (
-            profile.avg_session_duration_mins
-            if profile and profile.avg_session_duration_mins
-            else 45.0
-        )
-        avg_completed_mins = (
-            sum(task.estimated_mins for task in completed) / len(completed) if completed else None
-        )
-        sample_count = len(events) + len(mastery) + len(feedback)
-        velocity = profile.mastery_velocity if profile else None
         return {
-            "learning_speed": clamp(float(velocity) / 5.0)
-            if velocity is not None
-            else completed_rate,
-            "retention_rate": round(sum(retained) / len(retained), 4) if retained else None,
-            "forgetting_rate": round(forgetting_rate, 4),
-            "transfer_score": round(mastery_goal_count / goal_count, 4) if goal_count else None,
             "persistence_score": (
                 profile.consistency_score
                 if profile and profile.consistency_score is not None
                 else completed_rate
             ),
             "procrastination_score": round(clamp(float(procrastination)), 4),
-            "recovery_score": round(len(recovered) / len(negative_by_task), 4)
-            if negative_by_task
-            else None,
-            "difficulty_preference": round(
-                clamp(
-                    (avg_completed_mins or session_reference) / max(1.0, session_reference * 1.5)
-                ),
-                4,
-            ),
             "challenge_tolerance": round(high_load_completed / len(high_load), 4)
             if high_load
             else completed_rate,
             "feedback_acceptance": round(feedback_acceptance, 4)
             if feedback_acceptance is not None
             else None,
-            "sample_count": sample_count,
-            "confidence": round(clamp(sample_count / (sample_count + 20)), 4),
         }
 
 

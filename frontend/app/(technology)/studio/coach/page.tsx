@@ -415,7 +415,7 @@ const MORE_PILO_PROMPTS = [
   ["复盘进展", "帮我复盘最近一周的完成情况、变化和下一步"],
   ["检查知识盲点", "结合近期任务、错题和笔记，帮我找出反复卡住的知识点"],
   ["拆分目标", "把当前目标拆成几个清晰阶段，并给出最小可执行的下一步"],
-  ["校正学习画像", "我想检查并校正你对我的长期学习判断"],
+  ["修正学习观察", "我想检查并修正你对我的长期学习观察"],
 ];
 
 const COACH_THEME_STORAGE_KEY = "planpilot:coach-theme-v1";
@@ -2089,15 +2089,14 @@ export default function CoachPage() {
               {contextSections.patterns && <div id="context-patterns" className="companion-pattern-list">
                 {patterns.slice(0, 4).map((pattern) => {
                   const confidence = confidenceMeta(pattern.confidence);
-                  return <Link href={`/studio/coach/memory?pattern=${encodeURIComponent(pattern.id)}`} key={pattern.id}><span><Activity size={14} /></span><div><small>{PATTERN_LABELS[pattern.pattern_type] ?? "学习规律"} · {confidence.label}</small><strong>{pattern.explanation}</strong><p>{pattern.evidence_count} 条行为证据</p></div><ArrowRight size={14} /></Link>;
+                  return <Link href={`/studio/coach/memory?pattern=${encodeURIComponent(pattern.id)}`} key={pattern.id}><span><Activity size={14} /></span><div><small>{PATTERN_LABELS[pattern.pattern_type] ?? "学习规律"} · {confidence.label}</small><strong>{pattern.explanation}</strong><p>{pattern.evidence_count} 条行为证据 · 查看判断依据</p></div><ArrowRight size={14} /></Link>;
                 })}
                 {!patterns.length && <div className="companion-context-empty">继续完成任务和反馈建议后，这里会形成可追溯的长期判断。</div>}
               </div>}
             </section>
             {(primaryGap || authStatus !== "authenticated") && <section className={`companion-context-section ${contextSections.retention ? "is-expanded" : "is-collapsed"}`}><button type="button" className="companion-context-section__toggle" aria-expanded={contextSections.retention} aria-controls="context-retention" onClick={() => toggleContextSection("retention")}><span><RefreshCw size={14} /><strong>知识保持</strong><small className="is-attention">待关注</small></span><ChevronDown size={15} /></button>{contextSections.retention && <div id="context-retention" className="companion-gap-card"><FileSearch size={16} /><div><strong>{primaryGap?.name ?? "链表双指针"}</strong><p>{primaryGap ? `当前保持信号 ${Math.round(primaryGap.retention * 100)}%，适合安排一次短复习。` : "预计三天内进入复习窗口，建议安排一次短复习。"}</p></div></div>}</section>}
-            <section className={`companion-context-section ${contextSections.memories ? "is-expanded" : "is-collapsed"}`}><button type="button" className="companion-context-section__toggle" aria-expanded={contextSections.memories} aria-controls="context-memories" onClick={() => toggleContextSection("memories")}><span><BrainCircuit size={14} /><strong>相关长期记忆</strong><small>{semanticMemories.length || 2} 条</small></span><ChevronDown size={15} /></button>{contextSections.memories && <div id="context-memories" className="companion-memory-list">{(semanticMemories.length ? semanticMemories.map((item) => item.summary) : ["延期后先恢复连续性，比集中补偿更有效", "高压周的可持续投入约为 45 分钟"]).slice(0, 3).map((item) => <Link href="/studio/coach/memory" key={item}><BrainCircuit size={13} /><span>{item}</span><ArrowRight size={13} /></Link>)}</div>}</section>
+            <section className={`companion-context-section ${contextSections.memories ? "is-expanded" : "is-collapsed"}`}><button type="button" className="companion-context-section__toggle" aria-expanded={contextSections.memories} aria-controls="context-memories" onClick={() => toggleContextSection("memories")}><span><BrainCircuit size={14} /><strong>本轮参考的长期记录</strong><small>{semanticMemories.length || 2} 条</small></span><ChevronDown size={15} /></button>{contextSections.memories && <div id="context-memories" className="companion-memory-list">{(semanticMemories.length ? semanticMemories.map((item) => item.summary) : ["延期后先恢复连续性，比集中补偿更有效", "高压周的可持续投入约为 45 分钟"]).slice(0, 3).map((item) => <p key={item}><BrainCircuit size={13} /><span>{item}</span></p>)}</div>}</section>
             <section className={`companion-context-section ${contextSections.resources ? "is-expanded" : "is-collapsed"}`}><button type="button" className="companion-context-section__toggle" aria-expanded={contextSections.resources} aria-controls="context-resources" onClick={() => toggleContextSection("resources")}><span><FileSearch size={14} /><strong>本轮可用资料</strong><small>{resources.length} 项</small></span><ChevronDown size={15} /></button>{contextSections.resources && <div id="context-resources" className="companion-resource-list">{resources.slice(0, 4).map((resource) => <Link href={`/studio/work/knowledge?query=${encodeURIComponent(resource)}`} key={resource}><FileSearch size={13} /><span>{resource}</span><ArrowRight size={13} /></Link>)}{!resources.length && <p>当前还没有可检索资料</p>}</div>}</section>
-            <Link className="companion-profile-cta" href="/studio/coach/memory"><BrainCircuit size={16} /><span><strong>查看记忆与画像</strong><small>理解并校正 Pilo 对长期学习规律的判断</small></span><ArrowRight size={15} /></Link>
             </div>
           </motion.aside>
         )}

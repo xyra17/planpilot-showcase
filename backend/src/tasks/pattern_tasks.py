@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from celery.utils.log import get_task_logger
-from sqlalchemy import select
+from sqlalchemy import not_, select
 
 import src.database as database
 from src.celery_app import celery_app
@@ -16,7 +16,7 @@ from src.intelligence.pattern_update_engine import (
     DECAYED_TO_ACTIVE_CONFIDENCE,
     PatternUpdateEngine,
 )
-from src.models import LearnerPattern
+from src.models import LearnerPattern, UserDataConsent
 from src.tasks.runtime import run_async
 
 logger = get_task_logger(__name__)
@@ -43,7 +43,16 @@ async def _decay_patterns(now: datetime | None = None) -> dict[str, int]:
         patterns = list(
             (
                 await db.execute(
-                    select(LearnerPattern).where(LearnerPattern.status.in_(["active", "decayed"]))
+                    select(LearnerPattern).where(
+                        LearnerPattern.status.in_(["active", "decayed"]),
+                        not_(
+                            LearnerPattern.user_id.in_(
+                                select(UserDataConsent.user_id).where(
+                                    UserDataConsent.personalization_enabled.is_(False)
+                                )
+                            )
+                        ),
+                    )
                 )
             )
             .scalars()

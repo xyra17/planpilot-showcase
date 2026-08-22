@@ -1,0 +1,114 @@
+.app-shell .personalization-page { width: min(100%, 1120px); min-height: calc(100dvh - 64px); margin: 0 auto; padding: 22px clamp(16px, 3vw, 34px) 72px; overflow-x: clip; }
+.app-shell .personalization-pagebar { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 24px; padding: 0 0 22px; background: transparent; border: 0; border-bottom: 1px solid var(--workspace-border); border-radius: 0; box-shadow: none; }
+.app-shell .personalization-pagebar .workspace-page-title p { max-width: 720px; margin: 8px 0 0; color: var(--workspace-secondary); font-size: 14px; line-height: 1.65; }
+.app-shell .personalization-pagebar .workspace-page-title > span { display: block; margin-top: 8px; color: var(--workspace-tertiary); font-size: 12px; }
+.app-shell .personalization-scope { display: flex; min-height: 44px; align-items: center; gap: 8px; color: var(--workspace-secondary); }
+.app-shell .personalization-scope button { min-width: 190px; min-height: 44px; color: var(--workspace-text); background: var(--workspace-panel); border-color: var(--workspace-border); }
+.app-shell .personalization-content { display: grid; gap: 42px; padding-top: 30px; }
+.app-shell .personalization-group > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; padding-bottom: 14px; }
+.app-shell .personalization-group > header small { color: var(--workspace-accent); font-size: 10px; font-weight: 800; letter-spacing: .12em; }
+.app-shell .personalization-group > header h2 { margin: 5px 0 0; color: var(--workspace-text); font-size: 21px; letter-spacing: -.025em; }
+.app-shell .personalization-group > header p { max-width: 680px; margin: 6px 0 0; color: var(--workspace-secondary); font-size: 13px; line-height: 1.6; }
+.app-shell .personalization-group > header > span { display: grid; min-width: 34px; height: 34px; place-items: center; color: var(--workspace-accent); background: var(--workspace-accent-soft); border-radius: 50%; font-size: 12px; font-weight: 800; }
+.app-shell .personalization-list { border-top: 1px solid var(--workspace-border); }
+.app-shell .personalization-observation { padding: 22px 0 24px; border-bottom: 1px solid var(--workspace-border); scroll-margin-top: 22px; }
+.app-shell .personalization-observation.is-targeted { box-shadow: inset 3px 0 0 var(--workspace-accent); padding-left: 18px; }
+.app-shell .personalization-observation-title { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 4px 16px; }
+.app-shell .personalization-observation-title small { grid-column: 1; color: var(--workspace-accent); font-size: 10px; font-weight: 800; letter-spacing: .06em; }
+.app-shell .personalization-observation-title h3 { grid-column: 1; margin: 2px 0 0; color: var(--workspace-text); font-size: 17px; line-height: 1.55; }
+.app-shell .personalization-observation-title > span { grid-column: 2; grid-row: 1 / span 2; padding: 5px 9px; color: var(--workspace-secondary); background: var(--workspace-panel-subtle); border-radius: 999px; font-size: 11px; }
+.app-shell .personalization-observation-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; margin: 17px 0 0; border-top: 1px solid var(--workspace-border); border-bottom: 1px solid var(--workspace-border); }
+.app-shell .personalization-observation-facts > div { min-width: 0; padding: 12px 14px 12px 0; }
+.app-shell .personalization-observation-facts > div + div { padding-left: 14px; border-left: 1px solid var(--workspace-border); }
+.app-shell .personalization-observation-facts .is-impact { grid-column: 1 / -1; padding-left: 0; border-top: 1px solid var(--workspace-border); border-left: 0; }
+.app-shell .personalization-observation-facts dt { color: var(--workspace-tertiary); font-size: 10px; font-weight: 750; }
+.app-shell .personalization-observation-facts dd { margin: 4px 0 0; color: var(--workspace-text); font-size: 12px; line-height: 1.55; overflow-wrap: anywhere; }
+.app-shell .personalization-observation-controls { display: flex; align-items: end; gap: 12px; margin-top: 14px; }
+.app-shell .personalization-observation-controls label { display: grid; gap: 5px; }
+.app-shell .personalization-observation-controls label > span, .app-shell .personalization-correction > span { color: var(--workspace-secondary); font-size: 10px; font-weight: 750; }
+.app-shell .personalization-observation-controls select { min-width: 210px; min-height: 44px; padding: 0 34px 0 11px; color: var(--workspace-text); background: var(--workspace-panel); border: 1px solid var(--workspace-border); border-radius: 8px; font: inherit; font-size: 13px; }
+.app-shell .personalization-current-scope { display: inline-flex; min-height: 44px; align-items: center; gap: 6px; color: var(--workspace-secondary); font-size: 12px; }
+.app-shell .personalization-correction { display: grid; gap: 6px; margin-top: 14px; }
+.app-shell .personalization-correction textarea { min-height: 92px; padding: 11px; color: var(--workspace-text); background: var(--workspace-panel); border: 1px solid var(--workspace-border); border-radius: 8px; font: inherit; font-size: 16px; line-height: 1.55; resize: vertical; }
+.app-shell .personalization-observation-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 15px; }
+.app-shell .personalization-observation-actions :is(button, a), .app-shell .personalization-advanced button { display: inline-flex; min-height: 44px; align-items: center; justify-content: center; gap: 6px; padding: 0 12px; color: var(--workspace-text); background: transparent; border: 1px solid var(--workspace-border); border-radius: 8px; font: inherit; font-size: 12px; font-weight: 720; text-decoration: none; cursor: pointer; }
+.app-shell .personalization-observation-actions :is(button, a):hover { background: var(--workspace-hover); border-color: var(--workspace-border-strong); }
+.app-shell .personalization-observation-actions .is-danger { margin-left: auto; color: var(--workspace-danger, #b64a5b); }
+.app-shell .personalization-observation-actions button[aria-expanded="true"] > svg:last-child { transform: rotate(180deg); }
+.app-shell .personalization-evidence { display: grid; grid-template-columns: .85fr 1.15fr; gap: 24px; margin-top: 16px; padding: 17px 0 2px; overflow: hidden; border-top: 1px dashed var(--workspace-border); }
+.app-shell .personalization-evidence strong { color: var(--workspace-text); font-size: 12px; }
+.app-shell .personalization-evidence p { margin: 6px 0 0; color: var(--workspace-secondary); font-size: 12px; line-height: 1.65; }
+.app-shell .personalization-evidence ul { display: grid; gap: 7px; margin: 8px 0 0; padding: 0; list-style: none; }
+.app-shell .personalization-evidence li { display: flex; justify-content: space-between; gap: 12px; color: var(--workspace-text); font-size: 12px; }
+.app-shell .personalization-evidence li small { color: var(--workspace-tertiary); }
+.app-shell .personalization-empty { min-height: 108px; display: grid; place-items: center; padding: 20px; color: var(--workspace-secondary); border-top: 1px solid var(--workspace-border); border-bottom: 1px solid var(--workspace-border); font-size: 13px; }
+.app-shell .personalization-advanced { border-top: 1px solid var(--workspace-border); border-bottom: 1px solid var(--workspace-border); }
+.app-shell .personalization-advanced > summary { display: flex; min-height: 58px; align-items: center; justify-content: space-between; cursor: pointer; list-style: none; }
+.app-shell .personalization-advanced > summary > span { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 2px 8px; }
+.app-shell .personalization-advanced > summary small { grid-column: 2; color: var(--workspace-secondary); }
+.app-shell .personalization-advanced[open] > summary > svg { transform: rotate(180deg); }
+.app-shell .personalization-advanced > div { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; padding: 4px 0 20px; }
+.app-shell .personalization-advanced h3 { font-size: 13px; }
+.app-shell .personalization-advanced article { display: flex; min-height: 58px; align-items: center; justify-content: space-between; gap: 10px; border-top: 1px solid var(--workspace-border); }
+.app-shell .personalization-advanced article strong, .app-shell .personalization-advanced article small { display: block; }
+.app-shell .personalization-advanced article strong { font-size: 12px; }
+.app-shell .personalization-advanced article small { margin-top: 3px; color: var(--workspace-secondary); font-size: 10px; }
+.app-shell .personalization-guest, .app-shell .personalization-off-state { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 16px; max-width: 780px; margin: 34px auto 0; padding: 20px 0; border-top: 1px solid var(--workspace-border); border-bottom: 1px solid var(--workspace-border); }
+.app-shell :is(.personalization-guest, .personalization-off-state) h2 { margin: 0; font-size: 17px; }
+.app-shell :is(.personalization-guest, .personalization-off-state) p { margin: 5px 0 0; color: var(--workspace-secondary); font-size: 13px; line-height: 1.6; }
+.app-shell :is(.personalization-guest, .personalization-off-state) > a { display: inline-flex; min-height: 44px; align-items: center; gap: 7px; padding: 0 13px; color: #fff; background: var(--workspace-accent); border-radius: 8px; text-decoration: none; font-size: 12px; font-weight: 750; }
+
+.app-shell .settings-privacy-card .settings-section-head { grid-template-columns: auto minmax(0, 1fr) auto; }
+.app-shell .privacy-save-state { align-self: center; color: var(--workspace-secondary); font-size: 11px; }
+.app-shell .privacy-save-state.is-error { color: var(--workspace-danger, #b64a5b); }
+.app-shell .privacy-purpose-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 20px; min-height: 78px; padding: 14px 0; border-top: 1px solid var(--workspace-border); }
+.app-shell .privacy-purpose-row strong { color: var(--workspace-text); font-size: 13px; }
+.app-shell .privacy-purpose-row em { margin-left: 8px; padding: 3px 7px; color: var(--workspace-secondary); background: var(--workspace-panel-subtle); border-radius: 999px; font-size: 9px; font-style: normal; }
+.app-shell .privacy-purpose-row p { max-width: 720px; margin: 5px 0 0; color: var(--workspace-secondary); font-size: 12px; line-height: 1.55; }
+.app-shell .privacy-purpose-row .setting-toggle { min-width: 48px; width: 48px; min-height: 44px; height: 44px; }
+.app-shell .personalization-off-choice { display: grid; gap: 14px; padding: 16px; background: var(--workspace-panel-subtle); border-left: 3px solid var(--workspace-accent); }
+.app-shell .personalization-off-choice p { margin: 5px 0 0; color: var(--workspace-secondary); font-size: 12px; }
+.app-shell .personalization-off-choice > div:last-child { display: flex; flex-wrap: wrap; gap: 8px; }
+.app-shell .personalization-off-choice button, .app-shell .privacy-data-actions button, .app-shell .privacy-inline-error button, .app-shell .privacy-login-note a { display: inline-flex; min-height: 44px; align-items: center; justify-content: center; gap: 6px; padding: 0 12px; color: var(--workspace-text); background: var(--workspace-panel); border: 1px solid var(--workspace-border); border-radius: 8px; font: inherit; font-size: 12px; font-weight: 720; text-decoration: none; cursor: pointer; }
+.app-shell .personalization-off-choice .is-danger, .app-shell .privacy-danger-action button { color: var(--workspace-danger, #b64a5b); border-color: color-mix(in srgb, var(--workspace-danger, #b64a5b) 35%, var(--workspace-border)); }
+.app-shell .personalization-off-choice .is-quiet { color: var(--workspace-secondary); background: transparent; border-color: transparent; }
+.app-shell .privacy-inline-error { display: flex; min-height: 52px; align-items: center; justify-content: space-between; gap: 12px; color: var(--workspace-danger, #b64a5b); border-top: 1px solid var(--workspace-border); font-size: 12px; }
+.app-shell .privacy-data-actions { margin-top: 6px; border-top: 1px solid var(--workspace-border); }
+.app-shell .privacy-data-actions > summary { min-height: 52px; display: flex; align-items: center; color: var(--workspace-text); font-size: 12px; font-weight: 760; cursor: pointer; }
+.app-shell .privacy-data-actions > div { display: grid; gap: 0; }
+.app-shell .privacy-data-actions > div > div { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px 20px; padding: 16px 0; border-top: 1px solid var(--workspace-border); }
+.app-shell .privacy-data-actions strong { font-size: 12px; }
+.app-shell .privacy-data-actions p { grid-column: 1; margin: 4px 0 0; color: var(--workspace-secondary); font-size: 11px; line-height: 1.55; }
+.app-shell .privacy-data-actions button { grid-column: 2; grid-row: 1 / span 2; }
+.app-shell .privacy-login-note { display: flex; min-height: 76px; align-items: center; justify-content: space-between; gap: 14px; border-top: 1px solid var(--workspace-border); }
+
+@media (max-width: 760px) {
+  .app-shell .personalization-page { min-height: calc(100dvh - 104px); padding: 14px 14px 100px; }
+  .app-shell .personalization-pagebar { grid-template-columns: 1fr; gap: 14px; }
+  .app-shell .personalization-scope, .app-shell .personalization-scope button { width: 100%; }
+  .app-shell .personalization-content { gap: 34px; padding-top: 24px; }
+  .app-shell .personalization-observation.is-targeted { padding-left: 12px; }
+  .app-shell .personalization-observation-title { grid-template-columns: 1fr; }
+  .app-shell .personalization-observation-title > span { grid-column: 1; grid-row: auto; width: fit-content; margin-top: 6px; }
+  .app-shell .personalization-observation-facts { grid-template-columns: 1fr 1fr; }
+  .app-shell .personalization-observation-facts > div:nth-child(3) { padding-left: 0; border-top: 1px solid var(--workspace-border); border-left: 0; }
+  .app-shell .personalization-observation-facts > div:nth-child(4) { padding-left: 14px; border-top: 1px solid var(--workspace-border); border-left: 1px solid var(--workspace-border); }
+  .app-shell .personalization-observation-facts .is-impact { grid-column: auto; }
+  .app-shell .personalization-observation-controls { align-items: stretch; flex-direction: column; }
+  .app-shell .personalization-observation-controls select { width: 100%; min-width: 0; font-size: 16px; }
+  .app-shell .personalization-observation-actions { display: grid; grid-template-columns: 1fr 1fr; }
+  .app-shell .personalization-observation-actions .is-danger { margin-left: 0; }
+  .app-shell .personalization-evidence, .app-shell .personalization-advanced > div { grid-template-columns: 1fr; }
+  .app-shell .personalization-evidence li { align-items: flex-start; flex-direction: column; gap: 2px; }
+  .app-shell :is(.personalization-guest, .personalization-off-state) { grid-template-columns: auto 1fr; }
+  .app-shell :is(.personalization-guest, .personalization-off-state) > a { grid-column: 1 / -1; width: 100%; justify-content: center; }
+  .app-shell .settings-privacy-card .settings-section-head { grid-template-columns: auto minmax(0, 1fr); }
+  .app-shell .privacy-save-state { grid-column: 2; }
+  .app-shell .privacy-purpose-row { gap: 12px; }
+  .app-shell .privacy-data-actions > div > div { grid-template-columns: 1fr; }
+  .app-shell .privacy-data-actions button { grid-column: 1; grid-row: auto; width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-shell .personalization-page *, .app-shell .settings-privacy-card * { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; }
+}

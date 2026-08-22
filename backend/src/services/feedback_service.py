@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.events.publisher import emit
 from src.intelligence.pattern_feedback import apply_pattern_signal
 from src.models import DecisionProposal, LearnerPattern, ProposalFeedback
+from src.services import privacy_service
 from src.services.proposal_service import ProposalConflict, ProposalNotFound
 
 OUTCOME_WEIGHTS = {"helpful": 1.0, "neutral": 0.5, "unhelpful": 0.0}
@@ -74,16 +75,17 @@ async def record_feedback(
     )
     await db.flush()
 
-    contribution = CONFIDENCE_CONTRIBUTIONS[body.outcome]
-    await apply_pattern_signal(
-        db,
-        user_id=user_id,
-        pattern_ids=proposal.evidence_references or [],
-        event=event,
-        contribution=contribution,
-        source="proposal_feedback",
-        meta={"proposal_id": proposal.id, "outcome": body.outcome},
-    )
+    if await privacy_service.personalization_allowed(db, user_id):
+        contribution = CONFIDENCE_CONTRIBUTIONS[body.outcome]
+        await apply_pattern_signal(
+            db,
+            user_id=user_id,
+            pattern_ids=proposal.evidence_references or [],
+            event=event,
+            contribution=contribution,
+            source="proposal_feedback",
+            meta={"proposal_id": proposal.id, "outcome": body.outcome},
+        )
 
     await db.commit()
     await db.refresh(feedback)

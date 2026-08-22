@@ -51,7 +51,6 @@ const NAV_GROUPS = [
     label: "智能助学",
     items: [
       { label: "学习伙伴", href: "/studio/coach", icon: Bot, match: "coach" },
-      { label: "学习记忆", href: "/studio/coach/memory", icon: BrainCircuit, match: "memory" },
     ],
   },
 ];
@@ -424,9 +423,7 @@ export function ProductShell({
                         ? pathname.startsWith("/studio/work/knowledge")
                         : item.match === "notes"
                           ? pathname.startsWith("/studio/work/notes")
-                        : item.match === "memory"
-                          ? pathname.startsWith("/studio/coach/memory")
-                          : pathname === "/studio/coach" || pathname.startsWith("/studio/coach/proposals");
+                        : pathname === "/studio/coach" || pathname.startsWith("/studio/coach/proposals");
                 return (
                   <Link
                     key={item.label}

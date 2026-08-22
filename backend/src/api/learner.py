@@ -246,6 +246,7 @@ async def accept_proposal(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
+    await _require_personalization(db, current_user.id)
     try:
         return await proposal_service.accept_proposal(current_user.id, proposal_id, db)
     except proposal_service.ProposalNotFound as exc:
@@ -276,6 +277,7 @@ async def adjust_proposal(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
+    await _require_personalization(db, current_user.id)
     try:
         return await proposal_service.adjust_proposal(current_user.id, proposal_id, body, db)
     except proposal_service.ProposalNotFound as exc:
