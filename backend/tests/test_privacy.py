@@ -10,6 +10,7 @@ from sqlalchemy import func, select
 
 from src.core.time import utc_now
 from src.intelligence.cognitive_model import CognitiveProfileBuilder
+from src.intelligence.decision_context import DecisionContextBuilder
 from src.models import (
     ConsentAuditEvent,
     DataExportAudit,
@@ -34,7 +35,6 @@ from src.models import (
     User,
 )
 from src.services import privacy_service
-from src.services.chat_context import build_chat_context
 
 
 async def _current_user(client, auth, db) -> User:
@@ -97,23 +97,12 @@ async def test_consent_can_disable_then_erase_retained_derivatives_idempotently(
     assert await db.scalar(
         select(func.count()).select_from(LearnerProfile).where(LearnerProfile.user_id == user.id)
     ) == 1
-    with patch(
-        "src.services.chat_context._load_knowledge",
-        new=AsyncMock(
-            return_value=[
-                {"title": "用户主动检索的笔记", "snippet": "资料正文", "score": 0.9}
-            ]
-        ),
-    ):
-        chat_context, _ = await build_chat_context(
-            user_id=user.id, goal_id=None, message="根据我上传的资料回答"
-        )
-    assert chat_context.get("profile") is None
-    assert chat_context.get("cognitive_profile") is None
-    assert chat_context.get("patterns") == []
-    assert chat_context.get("memories") == []
-    assert chat_context.get("recent_events") == []
-    assert chat_context["knowledge_sources"][0]["title"] == "用户主动检索的笔记"
+    decision_context = await DecisionContextBuilder.build(db, user.id)
+    assert decision_context.get("profile") is None
+    assert decision_context.get("cognitive_profile") is None
+    assert decision_context.get("active_patterns") == []
+    assert decision_context.get("memories") == {}
+    assert decision_context.get("recent_events") == []
 
     request_id = f"privacy-{uuid.uuid4().hex}"
     body = {
@@ -319,9 +308,7 @@ async def test_sensitive_inference_is_opt_in_and_cleared_when_disabled(client, a
     assert profile.persistence_score is None
     assert profile.challenge_tolerance is None
     assert profile.feedback_acceptance is None
-    default_context, _ = await build_chat_context(
-        user_id=user.id, goal_id=None, message="根据我的情况复盘"
-    )
+    default_context = await DecisionContextBuilder.build(db, user.id)
     cognitive_context = default_context.get("cognitive_profile") or {}
     assert "procrastination_score" not in cognitive_context
     assert "persistence_score" not in cognitive_context
@@ -341,9 +328,7 @@ async def test_sensitive_inference_is_opt_in_and_cleared_when_disabled(client, a
     await db.commit()
     await db.refresh(profile)
     assert profile.procrastination_score is not None
-    enabled_context, _ = await build_chat_context(
-        user_id=user.id, goal_id=None, message="根据我的情况复盘"
-    )
+    enabled_context = await DecisionContextBuilder.build(db, user.id)
     assert (enabled_context.get("cognitive_profile") or {}).get("procrastination_score") is not None
 
     disabled = await client.patch(
