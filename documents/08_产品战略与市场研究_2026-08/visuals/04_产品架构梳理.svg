@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2200" height="1370" viewBox="0 0 2200 1370" role="img" aria-labelledby="title desc">
+<title id="title">PlanPilot 产品对象架构</title>
+<desc id="desc">用户目标如何连接计划、执行、证据、资料、记忆与受监督行动。</desc>
+<defs>
+<linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FBFAFF"/><stop offset=".58" stop-color="#FFFFFF"/><stop offset="1" stop-color="#F2FFFE"/></linearGradient>
+<linearGradient id="flow" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#8272FF"/><stop offset=".52" stop-color="#5B74FF"/><stop offset="1" stop-color="#45C7C3"/></linearGradient>
+<filter id="shadow" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="8" stdDeviation="14" flood-color="#77759A" flood-opacity=".12"/></filter>
+<marker id="arrow-purple" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0 L10 5 L0 10Z" fill="#8272FF"/></marker>
+<marker id="arrow-blue" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0 L10 5 L0 10Z" fill="#5B74FF"/></marker>
+<marker id="arrow-cyan" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0 L10 5 L0 10Z" fill="#45C7C3"/></marker>
+<marker id="arrow-amber" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0 L10 5 L0 10Z" fill="#F0A12D"/></marker>
+<style>
+text{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC","Microsoft YaHei",sans-serif}
+.title{font-size:56px;font-weight:720;letter-spacing:-2px;fill:#090A24}.subtitle{font-size:24px;font-weight:430;fill:#69708A}.kicker{font-size:18px;font-weight:650;letter-spacing:4px;fill:#8272FF}.section{font-size:26px;font-weight:680;fill:#090A24}.h{font-size:22px;font-weight:650;fill:#090A24}.body{font-size:19px;font-weight:470;fill:#282D49}.small{font-size:18px;font-weight:470;fill:#545C78}.tiny{font-size:16px;font-weight:600;fill:#69708A}.white{fill:#FFFFFF}.panel{fill:#FFFFFF;stroke:#DDE0EB;stroke-width:1.4}.soft-purple{fill:#F3F1FF;stroke:#E5E0FF;stroke-width:1}.soft-blue{fill:#EEF1FF;stroke:#DCE3FF;stroke-width:1}.soft-cyan{fill:#EFFBFA;stroke:#CBEFED;stroke-width:1}.soft-amber{fill:#FFF8EB;stroke:#F7DFB4;stroke-width:1}.soft-rose{fill:#FFF2F5;stroke:#F4D4DC;stroke-width:1}.shadow{filter:url(#shadow)}.line{fill:none;stroke:#A8AEC2;stroke-width:1.6}.purple-line{fill:none;stroke:#8272FF;stroke-width:2;marker-end:url(#arrow-purple)}.blue-line{fill:none;stroke:#5B74FF;stroke-width:2;marker-end:url(#arrow-blue)}.cyan-line{fill:none;stroke:#45C7C3;stroke-width:2;marker-end:url(#arrow-cyan)}.amber-line{fill:none;stroke:#F0A12D;stroke-width:2;stroke-dasharray:7 7;marker-end:url(#arrow-amber)}.lifeline{stroke:#C9CDDA;stroke-width:1.5;stroke-dasharray:6 7}
+</style>
+</defs>
+<rect width="2200" height="1370" fill="url(#bg)"/>
+<text x="64" y="56" class="kicker">PRODUCT OBJECT MAP · 2026</text>
+<text x="64" y="120" class="title">PlanPilot 产品对象架构</text>
+<text x="64" y="162" class="subtitle">这张图回答对象与状态怎样相连；技术部署另见系统架构图</text>
+<text x="2136" y="55" text-anchor="end" class="section">PlanPilot</text>
+<text x="70" y="235" class="section" text-anchor="start">01  学习执行主链</text>
+<rect x="110" y="285" width="300" height="135" rx="16" class="panel shadow"/>
+<text x="134" y="327" class="section" text-anchor="start">目标</text>
+<text x="134" y="366" class="small" text-anchor="start">截止 / 能力 / 时间 / 成功证据</text>
+<path d="M410 352 L475 352" class="purple-line"/>
+<rect x="485" y="285" width="300" height="135" rx="16" class="panel shadow"/>
+<text x="509" y="327" class="section" text-anchor="start">里程碑</text>
+<text x="509" y="366" class="small" text-anchor="start">长期阶段与依赖</text>
+<path d="M785 352 L850 352" class="blue-line"/>
+<rect x="860" y="285" width="300" height="135" rx="16" class="panel shadow"/>
+<text x="884" y="327" class="section" text-anchor="start">两周计划</text>
+<text x="884" y="366" class="small" text-anchor="start">用户确认后的近期窗口</text>
+<path d="M1160 352 L1225 352" class="cyan-line"/>
+<rect x="1235" y="285" width="300" height="135" rx="16" class="panel shadow"/>
+<text x="1259" y="327" class="section" text-anchor="start">任务 / 日程</text>
+<text x="1259" y="366" class="small" text-anchor="start">今日主任务与最小版本</text>
+<path d="M1535 352 L1600 352" class="cyan-line"/>
+<rect x="1610" y="285" width="300" height="135" rx="16" class="panel shadow"/>
+<text x="1634" y="327" class="section" text-anchor="start">完成 / 掌握</text>
+<text x="1634" y="366" class="small" text-anchor="start">解释 / 练习 / 作品证据</text>
+<text x="70" y="520" class="section" text-anchor="start">02  上下文与校准</text>
+<rect x="110" y="570" width="300" height="145" rx="16" class="soft-purple"/>
+<text x="134" y="612" class="section" text-anchor="start">知识资料</text>
+<text x="134" y="650" class="small" text-anchor="start">文件 / URL</text>
+<text x="134" y="676" class="small" text-anchor="start">索引 / 引用 / 版本</text>
+<rect x="485" y="570" width="300" height="145" rx="16" class="soft-purple"/>
+<text x="509" y="612" class="section" text-anchor="start">学习笔记</text>
+<text x="509" y="650" class="small" text-anchor="start">目标 / 任务关联</text>
+<text x="509" y="676" class="small" text-anchor="start">产出与快记</text>
+<rect x="860" y="570" width="300" height="145" rx="16" class="soft-cyan"/>
+<text x="884" y="612" class="section" text-anchor="start">学习事件</text>
+<text x="884" y="650" class="small" text-anchor="start">开始 / 完成 / 偏差</text>
+<text x="884" y="676" class="small" text-anchor="start">恢复 / 掌握证据</text>
+<rect x="1235" y="570" width="300" height="145" rx="16" class="soft-cyan"/>
+<text x="1259" y="612" class="section" text-anchor="start">学习记忆</text>
+<text x="1259" y="650" class="small" text-anchor="start">声明 / 事实 / 推断 / 临时</text>
+<text x="1259" y="676" class="small" text-anchor="start">来源 / 影响 / 可治理</text>
+<rect x="1610" y="570" width="300" height="145" rx="16" class="soft-blue"/>
+<text x="1634" y="612" class="section" text-anchor="start">下一轮计划</text>
+<text x="1634" y="650" class="small" text-anchor="start">按新容量与证据</text>
+<text x="1634" y="676" class="small" text-anchor="start">重新展开未来两周</text>
+<path d="M260 570 L260 430" class="cyan-line"/>
+<path d="M635 570 L635 430" class="cyan-line"/>
+<path d="M1010 430 L1010 560" class="cyan-line"/>
+<path d="M1160 642 L1225 642" class="cyan-line"/>
+<path d="M1535 642 L1600 642" class="cyan-line"/>
+<path d="M1760 570 C1760 470 1010 470 1010 430" class="blue-line"/>
+<text x="70" y="850" class="section" text-anchor="start">03  Pilo 与受监督行动</text>
+<rect x="110" y="900" width="1800" height="200" rx="16" class="soft-blue shadow"/>
+<rect x="150" y="965" width="230" height="68" rx="13" class="panel"/>
+<text x="265" y="1007" class="body" text-anchor="middle">对话 / 澄清</text>
+<path d="M380 999 L435 999" class="blue-line"/>
+<rect x="445" y="965" width="230" height="68" rx="13" class="panel"/>
+<text x="560" y="1007" class="body" text-anchor="middle">行动意图</text>
+<path d="M675 999 L730 999" class="blue-line"/>
+<rect x="740" y="965" width="230" height="68" rx="13" class="panel"/>
+<text x="855" y="1007" class="body" text-anchor="middle">变更预览</text>
+<path d="M970 999 L1025 999" class="blue-line"/>
+<rect x="1035" y="965" width="230" height="68" rx="13" class="panel"/>
+<text x="1150" y="1007" class="body" text-anchor="middle">风险审查</text>
+<path d="M1265 999 L1320 999" class="blue-line"/>
+<rect x="1330" y="965" width="230" height="68" rx="13" class="panel"/>
+<text x="1445" y="1007" class="body" text-anchor="middle">用户批准</text>
+<path d="M1560 999 L1615 999" class="blue-line"/>
+<rect x="1625" y="965" width="230" height="68" rx="13" class="panel"/>
+<text x="1740" y="1007" class="body" text-anchor="middle">执行 / 回读 / 撤销</text>
+<path d="M1510 900 C1510 815 1385 815 1385 725" class="blue-line"/>
+<rect x="110" y="1170" width="1800" height="90" rx="14" class="soft-amber"/>
+<text x="142" y="1207" class="h" text-anchor="start">治理边界</text>
+<text x="275" y="1207" class="body" text-anchor="start">模型负责候选与歧义；规则负责权限和状态；用户授权具体变更；数据库回读负责事实。</text>
+<text x="142" y="1238" class="h" text-anchor="start">延期归因</text>
+<text x="275" y="1238" class="body" text-anchor="start">原始延期保留；用户归因只改变有效模式样本，不计算理由真假。</text>
+</svg>

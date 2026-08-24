@@ -60,9 +60,9 @@ learning_events（原始事件流，append-only）
         │         增量维护，事件驱动更新
         │
         └──→ pattern_evidences（溯源链，append-only）
-        
+
         ↓ Profile Builder（批处理，每日）
-        
+
 learner_profiles（当前状态快照 / State）
         统计聚合值，无 confidence，直接反映近期数字
 
@@ -668,6 +668,16 @@ learner_patterns ──── 行为规律（增量维护 + 衰减）
 {
   "avg_days_overdue": 1.2,
   "chronic_delay_rate": 0.18,
+  "observed_delay_rate": 0.40,
+  "adjusted_delay_rate": 0.33,
+  "effective_sample_count": 8,
+  "supporting_count": 3,
+  "opposing_count": 5,
+  "excluded_count": 1,
+  "evidence_strength": 0.73,
+  "by_category": {
+    "数据叙事": {"sample_count": 5, "delayed_count": 3, "delay_rate": 0.60}
+  },
   "debt_accumulation_rate": 0.25,
   "debt_recovery_rate": 0.70,
   "reschedule_trigger_dist": {
@@ -678,7 +688,12 @@ learner_patterns ──── 行为规律（增量维护 + 衰减）
 }
 ```
 
-`chronic_delay_rate`: `days_overdue > 3` 的任务占比
+`chronic_delay_rate`: `days_overdue > 3` 的任务占比。
+
+`observed_delay_rate` 保留所有延期事实；`adjusted_delay_rate` 只使用有效行为证据。
+用户把某次延期标记为外部中断时，该记录不会被删除，而是进入 `excluded_count`，
+不参与行为模式统计。`evidence_strength` 只表示有效样本是否足够稳定，不表示用户
+“想不想做”或理由真实性的概率。
 
 **默认 decay_rate**: `0.05`
 
@@ -719,7 +734,8 @@ learner_patterns ──── 行为规律（增量维护 + 衰减）
 | `TaskCompleted` | `completion_rate_trend` | 事件本身=完成 | 对应日期的完成计数+1 |
 | `TaskCompleted` | `mastery_velocity` | `mastery_level`（与前值差） | 若等级提升则记录时间间隔 |
 | `TaskCompleted` | `estimation_accuracy` | `actual_mins` ÷ `task.estimated_mins` | 追加 ratio evidence |
-| `TaskCompleted` | `delay_pattern` | `days_overdue` | 追加 evidence，更新均值 |
+| `TaskCompleted` | `delay_pattern` | `days_overdue` | 逾期为支持、按时为反向，重算有效率 |
+| `DelayAttributionRecorded` | `delay_pattern` | 目标延期事件 + 用户归因 | 保留延期事实，重算有效证据 |
 | `TaskCompleted` | `focus_peak_time` | `occurred_at.hour` × `mastery_level` | 更新 hour → mastery 映射 |
 | `TaskSkipped` | `distraction_pattern` | `occurred_at.weekday()` + `hour` | 追加 skip evidence |
 | `TaskSkipped` | `delay_pattern` | `debt_created` | 债务计数+1 |
@@ -923,6 +939,10 @@ extraction_rule:
 | `decayed` → `archived` | `confidence < 0.2` 持续30天 | 规律已消失 |
 | `candidate` → `archived` | `evidence_count < 3` 且 `first_observed_at > 60天前` | 冷启动失败的孤立证据 |
 
+对 `delay_pattern`，`active` 还必须满足 `effective_sample_count >= 5` 且
+`adjusted_delay_rate > 0.5`。用户将一次延期标记为外部中断后，若有效样本或调整后
+延期率跌破条件，Pattern 会变为 `decayed`，但原始延期事件仍可审计。
+
 ---
 
 ### 7.3 confidence 计算公式
@@ -954,6 +974,19 @@ confidence_new = confidence_old + contribution × learning_rate × (1.0 - confid
 confidence_new = max(0.0, min(1.0, confidence_new))
 ```
 
+`delay_pattern` 是例外：它不把每条事件都当作同方向的正向证据，而是从最近窗口
+重新投影。逾期任务是支持证据，按时完成是反向证据；用户标记为
+`external_interruption` 的延期从有效样本中排除。其两个主要派生值为：
+
+```text
+adjusted_delay_rate = (1 + supporting_count) / (2 + effective_sample_count)
+evidence_strength = effective_sample_count / (effective_sample_count + 3)
+```
+
+因此 `confidence` 在该 Pattern 上表示证据强度，不是用户动机、借口真实性或因果
+归因的概率。归因由 `DelayAttributionRecorded` 追加事件记录，原始 `TaskCompleted`
+事实保持 append-only。
+
 **无新证据时**（每周衰减，由后台定时任务执行）:
 ```
 weeks_since_confirmed = (NOW - last_confirmed_at).days / 7.0
@@ -980,7 +1013,8 @@ confidence_new = confidence_old + contribution × learning_rate × confidence_ol
 confidence_new = max(0.0, min(1.0, confidence_new))
 ```
 
-> **实现注意**: contradiction detection 在 Phase 2C-3 中作为可选功能；Phase 2C-1 仅正向更新。
+> **实现注意**: 通用 Pattern 的 contradiction detection 仍可选；`delay_pattern` 已由
+> 双向任务观测和 `DelayAttributionRecorded` 归因事件实现反向/排除逻辑。
 
 ---
 
@@ -1009,7 +1043,7 @@ Agent 是**只读 Learner Model + 只写 Proposals** 的消费者，永远不直
 
 ```
 [Learner Model Layer]          [Agent Layer]              [Action Layer]
-learner_profiles     →         
+learner_profiles     →
 learner_patterns     →  AgentDecisionInput  →  Agent  →  DecisionProposal
 learning_events      →                                         ↓
 goals / plans        →                              用户确认 / 自动执行

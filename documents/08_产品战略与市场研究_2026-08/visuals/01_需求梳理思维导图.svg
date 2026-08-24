@@ -1,0 +1,122 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2200" height="1225" viewBox="0 0 2200 1225" role="img" aria-labelledby="title desc">
+<title id="title">PlanPilot 需求梳理</title>
+<desc id="desc">从目标用户的真实问题，收敛到 P0 闭环与可观测验收。</desc>
+<defs>
+<linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FBFAFF"/><stop offset=".58" stop-color="#FFFFFF"/><stop offset="1" stop-color="#F2FFFE"/></linearGradient>
+<linearGradient id="flow" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#8272FF"/><stop offset=".52" stop-color="#5B74FF"/><stop offset="1" stop-color="#45C7C3"/></linearGradient>
+<filter id="shadow" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="8" stdDeviation="14" flood-color="#77759A" flood-opacity=".12"/></filter>
+<marker id="arrow-purple" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0 L10 5 L0 10Z" fill="#8272FF"/></marker>
+<marker id="arrow-blue" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0 L10 5 L0 10Z" fill="#5B74FF"/></marker>
+<marker id="arrow-cyan" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0 L10 5 L0 10Z" fill="#45C7C3"/></marker>
+<marker id="arrow-amber" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0 L10 5 L0 10Z" fill="#F0A12D"/></marker>
+<style>
+text{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC","Microsoft YaHei",sans-serif}
+.title{font-size:56px;font-weight:720;letter-spacing:-2px;fill:#090A24}.subtitle{font-size:24px;font-weight:430;fill:#69708A}.kicker{font-size:18px;font-weight:650;letter-spacing:4px;fill:#8272FF}.section{font-size:26px;font-weight:680;fill:#090A24}.h{font-size:22px;font-weight:650;fill:#090A24}.body{font-size:19px;font-weight:470;fill:#282D49}.small{font-size:18px;font-weight:470;fill:#545C78}.tiny{font-size:16px;font-weight:600;fill:#69708A}.white{fill:#FFFFFF}.panel{fill:#FFFFFF;stroke:#DDE0EB;stroke-width:1.4}.soft-purple{fill:#F3F1FF;stroke:#E5E0FF;stroke-width:1}.soft-blue{fill:#EEF1FF;stroke:#DCE3FF;stroke-width:1}.soft-cyan{fill:#EFFBFA;stroke:#CBEFED;stroke-width:1}.soft-amber{fill:#FFF8EB;stroke:#F7DFB4;stroke-width:1}.soft-rose{fill:#FFF2F5;stroke:#F4D4DC;stroke-width:1}.shadow{filter:url(#shadow)}.line{fill:none;stroke:#A8AEC2;stroke-width:1.6}.purple-line{fill:none;stroke:#8272FF;stroke-width:2;marker-end:url(#arrow-purple)}.blue-line{fill:none;stroke:#5B74FF;stroke-width:2;marker-end:url(#arrow-blue)}.cyan-line{fill:none;stroke:#45C7C3;stroke-width:2;marker-end:url(#arrow-cyan)}.amber-line{fill:none;stroke:#F0A12D;stroke-width:2;stroke-dasharray:7 7;marker-end:url(#arrow-amber)}.lifeline{stroke:#C9CDDA;stroke-width:1.5;stroke-dasharray:6 7}
+</style>
+</defs>
+<rect width="2200" height="1225" fill="url(#bg)"/>
+<text x="64" y="56" class="kicker">REQUIREMENT MAP · 2026</text>
+<text x="64" y="120" class="title">PlanPilot 需求梳理</text>
+<text x="64" y="162" class="subtitle">从真实问题收敛到可验证需求；不把功能清单伪装成用户洞察</text>
+<text x="2136" y="55" text-anchor="end" class="section">PlanPilot</text>
+<path d="M250 296 C610 296 700 296 1030 296 C1370 296 1490 296 1930 296" stroke="url(#flow)" stroke-width="2.5" fill="none"/>
+<circle cx="250" cy="296" r="20" fill="#FFFFFF" stroke="#8272FF" stroke-width="1.5"/>
+<circle cx="250" cy="296" r="6" fill="#8272FF"/>
+<text x="200" y="250" class="h" text-anchor="start">01</text>
+<text x="250" y="346" class="h" text-anchor="middle">用户情境</text>
+<text x="250" y="372" class="small" text-anchor="middle">谁在何时需要</text>
+<circle cx="670" cy="296" r="20" fill="#FFFFFF" stroke="#5B74FF" stroke-width="1.5"/>
+<circle cx="670" cy="296" r="6" fill="#5B74FF"/>
+<text x="620" y="250" class="h" text-anchor="start">02</text>
+<text x="670" y="346" class="h" text-anchor="middle">核心任务</text>
+<text x="670" y="372" class="small" text-anchor="middle">开始 / 恢复 / 验证</text>
+<circle cx="1100" cy="296" r="20" fill="#FFFFFF" stroke="#D86E86" stroke-width="1.5"/>
+<circle cx="1100" cy="296" r="6" fill="#D86E86"/>
+<text x="1050" y="250" class="h" text-anchor="start">03</text>
+<text x="1100" y="346" class="h" text-anchor="middle">根因</text>
+<text x="1100" y="372" class="small" text-anchor="middle">问题为何反复发生</text>
+<circle cx="1520" cy="296" r="20" fill="#FFFFFF" stroke="#45C7C3" stroke-width="1.5"/>
+<circle cx="1520" cy="296" r="6" fill="#45C7C3"/>
+<text x="1470" y="250" class="h" text-anchor="start">04</text>
+<text x="1520" y="346" class="h" text-anchor="middle">P0 闭环</text>
+<text x="1520" y="372" class="small" text-anchor="middle">产品必须完成什么</text>
+<circle cx="1930" cy="296" r="20" fill="#FFFFFF" stroke="#F0A12D" stroke-width="1.5"/>
+<circle cx="1930" cy="296" r="6" fill="#F0A12D"/>
+<text x="1880" y="250" class="h" text-anchor="start">05</text>
+<text x="1930" y="346" class="h" text-anchor="middle">验收边界</text>
+<text x="1930" y="372" class="small" text-anchor="middle">如何决定继续投入</text>
+<rect x="64" y="430" width="370" height="500" rx="16" class="soft-purple shadow"/>
+<text x="90" y="475" class="section" text-anchor="start">用户</text>
+<path d="M90 495 L408 495" class="line"/>
+<text x="92" y="542" class="h" text-anchor="start">在职备考</text>
+<text x="94" y="573" class="small" text-anchor="start">• 考期固定</text>
+<text x="94" y="598" class="small" text-anchor="start">• 每周时间波动</text>
+<text x="92" y="654" class="h" text-anchor="start">职业转型</text>
+<text x="94" y="685" class="small" text-anchor="start">• 16 周作品集</text>
+<text x="94" y="710" class="small" text-anchor="start">• 多来源材料</text>
+<text x="92" y="766" class="h" text-anchor="start">共同触发</text>
+<text x="94" y="797" class="small" text-anchor="start">• 计划失真</text>
+<text x="94" y="822" class="small" text-anchor="start">• 中断后难恢复</text>
+<text x="94" y="847" class="small" text-anchor="start">• 完成≠掌握</text>
+<rect x="490" y="430" width="370" height="545" rx="16" class="soft-blue shadow"/>
+<text x="516" y="475" class="section" text-anchor="start">JTBD</text>
+<path d="M516 495 L834 495" class="line"/>
+<text x="518" y="542" class="h" text-anchor="start">开始</text>
+<text x="520" y="573" class="small" text-anchor="start">• 今天做哪一件事</text>
+<text x="520" y="598" class="small" text-anchor="start">• 最低配版本是什么</text>
+<text x="518" y="654" class="h" text-anchor="start">恢复</text>
+<text x="520" y="685" class="small" text-anchor="start">• 新容量下怎样继续</text>
+<text x="520" y="710" class="small" text-anchor="start">• 保留已完成历史</text>
+<text x="518" y="766" class="h" text-anchor="start">验证</text>
+<text x="520" y="797" class="small" text-anchor="start">• 解释 / 练习 / 作品</text>
+<text x="518" y="853" class="h" text-anchor="start">治理</text>
+<text x="520" y="884" class="small" text-anchor="start">• 看懂并纠正推断</text>
+<rect x="916" y="430" width="370" height="545" rx="16" class="soft-rose shadow"/>
+<text x="942" y="475" class="section" text-anchor="start">根因</text>
+<path d="M942 495 L1260 495" class="line"/>
+<text x="944" y="542" class="h" text-anchor="start">计划</text>
+<text x="946" y="573" class="small" text-anchor="start">• 远期过细</text>
+<text x="946" y="598" class="small" text-anchor="start">• 容量未显式</text>
+<text x="944" y="654" class="h" text-anchor="start">任务</text>
+<text x="946" y="685" class="small" text-anchor="start">• 粒度过大</text>
+<text x="946" y="710" class="small" text-anchor="start">• 无最小版本</text>
+<text x="944" y="766" class="h" text-anchor="start">结果</text>
+<text x="946" y="797" class="small" text-anchor="start">• 只记录勾选</text>
+<text x="946" y="822" class="small" text-anchor="start">• 证据脱离目标</text>
+<text x="944" y="878" class="h" text-anchor="start">信任</text>
+<text x="946" y="909" class="small" text-anchor="start">• 事实/推断混用</text>
+<text x="946" y="934" class="small" text-anchor="start">• 无授权与回读</text>
+<rect x="1342" y="430" width="370" height="650" rx="16" class="soft-cyan shadow"/>
+<text x="1368" y="475" class="section" text-anchor="start">P0 产品闭环</text>
+<path d="M1368 495 L1686 495" class="line"/>
+<text x="1370" y="542" class="h" text-anchor="start">目标合同</text>
+<text x="1372" y="573" class="small" text-anchor="start">• 截止 / 能力 / 时间 / 证据</text>
+<text x="1370" y="629" class="h" text-anchor="start">滚动计划</text>
+<text x="1372" y="660" class="small" text-anchor="start">• 可解释里程碑</text>
+<text x="1372" y="685" class="small" text-anchor="start">• 确认后展开两周</text>
+<text x="1370" y="741" class="h" text-anchor="start">今日执行</text>
+<text x="1372" y="772" class="small" text-anchor="start">• 一个主任务 + 最小版本</text>
+<text x="1370" y="828" class="h" text-anchor="start">恢复与掌握</text>
+<text x="1372" y="859" class="small" text-anchor="start">• 三档恢复</text>
+<text x="1372" y="884" class="small" text-anchor="start">• 30–90 秒验收</text>
+<text x="1370" y="940" class="h" text-anchor="start">可信边界</text>
+<text x="1372" y="971" class="small" text-anchor="start">• 批准 / 回读 / 可治理记忆</text>
+<rect x="1768" y="430" width="370" height="520" rx="16" class="soft-amber shadow"/>
+<text x="1794" y="475" class="section" text-anchor="start">验证与非目标</text>
+<path d="M1794 495 L2112 495" class="line"/>
+<text x="1796" y="542" class="h" text-anchor="start">行为</text>
+<text x="1798" y="573" class="small" text-anchor="start">• 10 分钟目标</text>
+<text x="1798" y="598" class="small" text-anchor="start">• 24 小时行动</text>
+<text x="1798" y="623" class="small" text-anchor="start">• 72 小时恢复</text>
+<text x="1798" y="648" class="small" text-anchor="start">• 7 日掌握结果</text>
+<text x="1796" y="704" class="h" text-anchor="start">安全</text>
+<text x="1798" y="735" class="small" text-anchor="start">• 未批准写入 = 0</text>
+<text x="1798" y="760" class="small" text-anchor="start">• 纠正影响可见</text>
+<text x="1796" y="816" class="h" text-anchor="start">不做</text>
+<text x="1798" y="847" class="small" text-anchor="start">• 课程内容库存</text>
+<text x="1798" y="872" class="small" text-anchor="start">• 通用待办</text>
+<text x="1798" y="897" class="small" text-anchor="start">• 全自治 / 羞耻留存</text>
+<rect x="230" y="1120" width="1740" height="72" rx="14" class="panel"/>
+<text x="260" y="1154" class="h" text-anchor="start">追溯规则</text>
+<text x="395" y="1154" class="body" text-anchor="start">每个 P0 必须回溯到一个真实成本，并绑定行为指标或硬安全底线；否则留在文档，不进入产品表面。</text>
+</svg>

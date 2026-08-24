@@ -12,7 +12,7 @@
 1. 架构概览与设计动机
 2. Event Processor 职责设计
 3. Extraction Rule Schema 设计
-4. 第一批 Extraction Rule 完整定义（8条）
+4. 第一批 Extraction Rule 完整定义（9条）
 5. Pattern Update Engine
    - 5.1 confidence 公式（完整）
    - 5.2 Lifecycle 状态机
@@ -298,9 +298,9 @@ async def run_extractor(
 
 ---
 
-## 4. 第一批 Extraction Rule 完整定义（8条）
+## 4. 第一批 Extraction Rule 完整定义（9条）
 
-以下按 Phase 2C-1 §6.1 规则表，从20条规则中选取**可立即实现**（不依赖 JOIN 或依赖简单 JOIN）的第一批8条。
+以下按 Phase 2C-1 §6.1 规则表，从20条规则中选取**可立即实现**（不依赖 JOIN 或依赖简单 JOIN）的第一批9条。
 
 ### 4.1 Habit 类（4条）
 
@@ -485,12 +485,37 @@ requires_db_join: false
 feature_extractor:
   days_overdue:  event.payload.get("days_overdue", 0)
   on_time:       event.payload.get("days_overdue", 0) <= 0
+  evidence_kind: "delay_observation"
+  task_category: event.payload.get("stage_label") or event.payload.get("task_type")
 
 description: |
   TaskCompleted.days_overdue → delay_pattern。
-  pattern_value 存储 avg_days_overdue 和 chronic_delay_rate（days_overdue > 3 的比例）。
-  每次任务完成都提供一个数据点，无论按时还是逾期。
+  pattern_value 同时存储 observed_delay_rate、adjusted_delay_rate、
+  effective_sample_count、supporting_count、opposing_count、excluded_count 和
+  evidence_strength。逾期是支持证据，按时完成是反向证据；每次任务完成都提供一个
+  数据点，但不再把所有完成事件都当成正向证据。
 ```
+
+#### Rule Pl-3: `delay_attribution_recorded_to_delay_pattern`
+
+```yaml
+rule_id: delay_attribution_recorded_to_delay_pattern
+source_event_type: DelayAttributionRecorded
+target_pattern_type: delay_pattern
+target_scope: user
+base_contribution: 0.0
+reliability: 1.0
+condition: target_event_id exists and attribution in [external_interruption, unexplained]
+
+feature_extractor:
+  target_event_id: payload.target_event_id
+  target_evidence_id: payload.target_evidence_id
+  attribution: payload.attribution
+  reason_code: payload.reason_code
+```
+
+该事件不新增一条延期事实，只追加用户归因并触发最近证据窗口重算。标记为
+`external_interruption` 的记录保留在原始事实中，但不进入 `adjusted_delay_rate`。
 
 ---
 
@@ -530,6 +555,8 @@ description: |
 | P-2 | MasteryRecorded | mastery_velocity | goal | 0.80 | ❌ |
 | Pl-1 | TaskCompleted | delay_pattern | user | 0.90 | ❌ |
 | Pl-2 | TaskRescheduled | plan_adherence | goal | 0.90 | ❌ |
+| Pl-3 | DelayAttributionRecorded | delay_pattern | user | 0.00（仅重算） | ❌ |
+| Pl-3 | DelayAttributionRecorded | delay_pattern | user | 0.00（仅重算） | ❌ |
 
 > **暂缓的 Rule**：
 > - `estimation_accuracy`：需要 JOIN `tasks.estimated_mins`，Phase 2C-3.1 实现
@@ -641,6 +668,17 @@ def _update_confidence(
     return max(0.0, min(1.0, confidence_new))
 ```
 
+对 `delay_pattern` 不使用上面的单向累计公式。引擎从最近 50 条 evidence.meta
+重建观测投影：
+
+```text
+adjusted_delay_rate = (1 + supporting_count) / (2 + effective_sample_count)
+evidence_strength = effective_sample_count / (effective_sample_count + 3)
+```
+
+`confidence` 在此处表示证据强度，不是用户动机概率。`DelayAttributionRecorded`
+是 append-only 的纠正事件：原始延期保留，外部中断只从有效模式样本中排除。
+
 **示例演算**（preferred_learning_time，初始 confidence=0.3，reliability=0.9）：
 
 | evidence_count | learning_rate | contribution | Δconfidence | 新 confidence |
@@ -705,6 +743,10 @@ def _run_lifecycle(pattern: LearnerPattern) -> str:
 
     return current
 ```
+
+`delay_pattern` 使用额外条件：只有 `effective_sample_count >= 5`、
+`adjusted_delay_rate > 0.5` 且证据强度达到阈值时才进入 `active`。一次用户纠正
+可能使它转为 `decayed`；这不删除原始事件，也不代表系统判定用户在找借口。
 
 **状态转换总表**：
 
@@ -1063,7 +1105,7 @@ async def user_with_events(db: AsyncSession):
 |------|---------|
 | Unit（Rule层） | 100% 的 condition_check 和 extract_features 函数 |
 | Unit（Engine层）| 所有 confidence 公式分支（上升/衰减/clamp/contradiction） |
-| Integration | 8条 Rule 全部有端到端集成测试 |
+| Integration | 9条 Rule 全部有端到端集成测试 |
 | Idempotency | 所有Rule 的幂等性验证 |
 
 ---
@@ -1097,7 +1139,7 @@ Step 4: EventProcessor 主循环（同步，不引入 Celery）
   ⚠️ Phase 2C-3 不引入 APScheduler / Celery / 消息队列
      调用方直接 await process_event() 即可
 
-Step 5: 第一批 8 条 Rule
+Step 5: 第一批 9 条 Rule
   ├─ H-1 task_completed_to_preferred_time
   ├─ H-2 task_completed_to_session_length
   ├─ H-3 checkin_submitted_to_session_length
@@ -1105,7 +1147,8 @@ Step 5: 第一批 8 条 Rule
   ├─ P-1 checkin_submitted_to_completion_trend
   ├─ P-2 mastery_recorded_to_mastery_velocity
   ├─ Pl-1 task_completed_to_delay_pattern
-  └─ Pl-2 task_rescheduled_to_plan_adherence
+  ├─ Pl-2 task_rescheduled_to_plan_adherence
+  └─ Pl-3 delay_attribution_recorded_to_delay_pattern
 
 Step 6: pattern_value 聚合函数
   ├─ preferred_learning_time：peak_hours（取最近50条 hour 分布，top-3）
@@ -1113,7 +1156,7 @@ Step 6: pattern_value 聚合函数
   ├─ completion_rate_trend：线性回归斜率（numpy-free 手算）
   ├─ mastery_velocity：levels/week 滑动均值
   ├─ weekly_learning_frequency：avg_days_per_week（28天窗口）
-  └─ delay_pattern：avg_days_overdue + chronic_delay_rate
+  └─ delay_pattern：observed/adjusted delay rate + category breakdown + evidence_strength
 
 Step 7: 集成测试
   ├─ Event → Processor → Evidence → Pattern Update（全流程）

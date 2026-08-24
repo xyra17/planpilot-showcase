@@ -26,6 +26,7 @@ LearningEvent
 - `backend/src/intelligence/decision_context.py`：Agent 只读上下文与 Evidence 溯源。
 - `backend/src/services/proposal_service.py`：Proposal 状态机和白名单 Apply Gateway。
 - `backend/src/services/feedback_service.py`：效果反馈、统计和 Pattern confidence 校准。
+- `backend/src/services/pattern_control_service.py`：学习观察治理，以及具体延期证据的外部中断归因与重算。
 - `backend/src/api/learner.py`：Phase 2C 对外 API。
 - `frontend/app/(dashboard)/dashboard/coach/page.tsx`：学习伙伴完整交互页面。
 - `backend/alembic/versions/u4v5w6x7y8z9_add_decision_feedback_loop.py`：数据库迁移。
@@ -39,6 +40,7 @@ LearningEvent
 5. 业务变更只能在用户接受后通过 Apply Gateway 执行。
 6. Proposal、业务变更和 Learning Event 在同一事务提交。
 7. Feedback 会留下 LearningEvent 与 PatternEvidence，可追溯 confidence 变化。
+8. `delay_pattern` 将按时完成作为反向证据；用户归因不会删除延期事实，只改变有效模式样本。
 
 ## 数据库升级
 

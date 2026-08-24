@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2100" height="1080" viewBox="0 0 2100 1080" role="img" aria-labelledby="title desc">
+<title id="title">证据到产品决策</title>
+<desc id="desc">研究、行为和增量证据怎样共同触发 Go / Hold / Pivot / Stop。</desc>
+<defs>
+<linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FBFAFF"/><stop offset=".58" stop-color="#FFFFFF"/><stop offset="1" stop-color="#F2FFFE"/></linearGradient>
+<linearGradient id="flow" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#8272FF"/><stop offset=".52" stop-color="#5B74FF"/><stop offset="1" stop-color="#45C7C3"/></linearGradient>
+<filter id="shadow" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="8" stdDeviation="14" flood-color="#77759A" flood-opacity=".12"/></filter>
+<marker id="arrow-purple" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0 L10 5 L0 10Z" fill="#8272FF"/></marker>
+<marker id="arrow-blue" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0 L10 5 L0 10Z" fill="#5B74FF"/></marker>
+<marker id="arrow-cyan" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0 L10 5 L0 10Z" fill="#45C7C3"/></marker>
+<marker id="arrow-amber" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0 L10 5 L0 10Z" fill="#F0A12D"/></marker>
+<style>
+text{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC","Microsoft YaHei",sans-serif}
+.title{font-size:56px;font-weight:720;letter-spacing:-2px;fill:#090A24}.subtitle{font-size:24px;font-weight:430;fill:#69708A}.kicker{font-size:18px;font-weight:650;letter-spacing:4px;fill:#8272FF}.section{font-size:26px;font-weight:680;fill:#090A24}.h{font-size:22px;font-weight:650;fill:#090A24}.body{font-size:19px;font-weight:470;fill:#282D49}.small{font-size:18px;font-weight:470;fill:#545C78}.tiny{font-size:16px;font-weight:600;fill:#69708A}.white{fill:#FFFFFF}.panel{fill:#FFFFFF;stroke:#DDE0EB;stroke-width:1.4}.soft-purple{fill:#F3F1FF;stroke:#E5E0FF;stroke-width:1}.soft-blue{fill:#EEF1FF;stroke:#DCE3FF;stroke-width:1}.soft-cyan{fill:#EFFBFA;stroke:#CBEFED;stroke-width:1}.soft-amber{fill:#FFF8EB;stroke:#F7DFB4;stroke-width:1}.soft-rose{fill:#FFF2F5;stroke:#F4D4DC;stroke-width:1}.shadow{filter:url(#shadow)}.line{fill:none;stroke:#A8AEC2;stroke-width:1.6}.purple-line{fill:none;stroke:#8272FF;stroke-width:2;marker-end:url(#arrow-purple)}.blue-line{fill:none;stroke:#5B74FF;stroke-width:2;marker-end:url(#arrow-blue)}.cyan-line{fill:none;stroke:#45C7C3;stroke-width:2;marker-end:url(#arrow-cyan)}.amber-line{fill:none;stroke:#F0A12D;stroke-width:2;stroke-dasharray:7 7;marker-end:url(#arrow-amber)}.lifeline{stroke:#C9CDDA;stroke-width:1.5;stroke-dasharray:6 7}
+</style>
+</defs>
+<rect width="2100" height="1080" fill="url(#bg)"/>
+<text x="64" y="56" class="kicker">EVIDENCE FLOW · 2026</text>
+<text x="64" y="120" class="title">证据到产品决策</text>
+<text x="64" y="162" class="subtitle">把工程门禁和用户价值分开：安全不达标不能扩量，价值不成立也不能继续堆功能</text>
+<text x="2036" y="55" text-anchor="end" class="section">PlanPilot</text>
+<text x="80" y="230" class="h" text-anchor="start">01</text>
+<circle cx="106" cy="285" r="17" fill="#FFFFFF" stroke="#8272FF" stroke-width="1.5"/><circle cx="106" cy="285" r="5" fill="#8272FF"/>
+<path d="M124 285 L452 285" stroke="#8272FF" stroke-width="2" marker-end="url(#arrow-purple)"/>
+<rect x="70" y="340" width="330" height="150" rx="16" class="panel shadow"/>
+<text x="94" y="382" class="section" text-anchor="start">问题证据</text>
+<text x="94" y="420" class="body" text-anchor="start">真实事件访谈</text>
+<text x="480" y="230" class="h" text-anchor="start">02</text>
+<circle cx="506" cy="285" r="17" fill="#FFFFFF" stroke="#5B74FF" stroke-width="1.5"/><circle cx="506" cy="285" r="5" fill="#5B74FF"/>
+<path d="M524 285 L852 285" stroke="#5B74FF" stroke-width="2" marker-end="url(#arrow-blue)"/>
+<rect x="470" y="340" width="330" height="150" rx="16" class="panel shadow"/>
+<text x="494" y="382" class="section" text-anchor="start">概念证据</text>
+<text x="494" y="420" class="body" text-anchor="start">任务成功与误解</text>
+<text x="880" y="230" class="h" text-anchor="start">03</text>
+<circle cx="906" cy="285" r="17" fill="#FFFFFF" stroke="#45C7C3" stroke-width="1.5"/><circle cx="906" cy="285" r="5" fill="#45C7C3"/>
+<path d="M924 285 L1252 285" stroke="#45C7C3" stroke-width="2" marker-end="url(#arrow-cyan)"/>
+<rect x="870" y="340" width="330" height="150" rx="16" class="panel shadow"/>
+<text x="894" y="382" class="section" text-anchor="start">行为证据</text>
+<text x="894" y="420" class="body" text-anchor="start">激活 / 恢复 / 掌握</text>
+<text x="1280" y="230" class="h" text-anchor="start">04</text>
+<circle cx="1306" cy="285" r="17" fill="#FFFFFF" stroke="#45C7C3" stroke-width="1.5"/><circle cx="1306" cy="285" r="5" fill="#45C7C3"/>
+<path d="M1324 285 L1652 285" stroke="#45C7C3" stroke-width="2" marker-end="url(#arrow-cyan)"/>
+<rect x="1270" y="340" width="330" height="150" rx="16" class="panel shadow"/>
+<text x="1294" y="382" class="section" text-anchor="start">增量证据</text>
+<text x="1294" y="420" class="body" text-anchor="start">基线 / 消融 / 成本</text>
+<text x="1680" y="230" class="h" text-anchor="start">05</text>
+<circle cx="1706" cy="285" r="17" fill="#FFFFFF" stroke="#F0A12D" stroke-width="1.5"/><circle cx="1706" cy="285" r="5" fill="#F0A12D"/>
+<rect x="1670" y="340" width="330" height="150" rx="16" class="panel shadow"/>
+<text x="1694" y="382" class="section" text-anchor="start">阶段决策</text>
+<text x="1694" y="420" class="body" text-anchor="start">Go / Hold / Pivot / Stop</text>
+<rect x="220" y="600" width="710" height="245" rx="16" class="soft-purple"/>
+<text x="252" y="645" class="section" text-anchor="start">工程 / 安全门禁</text>
+<text x="252" y="690" class="body" text-anchor="start">• Fast Gate 与当前代码一致</text>
+<text x="252" y="727" class="body" text-anchor="start">• 未批准写入、跨用户、重复写入为零</text>
+<text x="252" y="764" class="body" text-anchor="start">• 回读、撤销、紧急停用可运营</text>
+<rect x="980" y="600" width="710" height="245" rx="16" class="soft-cyan"/>
+<text x="1012" y="645" class="section" text-anchor="start">用户 / 商业证据</text>
+<text x="1012" y="690" class="body" text-anchor="start">• 24 小时首次行动与 72 小时恢复</text>
+<text x="1012" y="727" class="body" text-anchor="start">• W4/W8 WVLU 与掌握证据</text>
+<text x="1012" y="764" class="body" text-anchor="start">• 模型与基础设施成本</text>
+<path d="M575 490 L575 590" class="purple-line"/>
+<path d="M1335 490 L1335 590" class="cyan-line"/>
+<path d="M930 725 L970 725" class="purple-line"/>
+<rect x="1738" y="600" width="292" height="245" rx="16" class="soft-amber"/>
+<text x="1768" y="645" class="section" text-anchor="start">决策</text>
+<text x="1768" y="692" class="body" text-anchor="start">Go｜证据达标</text>
+<text x="1768" y="728" class="body" text-anchor="start">Hold｜问题成立但体验未过</text>
+<text x="1768" y="764" class="body" text-anchor="start">Pivot｜长期执行需求弱</text>
+<text x="1768" y="800" class="body" text-anchor="start">Stop｜无行动 / 恢复 / 留存</text>
+<path d="M1690 725 L1728 725" class="amber-line"/>
+<rect x="220" y="900" width="1810" height="78" rx="14" class="panel"/>
+<text x="250" y="934" class="h" text-anchor="start">决策纪律</text>
+<text x="375" y="934" class="body" text-anchor="start">合成评测证明工程合同，不证明用户价值；使用量增长但学习结果不增长，不构成产品进展。</text>
+</svg>

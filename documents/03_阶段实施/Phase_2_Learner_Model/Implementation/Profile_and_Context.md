@@ -35,7 +35,10 @@
 3. Recent Events：最多 20 条，仅输出白名单 payload 字段。
 4. Goal Context：目标、当前 Plan、任务统计、未来 7 天任务与逾期任务。
 
-每个 Pattern 额外返回最近 3 条 PatternEvidence 来源，使前端可以解释“为什么 AI 这样建议”。
+每个 Pattern 额外返回最近 6 条 PatternEvidence 来源，使前端可以解释“为什么 AI 这样建议”。
+对 `delay_pattern`，每条延期证据还返回 `days_overdue`、任务标题、是否被用户标记为
+外部中断以及 `evidence_id`，供学习记忆页对具体记录做可审计归因；这不会修改原始
+`TaskCompleted` 事件。
 
 ## 前端
 

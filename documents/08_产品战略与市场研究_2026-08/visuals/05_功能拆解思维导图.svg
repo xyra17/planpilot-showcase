@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2350" height="1250" viewBox="0 0 2350 1250" role="img" aria-labelledby="title desc">
+<title id="title">PlanPilot 功能拆解</title>
+<desc id="desc">围绕七个产品能力域，保留对象、核心动作、异常与验收。</desc>
+<defs>
+<linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FBFAFF"/><stop offset=".58" stop-color="#FFFFFF"/><stop offset="1" stop-color="#F2FFFE"/></linearGradient>
+<linearGradient id="flow" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#8272FF"/><stop offset=".52" stop-color="#5B74FF"/><stop offset="1" stop-color="#45C7C3"/></linearGradient>
+<filter id="shadow" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="8" stdDeviation="14" flood-color="#77759A" flood-opacity=".12"/></filter>
+<marker id="arrow-purple" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0 L10 5 L0 10Z" fill="#8272FF"/></marker>
+<marker id="arrow-blue" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0 L10 5 L0 10Z" fill="#5B74FF"/></marker>
+<marker id="arrow-cyan" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0 L10 5 L0 10Z" fill="#45C7C3"/></marker>
+<marker id="arrow-amber" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0 L10 5 L0 10Z" fill="#F0A12D"/></marker>
+<style>
+text{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC","Microsoft YaHei",sans-serif}
+.title{font-size:56px;font-weight:720;letter-spacing:-2px;fill:#090A24}.subtitle{font-size:24px;font-weight:430;fill:#69708A}.kicker{font-size:18px;font-weight:650;letter-spacing:4px;fill:#8272FF}.section{font-size:26px;font-weight:680;fill:#090A24}.h{font-size:22px;font-weight:650;fill:#090A24}.body{font-size:19px;font-weight:470;fill:#282D49}.small{font-size:18px;font-weight:470;fill:#545C78}.tiny{font-size:16px;font-weight:600;fill:#69708A}.white{fill:#FFFFFF}.panel{fill:#FFFFFF;stroke:#DDE0EB;stroke-width:1.4}.soft-purple{fill:#F3F1FF;stroke:#E5E0FF;stroke-width:1}.soft-blue{fill:#EEF1FF;stroke:#DCE3FF;stroke-width:1}.soft-cyan{fill:#EFFBFA;stroke:#CBEFED;stroke-width:1}.soft-amber{fill:#FFF8EB;stroke:#F7DFB4;stroke-width:1}.soft-rose{fill:#FFF2F5;stroke:#F4D4DC;stroke-width:1}.shadow{filter:url(#shadow)}.line{fill:none;stroke:#A8AEC2;stroke-width:1.6}.purple-line{fill:none;stroke:#8272FF;stroke-width:2;marker-end:url(#arrow-purple)}.blue-line{fill:none;stroke:#5B74FF;stroke-width:2;marker-end:url(#arrow-blue)}.cyan-line{fill:none;stroke:#45C7C3;stroke-width:2;marker-end:url(#arrow-cyan)}.amber-line{fill:none;stroke:#F0A12D;stroke-width:2;stroke-dasharray:7 7;marker-end:url(#arrow-amber)}.lifeline{stroke:#C9CDDA;stroke-width:1.5;stroke-dasharray:6 7}
+</style>
+</defs>
+<rect width="2350" height="1250" fill="url(#bg)"/>
+<text x="64" y="56" class="kicker">CAPABILITY MIND MAP · 2026</text>
+<text x="64" y="120" class="title">PlanPilot 功能拆解</text>
+<text x="64" y="162" class="subtitle">功能按能力域分组；同一对象只出现一次，状态与异常不重复堆叠</text>
+<text x="2286" y="55" text-anchor="end" class="section">PlanPilot</text>
+<rect x="980" y="576" width="390" height="148" rx="26" class="soft-blue shadow"/>
+<text x="1175" y="638" class="section" text-anchor="middle">PlanPilot</text>
+<text x="1175" y="678" class="h" text-anchor="middle">可验证学习执行系统</text>
+<text x="1175" y="706" class="small" text-anchor="middle">目标 → 行动 → 证据 → 恢复</text>
+<rect x="90" y="235" width="500" height="220" rx="16" class="soft-purple shadow"/>
+<text x="118" y="278" class="section" text-anchor="start">01 目标与计划</text>
+<text x="118" y="319" class="small" text-anchor="start">对象｜目标 / 里程碑 / 两周计划</text>
+<text x="118" y="350" class="small" text-anchor="start">动作｜建目标 / 审草案 / 确认</text>
+<text x="118" y="381" class="small" text-anchor="start">异常｜输入不足 / 容量冲突</text>
+<text x="118" y="412" class="small" text-anchor="start">验收｜10 分钟目标 + plan_confirmed</text>
+<path d="M590 345.0 C780.0 345.0 780.0 650 970 650" fill="none" stroke="#8272FF" stroke-width="2"/>
+<rect x="90" y="505" width="500" height="220" rx="16" class="soft-blue shadow"/>
+<text x="118" y="548" class="section" text-anchor="start">02 今日与任务</text>
+<text x="118" y="589" class="small" text-anchor="start">对象｜主任务 / 最小版本 / 日程</text>
+<text x="118" y="620" class="small" text-anchor="start">动作｜开始 / 完成 / 改期 / 求助</text>
+<text x="118" y="651" class="small" text-anchor="start">异常｜无计划 / 加载失败</text>
+<text x="118" y="682" class="small" text-anchor="start">验收｜30 秒下一步 + 24 小时行动</text>
+<path d="M590 615.0 C780.0 615.0 780.0 650 970 650" fill="none" stroke="#5B74FF" stroke-width="2"/>
+<rect x="90" y="775" width="500" height="220" rx="16" class="soft-cyan shadow"/>
+<text x="118" y="818" class="section" text-anchor="start">03 掌握与作品</text>
+<text x="118" y="859" class="small" text-anchor="start">对象｜完成 / 解释 / 练习 / 作品</text>
+<text x="118" y="890" class="small" text-anchor="start">动作｜轻验收 / 提交证据</text>
+<text x="118" y="921" class="small" text-anchor="start">状态｜执行 / 解释 / 应用 / 待巩固</text>
+<text x="118" y="952" class="small" text-anchor="start">验收｜7 日结果可复核</text>
+<path d="M590 885.0 C780.0 885.0 780.0 650 970 650" fill="none" stroke="#45C7C3" stroke-width="2"/>
+<rect x="880" y="965" width="590" height="220" rx="16" class="soft-cyan shadow"/>
+<text x="908" y="1008" class="section" text-anchor="start">04 知识与笔记</text>
+<text x="908" y="1049" class="small" text-anchor="start">资料｜导入 / 索引 / 引用 / 版本</text>
+<text x="908" y="1080" class="small" text-anchor="start">笔记｜编辑 / 保存 / 目标任务关联</text>
+<text x="908" y="1111" class="small" text-anchor="start">降级｜向量不可用 → 关键词</text>
+<text x="908" y="1142" class="small" text-anchor="start">验收｜来源清楚且不丢草稿</text>
+<path d="M1470 1075.0 C1220.0 1075.0 1220.0 650 970 650" fill="none" stroke="#45C7C3" stroke-width="2"/>
+<rect x="1760" y="775" width="500" height="220" rx="16" class="soft-purple shadow"/>
+<text x="1788" y="818" class="section" text-anchor="start">05 Pilo 与行动</text>
+<text x="1788" y="859" class="small" text-anchor="start">对话｜解释 / 比较 / 计划 / 复盘</text>
+<text x="1788" y="890" class="small" text-anchor="start">分流｜对话 / 澄清 / 受支持行动</text>
+<text x="1788" y="921" class="small" text-anchor="start">写入｜预览 / 批准 / 回读 / 撤销</text>
+<text x="1788" y="952" class="small" text-anchor="start">异常｜对象不明 / 策略拒绝 / 回读不符</text>
+<path d="M1760 885.0 C1570.0 885.0 1570.0 650 1380 650" fill="none" stroke="#8272FF" stroke-width="2"/>
+<rect x="1760" y="505" width="500" height="220" rx="16" class="soft-rose shadow"/>
+<text x="1788" y="548" class="section" text-anchor="start">06 学习记忆</text>
+<text x="1788" y="589" class="small" text-anchor="start">类型｜声明 / 事实 / 推断 / 临时</text>
+<text x="1788" y="620" class="small" text-anchor="start">解释｜来源 / 窗口 / 强度 / 影响</text>
+<text x="1788" y="651" class="small" text-anchor="start">治理｜纠正 / 暂停 / 删除 / 归因</text>
+<text x="1788" y="682" class="small" text-anchor="start">边界｜不判断借口；重算有效样本</text>
+<path d="M1760 615.0 C1570.0 615.0 1570.0 650 1380 650" fill="none" stroke="#D86E86" stroke-width="2"/>
+<rect x="1760" y="235" width="500" height="220" rx="16" class="soft-amber shadow"/>
+<text x="1788" y="278" class="section" text-anchor="start">07 身份与设置</text>
+<text x="1788" y="319" class="small" text-anchor="start">身份｜游客本机 / 登录账户</text>
+<text x="1788" y="350" class="small" text-anchor="start">模型｜本地 / 云端 / 明确降级</text>
+<text x="1788" y="381" class="small" text-anchor="start">隐私｜同意 / 导出 / 删除</text>
+<text x="1788" y="412" class="small" text-anchor="start">发布｜白名单 / 门禁 / 紧急停用</text>
+<path d="M1760 345.0 C1570.0 345.0 1570.0 650 1380 650" fill="none" stroke="#F0A12D" stroke-width="2"/>
+<rect x="760" y="190" width="790" height="72" rx="14" class="panel"/>
+<text x="790" y="226" class="h" text-anchor="start">进入近期范围</text>
+<text x="940" y="226" class="body" text-anchor="start">必须改善首次价值、恢复、掌握、留存或可信之一，并定义验证方法。</text>
+</svg>

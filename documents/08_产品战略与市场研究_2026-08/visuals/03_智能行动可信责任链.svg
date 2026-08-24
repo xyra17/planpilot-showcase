@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2300" height="1450" viewBox="0 0 2300 1450" role="img" aria-labelledby="title desc">
+<title id="title">智能行动时序</title>
+<desc id="desc">以“把错题复盘移到明天”为例，展示从理解到回读与撤销的受监督写入。</desc>
+<defs>
+<linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FBFAFF"/><stop offset=".58" stop-color="#FFFFFF"/><stop offset="1" stop-color="#F2FFFE"/></linearGradient>
+<linearGradient id="flow" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#8272FF"/><stop offset=".52" stop-color="#5B74FF"/><stop offset="1" stop-color="#45C7C3"/></linearGradient>
+<filter id="shadow" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="8" stdDeviation="14" flood-color="#77759A" flood-opacity=".12"/></filter>
+<marker id="arrow-purple" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0 L10 5 L0 10Z" fill="#8272FF"/></marker>
+<marker id="arrow-blue" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0 L10 5 L0 10Z" fill="#5B74FF"/></marker>
+<marker id="arrow-cyan" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0 L10 5 L0 10Z" fill="#45C7C3"/></marker>
+<marker id="arrow-amber" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0 L10 5 L0 10Z" fill="#F0A12D"/></marker>
+<style>
+text{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC","Microsoft YaHei",sans-serif}
+.title{font-size:56px;font-weight:720;letter-spacing:-2px;fill:#090A24}.subtitle{font-size:24px;font-weight:430;fill:#69708A}.kicker{font-size:18px;font-weight:650;letter-spacing:4px;fill:#8272FF}.section{font-size:26px;font-weight:680;fill:#090A24}.h{font-size:22px;font-weight:650;fill:#090A24}.body{font-size:19px;font-weight:470;fill:#282D49}.small{font-size:18px;font-weight:470;fill:#545C78}.tiny{font-size:16px;font-weight:600;fill:#69708A}.white{fill:#FFFFFF}.panel{fill:#FFFFFF;stroke:#DDE0EB;stroke-width:1.4}.soft-purple{fill:#F3F1FF;stroke:#E5E0FF;stroke-width:1}.soft-blue{fill:#EEF1FF;stroke:#DCE3FF;stroke-width:1}.soft-cyan{fill:#EFFBFA;stroke:#CBEFED;stroke-width:1}.soft-amber{fill:#FFF8EB;stroke:#F7DFB4;stroke-width:1}.soft-rose{fill:#FFF2F5;stroke:#F4D4DC;stroke-width:1}.shadow{filter:url(#shadow)}.line{fill:none;stroke:#A8AEC2;stroke-width:1.6}.purple-line{fill:none;stroke:#8272FF;stroke-width:2;marker-end:url(#arrow-purple)}.blue-line{fill:none;stroke:#5B74FF;stroke-width:2;marker-end:url(#arrow-blue)}.cyan-line{fill:none;stroke:#45C7C3;stroke-width:2;marker-end:url(#arrow-cyan)}.amber-line{fill:none;stroke:#F0A12D;stroke-width:2;stroke-dasharray:7 7;marker-end:url(#arrow-amber)}.lifeline{stroke:#C9CDDA;stroke-width:1.5;stroke-dasharray:6 7}
+</style>
+</defs>
+<rect width="2300" height="1450" fill="url(#bg)"/>
+<text x="64" y="56" class="kicker">SUPERVISED ACTION · SEQUENCE</text>
+<text x="64" y="120" class="title">智能行动时序</text>
+<text x="64" y="162" class="subtitle">模型提出候选；规则检查边界；用户授权具体版本；数据库回读确认事实</text>
+<text x="2236" y="55" text-anchor="end" class="section">PlanPilot</text>
+<rect x="50" y="250" width="220" height="58" rx="14" class="panel shadow"/>
+<text x="160" y="287" class="h" text-anchor="middle">用户</text>
+<path d="M160 308 L160 1310" class="lifeline"/>
+<rect x="390" y="250" width="220" height="58" rx="14" class="panel shadow"/>
+<text x="500" y="287" class="h" text-anchor="middle">Pilo</text>
+<path d="M500 308 L500 1310" class="lifeline"/>
+<rect x="750" y="250" width="220" height="58" rx="14" class="panel shadow"/>
+<text x="860" y="287" class="h" text-anchor="middle">意图与规划</text>
+<path d="M860 308 L860 1310" class="lifeline"/>
+<rect x="1110" y="250" width="220" height="58" rx="14" class="panel shadow"/>
+<text x="1220" y="287" class="h" text-anchor="middle">审查与策略</text>
+<path d="M1220 308 L1220 1310" class="lifeline"/>
+<rect x="1470" y="250" width="220" height="58" rx="14" class="panel shadow"/>
+<text x="1580" y="287" class="h" text-anchor="middle">执行器</text>
+<path d="M1580 308 L1580 1310" class="lifeline"/>
+<rect x="1830" y="250" width="220" height="58" rx="14" class="panel shadow"/>
+<text x="1940" y="287" class="h" text-anchor="middle">数据库 / 审计</text>
+<path d="M1940 308 L1940 1310" class="lifeline"/>
+<path d="M160 360 L490 360" stroke="#8272FF" stroke-width="2" marker-end="url(#arrow-purple)"/>
+<text x="330.0" y="347" class="small" text-anchor="middle">把错题复盘移到明天</text>
+<path d="M500 440 L850 440" stroke="#8272FF" stroke-width="2" marker-end="url(#arrow-purple)"/>
+<text x="680.0" y="427" class="small" text-anchor="middle">NeedFrame：行动；解析任务与明天日期</text>
+<path d="M860 520 L1930 520" stroke="#8272FF" stroke-width="2" marker-end="url(#arrow-purple)"/>
+<text x="1400.0" y="507" class="small" text-anchor="middle">读取目标、任务、当前日期</text>
+<path d="M1940 600 L870 600" stroke="#45C7C3" stroke-width="2" marker-end="url(#arrow-cyan)"/>
+<text x="1400.0" y="587" class="small" text-anchor="middle">返回当前业务事实</text>
+<path d="M860 680 L1210 680" stroke="#8272FF" stroke-width="2" marker-end="url(#arrow-purple)"/>
+<text x="1040.0" y="667" class="small" text-anchor="middle">AgentPlan + ChangeSet（修改前 → 修改后）</text>
+<path d="M1220 760 L510 760" stroke="#8272FF" stroke-width="2" marker-end="url(#arrow-purple)"/>
+<text x="860.0" y="747" class="small" text-anchor="middle">Review / Policy：需要用户批准</text>
+<path d="M500 840 L170 840" stroke="#8272FF" stroke-width="2" marker-end="url(#arrow-purple)"/>
+<text x="330.0" y="827" class="small" text-anchor="middle">展示影响、风险与具体版本</text>
+<path d="M160 920 L490 920" stroke="#8272FF" stroke-width="2" marker-end="url(#arrow-purple)"/>
+<text x="330.0" y="907" class="small" text-anchor="middle">批准当前变更版本</text>
+<path d="M500 1000 L1570 1000" stroke="#8272FF" stroke-width="2" marker-end="url(#arrow-purple)"/>
+<text x="1040.0" y="987" class="small" text-anchor="middle">带批准摘要请求执行</text>
+<path d="M1580 1080 L1930 1080" stroke="#45C7C3" stroke-width="2" marker-end="url(#arrow-cyan)"/>
+<text x="1760.0" y="1067" class="small" text-anchor="middle">租约 + 防重复 + 前置条件后写入</text>
+<path d="M1940 1160 L1590 1160" stroke="#45C7C3" stroke-width="2" marker-end="url(#arrow-cyan)"/>
+<text x="1760.0" y="1147" class="small" text-anchor="middle">回读真实任务状态</text>
+<path d="M1580 1240 L510 1240" stroke="#45C7C3" stroke-width="2" marker-end="url(#arrow-cyan)"/>
+<text x="1040.0" y="1227" class="small" text-anchor="middle">已验证完成；状态允许时提供撤销</text>
+<rect x="720" y="545" width="560" height="86" rx="12" class="soft-amber"/>
+<text x="748" y="578" class="h" text-anchor="start">对象不唯一时</text>
+<text x="885" y="578" class="body" text-anchor="start">保存待补充意图并追问；不创建半成品行动。</text>
+<rect x="1130" y="1268" width="910" height="88" rx="12" class="soft-cyan"/>
+<text x="1160" y="1302" class="h" text-anchor="start">验证失败或后续有冲突</text>
+<text x="1390" y="1302" class="body" text-anchor="start">不显示成功；撤销也不会覆盖用户之后的新修改。</text>
+</svg>

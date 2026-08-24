@@ -61,7 +61,9 @@ docker compose version
 
 > **Windows 用户注意**：需要在 Docker Desktop 设置中启用 WSL 2 后端，并确保 Hyper-V 已开启。
 
-### 2.2 Node.js（前端使用）
+### 2.2 Node.js（仅宿主机前端开发需要）
+
+直接使用 `docker compose up --build` 体验完整产品时不需要在宿主机安装 Node.js。只有希望脱离 Docker 单独开发前端时才需要以下环境。
 
 **下载地址：** https://nodejs.org/
 
@@ -252,15 +254,15 @@ cd /path/to/PlanPilot
 ./scripts/macos/install_local_llm_service.sh
 ```
 
-安装器会在 `~/Library/Application Support/PlanPilot/models/` 创建 APFS
-写时复制运行副本，以绕过 macOS 后台服务不能读取 Desktop/Downloads 的限制。
+安装器直接读取 `backend/.env` 中的 `MODEL_NAME`。当前机器使用
+`/Users/Admin/Downloads/models/PlanPilot/`，不会再创建 Application Support 副本。
 停止并移除服务配置：
 
 ```bash
 ./scripts/macos/uninstall_local_llm_service.sh
 ```
 
-该卸载脚本默认保留模型运行副本，避免误删大文件；完整清理方式见卸载文档。
+该卸载脚本默认保留 Downloads 中的模型文件；完整清理方式见卸载文档。
 
 AI 运行状态可访问：
 
@@ -367,29 +369,30 @@ docker compose exec minio mc mb local/planpilot
 cd /path/to/PlanPilot/frontend
 ```
 
-首次运行需要安装 Node.js 依赖（约 200MB，只需执行一次）：
+首次运行需要启用 Corepack 并安装 pnpm 依赖（只需执行一次）：
 
 ```bash
-npm install
+corepack enable
+pnpm install --frozen-lockfile
 ```
 
 安装完成后，启动开发服务器：
 
 ```bash
-npm run dev
+pnpm dev
 ```
 
 预期看到输出：
 
 ```
-▲ Next.js 14.2.x
+▲ Next.js 15.x
 - Local:        http://localhost:3000
 ✓ Ready in 2s
 ```
 
 此时前端已在 http://localhost:3000 运行。
 
-> **注意**：`npm run dev` 命令运行时终端窗口不能关闭，否则前端停止服务。建议开一个专用终端窗口保持运行。
+> **注意**：`pnpm dev` 命令运行时终端窗口不能关闭，否则前端停止服务。使用根目录 `docker compose up --build` 时，前端已经由 Compose 启动，不需要重复执行本节命令。
 
 ---
 
@@ -412,16 +415,10 @@ npm run dev
 
 ### 每次开发时的启动流程
 
-**步骤 1**：启动 Docker 服务（如果 Docker Desktop 已在运行且服务未停止，可跳过）
+启动完整 Docker 开发环境：
 ```bash
 cd /path/to/PlanPilot
-docker compose up -d
-```
-
-**步骤 2**：启动前端
-```bash
-cd /path/to/PlanPilot/frontend
-npm run dev
+docker compose up -d --build
 ```
 
 完成，访问 http://localhost:3000 即可。
@@ -429,16 +426,14 @@ npm run dev
 ### 停止所有服务
 
 ```bash
-# 停止前端：在运行 npm run dev 的终端按 Ctrl+C
-
-# 停止后端 Docker 服务：
+# 停止全部 Docker 服务：
 cd /path/to/PlanPilot
 docker compose down
 ```
 
 ### 修改后端代码后如何生效
 
-后端代码挂载在 Docker 容器内，`uvicorn --reload` 会自动检测文件变更并重载，**无需重启容器**。
+后端代码挂载在 Docker 容器内。当前开发 Compose 为了保持任务稳定未启用 `uvicorn --reload`，修改后执行 `docker compose restart api worker beat`。
 
 ### 修改前端代码后如何生效
 
@@ -526,27 +521,17 @@ docker compose exec postgres psql -U planpilot -d planpilot -c \
 
 ### 11.4 本地 LLM：mlx-lm（仅 Mac Apple Silicon）
 
-#### 11.4.1 设计思路：双层模型架构
+#### 11.4.1 设计思路：三个生成角色与一个向量角色
 
-PlanPilot 使用**两套模型配置**，分工不同：
+| 角色 | 主模型 | 回退 |
+|---|---|---|
+| 交互自然语言 | 本地 Qwen3.5-9B | DeepSeek Flash |
+| 计划、任务和 Agent JSON | DeepSeek Flash | 本地 Qwen3.5-9B，并重新校验结构 |
+| 学习答案评分与复杂终审 | DeepSeek Pro | 无静默降级 |
+| 知识库向量化与检索 | 本地 Qwen3-Embedding-0.6B | 关键词检索 |
 
-| 配置变量 | 用途 | 调用位置 |
-|---------|------|---------|
-| `OPENAI_API_KEY` + `OPENAI_BASE_URL` + `MODEL_NAME` | 本地模型（轻量、免费） | embedding 向量化、每日任务生成（`generate_daily_tasks`）|
-| `SMART_API_KEY` + `SMART_BASE_URL` + `SMART_MODEL_NAME` | 云端 Smart 模型（高质量） | 宏观计划、意图识别、重规划、验题、打卡分析等核心 Agent 节点 |
-
-**为什么这样设计：**
-- embedding（向量化）和每日任务生成调用频率高、对质量要求相对宽松 → 用本地模型节省成本
-- 宏观计划、意图识别等需要复杂推理 → 必须用高质量云端模型
-- 对话/打卡节点（`chat`、`checkin`、`replan_chat`）：Smart 优先，无 Smart 配置时自动降级到本地
-
-**回退机制（本地失败自动切 Smart API）：**
-
-代码中三处涉及本地模型的地方均已加入回退逻辑：
-```
-本地模型调用失败 → 自动切换到 Smart API → 仍失败则静默跳过
-```
-覆盖范围：`_vectorize`（知识库向量化）、语义搜索 embedding、`generate_daily_tasks`（每日任务生成）。
+Embedding 使用独立端点，不再复用生成模型。完整任务映射、结果契约和并发限制见
+[`PlanPilot_模型角色与并发规范.md`](../02_架构与技术规格/技术规格说明书/PlanPilot_模型角色与并发规范.md)。
 
 实际意义：**迁移到新电脑即使没有本地模型，只要配置了 `SMART_API_KEY`，所有功能均可正常使用。**
 
@@ -578,39 +563,36 @@ PlanPilot 使用**两套模型配置**，分工不同：
 
 #### 11.4.4 模型文件存储路径
 
-mlx-lm 使用 Hugging Face Hub 管理模型，下载后自动存储于：
+当前机器把 PlanPilot 模型统一存放于：
 
 ```
-~/.cache/huggingface/hub/models--{org}--{model-name}/snapshots/{hash}/
+/Users/Admin/Downloads/models/PlanPilot/
 ```
 
-例如 `mlx-community/Qwen2.5-7B-Instruct-4bit` 下载后路径类似：
+当前生成模型路径为：
 ```
-~/.cache/huggingface/hub/models--mlx-community--Qwen2.5-7B-Instruct-4bit/snapshots/abc123.../
+/Users/Admin/Downloads/models/PlanPilot/lmstudio-community/Qwen3.5-9B-MLX-4bit/
 ```
 
 **在 `.env` 中配置 `MODEL_NAME` 有两种方式：**
 
 ```env
-# 方式一：使用 HuggingFace 模型 ID（启动时自动下载，推荐）
-MODEL_NAME=mlx-community/Qwen2.5-7B-Instruct-4bit
-
-# 方式二：使用本地绝对路径（已下载的模型）
-MODEL_NAME=/Users/yourname/.cache/huggingface/hub/models--mlx-community--Qwen2.5-7B-Instruct-4bit/snapshots/abc123.../
+# 使用 Downloads 中便于查找的绝对路径
+MODEL_NAME=/Users/yourname/Downloads/models/PlanPilot/lmstudio-community/Qwen3.5-9B-MLX-4bit
 ```
 
-方式一更简便，mlx-lm server 会自动下载（首次需要网络）；方式二适合离线环境。
+launchd 与开发命令读取同一目录，不再维护第二份运行副本。
 
 ---
 
 #### 11.4.5 启动本地 LLM
 
 ```bash
-# 安装 mlx-lm（只需一次）
-pip install mlx-lm
+# 在宿主机 Python 环境安装可选 MLX 依赖（只需一次）
+pip install -r backend/requirements-mlx.txt
 
-# 启动服务（以 7B 模型为例，首次运行会自动下载模型）
-mlx_lm.server --model mlx-community/Qwen2.5-7B-Instruct-4bit --port 8080
+# 启动服务（本机只允许一个 9B 生成任务同时执行）
+zsh scripts/macos/run_local_llm.sh
 ```
 
 然后在 `backend/.env` 中配置：
@@ -658,37 +640,19 @@ MODEL_NAME=qwen2.5:7b
 
 目前无任何打包配置，需要额外开发工作。
 
-### 11.6 生产部署（未配置）
+### 11.6 生产部署参考
 
-当前项目仅配置了开发环境，用于生产需额外处理：
+项目已提供 `docker-compose.prod.yml`、迁移门禁、健康检查和备份恢复脚本，可作为生产部署基础；真正公开服务仍需额外处理：
 - Nginx 反向代理 + HTTPS 证书
 - 环境变量安全管理（不能明文存放密钥）
 - Docker 镜像推送到私有仓库
 - 域名绑定
 
-### 11.7 邮箱真实性验证（上线前实现）
+### 11.7 邮箱真实性验证
 
 **是什么**：注册时发送验证邮件，用户点击链接后账号才完全激活，确保邮箱真实可用。
 
-**当前状态**：未实现。注册接口不校验邮箱有效性，用假邮箱可正常注册。
-
-**MVP 阶段暂不实现的原因**：测试账号使用假邮箱，启用后这些账号无法激活。
-
-**正式上线前需实现：**
-1. `users` 表增加 `is_email_verified` 字段（默认 `false`）
-2. 注册后发送验证邮件（复用忘记密码的 token 机制）
-3. 未验证账号限制部分功能（或直接禁止登录）
-
-**轻量替代方案（可提前做）**：注册时对邮箱域名做 MX 记录校验，拦截 `@example.com` 等假域名，无需发邮件，几毫秒内完成：
-```python
-import dns.resolver
-def has_mx_record(domain: str) -> bool:
-    try:
-        dns.resolver.resolve(domain, "MX")
-        return True
-    except Exception:
-        return False
-```
+**当前状态**：注册、验证邮件接口、找回密码和重置密码流程已实现。下载体验环境可以不配置 SMTP；需要真实收信时在 `backend/.env` 中填写 SMTP 配置。
 
 ### 11.8 人机验证 / 防滥用（上线前实现）
 
@@ -742,7 +706,7 @@ brew services stop postgresql
 # 停止前端服务（Ctrl+C），然后：
 cd /path/to/PlanPilot/frontend
 rm -rf .next
-npm run dev
+pnpm dev
 ```
 
 ### Q3：登录后显示"网络请求失败"或接口报 500
@@ -755,12 +719,12 @@ docker compose logs api    # 查看错误日志
 
 **可能原因 2**：`.env` 文件中 `SMART_API_KEY` 未填写或填写错误。AI 相关接口（`/api/v1/agent/*`）在无 API Key 时会报错。
 
-### Q4：`npm install` 安装很慢或失败
+### Q4：`pnpm install` 安装很慢或失败
 
 **解决方法（切换国内镜像）：**
 ```bash
-npm config set registry https://registry.npmmirror.com
-npm install
+pnpm config set registry https://registry.npmmirror.com
+pnpm install --frozen-lockfile
 ```
 
 ### Q5：Docker 容器启动后很快就退出（Exit 1）

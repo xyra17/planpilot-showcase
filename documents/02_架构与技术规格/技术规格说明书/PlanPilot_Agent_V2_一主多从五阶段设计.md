@@ -1,5 +1,7 @@
 # PlanPilot Agent V2：一主多从五阶段设计
 
+> 历史设计说明：本文保留早期 Run/Step/Approval 实施细节，但“一主多从 Agent”命名已停止作为现行架构口径。当前规范是“一位 Pilo、对话与行动两种运行模式；一个确定性编排器、四类受控能力模块、一套安全执行内核”。职责和写入政策以 [PlanPilot_Agent职责与统一入口](./PlanPilot_Agent职责与统一入口.md) 为准；文中的“主 Agent 写入”统一解释为 Orchestrator 申请、Executor 物理执行。
+
 更新日期：2026-07-27
 
 ## V2.1 实施补充

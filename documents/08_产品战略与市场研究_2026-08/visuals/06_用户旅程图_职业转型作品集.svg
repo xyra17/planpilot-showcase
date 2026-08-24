@@ -1,0 +1,188 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2500" height="1440" viewBox="0 0 2500 1440" role="img" aria-labelledby="title desc">
+<title id="title">16 周数据分析转岗旅程</title>
+<desc id="desc">从目标建立到两周校准，突出用户决定、系统响应、证据和失效护栏。</desc>
+<defs>
+<linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FBFAFF"/><stop offset=".58" stop-color="#FFFFFF"/><stop offset="1" stop-color="#F2FFFE"/></linearGradient>
+<linearGradient id="flow" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#8272FF"/><stop offset=".52" stop-color="#5B74FF"/><stop offset="1" stop-color="#45C7C3"/></linearGradient>
+<filter id="shadow" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="8" stdDeviation="14" flood-color="#77759A" flood-opacity=".12"/></filter>
+<marker id="arrow-purple" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0 L10 5 L0 10Z" fill="#8272FF"/></marker>
+<marker id="arrow-blue" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0 L10 5 L0 10Z" fill="#5B74FF"/></marker>
+<marker id="arrow-cyan" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0 L10 5 L0 10Z" fill="#45C7C3"/></marker>
+<marker id="arrow-amber" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0 L10 5 L0 10Z" fill="#F0A12D"/></marker>
+<style>
+text{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC","Microsoft YaHei",sans-serif}
+.title{font-size:56px;font-weight:720;letter-spacing:-2px;fill:#090A24}.subtitle{font-size:24px;font-weight:430;fill:#69708A}.kicker{font-size:18px;font-weight:650;letter-spacing:4px;fill:#8272FF}.section{font-size:26px;font-weight:680;fill:#090A24}.h{font-size:22px;font-weight:650;fill:#090A24}.body{font-size:19px;font-weight:470;fill:#282D49}.small{font-size:18px;font-weight:470;fill:#545C78}.tiny{font-size:16px;font-weight:600;fill:#69708A}.white{fill:#FFFFFF}.panel{fill:#FFFFFF;stroke:#DDE0EB;stroke-width:1.4}.soft-purple{fill:#F3F1FF;stroke:#E5E0FF;stroke-width:1}.soft-blue{fill:#EEF1FF;stroke:#DCE3FF;stroke-width:1}.soft-cyan{fill:#EFFBFA;stroke:#CBEFED;stroke-width:1}.soft-amber{fill:#FFF8EB;stroke:#F7DFB4;stroke-width:1}.soft-rose{fill:#FFF2F5;stroke:#F4D4DC;stroke-width:1}.shadow{filter:url(#shadow)}.line{fill:none;stroke:#A8AEC2;stroke-width:1.6}.purple-line{fill:none;stroke:#8272FF;stroke-width:2;marker-end:url(#arrow-purple)}.blue-line{fill:none;stroke:#5B74FF;stroke-width:2;marker-end:url(#arrow-blue)}.cyan-line{fill:none;stroke:#45C7C3;stroke-width:2;marker-end:url(#arrow-cyan)}.amber-line{fill:none;stroke:#F0A12D;stroke-width:2;stroke-dasharray:7 7;marker-end:url(#arrow-amber)}.lifeline{stroke:#C9CDDA;stroke-width:1.5;stroke-dasharray:6 7}
+</style>
+</defs>
+<rect width="2500" height="1440" fill="url(#bg)"/>
+<text x="64" y="56" class="kicker">USER JOURNEY · CAREER TRANSITION</text>
+<text x="64" y="120" class="title">16 周数据分析转岗旅程</text>
+<text x="64" y="162" class="subtitle">删除重复说明，只保留阶段决策、系统承诺、证据与风险</text>
+<text x="2436" y="55" text-anchor="end" class="section">PlanPilot</text>
+<rect x="285" y="220" width="262" height="100" rx="13" class="soft-purple"/>
+<text x="303" y="252" class="h" text-anchor="start">01</text>
+<text x="303" y="283" class="section" text-anchor="start">建立目标</text>
+<text x="527" y="306" class="tiny" text-anchor="end">第 0 天</text>
+<rect x="555" y="220" width="262" height="100" rx="13" class="soft-blue"/>
+<text x="573" y="252" class="h" text-anchor="start">02</text>
+<text x="573" y="283" class="section" text-anchor="start">审查草案</text>
+<text x="797" y="306" class="tiny" text-anchor="end">第 0 天</text>
+<rect x="825" y="220" width="262" height="100" rx="13" class="soft-cyan"/>
+<text x="843" y="252" class="h" text-anchor="start">03</text>
+<text x="843" y="283" class="section" text-anchor="start">两周执行</text>
+<text x="1067" y="306" class="tiny" text-anchor="end">第 1–14 天</text>
+<rect x="1095" y="220" width="262" height="100" rx="13" class="soft-amber"/>
+<text x="1113" y="252" class="h" text-anchor="start">04</text>
+<text x="1113" y="283" class="section" text-anchor="start">中断恢复</text>
+<text x="1337" y="306" class="tiny" text-anchor="end">事件触发</text>
+<rect x="1365" y="220" width="262" height="100" rx="13" class="soft-cyan"/>
+<text x="1383" y="252" class="h" text-anchor="start">05</text>
+<text x="1383" y="283" class="section" text-anchor="start">留下证据</text>
+<text x="1607" y="306" class="tiny" text-anchor="end">任务后</text>
+<rect x="1635" y="220" width="262" height="100" rx="13" class="soft-purple"/>
+<text x="1653" y="252" class="h" text-anchor="start">06</text>
+<text x="1653" y="283" class="section" text-anchor="start">周复盘</text>
+<text x="1877" y="306" class="tiny" text-anchor="end">每周</text>
+<rect x="1905" y="220" width="262" height="100" rx="13" class="soft-rose"/>
+<text x="1923" y="252" class="h" text-anchor="start">07</text>
+<text x="1923" y="283" class="section" text-anchor="start">纠正归因</text>
+<text x="2147" y="306" class="tiny" text-anchor="end">复盘后</text>
+<rect x="2175" y="220" width="262" height="100" rx="13" class="soft-blue"/>
+<text x="2193" y="252" class="h" text-anchor="start">08</text>
+<text x="2193" y="283" class="section" text-anchor="start">校准下轮</text>
+<text x="2417" y="306" class="tiny" text-anchor="end">每两周</text>
+<rect x="45" y="350" width="232" height="150" fill="#090A24"/>
+<text x="69" y="392" class="h white" text-anchor="start">用户决定</text>
+<rect x="285" y="350" width="262" height="150" fill="#FFFFFF" stroke="#DDE0EB" stroke-width="1"/>
+<text x="301" y="388" class="small" text-anchor="start">输入目标、能力、</text>
+<text x="301" y="416" class="small" text-anchor="start">每周时间和资料</text>
+<rect x="555" y="350" width="262" height="150" fill="#FFFFFF" stroke="#DDE0EB" stroke-width="1"/>
+<text x="571" y="388" class="small" text-anchor="start">修改里程碑、</text>
+<text x="571" y="416" class="small" text-anchor="start">接受关键取舍</text>
+<rect x="825" y="350" width="262" height="150" fill="#FFFFFF" stroke="#DDE0EB" stroke-width="1"/>
+<text x="841" y="388" class="small" text-anchor="start">执行主任务；忙时</text>
+<text x="841" y="416" class="small" text-anchor="start">选择最小版本</text>
+<rect x="1095" y="350" width="262" height="150" fill="#FFFFFF" stroke="#DDE0EB" stroke-width="1"/>
+<text x="1111" y="388" class="small" text-anchor="start">更新剩余时间；选择</text>
+<text x="1111" y="416" class="small" text-anchor="start">保底/标准/冲刺</text>
+<rect x="1365" y="350" width="262" height="150" fill="#FFFFFF" stroke="#DDE0EB" stroke-width="1"/>
+<text x="1381" y="388" class="small" text-anchor="start">提交短解释、练习</text>
+<text x="1381" y="416" class="small" text-anchor="start">结果或作品链接</text>
+<rect x="1635" y="350" width="262" height="150" fill="#FFFFFF" stroke="#DDE0EB" stroke-width="1"/>
+<text x="1651" y="388" class="small" text-anchor="start">判断系统观察</text>
+<text x="1651" y="416" class="small" text-anchor="start">是否准确</text>
+<rect x="1905" y="350" width="262" height="150" fill="#FFFFFF" stroke="#DDE0EB" stroke-width="1"/>
+<text x="1921" y="388" class="small" text-anchor="start">标记一次延期为</text>
+<text x="1921" y="416" class="small" text-anchor="start">出差 / 外部中断</text>
+<rect x="2175" y="350" width="262" height="150" fill="#FFFFFF" stroke="#DDE0EB" stroke-width="1"/>
+<text x="2191" y="388" class="small" text-anchor="start">审查下一两周；</text>
+<text x="2191" y="416" class="small" text-anchor="start">接受或修改建议</text>
+<rect x="45" y="500" width="232" height="185" fill="#30354D"/>
+<text x="69" y="542" class="h white" text-anchor="start">系统承诺</text>
+<rect x="285" y="500" width="262" height="185" fill="#FFFFFF" stroke="#DDE0EB" stroke-width="1"/>
+<text x="301" y="538" class="small" text-anchor="start">形成目标合同；暴露</text>
+<text x="301" y="566" class="small" text-anchor="start">截止、容量和成功证据</text>
+<rect x="555" y="500" width="262" height="185" fill="#FFFFFF" stroke="#DDE0EB" stroke-width="1"/>
+<text x="571" y="538" class="small" text-anchor="start">说明假设和冲突；</text>
+<text x="571" y="566" class="small" text-anchor="start">确认后只展开两周</text>
+<rect x="825" y="500" width="262" height="185" fill="#FFFFFF" stroke="#DDE0EB" stroke-width="1"/>
+<text x="841" y="538" class="small" text-anchor="start">每天只给一个主任务</text>
+<text x="841" y="566" class="small" text-anchor="start">和一个最小版本</text>
+<rect x="1095" y="500" width="262" height="185" fill="#FFFFFF" stroke="#DDE0EB" stroke-width="1"/>
+<text x="1111" y="538" class="small" text-anchor="start">展示三档方案的影响；</text>
+<text x="1111" y="566" class="small" text-anchor="start">保留已完成历史</text>
+<rect x="1365" y="500" width="262" height="185" fill="#FFFFFF" stroke="#DDE0EB" stroke-width="1"/>
+<text x="1381" y="538" class="small" text-anchor="start">按任务类型提供</text>
+<text x="1381" y="566" class="small" text-anchor="start">30–90 秒轻验收</text>
+<rect x="1635" y="500" width="262" height="185" fill="#FFFFFF" stroke="#DDE0EB" stroke-width="1"/>
+<text x="1651" y="538" class="small" text-anchor="start">展示：SQL 稳定；数据叙事</text>
+<text x="1651" y="566" class="small" text-anchor="start">多次延期，并列出证据</text>
+<rect x="1905" y="500" width="262" height="185" fill="#FFFFFF" stroke="#DDE0EB" stroke-width="1"/>
+<text x="1921" y="538" class="small" text-anchor="start">保留延期事实；该事件</text>
+<text x="1921" y="566" class="small" text-anchor="start">排除出有效模式样本</text>
+<rect x="2175" y="500" width="262" height="185" fill="#FFFFFF" stroke="#DDE0EB" stroke-width="1"/>
+<text x="2191" y="538" class="small" text-anchor="start">按新容量与证据；</text>
+<text x="2191" y="566" class="small" text-anchor="start">缩小叙事任务</text>
+<rect x="45" y="685" width="232" height="155" fill="#090A24"/>
+<text x="69" y="727" class="h white" text-anchor="start">形成证据</text>
+<rect x="285" y="685" width="262" height="155" fill="#FFFFFF" stroke="#DDE0EB" stroke-width="1"/>
+<text x="301" y="723" class="small" text-anchor="start">Goal + 约束 +</text>
+<text x="301" y="751" class="small" text-anchor="start">成功证据定义</text>
+<rect x="555" y="685" width="262" height="155" fill="#FFFFFF" stroke="#DDE0EB" stroke-width="1"/>
+<text x="571" y="723" class="small" text-anchor="start">plan_confirmed +</text>
+<text x="571" y="751" class="small" text-anchor="start">两周 Task 集</text>
+<rect x="825" y="685" width="262" height="155" fill="#FFFFFF" stroke="#DDE0EB" stroke-width="1"/>
+<text x="841" y="723" class="small" text-anchor="start">task_started /</text>
+<text x="841" y="751" class="small" text-anchor="start">task_completed</text>
+<rect x="1095" y="685" width="262" height="155" fill="#FFFFFF" stroke="#DDE0EB" stroke-width="1"/>
+<text x="1111" y="723" class="small" text-anchor="start">deviation + recovery</text>
+<text x="1111" y="751" class="small" text-anchor="start">selected / completed</text>
+<rect x="1365" y="685" width="262" height="155" fill="#FFFFFF" stroke="#DDE0EB" stroke-width="1"/>
+<text x="1381" y="723" class="small" text-anchor="start">mastery_evidence_added +</text>
+<text x="1381" y="751" class="small" text-anchor="start">解释 / 练习 / 作品</text>
+<rect x="1635" y="685" width="262" height="155" fill="#FFFFFF" stroke="#DDE0EB" stroke-width="1"/>
+<text x="1651" y="723" class="small" text-anchor="start">支持 / 反向证据 +</text>
+<text x="1651" y="751" class="small" text-anchor="start">证据时间窗口</text>
+<rect x="1905" y="685" width="262" height="155" fill="#FFFFFF" stroke="#DDE0EB" stroke-width="1"/>
+<text x="1921" y="723" class="small" text-anchor="start">DelayAttributionRecorded +</text>
+<text x="1921" y="751" class="small" text-anchor="start">重算后的模式</text>
+<rect x="2175" y="685" width="262" height="155" fill="#FFFFFF" stroke="#DDE0EB" stroke-width="1"/>
+<text x="2191" y="723" class="small" text-anchor="start">adjusted pattern +</text>
+<text x="2191" y="751" class="small" text-anchor="start">下一窗口版本</text>
+<rect x="45" y="840" width="232" height="210" fill="#30354D"/>
+<text x="69" y="882" class="h white" text-anchor="start">风险 / 护栏</text>
+<rect x="285" y="840" width="262" height="210" fill="#FFFFFF" stroke="#DDE0EB" stroke-width="1"/>
+<text x="301" y="878" class="small" text-anchor="start">风险：像填问卷</text>
+<text x="301" y="906" class="small" text-anchor="start">护栏：只采集最小约束</text>
+<rect x="555" y="840" width="262" height="210" fill="#FFFFFF" stroke="#DDE0EB" stroke-width="1"/>
+<text x="571" y="878" class="small" text-anchor="start">风险：宏大计划制造新鲜感</text>
+<text x="571" y="906" class="small" text-anchor="start">护栏：显示容量与依赖</text>
+<rect x="825" y="840" width="262" height="210" fill="#FFFFFF" stroke="#DDE0EB" stroke-width="1"/>
+<text x="841" y="878" class="small" text-anchor="start">风险：任务仍太大</text>
+<text x="841" y="906" class="small" text-anchor="start">护栏：连续失败缩小粒度</text>
+<rect x="1095" y="840" width="262" height="210" fill="#FFFFFF" stroke="#DDE0EB" stroke-width="1"/>
+<text x="1111" y="878" class="small" text-anchor="start">风险：重写历史或隐藏代价</text>
+<text x="1111" y="906" class="small" text-anchor="start">护栏：影响预览后批准</text>
+<rect x="1365" y="840" width="262" height="210" fill="#FFFFFF" stroke="#DDE0EB" stroke-width="1"/>
+<text x="1381" y="878" class="small" text-anchor="start">风险：验收负担过高</text>
+<text x="1381" y="906" class="small" text-anchor="start">护栏：低价值任务免验收</text>
+<rect x="1635" y="840" width="262" height="210" fill="#FFFFFF" stroke="#DDE0EB" stroke-width="1"/>
+<text x="1651" y="878" class="small" text-anchor="start">风险：相关性贴人格标签</text>
+<text x="1651" y="906" class="small" text-anchor="start">护栏：展示任务级事实</text>
+<rect x="1905" y="840" width="262" height="210" fill="#FFFFFF" stroke="#DDE0EB" stroke-width="1"/>
+<text x="1921" y="878" class="small" text-anchor="start">风险：判断用户是否找借口</text>
+<text x="1921" y="906" class="small" text-anchor="start">护栏：事实与解释分离</text>
+<rect x="2175" y="840" width="262" height="210" fill="#FFFFFF" stroke="#DDE0EB" stroke-width="1"/>
+<text x="2191" y="878" class="small" text-anchor="start">风险：65→38 硬编码</text>
+<text x="2191" y="906" class="small" text-anchor="start">护栏：按样本重算</text>
+<rect x="45" y="1050" width="232" height="150" fill="#30354D"/>
+<text x="69" y="1092" class="h white" text-anchor="start">成功信号</text>
+<rect x="285" y="1050" width="262" height="150" fill="#FFFFFF" stroke="#DDE0EB" stroke-width="1"/>
+<text x="301" y="1088" class="small" text-anchor="start">≤10 分钟形成</text>
+<text x="301" y="1116" class="small" text-anchor="start">真实目标</text>
+<rect x="555" y="1050" width="262" height="150" fill="#FFFFFF" stroke="#DDE0EB" stroke-width="1"/>
+<text x="571" y="1088" class="small" text-anchor="start">计划确认后立即有</text>
+<text x="571" y="1116" class="small" text-anchor="start">首项行动</text>
+<rect x="825" y="1050" width="262" height="150" fill="#FFFFFF" stroke="#DDE0EB" stroke-width="1"/>
+<text x="841" y="1088" class="small" text-anchor="start">≤30 秒说出下一步；</text>
+<text x="841" y="1116" class="small" text-anchor="start">24 小时内开始</text>
+<rect x="1095" y="1050" width="262" height="150" fill="#FFFFFF" stroke="#DDE0EB" stroke-width="1"/>
+<text x="1111" y="1088" class="small" text-anchor="start">72 小时内恢复；</text>
+<text x="1111" y="1116" class="small" text-anchor="start">维护时间下降</text>
+<rect x="1365" y="1050" width="262" height="150" fill="#FFFFFF" stroke="#DDE0EB" stroke-width="1"/>
+<text x="1381" y="1088" class="small" text-anchor="start">证据可复核；</text>
+<text x="1381" y="1116" class="small" text-anchor="start">7 日结果可追踪</text>
+<rect x="1635" y="1050" width="262" height="150" fill="#FFFFFF" stroke="#DDE0EB" stroke-width="1"/>
+<text x="1651" y="1088" class="small" text-anchor="start">用户能解释结论依据；</text>
+<text x="1651" y="1116" class="small" text-anchor="start">接受或纠正</text>
+<rect x="1905" y="1050" width="262" height="150" fill="#FFFFFF" stroke="#DDE0EB" stroke-width="1"/>
+<text x="1921" y="1088" class="small" text-anchor="start">纠正影响可见；</text>
+<text x="1921" y="1116" class="small" text-anchor="start">无动机羞辱</text>
+<rect x="2175" y="1050" width="262" height="150" fill="#FFFFFF" stroke="#DDE0EB" stroke-width="1"/>
+<text x="2191" y="1088" class="small" text-anchor="start">两周后叙事推进；</text>
+<text x="2191" y="1116" class="small" text-anchor="start">模式继续可校准</text>
+<rect x="45" y="1230" width="2370" height="110" rx="14" class="soft-amber"/>
+<text x="73" y="1270" class="h" text-anchor="start">归因边界</text>
+<text x="205" y="1270" class="body" text-anchor="start">系统记录延期事实和用户归因，但不计算‘理由是否真实’；外部中断只改变有效模式样本。</text>
+<text x="205" y="1304" class="body" text-anchor="start">证据强度按样本重算，不能把 65% → 38% 写成固定业务规则；用户可恢复把事件纳入模式。</text>
+</svg>

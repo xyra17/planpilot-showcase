@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000" role="img" aria-labelledby="title desc">
+  <title id="title">PlanPilot 系统架构图（核心版）</title>
+  <desc id="desc">以六个核心层展示 PlanPilot 从用户端、前端产品、核心平台到数据、模型和安全运维的关系。</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0 L10 5 L0 10 Z" fill="#65738b"/></marker>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="5" stdDeviation="8" flood-color="#475569" flood-opacity=".14"/></filter>
+    <style>
+      .bg{fill:#fbfcff}.label{fill:#2155c8}.band{fill:#fff;stroke:#cfdcf7;stroke-width:2}.title{font:700 34px -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;fill:#172033}.sub{font:500 17px -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;fill:#69758a}.layer{font:700 21px -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;fill:#fff}.layer-en{font:500 14px -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;fill:#dbeafe}.h{font:700 19px -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;fill:#172033}.t{font:500 15px -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;fill:#3d4a61}.s{font:500 13px -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;fill:#718096}.chip{fill:#f7f9ff;stroke:#d5e0f7;stroke-width:1.5}.flow{fill:none;stroke:#65738b;stroke-width:2.5;marker-end:url(#arrow)}.dash{fill:none;stroke:#2aa6a1;stroke-width:2.5;stroke-dasharray:8 7;marker-end:url(#arrow)}
+    </style>
+  </defs>
+  <rect class="bg" width="1600" height="1000"/>
+  <text x="80" y="64" class="title">PlanPilot 系统架构 · 核心版</text>
+  <text x="80" y="98" class="sub">从用户进入，到可验证学习执行与可信智能行动</text>
+  <text x="1520" y="64" text-anchor="end" class="s">CORE ARCHITECTURE · 2026-08-24</text>
+
+  <rect x="70" y="140" width="170" height="100" rx="16" class="label"/>
+  <text x="155" y="184" text-anchor="middle" class="layer">用户端</text><text x="155" y="211" text-anchor="middle" class="layer-en">Clients</text>
+  <rect x="270" y="140" width="1260" height="100" rx="16" class="band" filter="url(#shadow)"/>
+  <rect x="310" y="166" width="270" height="48" rx="12" class="chip"/><text x="445" y="197" text-anchor="middle" class="t">桌面 / 移动浏览器</text>
+  <rect x="620" y="166" width="270" height="48" rx="12" class="chip"/><text x="755" y="197" text-anchor="middle" class="t">游客体验 / 登录账户</text>
+  <rect x="930" y="166" width="270" height="48" rx="12" class="chip"/><text x="1065" y="197" text-anchor="middle" class="t">目标、任务、Pilo 入口</text>
+  <rect x="1240" y="166" width="240" height="48" rx="12" class="chip"/><text x="1360" y="197" text-anchor="middle" class="t">用户授权与纠正</text>
+
+  <path d="M900 240 L900 266" class="flow"/>
+  <rect x="70" y="270" width="170" height="110" rx="16" class="label"/>
+  <text x="155" y="316" text-anchor="middle" class="layer">前端产品</text><text x="155" y="343" text-anchor="middle" class="layer-en">Product UI</text>
+  <rect x="270" y="270" width="1260" height="110" rx="16" class="band" filter="url(#shadow)"/>
+  <rect x="310" y="300" width="220" height="50" rx="12" class="chip"/><text x="420" y="331" text-anchor="middle" class="t">今日计划</text>
+  <rect x="555" y="300" width="220" height="50" rx="12" class="chip"/><text x="665" y="331" text-anchor="middle" class="t">目标与任务</text>
+  <rect x="800" y="300" width="220" height="50" rx="12" class="chip"/><text x="910" y="331" text-anchor="middle" class="t">知识与笔记</text>
+  <rect x="1045" y="300" width="220" height="50" rx="12" class="chip"/><text x="1155" y="331" text-anchor="middle" class="t">Pilo 与学习记忆</text>
+  <rect x="1290" y="300" width="190" height="50" rx="12" class="chip"/><text x="1385" y="331" text-anchor="middle" class="t">设置与隐私</text>
+
+  <path d="M900 380 L900 406" class="flow"/>
+  <rect x="70" y="410" width="170" height="160" rx="16" class="label"/>
+  <text x="155" y="468" text-anchor="middle" class="layer">核心平台</text><text x="155" y="495" text-anchor="middle" class="layer-en">Core Platform</text><text x="155" y="530" text-anchor="middle" class="layer-en">FastAPI / Python</text>
+  <rect x="270" y="410" width="1260" height="160" rx="16" class="band" filter="url(#shadow)"/>
+  <rect x="310" y="438" width="270" height="54" rx="12" class="chip"/><text x="445" y="472" text-anchor="middle" class="t">账户、权限与隐私</text>
+  <rect x="610" y="438" width="270" height="54" rx="12" class="chip"/><text x="745" y="472" text-anchor="middle" class="t">目标、计划、任务</text>
+  <rect x="910" y="438" width="270" height="54" rx="12" class="chip"/><text x="1045" y="472" text-anchor="middle" class="t">打卡、日程、知识</text>
+  <rect x="1210" y="438" width="270" height="54" rx="12" class="chip"/><text x="1345" y="472" text-anchor="middle" class="t">通知、搜索与事件</text>
+  <rect x="310" y="508" width="1170" height="38" rx="10" class="chip"/><text x="895" y="533" text-anchor="middle" class="s">API / REST · SSE 流式事件 · 用户隔离 · 业务状态机</text>
+
+  <path d="M900 570 L900 596" class="flow"/>
+  <rect x="70" y="600" width="170" height="160" rx="16" class="label"/>
+  <text x="155" y="658" text-anchor="middle" class="layer">智能与学习</text><text x="155" y="685" text-anchor="middle" class="layer-en">Intelligence</text><text x="155" y="720" text-anchor="middle" class="layer-en">Learning State</text>
+  <rect x="270" y="600" width="1260" height="160" rx="16" class="band" filter="url(#shadow)"/>
+  <rect x="310" y="628" width="270" height="54" rx="12" class="chip"/><text x="445" y="662" text-anchor="middle" class="t">目标、证据与掌握</text>
+  <rect x="610" y="628" width="270" height="54" rx="12" class="chip"/><text x="745" y="662" text-anchor="middle" class="t">偏差与恢复</text>
+  <rect x="910" y="628" width="270" height="54" rx="12" class="chip"/><text x="1045" y="662" text-anchor="middle" class="t">画像、规律与记忆</text>
+  <rect x="1210" y="628" width="270" height="54" rx="12" class="chip"/><text x="1345" y="662" text-anchor="middle" class="t">行动预览、审批与回读</text>
+  <rect x="310" y="698" width="1170" height="38" rx="10" class="chip"/><text x="895" y="723" text-anchor="middle" class="s">NeedFrame（需求框架）→ ChangeSet（变更集）→ 用户批准 → Readback（结果回读）</text>
+
+  <path d="M900 760 L900 786" class="flow"/>
+  <rect x="70" y="790" width="170" height="100" rx="16" class="label"/>
+  <text x="155" y="834" text-anchor="middle" class="layer">数据与模型</text><text x="155" y="861" text-anchor="middle" class="layer-en">Data &amp; Models</text>
+  <rect x="270" y="790" width="1260" height="100" rx="16" class="band" filter="url(#shadow)"/>
+  <rect x="310" y="816" width="270" height="48" rx="12" class="chip"/><text x="445" y="847" text-anchor="middle" class="t">PostgreSQL / pgvector</text>
+  <rect x="610" y="816" width="270" height="48" rx="12" class="chip"/><text x="745" y="847" text-anchor="middle" class="t">Redis / 对象存储</text>
+  <rect x="910" y="816" width="270" height="48" rx="12" class="chip"/><text x="1045" y="847" text-anchor="middle" class="t">本地 / 云端模型</text>
+  <rect x="1210" y="816" width="270" height="48" rx="12" class="chip"/><text x="1345" y="847" text-anchor="middle" class="t">向量检索 / 关键词回退</text>
+
+  <rect x="70" y="920" width="1460" height="46" rx="14" class="band"/>
+  <text x="800" y="950" text-anchor="middle" class="s">基础保障：Docker Compose · 迁移与备份 · 健康检查 · 日志与追踪 · Beta（有限测试）控制 · 紧急停用开关</text>
+  <text x="1520" y="985" text-anchor="end" class="s">主流程：用户请求 → 产品界面 → 核心平台 → 学习状态 / 智能行动 → 数据与模型</text>
+</svg>
