@@ -2027,6 +2027,16 @@
   font-weight: 780;
 }
 
+.knowledge-guest-gate-copy {
+  display: grid;
+  gap: 1px;
+  padding-left: 8px;
+}
+
+.knowledge-guest-gate-copy > span {
+  display: block;
+}
+
 .knowledge-reference-page :is(.knowledge-demo-intro, .knowledge-auth-gate) > footer {
   display: flex;
   align-items: center;

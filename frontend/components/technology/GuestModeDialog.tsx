@@ -36,7 +36,10 @@ export function GuestModeDialog({ onClose }: { onClose: () => void }) {
         </div>
         <div className="knowledge-guest-gate-message" id="guest-mode-description">
           <strong>页面展示的是一组体验数据</strong>
-          <span>目标、任务、笔记、资料与 Pilo 对话互相关联；登录后将使用你自己的真实数据。</span>
+          <span className="knowledge-guest-gate-copy">
+            <span>目标、任务、笔记、资料与 Pilo 对话互相关联</span>
+            <span>登录后将使用你自己的真实数据。</span>
+          </span>
         </div>
         <footer>
           <button ref={continueRef} type="button" className="knowledge-guest-gate-dismiss" onClick={onClose}>继续体验</button>

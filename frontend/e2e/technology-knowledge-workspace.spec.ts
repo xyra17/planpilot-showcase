@@ -18,7 +18,15 @@ test("访客说明只在首页展示并提供登录注册入口", async ({ page 
   await expect(intro.locator(".knowledge-demo-intro-heading p")).toHaveText("先看看一个完整的学习工作区");
   await expect(intro.locator(".knowledge-demo-intro-heading p")).toHaveCSS("font-size", "13px");
   await expect(intro.locator(".knowledge-guest-gate-message strong")).toHaveText("页面展示的是一组体验数据");
-  await expect(intro.locator(".knowledge-guest-gate-message span")).toContainText("目标、任务、笔记、资料与 Pilo 对话互相关联");
+  const guestCopy = intro.locator(".knowledge-guest-gate-copy");
+  const guestCopyLines = guestCopy.locator(":scope > span");
+  await expect(guestCopyLines).toHaveText([
+    "目标、任务、笔记、资料与 Pilo 对话互相关联",
+    "登录后将使用你自己的真实数据。",
+  ]);
+  const guestCopyBox = await guestCopyLines.first().boundingBox();
+  const guestCopyTitleBox = await intro.locator(".knowledge-guest-gate-message strong").boundingBox();
+  expect((guestCopyBox?.x ?? 0) - (guestCopyTitleBox?.x ?? 0)).toBeGreaterThanOrEqual(7);
   await expect(intro.getByRole("link", { name: "注册", exact: true })).toHaveAttribute("href", "/register");
   await expect(intro.getByRole("link", { name: "登录", exact: true })).toHaveAttribute("href", "/login");
 
