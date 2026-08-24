@@ -1,4 +1,5 @@
 import { api } from "@/lib/api";
+import type { AgentActionRun } from "@/lib/technology/productApi";
 
 export interface LearnerProfile {
   id: string;
@@ -89,14 +90,21 @@ export interface AdaptiveAssessment {
 }
 
 export interface PatternEvidence {
+  evidence_id?: string;
   event_id: string | null;
   event_type: string;
   occurred_at: string | null;
   contribution: number;
-  direction?: "supporting" | "opposing" | "neutral";
+  direction?: "supporting" | "opposing" | "neutral" | "excluded";
   source?: string | null;
   aggregate_type?: string | null;
   aggregate_id?: string | null;
+  task_title?: string | null;
+  days_overdue?: number | null;
+  attribution?: "external_interruption" | "unexplained" | null;
+  reason_code?: string | null;
+  note?: string | null;
+  correctable?: boolean;
 }
 
 export interface ActivePattern {
@@ -113,6 +121,7 @@ export interface ActivePattern {
     supporting_count: number;
     opposing_count: number;
     neutral_count: number;
+    excluded_count?: number;
     first_observed_at: string | null;
     last_observed_at: string | null;
     timezone?: string | null;
@@ -138,12 +147,15 @@ export interface ManagedPattern {
   paused_at: string | null;
   first_observed_at: string;
   last_confirmed_at: string | null;
+  pattern_value?: Record<string, unknown>;
+  evidence?: PatternEvidence[];
+  evidence_summary?: ActivePattern["evidence_summary"];
 }
 
 export interface PatternAudit {
   id: string;
   pattern_id: string;
-  action: "confirm" | "correct" | "set_scope" | "pause" | "restore" | "forget" | "undo";
+  action: "confirm" | "correct" | "correct_evidence" | "set_scope" | "pause" | "restore" | "forget" | "undo";
   actor_type: string;
   reason: string | null;
   before_state: Record<string, unknown>;
@@ -245,9 +257,13 @@ export interface DecisionProposal {
   summary: string;
   reasoning: string[];
   proposed_changes: Record<string, unknown>;
+  action_capability: string | null;
+  action_seed: Record<string, unknown>;
+  converted_run_id: string | null;
   evidence_references: string[];
   confidence: number;
   status: ProposalStatus;
+  lifecycle_status: "insight" | "converted" | "action_approved" | "applied" | "action_rejected" | "action_cancelled" | "action_failed" | "rolled_back";
   rejection_reason: string | null;
   expires_at: string | null;
   reviewed_at: string | null;
@@ -330,6 +346,13 @@ export const learnerApi = {
   ) => api.post<{ pattern?: ManagedPattern; deleted: boolean; audit_id: string }>(
     `/api/v1/learner/patterns/${patternId}/actions`, body,
   ),
+  recordDelayAttribution: (
+    patternId: string,
+    evidenceId: string,
+    body: { reason_code: "business_trip" | "illness_or_care" | "temporary_capacity" | "other_external" | "unexplained"; note?: string },
+  ) => api.post<{ pattern: ManagedPattern; evidence_id: string; attribution: string; audit_id: string }>(
+    `/api/v1/learner/patterns/${patternId}/evidence/${evidenceId}/attribution`, body,
+  ),
   listPatternAudits: (patternId?: string) => {
     const suffix = patternId ? `?pattern_id=${encodeURIComponent(patternId)}` : "";
     return api.get<PatternAudit[]>(`/api/v1/learner/pattern-audits${suffix}`);
@@ -353,8 +376,8 @@ export const learnerApi = {
       proposed_changes: proposedChanges,
       reason,
     }),
-  applyProposal: (proposalId: string) =>
-    api.post<DecisionProposal>(`/api/v1/learner/proposals/${proposalId}/apply`, {}),
+  createProposalActionRun: (proposalId: string) =>
+    api.post<AgentActionRun>(`/api/v1/learner/proposals/${proposalId}/action-run`, {}),
   recordFeedback: (
     proposalId: string,
     outcome: "helpful" | "neutral" | "unhelpful"

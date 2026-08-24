@@ -2,6 +2,7 @@
 
 Pl-1: task_completed_to_delay_pattern
 Pl-2: task_rescheduled_to_plan_adherence
+Pl-3: delay_attribution_recorded_to_delay_pattern
 """
 
 from __future__ import annotations
@@ -42,8 +43,45 @@ RuleRegistry.register(_PL1)
 async def _extract_pl1(event: "LearningEvent", db: "AsyncSession") -> dict[str, Any]:
     days_overdue = event.payload.get("days_overdue", 0) or 0
     return {
+        "evidence_kind": "delay_observation",
         "days_overdue": days_overdue,
         "on_time": days_overdue <= 0,
+        "task_id": event.aggregate_id,
+        "task_title": event.payload.get("title"),
+        "task_category": event.payload.get("stage_label") or event.payload.get("task_type") or "未分类任务",
+        "estimated_mins": event.payload.get("estimated_mins"),
+    }
+
+
+# ── Pl-3: DelayAttributionRecorded → delay_pattern ──────────────────────────
+
+_PL3 = ExtractionRule(
+    rule_id="delay_attribution_recorded_to_delay_pattern",
+    source_event_type="DelayAttributionRecorded",
+    target_pattern_type="delay_pattern",
+    target_scope="user",
+    # 归因事件本身不是新的延期事实；它只触发对已有观察的重算。
+    base_contribution=0.0,
+    reliability=1.0,
+    condition="payload.get('target_event_id') and payload.get('attribution') in {'external_interruption', 'unexplained'}",
+    description="用户为某次延期记录归因，保留延期事实并重新计算行为模式的有效证据。",
+)
+RuleRegistry.register(_PL3)
+
+
+@register_extractor("delay_attribution_recorded_to_delay_pattern")
+async def _extract_pl3(event: "LearningEvent", db: "AsyncSession") -> dict[str, Any]:
+    payload = event.payload or {}
+    return {
+        "evidence_kind": "delay_attribution",
+        "target_event_id": payload.get("target_event_id"),
+        "target_evidence_id": payload.get("target_evidence_id"),
+        "attribution": payload.get("attribution"),
+        "reason_code": payload.get("reason_code"),
+        "note": payload.get("note"),
+        "task_id": payload.get("task_id") or event.aggregate_id,
+        "task_title": payload.get("task_title"),
+        "recorded_at": event.occurred_at.isoformat(),
     }
 
 

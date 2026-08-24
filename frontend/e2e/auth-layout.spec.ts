@@ -132,3 +132,21 @@ test("未勾选记住登录状态时仍不向 JavaScript 暴露令牌", async ({
   expect(await page.evaluate(() => sessionStorage.getItem("access_token"))).toBeNull();
   expect(await page.evaluate(() => sessionStorage.getItem("user_info"))).toBeNull();
 });
+
+test("统一登录提示会返回触发登录的原页面，并拒绝外部跳转", async ({ page }) => {
+  const user = { id: "return-user", email: "return@example.com", username: "return-user" };
+  await page.route("**/api/v1/auth/login", (route) => route.fulfill({ status: 200, json: { user } }));
+  await page.route("**/api/v1/auth/me", (route) => route.fulfill({ json: user }));
+
+  await page.goto("/login?next=%2Fstudio%2Fcoach%2Fmemory%3Fview%3Dhistory");
+  await page.getByLabel("用户名或邮箱").fill("return-user");
+  await page.getByLabel("密码", { exact: true }).fill("correct-password");
+  await page.getByRole("button", { name: "登录", exact: true }).click();
+  await expect(page).toHaveURL(/\/studio\/coach\/memory\?view=history/);
+
+  await page.goto("/login?next=https%3A%2F%2Fexample.com%2Fphishing");
+  await page.getByLabel("用户名或邮箱").fill("return-user");
+  await page.getByLabel("密码", { exact: true }).fill("correct-password");
+  await page.getByRole("button", { name: "登录", exact: true }).click();
+  await expect(page).toHaveURL(/\/studio\/work$/);
+});

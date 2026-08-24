@@ -19,6 +19,7 @@ from src.core.agent_v2.resolver import (
     validate_plan,
 )
 from src.core.agent_v2.schemas import (
+    ActionIntent,
     AgentPlan,
     AgentRole,
     ChangeOperation,
@@ -27,7 +28,10 @@ from src.core.agent_v2.schemas import (
     OutputRef,
     PlanStep,
     PolicyOutcome,
+    ReviewFinding,
+    ReviewOutput,
     Risk,
+    ToolContext,
 )
 from src.core.agent_v2.transitions import transition_run, transition_step
 from src.core.time import utc_now
@@ -243,6 +247,111 @@ def test_policy_promotes_delete_to_high_risk():
     assert decision.outcome == PolicyOutcome.REQUIRE_APPROVAL
 
 
+@pytest.mark.asyncio
+async def test_review_capability_flags_capacity_deadline_and_multi_goal_collisions():
+    registry = build_registry()
+    context = {
+        "goals": [
+            {
+                "id": f"goal-{index}",
+                "title": f"目标 {index}",
+                "daily_hours": 1,
+                "deadline": "2026-08-25",
+            }
+            for index in range(1, 4)
+        ],
+        "tasks": [
+            {
+                "id": f"task-{index}",
+                "goal_id": f"goal-{index}",
+                "title": f"任务 {index}",
+                "date": "2026-08-24",
+                "status": "pending",
+                "estimated_minutes": 70,
+            }
+            for index in range(1, 4)
+        ],
+    }
+    operations = [
+        ChangeOperation(
+            entity="task",
+            entity_id=f"task-{index}",
+            field="scheduled_date",
+            before="2026-08-24",
+            after="2026-08-26",
+            label=f"任务 {index}",
+            reason="test",
+        ).model_dump(mode="json")
+        for index in range(1, 4)
+    ]
+
+    result = await registry.invoke(
+        MagicMock(),
+        registry.get("plan.review"),
+        ToolContext(user_id="user", run_id="run", step_id="review"),
+        {"change_set": {"summary": "review", "operations": operations}, "context": context},
+    )
+
+    assert any("超过每日容量" in warning for warning in result["warnings"])
+    assert any("截止日期" in warning for warning in result["warnings"])
+    assert any("3 个学习目标" in warning for warning in result["warnings"])
+    assert result["approved_for_preview"] is False
+    deadline = next(item for item in result["findings"] if item["code"] == "deadline_exceeded")
+    assert deadline["blocking"] is True
+    assert deadline["recommended_policy"] == "deny"
+    assert {item["id"] for item in result["blocking_alternatives"]} == {
+        "preview_goal_deadline_extension",
+        "analyze_deadline_risk_only",
+        "rebuild_within_deadline",
+    }
+
+
+def test_policy_consumes_structured_review_findings():
+    write_tool = build_registry().get("tasks.apply_changes")
+    change_set = ChangeSet(summary="review", operations=[])
+    blocker = ReviewOutput(
+        approved_for_preview=False,
+        findings=[
+            ReviewFinding(
+                code="deadline_exceeded",
+                severity="critical",
+                blocking=True,
+                message="任务越过截止日期",
+                recommended_policy="deny",
+            )
+        ],
+    )
+    denied = evaluate_policy(
+        write_tool,
+        role=AgentRole.MAIN,
+        change_set=change_set,
+        review=blocker,
+    )
+    assert denied.outcome == PolicyOutcome.DENY
+    assert denied.review_finding_codes == ["deadline_exceeded"]
+
+    high_risk = ReviewOutput(
+        approved_for_preview=True,
+        findings=[
+            ReviewFinding(
+                code="daily_capacity_exceeded",
+                severity="high",
+                message="负荷超过容量 150%",
+                recommended_policy="require_high_risk_confirmation",
+            )
+        ],
+    )
+    decision = evaluate_policy(
+        write_tool,
+        role=AgentRole.MAIN,
+        change_set=change_set,
+        review=high_risk,
+    )
+    assert decision.outcome == PolicyOutcome.REQUIRE_APPROVAL
+    assert decision.risk == Risk.HIGH
+    assert "explicit_high_risk_confirmation" in decision.obligations
+
+
 def test_policy_marks_bulk_suggestion_and_exposes_helper_decisions():
     registry = build_registry()
     read_tool = registry.get("context.load")
@@ -412,7 +521,7 @@ async def test_planner_accepts_valid_constrained_model_plan():
         usage_metadata={"total_tokens": 42},
     )
     llm = MagicMock(ainvoke=AsyncMock(return_value=response))
-    with patch("src.core.agent_v2.planner.create_structured_routine_llm", return_value=llm):
+    with patch("src.core.agent_v2.planner.create_json_llm", return_value=llm):
         plan, trace = await create_plan(
             build_registry(),
             "检查最近 21 天执行情况，周六不要安排，修改前确认",
@@ -441,7 +550,7 @@ async def test_planner_timeout_uses_deterministic_fallback():
 
     llm = MagicMock(ainvoke=AsyncMock(side_effect=slow_response))
     with (
-        patch("src.core.agent_v2.planner.create_structured_routine_llm", return_value=llm),
+        patch("src.core.agent_v2.planner.create_json_llm", return_value=llm),
         patch("src.core.agent_v2.planner.MODEL_PLANNER_TIMEOUT_SECONDS", 0.001),
     ):
         plan, trace = await create_plan(
@@ -452,6 +561,36 @@ async def test_planner_timeout_uses_deterministic_fallback():
     assert plan.objective["constraints"]["lookback_days"] == 30
     assert trace["validation"]["status"] == "fallback_accepted"
     assert trace["fallback_reason"] == "模型规划超过 0.001 秒，已使用确定性规划"
+
+
+@pytest.mark.asyncio
+async def test_known_action_uses_zero_model_deterministic_plan():
+    intent = ActionIntent(
+        capability="task_mutation",
+        goal_id="goal-1",
+        constraints={"task_title": "复习数组", "scheduled_date": "2026-08-23"},
+        requested_effect="create",
+        confidence=0.98,
+    )
+    with patch("src.core.agent_v2.planner.create_json_llm") as create_llm:
+        plan, trace = await create_plan(
+            build_registry(),
+            "新增任务“复习数组”，安排到明天",
+            "goal-1",
+            step_budget=5,
+            action_intent=intent,
+            deterministic_only=True,
+        )
+
+    create_llm.assert_not_called()
+    assert plan.planner == "deterministic"
+    assert plan.estimated_tokens == 0
+    assert trace["token_usage"] == 0
+    assert [step.tool_name for step in plan.steps[-3:]] == [
+        "tasks.preview_mutation",
+        "plan.review",
+        "tasks.apply_changes",
+    ]
 
 
 @pytest.mark.asyncio
@@ -470,7 +609,7 @@ async def test_planner_rejects_unsafe_model_input_and_falls_back():
     }
     response = MagicMock(content=json.dumps(payload), response_metadata={}, usage_metadata={})
     llm = MagicMock(ainvoke=AsyncMock(return_value=response))
-    with patch("src.core.agent_v2.planner.create_structured_routine_llm", return_value=llm):
+    with patch("src.core.agent_v2.planner.create_json_llm", return_value=llm):
         plan, trace = await create_plan(build_registry(), "搜索知识资料", None, step_budget=5)
     assert plan.planner == "fallback"
     assert trace["validation"]["status"] == "fallback_accepted"

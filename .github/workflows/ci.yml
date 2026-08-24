@@ -48,7 +48,29 @@ jobs:
           cache: pip
           cache-dependency-path: backend/requirements.txt
       - run: pip install -r requirements.txt -r requirements-test.txt
+      - name: V2.5 metrics and pattern cursor order regression
+        run: >-
+          pytest
+          tests/test_agent_v25_evaluation_gate.py::test_v2_metrics_do_not_count_conversion_as_acceptance_or_internal_drafts
+          tests/test_pattern_analyzer.py::TestBatchProcessing::test_run_batch_respects_batch_size_limit
+          -q --tb=short
       - run: pytest tests --ignore=tests/integration -m "not integration and not soak" -q --tb=short
+
+  backend-agent-v25-gate:
+    name: Agent V2.5 fast contract gate
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - run: pip install -r requirements.txt -r requirements-test.txt
+      - run: pytest tests/test_agent_v25_evaluation_gate.py -q --tb=short
 
   backend-migrations:
     name: Alembic lifecycle and release gate
@@ -135,7 +157,10 @@ jobs:
           cache-dependency-path: backend/requirements.txt
       - run: pip install -r requirements.txt -r requirements-test.txt
       - run: alembic upgrade head
-      - run: pytest tests/integration -m "integration and not soak" -q --tb=short
+      - name: Agent V2.5 PostgreSQL runtime safety gate
+        run: pytest tests/integration/test_15_agent_v25_runtime_gate.py -q --tb=short
+      - name: Remaining PostgreSQL integration tests
+        run: pytest tests/integration --ignore=tests/integration/test_15_agent_v25_runtime_gate.py -m "integration and not soak" -q --tb=short
 
   frontend-build:
     name: Frontend production build
@@ -145,13 +170,17 @@ jobs:
         working-directory: frontend
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.19.0
+          run_install: false
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-      - run: npm ci
-      - run: npm run build
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
 
   frontend-e2e:
     name: Frontend mocked browser contracts
@@ -163,17 +192,21 @@ jobs:
       PLANPILOT_WEB_URL: http://127.0.0.1:3000
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.19.0
+          run_install: false
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-      - run: npm ci
-      - run: npx playwright install --with-deps chromium
-      - run: npm run build
+          node-version: "22"
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm build
       - name: Start frontend
         run: |
-          npm run start > /tmp/planpilot-frontend.log 2>&1 &
+          pnpm start > /tmp/planpilot-frontend.log 2>&1 &
           for attempt in {1..60}; do
             if curl --fail --silent http://127.0.0.1:3000/ >/dev/null; then
               exit 0
@@ -182,7 +215,7 @@ jobs:
           done
           cat /tmp/planpilot-frontend.log
           exit 1
-      - run: npx playwright test --reporter=line
+      - run: pnpm exec playwright test --reporter=line
       - if: failure()
         uses: actions/upload-artifact@v4
         with:
@@ -197,6 +230,7 @@ jobs:
     needs:
       - backend-quality
       - backend-unit
+      - backend-agent-v25-gate
       - backend-migrations
       - backend-integration
       - frontend-build

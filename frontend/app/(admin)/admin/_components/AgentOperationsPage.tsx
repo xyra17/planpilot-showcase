@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { usePathname } from "next/navigation";
+import Link from "next/link";
 import {
   Activity,
   AlertTriangle,
@@ -12,6 +13,7 @@ import {
   Clock3,
   FlaskConical,
   Gauge,
+  HeartPulse,
   History,
   LockKeyhole,
   RefreshCw,
@@ -27,14 +29,18 @@ import {
   type AgentInvocation,
   type AgentTrace,
   type AgentVersions,
+  type BetaOverview,
+  type BetaReviewSample,
   type EvaluationRun,
   type FeedbackEvent,
   type OfflineGate,
   type OnlineExperiment,
+  type ProductValidationReport,
   type RuntimeOverview,
   type GatewayCircuit,
 } from "@/lib/agent-control-api";
 import { StrategyManagerModal } from "@/components/admin/StrategyManagerModal";
+import { DataSyncNotice } from "@/components/ui/DataSyncNotice";
 import { useAuthStore } from "@/lib/stores/authStore";
 import { cn } from "@/lib/utils";
 
@@ -89,21 +95,38 @@ const ENVIRONMENT_LABEL: Record<string, string> = {
   production: "生产环境",
 };
 
+const MODEL_ROLE_LABEL = {
+  interactive: { name: "对话模型", description: "日常问答与交流", tone: "border-indigo-100 bg-indigo-50/55 text-indigo-700" },
+  structured: { name: "任务模型", description: "生成计划和行动建议", tone: "border-cyan-100 bg-cyan-50/55 text-cyan-700" },
+  critical: { name: "安全判断模型", description: "处理高风险判断", tone: "border-amber-100 bg-amber-50/55 text-amber-700" },
+  embedding: { name: "知识检索模型", description: "查找笔记和资料", tone: "border-emerald-100 bg-emerald-50/55 text-emerald-700" },
+} as const;
+
+const ROUTE_LABEL: Record<string, string> = {
+  local: "本地 Qwen",
+  flash: "DeepSeek Flash",
+  pro: "DeepSeek Pro",
+  "embedding-local": "本地向量检索",
+  "keyword-search": "关键词包含匹配",
+};
+
 function StatCard({
   label,
   value,
   note,
   icon: Icon,
   tone,
+  href,
 }: {
   label: string;
   value: string;
   note: string;
   icon: typeof Activity;
   tone: "indigo" | "emerald" | "violet" | "amber";
+  href?: string;
 }) {
-  return (
-    <div className={cn("pp-admin-stat-card rounded-2xl p-4", `pp-admin-stat-${tone}`)}>
+  const content = (
+    <>
       <div className="flex items-center justify-between">
         <span className="text-xs font-medium text-gray-500">{label}</span>
         <span className="pp-admin-stat-icon flex h-8 w-8 items-center justify-center rounded-xl">
@@ -112,8 +135,10 @@ function StatCard({
       </div>
       <div className="mt-4 text-2xl font-semibold tracking-tight text-gray-900">{value}</div>
       <p className="mt-1 text-xs text-gray-400">{note}</p>
-    </div>
+    </>
   );
+  const className = cn("pp-admin-stat-card rounded-2xl p-4", `pp-admin-stat-${tone}`);
+  return href ? <Link href={href} className={cn(className, "block transition hover:-translate-y-0.5 hover:shadow-md")}>{content}</Link> : <div className={className}>{content}</div>;
 }
 
 function EmptyState({ text }: { text: string }) {
@@ -317,7 +342,7 @@ function CanaryRollbackModal({
             <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-red-100 text-red-600"><RotateCcw size={17} /></span>
             <div>
               <div className="text-[10px] font-semibold uppercase tracking-[.16em] text-red-500">ROLLBACK CONTROL</div>
-              <h2 id="canary-rollback-title" className="mt-1 text-lg font-semibold text-gray-900">确认回滚当前 Canary？</h2>
+              <h2 id="canary-rollback-title" className="mt-1 text-lg font-semibold text-gray-900">确认回滚当前灰度发布？</h2>
             </div>
           </div>
           <button type="button" onClick={onClose} disabled={busy} aria-label="关闭回滚确认" className="rounded-xl p-2 text-gray-400 transition hover:bg-white hover:text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300 disabled:cursor-not-allowed disabled:opacity-50">
@@ -325,9 +350,9 @@ function CanaryRollbackModal({
           </button>
         </div>
         <div className="space-y-3 px-6 py-5">
-          <p id="canary-rollback-description" className="text-sm leading-6 text-gray-600">回滚会立即停止当前 Canary 流量，并恢复到当前生产基线版本。</p>
+          <p id="canary-rollback-description" className="text-sm leading-6 text-gray-600">回滚会立即停止当前灰度流量，并恢复到当前稳定版本。</p>
           <div className="rounded-2xl border border-red-100 bg-red-50/60 px-4 py-3 text-xs leading-5 text-red-700">
-            回滚操作会写入审计记录；如需再次放量，需要重新创建一次 Canary 发布。
+            回滚操作会写入审计记录；如需再次放量，需要重新创建一次灰度发布。
           </div>
         </div>
         <div className="flex items-center justify-end gap-2 border-t border-gray-100 bg-gray-50/70 px-6 py-4">
@@ -446,12 +471,14 @@ function AdminHeadingActions({ children }: { children: React.ReactNode }) {
   return target ? createPortal(children, target) : null;
 }
 
-export type AdminOperationsView = "overview" | "canary" | "experiments" | "gateway" | "traces";
+export type AdminOperationsView = "overview" | "canary" | "beta" | "experiments" | "gateway" | "traces";
 
 export default function AgentOperationsPage() {
   const pathname = usePathname();
   const view: AdminOperationsView = pathname.endsWith("/canary")
     ? "canary"
+    : pathname.endsWith("/beta")
+      ? "beta"
     : pathname.endsWith("/experiments")
       ? "experiments"
       : pathname.endsWith("/gateway")
@@ -468,6 +495,15 @@ export default function AgentOperationsPage() {
   const [versions, setVersions] = useState<AgentVersions | null>(null);
   const [offlineGates, setOfflineGates] = useState<OfflineGate[]>([]);
   const [gatewayCircuits, setGatewayCircuits] = useState<GatewayCircuit[]>([]);
+  const [betaOverview, setBetaOverview] = useState<BetaOverview | null>(null);
+  const [productValidation, setProductValidation] = useState<ProductValidationReport | null>(null);
+  const [betaSamples, setBetaSamples] = useState<BetaReviewSample[]>([]);
+  const [betaCohort, setBetaCohort] = useState<"beta" | "stable" | "all">("beta");
+  const [betaSource, setBetaSource] = useState<"conversation" | "insight" | "scheduler" | "api" | "internal" | "legacy_unattributed" | "all">("conversation");
+  const [betaCapability, setBetaCapability] = useState("");
+  const [betaResolutionQuality, setBetaResolutionQuality] = useState("");
+  const [betaStart, setBetaStart] = useState("");
+  const [betaEnd, setBetaEnd] = useState("");
   const [selectedTrace, setSelectedTrace] = useState<AgentTrace | null>(null);
   const [selectedDeployment, setSelectedDeployment] = useState<AgentVersions["deployments"][number] | null>(null);
   const [selectedGateway, setSelectedGateway] = useState<GatewayCircuit | null>(null);
@@ -475,38 +511,69 @@ export default function AgentOperationsPage() {
   const [canaryRollbackOpen, setCanaryRollbackOpen] = useState(false);
   const [strategyModalOpen, setStrategyModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadedView, setLoadedView] = useState<AdminOperationsView | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [errorCanReload, setErrorCanReload] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setErrorCanReload(false);
     try {
-      const [nextOverview, nextInvocations, nextEvaluations, nextExperiments, nextFeedback, nextVersions, nextGates, nextCircuits] =
-        await Promise.all([
+      if (view === "overview") {
+        const [nextOverview, nextEvaluations, nextFeedback, nextVersions, nextProductValidation] = await Promise.all([
           agentControlApi.getOverview(),
-          user?.is_admin ? agentControlApi.getAdminInvocations(100) : agentControlApi.getInvocations(30),
           agentControlApi.getEvaluations(),
-          agentControlApi.getExperiments(),
           agentControlApi.getFeedbackHistory(),
           user?.is_admin ? agentControlApi.getVersions() : Promise.resolve(null),
-          agentControlApi.getOfflineGates(),
-          user?.is_admin ? agentControlApi.getGatewayCircuits() : Promise.resolve([]),
+          user?.is_admin ? agentControlApi.getLatestProductValidation() : Promise.resolve(null),
         ]);
-      setOverview(nextOverview);
-      setInvocations(nextInvocations);
-      setEvaluations(nextEvaluations);
-      setExperiments(nextExperiments);
-      setFeedback(nextFeedback);
-      setVersions(nextVersions);
-      setOfflineGates(nextGates);
-      setGatewayCircuits(nextCircuits);
+        setOverview(nextOverview);
+        setEvaluations(nextEvaluations);
+        setFeedback(nextFeedback);
+        setVersions(nextVersions);
+        setProductValidation(nextProductValidation);
+      } else if (view === "canary") {
+        const [nextOverview, nextVersions, nextGates] = await Promise.all([
+          agentControlApi.getOverview(),
+          user?.is_admin ? agentControlApi.getVersions() : Promise.resolve(null),
+          agentControlApi.getOfflineGates(),
+        ]);
+        setOverview(nextOverview);
+        setVersions(nextVersions);
+        setOfflineGates(nextGates);
+      } else if (view === "beta" && user?.is_admin) {
+        const [nextBeta, nextSamples] = await Promise.all([
+          agentControlApi.getBetaOverview(),
+          agentControlApi.getBetaReviewSamples(),
+        ]);
+        setBetaOverview(nextBeta);
+        setBetaSamples(nextSamples);
+      } else if (view === "experiments") {
+        const [nextEvaluations, nextExperiments, nextVersions] = await Promise.all([
+          agentControlApi.getEvaluations(),
+          agentControlApi.getExperiments(),
+          user?.is_admin ? agentControlApi.getVersions() : Promise.resolve(null),
+        ]);
+        setEvaluations(nextEvaluations);
+        setExperiments(nextExperiments);
+        setVersions(nextVersions);
+      } else if (view === "gateway" && user?.is_admin) {
+        setGatewayCircuits(await agentControlApi.getGatewayCircuits());
+      } else if (view === "traces") {
+        setInvocations(user?.is_admin
+          ? await agentControlApi.getAdminInvocations(100)
+          : await agentControlApi.getInvocations(30));
+      }
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "智能运营数据加载失败");
+      setErrorCanReload(true);
     } finally {
+      setLoadedView(view);
       setLoading(false);
     }
-  }, [user?.is_admin]);
+  }, [user?.is_admin, view]);
 
   useEffect(() => {
     void load();
@@ -515,6 +582,7 @@ export default function AgentOperationsPage() {
   const adminAction = async (action: "evaluation" | "gate" | "metrics" | "calibration") => {
     setBusy(action);
     setError(null);
+    setErrorCanReload(false);
     try {
       if (action === "evaluation") await agentControlApi.runEvaluation();
       else if (action === "gate") await agentControlApi.runOfflineGate();
@@ -530,6 +598,8 @@ export default function AgentOperationsPage() {
 
   const inspectTrace = async (traceId: string) => {
     setBusy(`trace:${traceId}`);
+    setError(null);
+    setErrorCanReload(false);
     try {
       setSelectedTrace(await agentControlApi.getTrace(traceId));
     } catch (reason) {
@@ -539,21 +609,92 @@ export default function AgentOperationsPage() {
     }
   };
 
+  const betaAction = async (action: "toggle-beta" | "kill-switch" | "normalize" | "scan-safety") => {
+    setBusy(`beta:${action}`);
+    setError(null);
+    try {
+      if (action === "normalize") {
+        await agentControlApi.normalizeBetaReviewSamples();
+      } else if (action === "scan-safety") {
+        await agentControlApi.scanBetaSafety();
+      } else if (action === "kill-switch") {
+        await agentControlApi.updateBetaControl({
+          new_action_runs_enabled: !betaOverview?.control.new_action_runs_enabled,
+          reason: betaOverview?.control.new_action_runs_enabled
+            ? "管理员触发行动功能安全停机"
+            : "安全复核完成后恢复新行动",
+        });
+      } else {
+        await agentControlApi.updateBetaControl({
+          beta_enabled: !betaOverview?.control.beta_enabled,
+          reason: betaOverview?.control.beta_enabled ? "暂停行动功能试用" : "开启受控试用人群",
+        });
+      }
+      await load();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "行动功能控制失败");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const applyBetaFilters = async () => {
+    if (!betaOverview) return;
+    setBusy("beta:filters");
+    setError(null);
+    try {
+      const metrics = await agentControlApi.getBetaMetrics({
+        cohort: betaCohort,
+        source: betaSource,
+        capability: betaCapability || undefined,
+        resolution_quality: betaResolutionQuality || undefined,
+        start: betaStart ? new Date(betaStart).toISOString() : undefined,
+        end: betaEnd ? new Date(betaEnd).toISOString() : undefined,
+      });
+      setBetaOverview({ ...betaOverview, metrics });
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "行动数据筛选失败");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const reviewBetaSample = async (sample: BetaReviewSample, status: "confirmed" | "dismissed") => {
+    setBusy(`sample:${sample.id}`);
+    setError(null);
+    try {
+      await agentControlApi.reviewBetaSample(
+        sample.id,
+        status,
+        status === "confirmed" ? "已人工复核，确认可作为候选评测案例" : "已人工复核，不构成有效评测案例"
+      );
+      await load();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "样本复核失败");
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const createCanary = async () => {
     const gate = offlineGates.find((row) => row.status === "passed");
     const prompt = versions?.prompts.find((row) => row.status === "approved");
-    const model = versions?.models.find((row) => row.status === "approved");
+    const model = versions?.models.find(
+      (row) => row.status === "approved" && (row.provider === "local" || row.provider === "smart")
+    );
     const policy = versions?.policies.find((row) => row.status === "approved");
     if (!gate || !prompt || !model || !policy) {
+      setErrorCanReload(false);
       setError("请先通过生产离线门禁，并确认候选版本均已批准。");
       return;
     }
     setBusy("create-canary");
     setError(null);
+    setErrorCanReload(false);
     try {
       await agentControlApi.createCanary({
-        name: `Coach Canary ${new Date().toISOString()}`,
-        hypothesis: "候选 Coach 策略在保持安全与可靠性基线的同时提升建议完成效果",
+        name: `Learning Advice Canary ${new Date().toISOString()}`,
+        hypothesis: "候选学习建议策略在保持安全与可靠性基线的同时提升建议完成效果",
         offline_gate_id: gate.id,
         prompt_version_id: prompt.id,
         model_config_id: model.id,
@@ -572,6 +713,7 @@ export default function AgentOperationsPage() {
     if (!canary) return;
     setBusy(`canary:${action}`);
     setError(null);
+    setErrorCanReload(false);
     try {
       if (action === "advance") await agentControlApi.advanceCanary(canary.id);
       else if (action === "pause") await agentControlApi.pauseCanary(canary.id, "管理员从生产看板暂停");
@@ -596,6 +738,7 @@ export default function AgentOperationsPage() {
   const rollback = async (deploymentId: string) => {
     setBusy(`rollback:${deploymentId}`);
     setError(null);
+    setErrorCanReload(false);
     try {
       await agentControlApi.rollbackDeployment(deploymentId, "从智能运营页面执行受控回滚");
       await load();
@@ -613,10 +756,10 @@ export default function AgentOperationsPage() {
     });
   };
 
-  if (loading && !overview) {
+  if (loading && loadedView !== view) {
     return (
-      <div className="flex min-h-full items-center justify-center text-sm text-gray-400">
-        <RefreshCw size={16} className="mr-2 animate-spin" />正在读取 Agent 运行状态…
+      <div className="flex min-h-56 items-center justify-center text-sm text-gray-500">
+        <RefreshCw size={17} className="mr-2 animate-spin" />正在读取当前页面数据…
       </div>
     );
   }
@@ -635,6 +778,11 @@ export default function AgentOperationsPage() {
   const traceAverageLatency = invocations.length > 0
     ? Math.round(invocations.reduce((total, invocation) => total + invocation.latency_ms, 0) / invocations.length)
     : 0;
+  const productStatusLabel = productValidation?.status === "supported"
+    ? "达到预设线"
+    : productValidation?.status === "not_supported"
+      ? "需要改善"
+      : "等待样本";
 
   return (
     <div className="mx-auto w-full max-w-7xl px-5 pb-8 sm:px-8" data-admin-view={view}>
@@ -673,6 +821,28 @@ export default function AgentOperationsPage() {
                   {busy === "metrics" ? "聚合中…" : "刷新运行指标"}
                 </button>
               )}
+              {view === "beta" && (
+                <>
+                  <button
+                    onClick={() => void betaAction("scan-safety")}
+                    disabled={busy != null}
+                    data-testid="scan-beta-safety"
+                    className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 transition hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-50"
+                  >
+                    <ShieldCheck size={14} className="mr-1.5 inline" />
+                    {busy === "beta:scan-safety" ? "扫描中…" : "运行安全扫描"}
+                  </button>
+                  <button
+                    onClick={() => void betaAction("normalize")}
+                    disabled={busy != null}
+                    data-testid="normalize-beta-samples"
+                    className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 transition hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-50"
+                  >
+                    <Sparkles size={14} className="mr-1.5 inline" />
+                    {busy === "beta:normalize" ? "归一化中…" : "提取真实样本"}
+                  </button>
+                </>
+              )}
             </>
           )}
           <button
@@ -686,38 +856,139 @@ export default function AgentOperationsPage() {
       </AdminHeadingActions>
 
       {error && (
-        <div className="mt-5 flex items-center gap-2 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-600">
-          <AlertTriangle size={16} />{error}
+        <DataSyncNotice
+          title={errorCanReload ? "智能运营数据加载失败" : "智能运营操作未完成"}
+          message={error}
+          retryLabel="重新加载"
+          onRetry={errorCanReload ? () => void load() : undefined}
+        />
+      )}
+
+      {view === "beta" && betaOverview && (
+        <div className="space-y-5" data-testid="action-beta-evidence">
+          <section className="pp-admin-panel pp-admin-panel-violet pp-action-shell rounded-3xl border border-violet-100 bg-gradient-to-br from-white to-violet-50/50 p-5 shadow-[var(--shadow-xs)]">
+            <div className="pp-action-header flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <ShieldCheck size={18} className="text-violet-600" />
+                  <h2 className="text-base font-semibold text-gray-900">试用范围与安全开关</h2>
+                  <span className={cn("rounded-full px-2.5 py-1 text-[10px] font-semibold", betaOverview.control.beta_enabled ? "bg-violet-100 text-violet-700" : "bg-gray-100 text-gray-600")}>
+                    {betaOverview.control.beta_enabled ? "试用已开启" : "试用未开启"}
+                  </span>
+                  <span className={cn("rounded-full px-2.5 py-1 text-[10px] font-semibold", betaOverview.control.new_action_runs_enabled ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700")}>
+                    {betaOverview.control.new_action_runs_enabled ? "允许发起新行动" : "新行动已停用"}
+                  </span>
+                </div>
+                <p className="mt-2 max-w-3xl text-xs leading-5 text-gray-500">
+                  试用人群由系统确定，当前使用 {betaOverview.control.cohort_mode === "allowlist" ? "指定名单" : `${betaOverview.control.traffic_percent}% 固定分组`}。停机只阻止发起新行动，已有记录仍可查看、审计与撤销。
+                </p>
+                <p className="mt-2 text-xs font-medium text-amber-700">功能已经可以试用，但真实效果样本还不够，暂时不能下结论。</p>
+              </div>
+              <div className="flex shrink-0 flex-wrap gap-2">
+                <button data-testid="toggle-action-beta" onClick={() => void betaAction("toggle-beta")} disabled={busy != null} className="rounded-xl border border-violet-200 bg-white px-3 py-2 text-xs font-semibold text-violet-700 transition hover:bg-violet-50 disabled:opacity-40">
+                  {betaOverview.control.beta_enabled ? "暂停试用" : "开启试用"}
+                </button>
+                <button data-testid="action-beta-kill-switch" onClick={() => void betaAction("kill-switch")} disabled={busy != null} className={cn("rounded-xl px-3 py-2 text-xs font-semibold transition disabled:opacity-40", betaOverview.control.new_action_runs_enabled ? "bg-red-600 text-white hover:bg-red-700" : "bg-emerald-600 text-white hover:bg-emerald-700")}>
+                  {betaOverview.control.new_action_runs_enabled ? "停止新行动" : "恢复新行动"}
+                </button>
+              </div>
+            </div>
+            <div className="pp-action-filterbar mt-5 rounded-2xl border border-violet-100 bg-white/80 p-4" data-testid="beta-metric-filters">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="mr-1 text-xs font-semibold text-gray-500">试用人群</span>
+                {([['beta', '试用组（默认）'], ['stable', '稳定组'], ['all', '全部用户']] as const).map(([value, label]) => (
+                  <button key={value} type="button" onClick={() => setBetaCohort(value)} className={cn("rounded-lg px-2.5 py-1.5 text-[11px] font-semibold transition", betaCohort === value ? "bg-violet-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200")}>{label}</button>
+                ))}
+                <span className="ml-2 mr-1 text-xs font-semibold text-gray-500">入口来源</span>
+                {([['conversation', '对话'], ['insight', '洞察'], ['scheduler', '定时任务'], ['api', '接口'], ['internal', '内部'], ['legacy_unattributed', '历史未标注']] as const).map(([value, label]) => (
+                  <button key={value} type="button" onClick={() => setBetaSource(value)} className={cn("rounded-lg px-2.5 py-1.5 text-[11px] font-semibold transition", betaSource === value ? "bg-indigo-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200")}>{label}</button>
+                ))}
+              </div>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+                <input aria-label="能力类型过滤" value={betaCapability} onChange={(event) => setBetaCapability(event.target.value)} placeholder="能力类型（可选）" className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 outline-none focus:border-violet-300" />
+                <input aria-label="解析质量过滤" value={betaResolutionQuality} onChange={(event) => setBetaResolutionQuality(event.target.value)} placeholder="解析质量（可选）" className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 outline-none focus:border-violet-300" />
+                <input aria-label="观测开始时间" type="datetime-local" value={betaStart} onChange={(event) => setBetaStart(event.target.value)} className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs text-gray-700 outline-none focus:border-violet-300" />
+                <input aria-label="观测结束时间" type="datetime-local" value={betaEnd} onChange={(event) => setBetaEnd(event.target.value)} className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs text-gray-700 outline-none focus:border-violet-300" />
+                <button type="button" onClick={() => void applyBetaFilters()} disabled={busy != null} className="rounded-xl bg-violet-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-violet-700 disabled:opacity-40">{busy === "beta:filters" ? "查询中…" : "应用筛选"}</button>
+              </div>
+              <p className="mt-2 text-[10px] text-gray-400">当前窗口：{dateTime(betaOverview.metrics.measurement_start, user?.timezone ?? "Asia/Shanghai")} 至 {dateTime(betaOverview.metrics.measurement_end, user?.timezone ?? "Asia/Shanghai")} · {betaOverview.metrics.cohort} / {betaOverview.metrics.source}</p>
+            </div>
+            <div className="pp-action-kpis mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <StatCard label="会话样本" value={String(betaOverview.metrics.sample_size)} note={betaOverview.metrics.insufficient_data ? "样本不足，不展示效果提升结论" : `指标版本 ${betaOverview.metrics.metric_version}`} icon={Activity} tone="indigo" />
+              <StatCard label="行动识别率" value={percent(betaOverview.metrics.rates.routing_rate)} note={`${betaOverview.metrics.counts.action_run_created ?? 0} 条行动记录`} icon={Gauge} tone="violet" />
+              <StatCard label="执行净成功率" value={percent(betaOverview.metrics.rates.execution_success_rate)} note="已排除撤销记录" icon={CheckCircle2} tone="emerald" />
+              <StatCard label="95% 预览响应" value={betaOverview.metrics.latency.preview_p95_ms == null ? "暂无数据" : `${Math.round(betaOverview.metrics.latency.preview_p95_ms)} ms`} note={`运行门禁：${betaOverview.runtime_gate.valid ? "已通过且有效" : betaOverview.runtime_gate.status === "missing" ? "缺失" : "失效或不匹配"}`} icon={Clock3} tone="amber" />
+            </div>
+          </section>
+
+          <div className="pp-action-evidence-grid grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
+            <section className="pp-admin-panel pp-admin-panel-indigo pp-action-evidence-panel rounded-3xl border border-gray-100 bg-white p-5 shadow-[var(--shadow-xs)]">
+              <div className="flex items-start justify-between gap-3">
+                <div><h2 className="text-base font-semibold text-gray-900">统一行动漏斗</h2><p className="mt-1 text-xs text-gray-500">同一指标版本追踪会话、意图、预览、审批、执行和撤销。</p></div>
+                <span className="rounded-full bg-indigo-50 px-2.5 py-1 text-[10px] font-semibold text-indigo-700">{betaOverview.metrics.metric_version}</span>
+              </div>
+              <div className="pp-action-funnel-grid mt-4 grid gap-2 sm:grid-cols-2">
+                {[
+                  ["收到会话", "conversation_turn_received"], ["核心需求已解析", "need_frame_resolved"],
+                  ["发起澄清", "clarification_requested"], ["意图已解析", "intent_resolved"],
+                  ["生成行动方案", "action_run_created"], ["预览就绪", "preview_ready"],
+                  ["已批准", "approved"], ["执行完成（净成功）", "completed"],
+                  ["执行失败", "failed"], ["已撤销", "rolled_back"],
+                ].map(([label, key]) => <div key={key} className="pp-action-funnel-item flex items-center justify-between rounded-xl bg-gray-50 px-3 py-2.5"><span className="text-[11px] text-gray-500">{label}</span><strong className="text-sm text-gray-800">{betaOverview.metrics.counts[key] ?? 0}</strong></div>)}
+              </div>
+            </section>
+
+            <section className="pp-admin-panel pp-admin-panel-amber pp-action-evidence-panel rounded-3xl border border-gray-100 bg-white p-5 shadow-[var(--shadow-xs)]">
+              <div className="flex items-start justify-between gap-3"><div><h2 className="text-base font-semibold text-gray-900">安全底线</h2><p className="mt-1 text-xs text-gray-500">任一项大于 0，系统就会停止扩大试用并关闭新行动。</p></div><span className={cn("rounded-full px-2.5 py-1 text-xs font-semibold", betaOverview.safety.status === "observed_clear" ? "bg-emerald-100 text-emerald-700" : betaOverview.safety.status === "violated" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700")}>{betaOverview.safety.status === "observed_clear" ? "已观测清零" : betaOverview.safety.status === "violated" ? "发现违规" : betaOverview.safety.status === "stale" ? "观测已过期" : "尚未观测"}</span></div>
+              <p className="mt-2 text-[10px] leading-4 text-gray-400">{betaOverview.safety.observed_at ? `最近观测 ${dateTime(betaOverview.safety.observed_at, user?.timezone ?? "Asia/Shanghai")} · 有效至 ${betaOverview.safety.expires_at ? dateTime(betaOverview.safety.expires_at, user?.timezone ?? "Asia/Shanghai") : "未知"} · 来源 ${betaOverview.safety.source ?? "未知"}` : "尚无真实安全扫描，不得视为四项清零。"}</p>
+              <dl className="pp-action-safety-list mt-4 divide-y divide-gray-100 rounded-xl border border-gray-100 px-4">
+                {[["未经确认就写入", "unconfirmed_write_count"], ["访问了其他用户数据", "cross_user_access_count"], ["重复写入", "duplicate_write_count"], ["审核关联失败", "review_binding_failure_count"]].map(([label, key]) => { const count = betaOverview.safety.counts?.[key]; return <div key={key} className="flex items-center justify-between py-3"><dt className="text-xs text-gray-500">{label}</dt><dd className={cn("text-sm font-semibold", count == null ? "text-amber-600" : count > 0 ? "text-red-600" : "text-emerald-700")}>{count == null ? "未知" : count}</dd></div>; })}
+              </dl>
+            </section>
+          </div>
+
+          <section className="pp-admin-panel pp-admin-panel-emerald pp-action-review-panel rounded-3xl border border-gray-100 bg-white p-5 shadow-[var(--shadow-xs)]">
+            <div><h2 className="text-base font-semibold text-gray-900">真实样本复核队列</h2><p className="mt-1 text-xs text-gray-500">仅从持久化事件生成；默认不复制完整请求文本。人工确认后才可进入 v1.2 候选集。</p></div>
+            <div className="mt-4 space-y-3">
+              {betaSamples.length === 0 ? <EmptyState text="当前没有待复核样本。可先从真实运行事件中提取。" /> : betaSamples.map((sample) => (
+                <article key={sample.id} className="flex flex-col gap-3 rounded-2xl border border-emerald-100 bg-emerald-50/35 p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><strong className="text-sm text-gray-900">{sample.sample_type}</strong><span className="rounded-full bg-white px-2 py-0.5 text-[10px] text-gray-500">{sample.pseudonymous_user_key}</span></div><p className="mt-1 text-[11px] leading-5 text-gray-500">{sample.redacted_summary}</p></div>
+                  <div className="flex shrink-0 gap-2"><button onClick={() => void reviewBetaSample(sample, "dismissed")} disabled={busy != null} className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-600 disabled:opacity-40">排除</button><button onClick={() => void reviewBetaSample(sample, "confirmed")} disabled={busy != null} className="rounded-xl bg-emerald-600 px-3 py-2 text-xs font-semibold text-white disabled:opacity-40">确认案例</button></div>
+                </article>
+              ))}
+            </div>
+          </section>
         </div>
       )}
 
       {view === "overview" && <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
-          label="Agent 调用"
-          value={String(overview?.metrics.invocation_count ?? 0)}
-          note={`成功率 ${percent(overview?.metrics.success_rate)}`}
+          label="用户价值证据"
+          value={productStatusLabel}
+          note={productValidation ? `${productValidation.consented_user_count} 位授权用户 · 点击查看明细` : "尚未生成产品验证数据"}
+          icon={HeartPulse}
+          tone="emerald"
+          href="/admin/product"
+        />
+        <StatCard
+          label="系统运行"
+          value={HEALTH_LABEL[health] ?? health}
+          note={`${overview?.metrics.invocation_count ?? 0} 次调用 · 成功率 ${percent(overview?.metrics.success_rate)}`}
           icon={Activity}
           tone="indigo"
         />
         <StatCard
-          label="建议有效性"
-          value={percent(overview?.metrics.helpful_rate)}
-          note={`${overview?.metrics.proposal_count ?? 0} 条建议已进入审阅流程`}
-          icon={CheckCircle2}
-          tone="emerald"
-        />
-        <StatCard
-          label="离线评估"
-          value={percent(latestEvaluation?.summary_metrics.pass_rate)}
-          note={`${latestEvaluation?.summary_metrics.passed ?? 0}/${latestEvaluation?.summary_metrics.total ?? 0} 个基准案例通过`}
-          icon={FlaskConical}
+          label="当前灰度发布"
+          value={canary ? (CANARY_STATUS[canary.status] ?? canary.status) : "尚未发布"}
+          note={canary ? `当前阶段 ${canary.current_stage === "internal" ? "内部试用" : `${canary.current_stage}%`}` : "通过质量门禁后才能开始放量"}
+          icon={Gauge}
           tone="violet"
         />
         <StatCard
-          label="反馈学习事件"
-          value={String(overview?.feedback_learning.event_count ?? 0)}
-          note={`${overview?.feedback_learning.delayed_outcome_count ?? 0} 条延迟效果已归因`}
-          icon={RotateCcw}
+          label="需要处理"
+          value={`${overview?.monitoring.open_incidents.length ?? 0} 项`}
+          note={(overview?.monitoring.open_incidents.length ?? 0) > 0 ? "有运行异常等待处理" : `最近离线评估 ${percent(latestEvaluation?.summary_metrics.pass_rate)}`}
+          icon={AlertTriangle}
           tone="amber"
         />
       </div>}
@@ -727,7 +998,7 @@ export default function AgentOperationsPage() {
           <div>
             <div className="flex items-center gap-2">
               <ShieldCheck size={18} className="text-violet-600" />
-              <h2 className="text-base font-semibold text-gray-900">生产 Canary 发布</h2>
+              <h2 className="text-base font-semibold text-gray-900">生产灰度发布</h2>
             </div>
             <p className="mt-1 text-xs text-gray-500">离线门禁通过后，按内部、1%、5%、20%、50%、100% 逐级放量。</p>
           </div>
@@ -735,7 +1006,7 @@ export default function AgentOperationsPage() {
             {offlineGates[0] ? (
               <button type="button" data-testid="latest-production-gate" onClick={openGateHistory} className="group min-w-[270px] rounded-lg px-1.5 py-1 text-right transition hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300">
                 <span className={cn("flex items-center justify-end gap-2 text-[11px] font-semibold", offlineGates[0].status === "passed" ? "text-emerald-700" : "text-red-700")}>
-                  {offlineGates[0].status === "passed" ? "允许进入 Canary" : "已阻止发布"}
+                  {offlineGates[0].status === "passed" ? "允许进入灰度发布" : "已阻止发布"}
                   <span className="text-sm font-semibold text-gray-400 transition group-hover:text-emerald-700">→</span>
                 </span>
                 <span className="mt-1 flex items-baseline justify-end gap-1 whitespace-nowrap text-[11px]">
@@ -788,7 +1059,7 @@ export default function AgentOperationsPage() {
               </div>
 
               <div className={cn("rounded-2xl border p-4", canary.status === "running" ? "border-violet-200 bg-violet-50" : canary.status === "paused" ? "border-amber-200 bg-amber-50" : canary.status === "completed" ? "border-emerald-100 bg-emerald-50" : "border-red-100 bg-red-50")}>
-                <span className="text-[10px] font-semibold uppercase tracking-[.12em] text-gray-500">Release status</span>
+                <span className="text-xs font-semibold text-gray-500">发布状态</span>
                 <div className="mt-3 text-xl font-semibold text-gray-900">{CANARY_STATUS[canary.status] ?? canary.status}</div>
                 <p className="mt-2 text-xs leading-5 text-gray-500">{canary.status === "running" ? `正在向${canary.current_stage === "internal" ? "内部用户" : `${canary.current_stage}% 用户`}开放，等待观测窗口完成。` : canary.status === "rolled_back" ? "本次发布已停止，生产流量已恢复到基线版本。" : canary.status === "paused" ? "流量放量已暂停，可在确认指标后继续或回滚。" : "本次渐进发布已完成全部阶段。"}</p>
               </div>
@@ -802,7 +1073,7 @@ export default function AgentOperationsPage() {
             ) : (
               <div className="mt-4 flex flex-col gap-4 rounded-2xl border border-dashed border-violet-200 bg-white/70 p-5 sm:flex-row sm:items-center">
                 <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-violet-100 text-violet-600"><Activity size={19} /></span>
-                <div className="min-w-0 flex-1"><h3 className="text-sm font-semibold text-gray-800">尚未形成真实观测窗口</h3><p className="mt-1 text-xs leading-5 text-gray-400">不再展示六个重复的“暂无数据”指标。Canary 产生真实流量后，这里会自动拆分为效果指标和风险护栏。</p></div>
+                <div className="min-w-0 flex-1"><h3 className="text-sm font-semibold text-gray-800">尚未形成真实观测窗口</h3><p className="mt-1 text-xs leading-5 text-gray-400">灰度发布产生真实流量后，这里会自动显示效果指标和风险护栏。</p></div>
                 <div className="flex shrink-0 gap-4 rounded-xl bg-gray-50 px-4 py-3 text-center"><div><strong className="block text-sm text-gray-800">{canary.observations.exposures}</strong><span className="text-[9px] text-gray-400">暴露</span></div><div><strong className="block text-sm text-gray-800">{canary.observations.decisions}</strong><span className="text-[9px] text-gray-400">决策</span></div><div><strong className="block text-sm text-gray-800">{canary.observations.outcomes}</strong><span className="text-[9px] text-gray-400">结果</span></div></div>
               </div>
             )}
@@ -813,16 +1084,16 @@ export default function AgentOperationsPage() {
                 <div><p className="text-xs font-semibold text-gray-700">{canary.status === "paused" ? "当前已暂停：确认指标后可继续放量" : canary.advance_ready ? "满足下一阶段条件" : `暂不可升阶：${canary.advance_blockers.join("、") || "当前发布状态不支持升阶"}`}</p><p className="mt-1 text-[10px] text-gray-400">校准状态：{overview.calibration.status === "insufficient_data" ? "数据积累中" : overview.calibration.status === "analysis_ready" ? "可离线分析" : "可创建新版本"}</p></div>
               </div>
               {user?.is_admin && ["running", "paused"].includes(canary.status) && <div className="flex shrink-0 flex-wrap gap-2">{canary.status === "running" && <button onClick={() => void canaryAction("pause")} disabled={busy != null} className="rounded-xl border border-amber-200 bg-white px-3 py-2 text-xs font-semibold text-amber-700 transition hover:bg-amber-50 disabled:opacity-40">暂停放量</button>}{canary.status === "paused" && <button data-testid="resume-canary" onClick={() => void canaryAction("resume")} disabled={busy != null} className="rounded-xl bg-violet-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-violet-700 disabled:opacity-40">{busy === "canary:resume" ? "恢复中…" : "继续放量"}</button>}<button data-testid="rollback-canary" onClick={() => void canaryAction("rollback")} disabled={busy != null} className="rounded-xl border border-red-200 bg-white px-3 py-2 text-xs font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-40">回滚到基线</button></div>}
-              {user?.is_admin && ["rolled_back", "completed"].includes(canary.status) && <button data-testid="create-canary" onClick={() => void createCanary()} disabled={busy != null || !offlineGates.some((row) => row.status === "passed")} className="shrink-0 rounded-xl bg-violet-600 px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-40">{busy === "create-canary" ? "创建中…" : "创建下一次 Coach Canary"}</button>}
+              {user?.is_admin && ["rolled_back", "completed"].includes(canary.status) && <button data-testid="create-canary" onClick={() => void createCanary()} disabled={busy != null || !offlineGates.some((row) => row.status === "passed")} className="shrink-0 rounded-xl bg-violet-600 px-4 py-2.5 text-xs font-semibold text-white disabled:opacity-40">{busy === "create-canary" ? "创建中…" : "创建下一次灰度发布"}</button>}
             </div>
           </>
         ) : (
           <div className="mt-5 rounded-2xl border border-dashed border-violet-200 bg-white/70 p-5 text-center">
-            <p className="text-sm font-medium text-gray-700">当前没有 Coach Canary</p>
+            <p className="text-sm font-medium text-gray-700">当前没有学习建议灰度发布</p>
             <p className="mt-1 text-xs text-gray-400">最近生产门禁：{offlineGates[0] ? `${offlineGates[0].status === "passed" ? "已通过" : "未通过"} · ${offlineGates[0].metrics.total} 个案例` : "尚未运行"}</p>
             {user?.is_admin && (
               <button data-testid="create-canary" onClick={() => void createCanary()} disabled={busy != null || !offlineGates.some((row) => row.status === "passed")} className="mt-4 rounded-xl bg-violet-600 px-4 py-2 text-xs font-semibold text-white disabled:opacity-40">
-                {busy === "create-canary" ? "创建中…" : "创建 Coach Canary"}
+                {busy === "create-canary" ? "创建中…" : "创建学习建议灰度发布"}
               </button>
             )}
           </div>
@@ -836,7 +1107,7 @@ export default function AgentOperationsPage() {
               <ShieldCheck size={17} className="text-emerald-600" />
               <div>
                 <h2 className="text-base font-semibold text-gray-900">生产门禁记录</h2>
-                <p className="text-xs text-gray-500">Canary 发布前的质量判定和基准数据版本，历史记录集中在这里。</p>
+                <p className="text-xs text-gray-500">灰度发布前的质量判定和基准数据版本，历史记录集中在这里。</p>
               </div>
             </div>
             <ChevronDown size={18} className="shrink-0 text-gray-400" />
@@ -861,12 +1132,51 @@ export default function AgentOperationsPage() {
         </details>
       )}
 
+      {view === "overview" && overview?.model_roles && (
+        <section className="pp-admin-panel pp-admin-panel-indigo mt-5 rounded-3xl border border-gray-100 bg-white p-5 shadow-[var(--shadow-xs)]" data-testid="runtime-model-roles">
+          <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-end">
+            <div>
+              <h2 className="text-base font-semibold text-gray-900">实际模型路由</h2>
+              <p className="mt-1 text-xs leading-5 text-gray-500">以当前实际运行配置为准；学习建议的发布修订只影响任务模型，不代表所有模型都会一起变化。</p>
+            </div>
+            <span className="text-[11px] font-medium text-gray-400">3 个生成角色 + 1 个向量角色</span>
+          </div>
+          <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            {(Object.keys(MODEL_ROLE_LABEL) as Array<keyof typeof MODEL_ROLE_LABEL>).map((roleKey) => {
+              const meta = MODEL_ROLE_LABEL[roleKey];
+              const role = overview.model_roles[roleKey];
+              const primaryName = role.primary_model || "未配置模型";
+              const fallbackName = role.fallback
+                ? `${ROUTE_LABEL[role.fallback] ?? role.fallback}${role.fallback_model ? ` · ${role.fallback_model}` : ""}`
+                : "无静默降级";
+              return (
+                <article key={roleKey} className={cn("rounded-2xl border p-4", meta.tone)}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-[11px] font-semibold uppercase tracking-[.12em]">{meta.name}</div>
+                      <div className="mt-1 text-sm font-semibold text-gray-900">{meta.description}</div>
+                    </div>
+                    <span className="rounded-full bg-white/80 px-2 py-1 text-[10px] font-semibold text-gray-500">并发 {role.max_concurrency}</span>
+                  </div>
+                  <p className="mt-3 min-h-10 text-[11px] leading-5 text-gray-500">{role.purpose}</p>
+                  <dl className="mt-3 space-y-2 border-t border-current/10 pt-3 text-[10px]">
+                    <div><dt className="text-gray-400">主路由</dt><dd className="mt-0.5 break-words font-semibold text-gray-700">{ROUTE_LABEL[role.primary] ?? role.primary} · {primaryName}</dd></div>
+                    <div><dt className="text-gray-400">回退</dt><dd className="mt-0.5 break-words font-medium text-gray-600">{fallbackName}</dd></div>
+                  </dl>
+                  <p className="mt-3 border-t border-current/10 pt-3 text-[10px] leading-4 text-gray-500">{role.fallback_policy}</p>
+                </article>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
       {view === "overview" && <div className="mt-5 grid gap-5 xl:grid-cols-[1.05fr_0.95fr]">
         <section id="strategy" className="pp-admin-panel pp-admin-panel-indigo scroll-mt-24 rounded-3xl border border-gray-100 bg-white p-5 shadow-[var(--shadow-xs)]">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h2 className="text-base font-semibold text-gray-900">当前生产策略</h2>
-              <p className="mt-1 text-xs text-gray-400">每次生成建议都会记录本次实际使用的版本。</p>
+              <h2 className="text-base font-semibold text-gray-900">学习建议生产策略</h2>
+              <p className="mt-1 text-xs text-gray-400">只管理需要用户确认的计划和行动建议；每次调用都会记录实际使用的模型。</p>
             </div>
             <button type="button" onClick={() => setStrategyModalOpen(true)} className="flex items-center gap-1.5 rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-700 transition hover:border-indigo-200 hover:bg-indigo-100">
               <Settings2 size={14} />管理策略 · 修订 {overview?.strategy.deployment_revision ?? "—"}
@@ -875,7 +1185,7 @@ export default function AgentOperationsPage() {
           <div className="mt-5 grid gap-3 sm:grid-cols-3">
             {[
               ["提示词", overview?.strategy.prompt],
-              ["模型", overview?.strategy.model],
+              ["任务主模型", overview?.strategy.model],
               ["安全策略", overview?.strategy.policy],
             ].map(([label, value]) => (
               <button type="button" onClick={() => setStrategyModalOpen(true)} key={label} className="group rounded-2xl bg-gray-50 p-4 text-left transition hover:-translate-y-0.5 hover:shadow-sm">

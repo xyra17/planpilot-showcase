@@ -7,7 +7,7 @@ test.skip(
   "Set PLANPILOT_E2E=1 when the real Docker backend and frontend are running"
 );
 
-test("管理员完成生产门禁、Canary 创建与受控回滚", async ({ page }) => {
+test("管理员查看运营总览并完成灰度发布与受控回滚", async ({ page }) => {
   const unique = Date.now().toString();
   const username = `canary${unique}`.slice(0, 28);
   const email = `canary-${unique}@example.com`;
@@ -61,12 +61,17 @@ test("管理员完成生产门禁、Canary 创建与受控回滚", async ({ page
     (element) => window.getComputedStyle(element).backgroundColor
   );
   expect(adminCanvas).toBe("rgb(243, 245, 248)");
-  await expect(page.getByRole("heading", { name: "生产运营总览" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "运营决策总览" })).toBeVisible();
+  await expect(page.getByTestId("runtime-model-roles")).toBeVisible();
+  await expect(page.getByTestId("runtime-model-roles").getByText("对话模型", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("runtime-model-roles").getByText("任务模型", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("runtime-model-roles").getByText("安全判断模型", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("runtime-model-roles").getByText("知识检索模型", { exact: true })).toBeVisible();
   await expect(page.getByTestId("production-canary-dashboard")).toHaveCount(0);
 
-  await page.getByRole("link", { name: "Canary 发布" }).click();
+  await page.getByRole("link", { name: "灰度发布" }).click();
   await expect(page).toHaveURL(/\/admin\/canary$/);
-  await expect(page.getByRole("heading", { name: "Canary 发布管理" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "灰度发布管理" })).toBeVisible();
   await expect(page.getByTestId("production-canary-dashboard")).toBeVisible();
   await page.getByTestId("run-production-gate").click();
   await expect(page.getByText(/104\/104 个基准案例通过/)).toBeVisible({

@@ -75,12 +75,13 @@ class CognitiveProfileBuilder:
         user_id: str,
         *,
         window_days: int = DEFAULT_WINDOW_DAYS,
+        as_of: datetime | None = None,
     ) -> dict[str, int]:
         consent = await db.get(UserDataConsent, user_id)
         if consent is not None and not consent.personalization_enabled:
             return {"goal_count": 0}
         sensitive_enabled = bool(consent and consent.sensitive_inference_enabled)
-        now = utc_now()
+        now = as_of or utc_now()
         goals = list(
             (
                 await db.execute(
@@ -158,6 +159,7 @@ class CognitiveProfileBuilder:
         event_stmt = select(LearningEvent).where(
             LearningEvent.user_id == user_id,
             LearningEvent.occurred_at >= since,
+            LearningEvent.occurred_at <= now,
         )
         task_stmt = select(Task).join(Goal, Task.goal_id == Goal.id).where(Goal.user_id == user_id)
         mastery_stmt = (
@@ -205,6 +207,17 @@ class CognitiveProfileBuilder:
             profile,
             now,
             sensitive_enabled=sensitive_enabled,
+        )
+        evidence_times = [row.occurred_at for row in events if row.occurred_at]
+        observed_span_days = (
+            float((max(evidence_times).date() - min(evidence_times).date()).days + 1)
+            if evidence_times
+            else 0.0
+        )
+        # A 60-day history cannot justify 90-day confidence.  Keep supported
+        # metrics, but calibrate confidence to the actually observed span.
+        metrics["confidence"] = round(
+            min(float(metrics["confidence"]), observed_span_days / max(1, window_days)), 4
         )
         row = await cls.get_profile(db, user_id, goal_id)
         if row is None:
@@ -312,11 +325,10 @@ class CognitiveProfileBuilder:
             "recovery_score": round(len(recovered) / len(negative_by_task), 4)
             if negative_by_task
             else None,
-            "difficulty_preference": round(
-                clamp(
-                    (avg_completed_mins or session_reference) / max(1.0, session_reference * 1.5)
-                ),
-                4,
+            "difficulty_preference": (
+                round(clamp(avg_completed_mins / max(1.0, session_reference * 1.5)), 4)
+                if avg_completed_mins is not None
+                else None
             ),
             "challenge_tolerance": sensitive_metrics.get("challenge_tolerance"),
             "feedback_acceptance": sensitive_metrics.get("feedback_acceptance"),

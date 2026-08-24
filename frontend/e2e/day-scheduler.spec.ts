@@ -13,6 +13,12 @@ import {
 const colors = ["#6657d9", "#7184df"];
 const availability = [{ startMinute: 9 * 60, endMinute: 11 * 60 }];
 
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    window.sessionStorage.setItem("planpilot:guest-home-intro-seen:v1", "1");
+  });
+});
+
 function task(id: string, durationMinutes: number, priority = "普通优先级"): DayScheduleTask {
   return {
     id,
@@ -327,6 +333,7 @@ test("首页自动规划读取设置页保存的逐日可用时段", async ({ pa
 
   await page.clock.setFixedTime(fixedMorning);
   await page.addInitScript(({ date, weekly }) => {
+    window.sessionStorage.setItem("planpilot:guest-home-intro-seen:v1", "1");
     window.localStorage.setItem("planpilot-v2-weekly-availability", JSON.stringify(weekly));
     window.localStorage.setItem("planpilot-v2-tasks", JSON.stringify([{
       id: 1,
@@ -344,12 +351,78 @@ test("首页自动规划读取设置页保存的逐日可用时段", async ({ pa
 
   await page.goto("/studio/work");
   const panel = page.locator(".today-panel");
+  const taskModeActions = await panel.locator(".today-plan-actions button").evaluateAll((buttons) => buttons.map((button) => ({
+    label: button.textContent?.trim(),
+    horizontalOverflow: button.scrollWidth - button.clientWidth,
+  })));
+  expect(taskModeActions).toEqual(expect.arrayContaining([
+    expect.objectContaining({ label: "时间规划", horizontalOverflow: 0 }),
+    expect.objectContaining({ label: "添加任务", horizontalOverflow: 0 }),
+  ]));
   await panel.getByRole("button", { name: "打开时间规划" }).click();
-  await panel.getByRole("button", { name: "自动规划" }).click();
 
   const planner = panel.getByRole("dialog", { name: "自动规划今天的任务" });
   await expect(planner.locator(".today-schedule-planner-availability")).toContainText("14:00–15:30");
-  await expect(planner.getByText("14:00–14:30")).toBeVisible();
+  await expect(planner.getByText(/14:00–14:/)).toBeVisible();
+});
+
+test("自动规划无剩余时间时三段状态沿同一信息轴排列", async ({ page }) => {
+  await page.setViewportSize({ width: 1024, height: 768 });
+  const fixedEvening = new Date(2026, 7, 24, 20);
+  const isoDate = "2026-08-24";
+  await page.clock.setFixedTime(fixedEvening);
+  await page.addInitScript(({ date }) => {
+    window.sessionStorage.setItem("planpilot:guest-home-intro-seen:v1", "1");
+    const weekly = Object.fromEntries(
+      ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].map((day) => [day, day === "mon" ? [{ start: "09:00", end: "10:00" }] : []]),
+    );
+    window.localStorage.setItem("planpilot-v2-weekly-availability", JSON.stringify(weekly));
+    window.localStorage.setItem("planpilot-v2-tasks", JSON.stringify([
+      { id: 1, goalId: "1", date, title: "晚间复盘", goal: "测试目标", duration: "40 分钟", time: "待安排", done: false, priority: "核心" },
+      { id: 2, goalId: "1", date, title: "整理错题", goal: "测试目标", duration: "30 分钟", time: "待安排", done: false, priority: "普通优先级" },
+    ]));
+    window.localStorage.removeItem(`planpilot.technology.schedule.${date}`);
+  }, { date: isoDate });
+
+  await page.goto("/studio/work");
+  const panel = page.locator(".today-panel");
+  await panel.getByRole("button", { name: "打开时间规划" }).click();
+
+  const planner = panel.getByRole("dialog", { name: "自动规划今天的任务" });
+  await expect(planner.getByText("今天剩余的可用时段不足以安排任务", { exact: true })).toBeVisible();
+  await expect(planner.getByText("2 项暂未排入，可切换节奏比较结果", { exact: true })).toBeVisible();
+  await expect(planner.getByText("今天已没有剩余可用时间", { exact: true })).toBeVisible();
+
+  const alignment = await planner.evaluate((dialog) => {
+    const empty = dialog.querySelector(".today-schedule-planner-empty")!;
+    const unresolved = dialog.querySelector(".today-schedule-planner-unresolved")!;
+    const availability = dialog.querySelector(".today-schedule-planner-availability")!;
+    const rect = (selector: string, root: Element) => root.querySelector(selector)!.getBoundingClientRect();
+    const emptyText = rect("span", empty);
+    const unresolvedText = rect("span", unresolved);
+    const availabilityLabel = rect("span", availability);
+    return {
+      statusTextLefts: [emptyText.left, unresolvedText.left],
+      availabilityLeft: availabilityLabel.left,
+      footerLeft: dialog.querySelector("footer")!.getBoundingClientRect().left,
+      emptyBottom: empty.getBoundingClientRect().bottom,
+      unresolvedTop: unresolved.getBoundingClientRect().top,
+      unresolvedBottom: unresolved.getBoundingClientRect().bottom,
+      availabilityTop: availability.getBoundingClientRect().top,
+      unresolvedTopDivider: getComputedStyle(unresolved).borderTopWidth,
+      unresolvedBottomDivider: getComputedStyle(unresolved).borderBottomWidth,
+      availabilityIconCount: availability.querySelectorAll("svg").length,
+      horizontalOverflow: dialog.scrollWidth - dialog.clientWidth,
+    };
+  });
+  expect(Math.max(...alignment.statusTextLefts) - Math.min(...alignment.statusTextLefts)).toBeLessThanOrEqual(1);
+  expect(Math.abs(alignment.availabilityLeft - alignment.footerLeft)).toBeLessThanOrEqual(1);
+  expect(alignment.emptyBottom).toBeLessThanOrEqual(alignment.unresolvedTop);
+  expect(alignment.unresolvedBottom).toBeLessThanOrEqual(alignment.availabilityTop);
+  expect(alignment.unresolvedTopDivider).toBe("0px");
+  expect(alignment.unresolvedBottomDivider).toBe("1px");
+  expect(alignment.availabilityIconCount).toBe(0);
+  expect(alignment.horizontalOverflow).toBeLessThanOrEqual(1);
 });
 
 test("卡片内规划面板实时预览节奏并在应用后更新安排", async ({ page }) => {
@@ -362,22 +435,39 @@ test("卡片内规划面板实时预览节奏并在应用后更新安排", async
   ].join("-");
   await page.clock.setFixedTime(fixedMorning);
   await page.addInitScript(({ tasks, schedule, date }) => {
+    window.sessionStorage.setItem("planpilot:guest-home-intro-seen:v1", "1");
+    window.localStorage.setItem("planpilot:guest-dataset-version", "4");
     window.localStorage.setItem("planpilot-v2-tasks", JSON.stringify(tasks));
     window.localStorage.setItem(`planpilot.technology.schedule.${date}`, JSON.stringify(schedule));
   }, {
     date: isoDate,
     tasks: [
-      { id: 1, goalId: "1", date: isoDate, title: "已有任务", goal: "测试目标", duration: "40 分钟", time: "09:00", done: false, priority: "核心" },
       { id: 2, goalId: "1", date: isoDate, title: "会话管理接口", goal: "测试目标", duration: "40 分钟", time: "待安排", done: false, priority: "普通优先级" },
+      { id: 1, goalId: "1", date: isoDate, title: "已有任务", goal: "测试目标", duration: "40 分钟", time: "09:00", done: false, priority: "核心" },
     ],
     schedule: [block("1", 9, 40)],
   });
 
   await page.goto("/studio/work");
   const panel = page.locator(".today-panel");
-  await panel.getByRole("button", { name: "打开时间规划" }).click();
-  await expect(panel.locator(".today-schedule-row")).toHaveCount(1);
-  await panel.getByRole("button", { name: "自动规划" }).click();
+  await expect(panel.getByRole("button", { name: "重新规划" })).toBeVisible();
+  await expect(panel.locator(".task-elapsed-progress")).toHaveCount(1);
+  await expect(panel.locator(".task-item").first()).toContainText("已有任务");
+  await expect(panel.locator(".task-item").nth(1)).toContainText("会话管理接口");
+  await expect(panel.locator(".task-schedule-rail.is-scheduled")).toHaveCSS("width", "4px");
+  await expect(panel.locator(".task-elapsed-progress").first().locator(".task-elapsed-bar")).toBeVisible();
+  await expect(panel.locator(".task-elapsed-progress").first().locator(".task-elapsed-bar em")).toHaveCount(0);
+  await expect(panel.locator(".task-elapsed-progress").first().locator("i")).toHaveCSS("width", "72px");
+  await expect(panel.locator(".task-meta.is-scheduled").first()).toHaveCSS("transform", "matrix(1, 0, 0, 1, -4, 0)");
+  await expect(panel.locator(".task-elapsed-progress").first()).toHaveCSS("cursor", "default");
+  await expect(panel.locator(".task-elapsed-progress").first().locator(".task-elapsed-copy")).toHaveCSS("font-size", "11px");
+  await expect(panel.locator(".task-elapsed-progress").first().locator(".task-elapsed-copy")).toBeHidden();
+  await panel.locator(".task-elapsed-progress").first().hover();
+  await expect(panel.locator(".task-elapsed-progress").first().locator(".task-elapsed-bar")).toBeHidden();
+  await expect(panel.locator(".task-elapsed-progress").first().locator(".task-elapsed-copy")).toBeVisible();
+  await expect(panel.locator(".task-open-button").first()).toHaveAttribute("title", /跳转到目标详情/);
+  await expect(panel.locator(".today-schedule-row")).toHaveCount(0);
+  await panel.getByRole("button", { name: "重新规划" }).click();
 
   const planner = panel.getByRole("dialog", { name: "自动规划今天的任务" });
   await expect(planner).toBeVisible();
@@ -413,10 +503,11 @@ test("卡片内规划面板实时预览节奏并在应用后更新安排", async
   await expect(balancedTooltip).toHaveCSS("opacity", "1");
   expect(Number.parseInt(await balancedTooltip.evaluate((tooltip) => getComputedStyle(tooltip).zIndex), 10)).toBeGreaterThanOrEqual(100);
   const availability = planner.locator(".today-schedule-planner-availability");
-  await expect(availability).toContainText("今天可用");
+  await expect(availability).toContainText("今日可用时段");
   await expect(planner.getByText("安排预览", { exact: true })).toHaveCount(0);
   await expect(planner.getByText(/个时间块$/)).toHaveCount(0);
-  await expect(availability).toHaveCSS("border-top-width", "1px");
+  await expect(availability).toHaveCSS("border-top-width", "0px");
+  await expect(availability.locator("svg")).toHaveCount(0);
   const applyButton = planner.getByRole("button", { name: "应用", exact: true });
   const cancelButton = planner.getByRole("button", { name: "取消", exact: true });
   await expect(applyButton).toHaveCSS("min-height", "30px");
@@ -433,31 +524,40 @@ test("卡片内规划面板实时预览节奏并在应用后更新安排", async
       previewBottom: preview.bottom,
       availabilityTop: available.top,
       availabilityBottom: available.bottom,
+      availabilityCenter: available.top + available.height / 2,
       footerTop: footer.top,
       cancelTop: cancel.top,
       applyTop: apply.top,
+      actionsCenter: (cancel.top + Math.max(cancel.height, apply.height) / 2),
       cancelHeight: cancel.height,
       applyHeight: apply.height,
     };
   });
   expect(footerOrder.previewBottom).toBeLessThanOrEqual(footerOrder.availabilityTop);
-  expect(footerOrder.availabilityBottom).toBeLessThanOrEqual(footerOrder.footerTop);
+  expect(footerOrder.availabilityTop).toBeGreaterThanOrEqual(footerOrder.footerTop);
   expect(Math.abs(footerOrder.cancelTop - footerOrder.applyTop)).toBeLessThanOrEqual(1);
+  expect(Math.abs(footerOrder.availabilityCenter - footerOrder.actionsCenter)).toBeLessThanOrEqual(2);
   expect(Math.abs(footerOrder.cancelHeight - footerOrder.applyHeight)).toBeLessThanOrEqual(2);
   await expect(planner.getByText("09:50–10:30")).toBeVisible();
-  await expect(panel.locator(".today-schedule-row")).toHaveCount(1);
+  await expect(panel.locator(".task-item").first()).toContainText("09:00–09:40");
 
   await planner.getByRole("button", { name: /紧凑/ }).click();
   await expect(planner.getByText("09:40–10:20")).toBeVisible();
   await applyButton.click();
 
-  await expect(panel.locator(".today-schedule-row")).toHaveCount(2);
-  await expect(panel.locator(".today-schedule-row").first()).toContainText("09:00–09:40");
-  await expect(panel.getByText("已按紧凑方式生成安排，请确认后保存。")).toBeVisible();
+  await expect(panel.locator(".today-schedule-row")).toHaveCount(0);
+  await expect(panel.locator(".task-item").first()).toContainText("09:00–09:40");
+  await expect(panel.locator(".task-item").nth(1)).toContainText("09:40–10:20");
+  await expect(panel.locator(".task-elapsed-progress")).toHaveCount(2);
+  await expect(panel.locator(".task-priority-picker")).toHaveCount(0);
+  const taskRowHeights = await panel.locator(".task-item").evaluateAll((rows) => rows.map((row) => row.getBoundingClientRect().height));
+  expect(Math.max(...taskRowHeights) - Math.min(...taskRowHeights)).toBeLessThanOrEqual(1);
+  await expect(panel.getByText(/已按紧凑方式|时间安排已同步/)).toBeVisible();
+  await expect(panel.getByRole("button", { name: "重新规划" })).toBeVisible();
   await expect(planner).toHaveCount(0);
 });
 
-test("空状态中的待安排入口打开自动规划面板", async ({ page }) => {
+test("任务列表中的时间规划入口打开自动规划面板", async ({ page }) => {
   const today = new Date();
   const fixedMorning = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 8);
   const isoDate = [
@@ -467,6 +567,8 @@ test("空状态中的待安排入口打开自动规划面板", async ({ page }) 
   ].join("-");
   await page.clock.setFixedTime(fixedMorning);
   await page.addInitScript(({ date }) => {
+    window.sessionStorage.setItem("planpilot:guest-home-intro-seen:v1", "1");
+    window.localStorage.setItem("planpilot:guest-dataset-version", "4");
     const tasks = Array.from({ length: 7 }, (_, index) => ({
       id: index + 1,
       goalId: "1",
@@ -484,12 +586,11 @@ test("空状态中的待安排入口打开自动规划面板", async ({ page }) 
 
   await page.goto("/studio/work");
   const panel = page.locator(".today-panel");
+  await expect(panel.getByRole("button", { name: "添加任务" })).toBeVisible();
   await panel.getByRole("button", { name: "打开时间规划" }).click();
-  const emptyState = panel.locator(".today-schedule-empty");
-  await expect(emptyState).toBeVisible();
-  expect((await emptyState.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(180);
-  await emptyState.getByRole("button", { name: "7 项任务待安排" }).click();
   await expect(panel.getByRole("dialog", { name: "自动规划今天的任务" })).toBeVisible();
+  await expect(panel.locator(".today-schedule-view")).toHaveCount(0);
+  await expect(panel.locator(".today-schedule-empty")).toHaveCount(0);
 });
 
 test("账号时区跨午夜后自动刷新今日日期", async ({ page }) => {

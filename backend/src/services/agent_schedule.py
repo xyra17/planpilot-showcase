@@ -2,17 +2,21 @@ from __future__ import annotations
 
 import re
 import uuid
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from typing import Any
 
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.core.agent_v2.schemas import ChangeOperation, ChangeSet
+from src.core.agent_v2.schemas import ActionIntent, ChangeOperation, ChangeSet
 from src.core.time import utc_now
 from src.events.publisher import emit
-from src.models import Goal, Task
+from src.models import CheckinRecord, Goal, Task
+from src.services.learning_lifecycle_service import (
+    emit_recovery_completed_if_applicable,
+    emit_task_started_if_missing,
+)
 
 WEEKDAY_NAMES = {
     0: "周一",
@@ -103,15 +107,27 @@ def _task_snapshot(task: Task) -> dict[str, Any]:
     return {
         "id": task.id,
         "goal_id": task.goal_id,
+        "plan_id": task.plan_id,
         "title": task.title,
         "description": task.description,
         "estimated_mins": task.estimated_mins,
+        "actual_mins": task.actual_mins,
         "status": task.status,
         "priority": task.priority,
         "scheduled_date": task.scheduled_date,
         "mastery_level": task.mastery_level,
+        "type": task.type,
+        "kb_refs": list(task.kb_refs or []),
+        "stage_label": task.stage_label,
+        "sequence_in_plan": task.sequence_in_plan,
+        "completed_at": task.completed_at.isoformat() if task.completed_at else None,
         "version": task.version,
     }
+
+
+def _matches_snapshot(task: Task, expected: dict[str, Any]) -> bool:
+    actual = _task_snapshot(task)
+    return all(actual.get(key) == value for key, value in expected.items())
 
 
 def _normalized_create_snapshot(operation: ChangeOperation) -> dict[str, Any]:
@@ -166,16 +182,53 @@ def build_task_mutation_preview(
     goal_id: str | None,
     excluded_weekdays: list[int] | None = None,
     today: date | None = None,
+    action_intent: dict[str, Any] | ActionIntent | None = None,
 ) -> ChangeSet:
     reference_date = today or date.today()
     goals = context["goals"]
-    selected_goal = goal_id or (goals[0]["id"] if len(goals) == 1 else None)
     tasks = context["tasks"]
+    resolved_intent = (
+        action_intent
+        if isinstance(action_intent, ActionIntent)
+        else ActionIntent.model_validate(action_intent)
+        if action_intent
+        else None
+    )
+    if resolved_intent and not resolved_intent.complete:
+        raise ValueError("不能使用缺少关键参数的 ActionIntent 生成变更预览")
+
+    selected_goal = (
+        resolved_intent.goal_id
+        if resolved_intent
+        else goal_id or (goals[0]["id"] if len(goals) == 1 else None)
+    )
     quoted = re.findall(r"[“\"]([^”\"]+)[”\"]", request)
-    is_delete = any(term in request for term in ("删除任务", "删掉任务", "移除任务"))
-    is_complete = any(term in request for term in ("完成任务", "标记完成"))
-    is_create = any(term in request for term in ("新增", "创建", "添加"))
-    requested_date = _requested_date(request, today=reference_date)
+    effect = resolved_intent.requested_effect if resolved_intent else None
+    if resolved_intent:
+        # ActionIntent is the authoritative semantic contract. Re-reading the
+        # original sentence here can invert the resolved effect: for example,
+        # “把任务延两天；只创建待审批预览” is an update, not a task creation.
+        is_delete = effect == "delete"
+        is_complete = effect == "complete"
+        is_create = effect == "create"
+        requested_date = (
+            str(resolved_intent.constraints["scheduled_date"])
+            if resolved_intent.constraints.get("scheduled_date")
+            else None
+        )
+    else:
+        is_delete = any(term in request for term in ("删除任务", "删掉任务", "移除任务"))
+        is_complete = any(term in request for term in ("完成任务", "标记完成"))
+        is_create = any(term in request for term in ("新增", "创建", "添加"))
+        requested_date = _requested_date(request, today=reference_date)
+
+    resolved_refs = (
+        {ref.entity: ref for ref in resolved_intent.entity_refs} if resolved_intent else {}
+    )
+    resolved_task_id = resolved_refs.get("task").entity_id if resolved_refs.get("task") else None
+    resolved_title = (
+        str(resolved_intent.constraints.get("task_title", "")).strip() if resolved_intent else ""
+    )
 
     if is_create:
         if not selected_goal:
@@ -184,7 +237,12 @@ def build_task_mutation_preview(
                 warnings=["创建任务必须关联一个目标，请在工作台选择目标后重试。"],
             )
         count = _requested_task_count(request)
-        base_title = quoted[0] if quoted else "复习任务"
+        base_title = resolved_title or (quoted[0] if quoted else "")
+        if not base_title or not requested_date:
+            return ChangeSet(
+                summary="创建任务所需信息不完整",
+                warnings=["请明确任务标题和执行日期后再生成方案。"],
+            )
         available = next_week_dates(excluded_weekdays, today=reference_date) or [
             reference_date + timedelta(days=1)
         ]
@@ -203,6 +261,8 @@ def build_task_mutation_preview(
                 "priority": "medium",
                 "scheduled_date": scheduled,
                 "mastery_level": "unknown",
+                "type": "study",
+                "kb_refs": [],
                 "version": 1,
             }
             operations.append(
@@ -218,15 +278,18 @@ def build_task_mutation_preview(
             )
         return ChangeSet(summary=f"建议创建 {count} 项任务", operations=operations)
 
-    matches = [
-        task
-        for task in tasks
-        if (not selected_goal or task["goal_id"] == selected_goal)
-        and (
-            any(title in task["title"] or task["title"] in title for title in quoted)
-            or (not quoted and task["title"] in request)
-        )
-    ]
+    if resolved_intent:
+        matches = [task for task in tasks if task["id"] == resolved_task_id]
+    else:
+        matches = [
+            task
+            for task in tasks
+            if (not selected_goal or task["goal_id"] == selected_goal)
+            and (
+                any(title in task["title"] or task["title"] in title for title in quoted)
+                or (not quoted and task["title"] in request)
+            )
+        ]
     if is_delete or is_complete or requested_date:
         if not matches:
             return ChangeSet(
@@ -238,13 +301,20 @@ def build_task_mutation_preview(
             snapshot = {
                 "id": raw["id"],
                 "goal_id": raw["goal_id"],
+                "plan_id": raw.get("plan_id"),
                 "title": raw["title"],
                 "description": raw.get("description"),
                 "estimated_mins": raw["estimated_minutes"],
+                "actual_mins": raw.get("actual_mins"),
                 "status": raw["status"],
                 "priority": raw["priority"],
                 "scheduled_date": raw["date"],
                 "mastery_level": raw.get("mastery_level", "unknown"),
+                "type": raw.get("type", "study"),
+                "kb_refs": list(raw.get("kb_refs") or []),
+                "stage_label": raw.get("stage_label"),
+                "sequence_in_plan": raw.get("sequence_in_plan"),
+                "completed_at": raw.get("completed_at"),
                 "version": int(raw.get("version", 1)),
             }
             if is_delete:
@@ -304,9 +374,155 @@ async def apply_task_changes(
         "status",
         "priority",
         "scheduled_date",
+        "type",
+        "kb_refs",
     }
     applied: list[dict[str, Any]] = []
     for operation in change_set.operations:
+        if operation.entity == "checkin":
+            if operation.field != "__upsert__":
+                raise HTTPException(400, "变更集中包含不受支持的打卡写操作")
+            snapshot = dict(operation.after or {})
+            goal = await db.scalar(
+                select(Goal).where(Goal.id == snapshot.get("goal_id"), Goal.user_id == user_id)
+            )
+            if goal is None:
+                raise HTTPException(404, "打卡关联目标不存在")
+            row = await db.scalar(
+                select(CheckinRecord).where(
+                    CheckinRecord.user_id == user_id,
+                    CheckinRecord.goal_id == goal.id,
+                    CheckinRecord.date == snapshot.get("date"),
+                )
+            )
+            if row is not None:
+                actual = {
+                    "id": row.id,
+                    "goal_id": row.goal_id,
+                    "date": row.date,
+                    "mode": row.mode,
+                    "natural_text": row.natural_text,
+                    "completion_rate": row.completion_rate,
+                }
+                if all(actual.get(key) == value for key, value in snapshot.items()):
+                    applied.append({**operation.model_dump(), "already_applied": True})
+                    continue
+                before = dict(operation.before or {}) if operation.before else None
+                if before is None or any(actual.get(key) != value for key, value in before.items()):
+                    raise HTTPException(409, "打卡记录已发生变化，请重新生成预览")
+            if row is None:
+                row = CheckinRecord(
+                    id=operation.entity_id,
+                    user_id=user_id,
+                    goal_id=goal.id,
+                    date=str(snapshot["date"]),
+                    mode="natural",
+                    natural_text=str(snapshot.get("natural_text") or ""),
+                    completion_rate=float(snapshot["completion_rate"]),
+                    stats={},
+                    feedback="",
+                )
+                db.add(row)
+            else:
+                row.mode = "natural"
+                row.natural_text = str(snapshot.get("natural_text") or "")
+                row.completion_rate = float(snapshot["completion_rate"])
+            await emit(
+                db,
+                user_id=user_id,
+                goal_id=goal.id,
+                aggregate_type="checkin",
+                aggregate_id=row.id,
+                event_type="CheckinRecorded",
+                source="ai_agent",
+                correlation_id=change_set.run_id,
+                causation_id=operation.source_step_id,
+                idempotency_key=f"agent-operation:{operation.operation_id}:apply",
+                payload={
+                    "date": row.date,
+                    "completion_rate": row.completion_rate,
+                    "mode": "natural",
+                },
+            )
+            applied.append(operation.model_dump())
+            continue
+        if operation.entity == "goal":
+            if operation.field == "__create__":
+                snapshot = dict(operation.after or {})
+                existing = await db.get(Goal, operation.entity_id)
+                if existing:
+                    if existing.user_id == user_id and all(
+                        getattr(existing, key, None) == value
+                        for key, value in snapshot.items()
+                        if key not in {"id", "version"}
+                    ):
+                        applied.append({**operation.model_dump(), "already_applied": True})
+                        continue
+                    raise HTTPException(409, "目标幂等键冲突")
+                goal = Goal(
+                    id=operation.entity_id,
+                    user_id=user_id,
+                    type=str(snapshot.get("type", "skill")),
+                    title=str(snapshot["title"]),
+                    deadline=str(snapshot["deadline"]),
+                    daily_hours=float(snapshot.get("daily_hours", 1)),
+                    current_level=str(snapshot.get("current_level", "beginner")),
+                    status=str(snapshot.get("status", "active")),
+                    meta=dict(snapshot.get("meta") or {}),
+                    version=int(snapshot.get("version", 1)),
+                )
+                db.add(goal)
+                await emit(
+                    db,
+                    user_id=user_id,
+                    goal_id=goal.id,
+                    aggregate_type="goal",
+                    aggregate_id=goal.id,
+                    event_type="GoalCreated",
+                    source="ai_agent",
+                    correlation_id=change_set.run_id,
+                    causation_id=operation.source_step_id,
+                    idempotency_key=f"agent-operation:{operation.operation_id}:apply",
+                    payload={**snapshot, "aggregate_version": 1},
+                )
+                applied.append(operation.model_dump())
+                continue
+            if operation.field != "daily_hours":
+                raise HTTPException(400, "变更集中包含不受支持的目标写操作")
+            goal = await db.scalar(
+                select(Goal).where(Goal.id == operation.entity_id, Goal.user_id == user_id)
+            )
+            if goal is None:
+                raise HTTPException(404, "目标不存在")
+            if goal.daily_hours == operation.after:
+                applied.append({**operation.model_dump(), "already_applied": True})
+                continue
+            expected_version = operation.precondition.get("version")
+            if expected_version is not None and goal.version != int(expected_version):
+                raise HTTPException(409, f"目标“{goal.title}”版本已变化，请重新生成方案")
+            if goal.daily_hours != operation.before:
+                raise HTTPException(409, f"目标“{goal.title}”已发生变化，请重新生成方案")
+            goal.daily_hours = float(operation.after)
+            await emit(
+                db,
+                user_id=user_id,
+                goal_id=goal.id,
+                aggregate_type="goal",
+                aggregate_id=goal.id,
+                event_type="GoalUpdated",
+                source="ai_agent",
+                correlation_id=change_set.run_id,
+                causation_id=operation.source_step_id,
+                idempotency_key=f"agent-operation:{operation.operation_id}:apply",
+                payload={
+                    "changed_fields": ["daily_hours"],
+                    "old_daily_hours": operation.before,
+                    "daily_hours": operation.after,
+                    "aggregate_version": goal.version + 1,
+                },
+            )
+            applied.append(operation.model_dump())
+            continue
         if operation.entity != "task" or operation.field not in {
             *allowed_fields,
             "__create__",
@@ -324,7 +540,7 @@ async def apply_task_changes(
                 raise HTTPException(404, "创建任务所关联的目标不存在")
             existing = await db.get(Task, operation.entity_id)
             if existing:
-                if _task_snapshot(existing) == snapshot:
+                if _matches_snapshot(existing, snapshot):
                     applied.append({**operation.model_dump(), "already_applied": True})
                     continue
                 raise HTTPException(409, "任务幂等键冲突")
@@ -339,6 +555,8 @@ async def apply_task_changes(
                     priority=snapshot.get("priority", "medium"),
                     scheduled_date=snapshot["scheduled_date"],
                     mastery_level=snapshot.get("mastery_level", "unknown"),
+                    type=snapshot.get("type", "study"),
+                    kb_refs=snapshot.get("kb_refs", []),
                     version=int(snapshot.get("version", 1)),
                 )
             )
@@ -380,7 +598,7 @@ async def apply_task_changes(
             raise HTTPException(409, f"任务“{task.title}”版本已变化，请重新生成方案")
         if operation.field == "__delete__":
             expected = dict(operation.before or {})
-            if expected and _task_snapshot(task) != expected:
+            if expected and not _matches_snapshot(task, expected):
                 raise HTTPException(409, f"任务“{task.title}”已发生变化，请重新生成方案")
             await emit(
                 db,
@@ -412,7 +630,21 @@ async def apply_task_changes(
             if operation.field == "scheduled_date"
             else "TaskUpdated"
         )
-        await emit(
+        if event_type == "TaskCompleted":
+            await emit_task_started_if_missing(
+                db,
+                user_id=user_id,
+                goal_id=task.goal_id,
+                task_id=task.id,
+                trigger="agent_completion_backfill",
+                from_status=str(current),
+                scheduled_date=task.scheduled_date,
+                estimated_mins=task.estimated_mins,
+                source="ai_agent",
+                correlation_id=change_set.run_id,
+                causation_id=operation.source_step_id,
+            )
+        domain_event = await emit(
             db,
             user_id=user_id,
             goal_id=task.goal_id,
@@ -430,6 +662,14 @@ async def apply_task_changes(
                 "aggregate_version": task.version + 1,
             },
         )
+        if event_type == "TaskCompleted":
+            await emit_recovery_completed_if_applicable(
+                db,
+                user_id=user_id,
+                goal_id=task.goal_id,
+                task_id=task.id,
+                action_event=domain_event,
+            )
         applied.append(operation.model_dump())
     # Executor 在 Observer 回读验证通过后统一提交；验证失败时可整体回滚。
     await db.flush()
@@ -442,6 +682,82 @@ async def undo_task_changes(
     reverted: list[str] = []
     for raw in reversed(operations):
         operation = ChangeOperation.model_validate(raw)
+        if operation.entity == "checkin":
+            row = await db.scalar(
+                select(CheckinRecord)
+                .join(Goal, CheckinRecord.goal_id == Goal.id)
+                .where(CheckinRecord.id == operation.entity_id, Goal.user_id == user_id)
+            )
+            before = dict(operation.before or {}) if operation.before else None
+            if before is None:
+                if row is not None:
+                    await db.delete(row)
+                    reverted.append(operation.entity_id)
+                continue
+            if row is None:
+                raise HTTPException(409, "原打卡记录已不存在，不能自动撤销")
+            row.mode = str(before.get("mode") or "natural")
+            row.natural_text = before.get("natural_text")
+            row.completion_rate = float(before.get("completion_rate") or 0)
+            reverted.append(row.id)
+            continue
+        if operation.entity == "goal":
+            if operation.field == "__create__":
+                goal = await db.scalar(
+                    select(Goal).where(Goal.id == operation.entity_id, Goal.user_id == user_id)
+                )
+                if goal is None:
+                    continue
+                task_count = await db.scalar(
+                    select(func.count(Task.id)).where(Task.goal_id == goal.id)
+                )
+                if task_count:
+                    raise HTTPException(409, f"目标“{goal.title}”仍有关联任务，不能自动撤销")
+                await db.delete(goal)
+                await emit(
+                    db,
+                    user_id=user_id,
+                    goal_id=goal.id,
+                    aggregate_type="goal",
+                    aggregate_id=goal.id,
+                    event_type="AgentGoalChangeUndone",
+                    source="ai_agent",
+                    correlation_id=operation.source_step_id,
+                    idempotency_key=f"agent-operation:{operation.operation_id}:undo",
+                    payload={"undo": "create", "aggregate_version": goal.version},
+                )
+                reverted.append(goal.id)
+                continue
+            goal = await db.scalar(
+                select(Goal).where(Goal.id == operation.entity_id, Goal.user_id == user_id)
+            )
+            if goal is None or goal.daily_hours == operation.before:
+                continue
+            expected_version = operation.precondition.get("version")
+            if expected_version is not None and goal.version != int(expected_version) + 1:
+                raise HTTPException(409, f"目标“{goal.title}”版本已变化，不能自动撤销")
+            if goal.daily_hours != operation.after:
+                raise HTTPException(409, f"目标“{goal.title}”已再次变化，不能自动撤销")
+            goal.daily_hours = float(operation.before)
+            await emit(
+                db,
+                user_id=user_id,
+                goal_id=goal.id,
+                aggregate_type="goal",
+                aggregate_id=goal.id,
+                event_type="AgentGoalChangeUndone",
+                source="ai_agent",
+                correlation_id=operation.source_step_id,
+                idempotency_key=f"agent-operation:{operation.operation_id}:undo",
+                payload={
+                    "field": operation.field,
+                    "before": operation.after,
+                    "after": operation.before,
+                    "aggregate_version": goal.version + 1,
+                },
+            )
+            reverted.append(goal.id)
+            continue
         if operation.field == "__create__":
             row = (
                 await db.execute(
@@ -451,7 +767,7 @@ async def undo_task_changes(
                 )
             ).scalar_one_or_none()
             if row:
-                if _task_snapshot(row) != _normalized_create_snapshot(operation):
+                if not _matches_snapshot(row, _normalized_create_snapshot(operation)):
                     raise HTTPException(409, f"任务“{row.title}”已变化，不能自动撤销")
                 await db.delete(row)
                 await emit(
@@ -478,20 +794,37 @@ async def undo_task_changes(
             if not goal:
                 raise HTTPException(409, "原目标已不存在，不能恢复任务")
             if not await db.get(Task, operation.entity_id):
-                db.add(
-                    Task(
-                        id=operation.entity_id,
-                        goal_id=snapshot["goal_id"],
-                        title=snapshot["title"],
-                        description=snapshot.get("description"),
-                        estimated_mins=snapshot["estimated_mins"],
-                        status=snapshot["status"],
-                        priority=snapshot["priority"],
-                        scheduled_date=snapshot["scheduled_date"],
-                        mastery_level=snapshot.get("mastery_level", "unknown"),
-                        version=int(snapshot.get("version", 1)),
-                    )
+                restored_task = Task(
+                    id=operation.entity_id,
+                    goal_id=snapshot["goal_id"],
+                    plan_id=snapshot.get("plan_id"),
+                    title=snapshot["title"],
+                    description=snapshot.get("description"),
+                    estimated_mins=snapshot["estimated_mins"],
+                    actual_mins=snapshot.get("actual_mins"),
+                    status=snapshot["status"],
+                    priority=snapshot["priority"],
+                    scheduled_date=snapshot["scheduled_date"],
+                    mastery_level=snapshot.get("mastery_level", "unknown"),
+                    type=snapshot.get("type", "study"),
+                    kb_refs=snapshot.get("kb_refs", []),
+                    stage_label=snapshot.get("stage_label"),
+                    sequence_in_plan=snapshot.get("sequence_in_plan"),
+                    completed_at=(
+                        datetime.fromisoformat(snapshot["completed_at"])
+                        if snapshot.get("completed_at")
+                        else None
+                    ),
+                    version=int(snapshot.get("version", 1)),
                 )
+                db.add(restored_task)
+                await db.flush()
+                # Some deployments apply a server default of 1 on INSERT;
+                # never let Undo lower the observable aggregate version.
+                original_version = int(snapshot.get("version", 1))
+                if restored_task.version < original_version:
+                    restored_task.version = original_version
+                    await db.flush()
                 await emit(
                     db,
                     user_id=user_id,

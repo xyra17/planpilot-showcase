@@ -13,17 +13,24 @@
 """
 
 import uuid
+from datetime import datetime
+from typing import Literal
 
 from fastapi import HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.core.time import utc_now
-from src.core.time import local_date_for_timezone
+from src.core.time import local_date_for_timezone, to_user_timezone, utc_now, utc_now_aware
 from src.domain.errors import DomainVersionConflict
 from src.events.publisher import emit
 from src.models import DailyBriefCache, DailySchedule, Goal, Task, TaskMasteryRecord
+from src.services.learning_lifecycle_service import (
+    emit_deviation_detected,
+    emit_recovery_completed_if_applicable,
+    emit_recovery_selected,
+    emit_task_started_if_missing,
+)
 
 # ── API Schemas ────────────────────────────────────────────────────────────
 
@@ -35,6 +42,7 @@ class TaskOut(BaseModel):
     goalId: str
     goalTitle: str
     done: bool
+    status: str
     estimatedMinutes: int
     actualMinutes: int | None = None
     date: str
@@ -62,6 +70,8 @@ class TaskPatch(BaseModel):
     priority: str | None = None
     mastery_level: str | None = None
     date: str | None = None
+    rescheduleTrigger: Literal["user_manual", "overload_recovery", "deviation_recovery"] | None = None
+    recoveryStrategy: Literal["minimum", "standard", "sprint"] | None = None
     expectedVersion: int | None = None
 
 
@@ -77,6 +87,7 @@ def _to_out(task: Task, goal_title: str) -> TaskOut:
         goalId=task.goal_id,
         goalTitle=goal_title,
         done=task.status == "completed",
+        status=task.status,
         estimatedMinutes=task.estimated_mins,
         actualMinutes=task.actual_mins,
         date=task.scheduled_date,
@@ -173,8 +184,6 @@ async def _invalidate_daily_brief(user_id: str, db: AsyncSession, timezone_name:
 
     当任务 done 状态变更时调用，保证下次访问重新生成简报。
     """
-    from datetime import date as date_type
-
     await db.execute(
         delete(DailyBriefCache).where(
             DailyBriefCache.user_id == user_id,
@@ -265,11 +274,13 @@ async def create_task_with_schedule(
     from src.api.schedule import ScheduleBlock, ScheduleSave
 
     task = _new_task(body)
-    owned_block = ScheduleBlock.model_validate({
-        **schedule_blocks[0],
-        "id": f"task-schedule-{task.id}",
-        "taskId": task.id,
-    })
+    owned_block = ScheduleBlock.model_validate(
+        {
+            **schedule_blocks[0],
+            "id": f"task-schedule-{task.id}",
+            "taskId": task.id,
+        }
+    )
     db.add(task)
     await _emit_task_created(user_id, body, task, db)
 
@@ -351,10 +362,17 @@ async def update_task(
         "actual_mins": task.actual_mins,
         "priority": task.priority,
         "done": task.status == "completed",
+        "status": task.status,
     }
 
     changed_fields = _apply_patch_fields(task, body)
     changed_fields.discard("expectedVersion")
+    if (
+        "actual_mins" in changed_fields
+        and (task.actual_mins or 0) > 0
+        and task.status == "pending"
+    ):
+        task.status = "in_progress"
     next_version = task.version + 1 if changed_fields else task.version
 
     # 当 done 状态变更时清除简报缓存
@@ -362,6 +380,7 @@ async def update_task(
         await _invalidate_daily_brief(user_id, db, timezone_name)
 
     # emit events（在 commit 前，与 domain change 原子落库）
+    completion_event = None
     if "done" in changed_fields and body.done:
         from datetime import date as date_type
 
@@ -375,7 +394,17 @@ async def update_task(
             )
         except ValueError:
             days_overdue = 0
-        await emit(
+        await emit_task_started_if_missing(
+            db,
+            user_id=user_id,
+            goal_id=task.goal_id,
+            task_id=task.id,
+            trigger="task_completion_backfill",
+            from_status=str(old_values["status"]),
+            scheduled_date=task.scheduled_date,
+            estimated_mins=task.estimated_mins,
+        )
+        completion_event = await emit(
             db,
             user_id=user_id,
             goal_id=task.goal_id,
@@ -384,6 +413,8 @@ async def update_task(
             event_type="TaskCompleted",
             payload={
                 "title": task.title,
+                "task_type": task.type,
+                "stage_label": task.stage_label,
                 "scheduled_date": scheduled,
                 "completed_at": task.completed_at.isoformat() if task.completed_at else None,
                 "actual_mins": task.actual_mins,
@@ -393,8 +424,34 @@ async def update_task(
                 "aggregate_version": next_version,
             },
         )
+        await emit_recovery_completed_if_applicable(
+            db,
+            user_id=user_id,
+            goal_id=task.goal_id,
+            task_id=task.id,
+            action_event=completion_event,
+        )
+
+    if (
+        "actual_mins" in changed_fields
+        and (task.actual_mins or 0) > 0
+        and not body.done
+        and old_values["status"] != "completed"
+    ):
+        await emit_task_started_if_missing(
+            db,
+            user_id=user_id,
+            goal_id=task.goal_id,
+            task_id=task.id,
+            trigger="actual_minutes_recorded",
+            from_status=str(old_values["status"]),
+            scheduled_date=task.scheduled_date,
+            estimated_mins=task.estimated_mins,
+            extra_payload={"actual_mins": task.actual_mins},
+        )
 
     if "date" in changed_fields:
+        reschedule_trigger = body.rescheduleTrigger or "user_manual"
         await emit(
             db,
             user_id=user_id,
@@ -406,10 +463,46 @@ async def update_task(
                 "title": task.title,
                 "from_date": old_date,
                 "to_date": task.scheduled_date,
-                "trigger": "user_manual",
+                "trigger": reschedule_trigger,
+                "recovery_strategy": body.recoveryStrategy,
                 "aggregate_version": next_version,
             },
         )
+        if reschedule_trigger in {"overload_recovery", "deviation_recovery"}:
+            deviation_event = await emit_deviation_detected(
+                db,
+                user_id=user_id,
+                goal_id=task.goal_id,
+                aggregate_id=f"{task.id}:{old_date}",
+                deviation_type=(
+                    "schedule_overload"
+                    if reschedule_trigger == "overload_recovery"
+                    else "execution_deviation"
+                ),
+                source="user_action",
+                idempotency_key=(
+                    f"task-deviation:{task.id}:{old_date}:{task.scheduled_date}:"
+                    f"{reschedule_trigger}"
+                ),
+                payload={
+                    "task_id": task.id,
+                    "detected_on_confirmation": True,
+                    "from_date": old_date,
+                    "to_date": task.scheduled_date,
+                    "trigger": reschedule_trigger,
+                },
+            )
+            await emit_recovery_selected(
+                db,
+                user_id=user_id,
+                goal_id=task.goal_id,
+                task_id=task.id,
+                deviation_event=deviation_event,
+                strategy=body.recoveryStrategy or "standard",
+                trigger=reschedule_trigger,
+                from_date=old_date,
+                to_date=task.scheduled_date,
+            )
 
     if "mastery_level" in changed_fields:
         await emit(
@@ -476,6 +569,82 @@ async def update_task(
     await db.commit()
     await db.refresh(task)
 
+    return _to_out(task, goal.title)
+
+
+async def observe_scheduled_task_start(
+    user_id: str,
+    task_id: str,
+    db: AsyncSession,
+    timezone_name: str,
+    *,
+    now: datetime | None = None,
+) -> TaskOut | None:
+    """在已确认执行时段内观察到前台活动时记录任务首次开始。
+
+    保存或确认时间块本身不构成开始。调用方只能在用户打开今日工作区时
+    触发本观察；服务端再次校验用户本地日期、任务日期和当前时间窗。
+    """
+    row = (
+        await db.execute(
+            select(Task, Goal)
+            .join(Goal, Task.goal_id == Goal.id)
+            .where(Task.id == task_id, Goal.user_id == user_id)
+        )
+    ).first()
+    if not row:
+        return None
+
+    task, goal = row
+    if task.status != "pending":
+        return _to_out(task, goal.title)
+
+    local_now = to_user_timezone(now or utc_now_aware(), timezone_name)
+    local_date = local_now.date().isoformat()
+    if task.scheduled_date != local_date:
+        return _to_out(task, goal.title)
+    schedule = await db.scalar(
+        select(DailySchedule).where(
+            DailySchedule.user_id == user_id,
+            DailySchedule.date == local_date,
+        )
+    )
+    current_minute = local_now.hour * 60 + local_now.minute + local_now.second / 60
+    active_block = next(
+        (
+            block
+            for block in (schedule.blocks if schedule else [])
+            if str(block.get("taskId") or "") == task.id
+            and float(block.get("startHour", -1)) * 60 <= current_minute
+            < float(block.get("startHour", -1)) * 60
+            + float(block.get("durationMinutes", 0))
+        ),
+        None,
+    )
+    if active_block is None:
+        return _to_out(task, goal.title)
+
+    previous_status = task.status
+    task.status = "in_progress"
+    await emit_task_started_if_missing(
+        db,
+        user_id=user_id,
+        goal_id=task.goal_id,
+        task_id=task.id,
+        trigger="schedule_window_observed",
+        from_status=previous_status,
+        scheduled_date=task.scheduled_date,
+        estimated_mins=task.estimated_mins,
+        source="system",
+        extra_payload={
+            "schedule_block_id": active_block.get("id"),
+            "scheduled_start_hour": active_block.get("startHour"),
+            "scheduled_duration_minutes": active_block.get("durationMinutes"),
+            "observed_via": "today_workspace_active",
+        },
+    )
+    await db.commit()
+    await db.refresh(task)
     return _to_out(task, goal.title)
 
 

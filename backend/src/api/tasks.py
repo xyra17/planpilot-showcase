@@ -3,9 +3,9 @@ from pydantic import Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.api.schedule import ScheduleBlock, ScheduleSave, validate_schedule_date
 from src.database import get_db
 from src.deps import get_current_user
-from src.api.schedule import ScheduleBlock, ScheduleSave, validate_schedule_date
 from src.models import Goal, User
 from src.services import task_service
 from src.services.task_service import TaskCreate, TaskOut, TaskPatch
@@ -25,7 +25,9 @@ async def list_tasks(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> list[TaskOut]:
-    return await task_service.list_tasks(current_user.id, date, db, date_from=date_from, date_to=date_to)
+    return await task_service.list_tasks(
+        current_user.id, date, db, date_from=date_from, date_to=date_to
+    )
 
 
 @router.post("", response_model=TaskOut, status_code=201)
@@ -83,7 +85,26 @@ async def update_task(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> TaskOut:
-    result = await task_service.update_task(current_user.id, task_id, body, db, current_user.timezone)
+    result = await task_service.update_task(
+        current_user.id, task_id, body, db, current_user.timezone
+    )
+    if result is None:
+        raise HTTPException(404, "任务不存在")
+    return result
+
+
+@router.post("/{task_id}/observe-start", response_model=TaskOut)
+async def observe_scheduled_task_start(
+    task_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> TaskOut:
+    result = await task_service.observe_scheduled_task_start(
+        current_user.id,
+        task_id,
+        db,
+        current_user.timezone,
+    )
     if result is None:
         raise HTTPException(404, "任务不存在")
     return result

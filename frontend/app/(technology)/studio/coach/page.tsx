@@ -45,9 +45,15 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 import { useAuth } from "@/components/technology/AuthProvider";
+import {
+  ACTIVE_ACTION_STATUSES,
+  ActionRunCard,
+} from "@/components/technology/companion/ActionRunCard";
 import { PiloAvatar } from "@/components/technology/PiloAvatar";
 import { UserAvatar } from "@/components/technology/UserAvatar";
+import { DataSyncNotice } from "@/components/ui/DataSyncNotice";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { streamServerEvents } from "@/lib/api";
 import {
   type ActivePattern,
   type DecisionContext,
@@ -57,6 +63,8 @@ import {
 import {
   productApi,
   streamAgentMessage,
+  type AgentActionApproval,
+  type AgentActionRun,
   type CoachArchiveConversation,
   type ApiGoal,
 } from "@/lib/technology/productApi";
@@ -71,12 +79,20 @@ import {
   type PiloCoachTransition,
 } from "@/lib/technology/piloTransition";
 import { clearPiloState, signalPiloAgentPhase } from "@/lib/technology/piloState";
+import {
+  GUEST_PATTERNS,
+  GUEST_RESOURCES,
+  ensureGuestDatasetSeeded,
+  guestApiGoals,
+  guestConversations,
+} from "@/lib/technology/guestData";
 
 type ChatMessage = {
   id: string;
   role: "user" | "assistant";
   content: string;
   createdAt?: string;
+  actionRunId?: string;
 };
 
 type DemoProposalState = "pending" | "applied" | "dismissed";
@@ -147,30 +163,12 @@ const PATTERN_LABELS: Record<string, string> = {
   estimation_accuracy: "估时特征",
 };
 
+const DEMO_CONVERSATIONS: PiloConversation[] = guestConversations();
+// The archive can be rich without opening a historical thread as if it were a
+// new conversation. Guest sessions start clean and can restore a demo thread
+// deliberately from history.
 const DEMO_MESSAGES: ChatMessage[] = [];
-
-const DEMO_GOALS: ApiGoal[] = [
-  {
-    id: "demo-goal-algorithm",
-    type: "skill",
-    title: "算法进阶",
-    deadline: "2026-12-31",
-    daily_hours: 1.5,
-    current_level: "进阶中",
-    status: "active",
-    created_at: "2026-07-01T08:00:00.000Z",
-  },
-  {
-    id: "demo-goal-data-structure",
-    type: "skill",
-    title: "数据结构巩固",
-    deadline: "2026-11-30",
-    daily_hours: 1,
-    current_level: "巩固中",
-    status: "active",
-    created_at: "2026-07-08T08:00:00.000Z",
-  },
-];
+const DEMO_GOALS: ApiGoal[] = guestApiGoals();
 
 const DEFAULT_PILO_PREFERENCES: PiloPreferences = {
   tone: "warm",
@@ -220,13 +218,6 @@ const conversationFromArchive = (conversation: CoachArchiveConversation): PiloCo
   updatedAt: conversation.updated_at,
 });
 
-const demoTimestamp = (daysAgo: number, hour: number, minute: number) => {
-  const value = new Date();
-  value.setDate(value.getDate() - daysAgo);
-  value.setHours(hour, minute, 0, 0);
-  return value.toISOString();
-};
-
 const formatMessageTime = (createdAt?: string) => {
   if (!createdAt) return "";
   const value = new Date(createdAt);
@@ -246,158 +237,10 @@ const restoreMessageTimes = (conversation: PiloConversation) => {
   }));
 };
 
-const demoMonthTimestamp = (monthOffset: number, day: number, hour: number, minute: number) => {
-  const value = new Date();
-  value.setMonth(value.getMonth() + monthOffset, day);
-  value.setHours(hour, minute, 0, 0);
-  return value.toISOString();
-};
-
-const DEMO_ARCHIVE_VERSION = 2;
+const DEMO_ARCHIVE_VERSION = 4;
 const DEMO_ARCHIVE_VERSION_KEY = "planpilot:pilo-demo-archive-version";
-
-const DEMO_CONVERSATIONS: PiloConversation[] = [
-  {
-    id: "demo-plan-adjustment",
-    sessionId: "demo-plan-adjustment",
-    goalId: null,
-    goalTitle: "算法进阶",
-    title: "调整本周算法计划",
-    summary: "周五负荷过高，重新安排动态规划练习与恢复时间。",
-    piloFeedback: "保留核心练习，把 95 分钟恢复空间留到周末；这次调整先试一周。",
-    association: "关联 4 个任务 · 1 条待确认方案",
-    isFavorite: true,
-    createdAt: demoTimestamp(0, 9, 20),
-    updatedAt: demoTimestamp(0, 10, 6),
-    messages: [
-      { id: "demo-1-u1", role: "user", content: "这周算法题比预计慢，周五还排了两组动态规划，我担心做不完。" },
-      { id: "demo-1-a1", role: "assistant", content: "我看了最近的完成节奏。周五继续维持原负荷会比较吃力，我们可以先保住最重要的一组练习，把恢复空间留出来。" },
-      { id: "demo-1-u2", role: "user", content: "可以，但我不想把核心练习全部往后拖。" },
-      { id: "demo-1-a2", role: "assistant", content: "明白。那就保留核心练习，只把一组补充题移到周末，预计释放 95 分钟。先试一周，任何计划变化都由你确认。" },
-    ],
-  },
-  {
-    id: "demo-linked-list-review",
-    sessionId: "demo-linked-list-review",
-    goalId: null,
-    goalTitle: "数据结构巩固",
-    title: "复盘链表错题",
-    summary: "定位双指针的重复错误，并安排三天后的短复习。",
-    piloFeedback: "错误主要发生在边界更新，不需要重做整章；三天后做一次 20 分钟检索练习。",
-    association: "关联 1 篇笔记 · 6 道错题",
-    isFavorite: false,
-    createdAt: demoTimestamp(1, 20, 40),
-    updatedAt: demoTimestamp(1, 21, 12),
-    messages: [
-      { id: "demo-2-u1", role: "user", content: "我今天链表双指针又错了两题，是不是应该把整章重新学一遍？" },
-      { id: "demo-2-a1", role: "assistant", content: "先不用重学整章。你重复出错的位置集中在快慢指针的边界更新，而不是概念本身。" },
-      { id: "demo-2-u2", role: "user", content: "那怎么复习更有效？" },
-      { id: "demo-2-a2", role: "assistant", content: "今天只整理两个错误触发点，三天后安排一次 20 分钟无提示练习。我会把你的链表笔记和这 6 道错题一起关联进复习。" },
-    ],
-  },
-  {
-    id: "demo-load-recovery",
-    sessionId: "demo-load-recovery",
-    goalId: null,
-    goalTitle: "跨目标节奏",
-    title: "降低学习负荷",
-    summary: "连续延期后停止集中补偿，先恢复可持续的连续性。",
-    piloFeedback: "接下来三天每天保留 45 分钟高优任务，暂缓补偿欠下的全部进度。",
-    association: "关联 2 个目标 · 近期 3 次延期",
-    isFavorite: false,
-    createdAt: demoTimestamp(3, 19, 10),
-    updatedAt: demoTimestamp(3, 19, 36),
-    messages: [
-      { id: "demo-3-u1", role: "user", content: "我连续延期了三天，想周末一次性全部补回来。" },
-      { id: "demo-3-a1", role: "assistant", content: "我理解你想尽快追回进度，但一次性补偿很可能继续打乱节奏。我们先把连续性找回来。" },
-      { id: "demo-3-u2", role: "user", content: "那这周应该做到什么程度？" },
-      { id: "demo-3-a2", role: "assistant", content: "接下来三天每天只保留 45 分钟最高优任务，其余欠账先不追。等完成节奏稳定后，再决定哪些内容值得补。" },
-    ],
-  },
-  {
-    id: "demo-monthly-review",
-    sessionId: "demo-monthly-review",
-    goalId: null,
-    goalTitle: "算法进阶",
-    title: "整理本月薄弱题型",
-    summary: "把本月反复出错的题型整理成下一轮练习重点。",
-    piloFeedback: "先保留状态转移和边界判断两类，不需要把所有错题重新做一遍。",
-    association: "关联 2 篇笔记 · 8 道错题",
-    isFavorite: false,
-    createdAt: demoMonthTimestamp(0, 1, 18, 40),
-    updatedAt: demoMonthTimestamp(0, 1, 19, 8),
-    messages: [
-      { id: "demo-4-u1", role: "user", content: "这个月错题有点散，我不知道该从哪里重新开始。" },
-      { id: "demo-4-a1", role: "assistant", content: "先按重复错误归类，不按章节重学。状态转移和边界判断出现得最多，可以作为下一轮重点。" },
-      { id: "demo-4-u2", role: "user", content: "那其他错题暂时不管吗？" },
-      { id: "demo-4-a2", role: "assistant", content: "先保留记录，不急着全部重做。等两类高频问题稳定后再补剩余内容。" },
-    ],
-  },
-  {
-    id: "demo-previous-month",
-    sessionId: "demo-previous-month",
-    goalId: null,
-    goalTitle: "学习节奏",
-    title: "复盘上月学习节奏",
-    summary: "回看上月完成情况，减少计划过密造成的连续延期。",
-    piloFeedback: "晚间高认知任务控制在一项，连续完成比一次安排三项更适合你。",
-    association: "关联 1 份月度复盘 · 3 条规律",
-    isFavorite: true,
-    createdAt: demoMonthTimestamp(-1, 12, 20, 10),
-    updatedAt: demoMonthTimestamp(-1, 12, 20, 42),
-    messages: [
-      { id: "demo-5-u1", role: "user", content: "上个月计划经常拖到第二天，是不是安排得太松了？" },
-      { id: "demo-5-a1", role: "assistant", content: "更像是晚间高认知任务叠得太多，不是太松。连续完成比集中补偿更重要。" },
-      { id: "demo-5-u2", role: "user", content: "下个月怎么控制？" },
-      { id: "demo-5-a2", role: "assistant", content: "每个晚间只放一项高认知任务，其余作为可选项，再观察两周。" },
-    ],
-  },
-];
-
-const DEMO_PATTERNS: ActivePattern[] = [
-  {
-    id: "demo-evening",
-    goal_id: null,
-    scope: "user",
-    pattern_type: "preferred_learning_time",
-    pattern_value: { peak_hours: [19, 20] },
-    confidence: 0.82,
-    evidence_count: 18,
-    last_confirmed_at: null,
-    evidence: [],
-    explanation: "工作日晚间 19:00–21:00 更容易完成高认知任务",
-  },
-  {
-    id: "demo-recovery",
-    goal_id: null,
-    scope: "user",
-    pattern_type: "plan_adherence",
-    pattern_value: {},
-    confidence: 0.74,
-    evidence_count: 11,
-    last_confirmed_at: null,
-    evidence: [],
-    explanation: "延期后先恢复连续性，比集中补偿更容易坚持",
-  },
-  {
-    id: "demo-duration",
-    goal_id: null,
-    scope: "user",
-    pattern_type: "preferred_session_length",
-    pattern_value: { minutes: 45 },
-    confidence: 0.69,
-    evidence_count: 9,
-    last_confirmed_at: null,
-    evidence: [],
-    explanation: "高负荷周将单次学习控制在 45 分钟左右更稳定",
-  },
-];
-
-const DEMO_RESOURCES = [
-  "动态规划题型总结.pdf",
-  "链表双指针笔记",
-  "前端面试高频题.md",
-];
+const DEMO_PATTERNS: ActivePattern[] = GUEST_PATTERNS.map((pattern) => ({ ...pattern, evidence: [...pattern.evidence] }));
+const DEMO_RESOURCES = GUEST_RESOURCES.map((resource) => resource.name);
 
 const QUICK_PROMPTS = [
   { label: "讨论观察", prompt: "我想先讨论你刚才的观察，请解释它对我当前学习安排的影响", icon: MessagesSquare, kind: "discuss" },
@@ -533,7 +376,9 @@ function CoachProposal({
   const reduceMotion = useReducedMotion();
   const [expanded, setExpanded] = useState(false);
   const confidence = confidenceMeta(proposal.confidence);
-  const canConfirm = proposal.status === "pending" || proposal.status === "accepted";
+  const isNonExecutableInsight = proposal.proposal_type === "learning_nudge";
+  const canConfirm = proposal.status === "pending"
+    || (!isNonExecutableInsight && proposal.status === "accepted");
 
   return (
     <motion.article
@@ -545,7 +390,7 @@ function CoachProposal({
     >
       <header>
         <div>
-          <span className="companion-proposal-kicker"><Sparkles size={12} /> 可执行建议</span>
+          <span className="companion-proposal-kicker"><Sparkles size={12} /> 学习洞察</span>
           <h2>{proposal.title}</h2>
         </div>
         <span className={`companion-status is-${proposal.status}`}>
@@ -593,7 +438,7 @@ function CoachProposal({
           {proposal.status === "pending" && <button type="button" className="is-quiet" onClick={onReject} disabled={busy}>暂不调整</button>}
           <button type="button" className="is-primary" onClick={onConfirm} disabled={busy}>
             {busy ? <LoaderCircle className="spin" size={14} /> : <Check size={14} />}
-            {proposal.status === "accepted" ? "应用变更" : "确认并应用"}
+            {isNonExecutableInsight ? "记下这条提醒" : "生成调整方案"}
           </button>
         </footer>
       ) : proposal.status === "applied" && !proposal.has_feedback ? (
@@ -620,6 +465,7 @@ export default function CoachPage() {
   const [context, setContext] = useState<DecisionContext | null>(null);
   const [proposals, setProposals] = useState<DecisionProposal[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>(DEMO_MESSAGES);
+  const [actionRuns, setActionRuns] = useState<Record<string, AgentActionRun>>({});
   const [draft, setDraft] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [streamStatus, setStreamStatus] = useState("");
@@ -674,6 +520,7 @@ export default function CoachPage() {
   const lampTimerRef = useRef<number | undefined>(undefined);
   const coachArchiveReadyRef = useRef(false);
   const contextRequestRef = useRef(0);
+  const actionEventCursorsRef = useRef<Record<string, number>>({});
   const coachArchiveImportRef = useRef<HTMLInputElement | null>(null);
   const initialCoachTransitionRef = useRef<PiloCoachTransition | null | undefined>(undefined);
 
@@ -894,6 +741,7 @@ export default function CoachPage() {
     setResources([]);
     setMessages([]);
     if (authStatus === "unauthenticated") {
+      ensureGuestDatasetSeeded();
       setGoals(DEMO_GOALS);
       setGoalId((current) => current && DEMO_GOALS.some((goal) => goal.id === current) ? current : "");
       setMessages(DEMO_MESSAGES);
@@ -1042,6 +890,96 @@ export default function CoachPage() {
   }, [loadContext]);
 
   useEffect(() => {
+    if (authStatus !== "authenticated") return;
+    let disposed = false;
+    void productApi.listActionRuns(20).then(async (runs) => {
+      const recoverable = runs.filter((run) => [
+        "queued",
+        "executing",
+        "waiting_approval",
+        "retrying",
+        "replanning",
+        "paused",
+        "failed",
+      ].includes(run.status));
+      const details = await Promise.allSettled(recoverable.map((run) => productApi.getActionRun(run.id)));
+      if (disposed) return;
+      setActionRuns((current) => {
+        const next = { ...current };
+        details.forEach((result) => {
+          if (result.status === "fulfilled") next[result.value.id] = result.value;
+        });
+        return next;
+      });
+    }).catch(() => {
+      // Conversation remains available even if durable run recovery is temporarily offline.
+    });
+    return () => {
+      disposed = true;
+    };
+  }, [authStatus]);
+
+  const activeActionRunSignature = Object.values(actionRuns)
+    .filter((run) => ACTIVE_ACTION_STATUSES.has(run.status))
+    .map((run) => `${run.id}:${run.status}`)
+    .sort()
+    .join("|");
+  const linkedActionRunIds = new Set(messages.flatMap((message) => message.actionRunId ? [message.actionRunId] : []));
+  const recoveredActionRuns = Object.values(actionRuns)
+    .filter((run) => !linkedActionRunIds.has(run.id))
+    .sort((left, right) => String(right.updated_at ?? right.created_at ?? "").localeCompare(String(left.updated_at ?? left.created_at ?? "")));
+
+  useEffect(() => {
+    const runIds = activeActionRunSignature.split("|").filter(Boolean).map((item) => item.split(":", 1)[0]);
+    if (!runIds.length) return;
+    const controllers = runIds.map(() => new AbortController());
+    const refreshRun = async (runId: string) => {
+      const run = await productApi.getActionRun(runId);
+      setActionRuns((current) => ({ ...current, [run.id]: run }));
+    };
+    runIds.forEach((runId, index) => {
+      const controller = controllers[index];
+      void refreshRun(runId).catch(() => undefined);
+      void (async () => {
+        let retryDelay = 500;
+        while (!controller.signal.aborted) {
+          try {
+            await streamServerEvents(
+              `/api/v2/agent/runs/${encodeURIComponent(runId)}/events/stream`,
+              {
+                signal: controller.signal,
+                lastEventId: actionEventCursorsRef.current[runId],
+                onEvent: (event) => {
+                  const cursor = Number(event.id);
+                  if (Number.isSafeInteger(cursor) && cursor >= 0) {
+                    actionEventCursorsRef.current[runId] = cursor;
+                  }
+                  void refreshRun(runId).catch(() => undefined);
+                },
+              },
+            );
+            retryDelay = 500;
+          } catch (reason) {
+            if (controller.signal.aborted || (reason instanceof DOMException && reason.name === "AbortError")) return;
+            if (retryDelay >= 2_000) setNotice("行动状态连接正在恢复，进度不会丢失");
+          }
+          await new Promise<void>((resolve) => {
+            const timer = window.setTimeout(resolve, retryDelay);
+            controller.signal.addEventListener("abort", () => {
+              window.clearTimeout(timer);
+              resolve();
+            }, { once: true });
+          });
+          retryDelay = Math.min(retryDelay * 2, 5_000);
+        }
+      })();
+    });
+    return () => {
+      controllers.forEach((controller) => controller.abort());
+    };
+  }, [activeActionRunSignature]);
+
+  useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const entry = parsePiloCoachEntry(params);
     setCoachEntry(entry);
@@ -1054,6 +992,12 @@ export default function CoachPage() {
       scrollFeedElementIntoView("companion-proposals", reduceMotion ? "auto" : "smooth");
     }
   }, [reduceMotion, scrollFeedElementIntoView]);
+
+  useEffect(() => {
+    const routedGoalId = coachEntry?.goalId ?? (coachEntry?.goalIds?.length === 1 ? coachEntry.goalIds[0] : undefined);
+    if (!routedGoalId || !goals.some((goal) => goal.id === routedGoalId)) return;
+    setGoalId(routedGoalId);
+  }, [coachEntry?.goalId, coachEntry?.goalIds, goals]);
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
@@ -1291,6 +1235,28 @@ export default function CoachPage() {
         session_id: sessionIdRef.current,
         pilo_preferences: piloPreferences,
       }, ({ event: streamEvent, data }) => {
+        if (streamEvent === "action_start") {
+          setStreamStatus("正在建立可跟踪的行动任务");
+          signalPiloAgentPhase("tool", { source: piloStreamSource, tool: "action-agent" });
+        }
+        if (streamEvent === "action_run" && typeof data.id === "string") {
+          const run = data as unknown as AgentActionRun;
+          setActionRuns((current) => ({ ...current, [run.id]: run }));
+          setMessages((current) => current.map((message) => message.id === assistantId
+            ? {
+                ...message,
+                content: "这是一个会影响学习数据的行动请求。我会先生成变更预览，确认前不会修改任何数据。",
+                actionRunId: run.id,
+              }
+            : message));
+          signalPiloAgentPhase("waiting", { source: piloStreamSource });
+        }
+        if (streamEvent === "context_start") {
+          setStreamStatus("正在读取你的目标与学习记录");
+        }
+        if (streamEvent === "context_ready") {
+          setStreamStatus("已经理解本轮上下文，正在组织回答");
+        }
         if (streamEvent === "token" && typeof data.text === "string") {
           setStreamStatus("正在组织回答");
           if (!generating) {
@@ -1339,6 +1305,36 @@ export default function CoachPage() {
     }
   }
 
+  async function updateActionRun(
+    runId: string,
+    action: () => Promise<AgentActionRun>,
+    failureMessage: string,
+  ) {
+    setBusyId(`action:${runId}`);
+    setError("");
+    try {
+      const next = await action();
+      setActionRuns((current) => ({ ...current, [next.id]: next }));
+      if (next.status === "completed" || next.status === "rolled_back") await loadContext();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : failureMessage);
+    } finally {
+      setBusyId("");
+    }
+  }
+
+  function approveActionRun(run: AgentActionRun, approval: AgentActionApproval, highRiskConfirmed: boolean) {
+    void updateActionRun(
+      run.id,
+      () => productApi.approveActionRun(run.id, approval, highRiskConfirmed),
+      "行动方案执行失败",
+    );
+  }
+
+  function rejectActionRun(run: AgentActionRun, approval: AgentActionApproval) {
+    void updateActionRun(run.id, () => productApi.rejectActionRun(run.id, approval.id), "无法保留原计划");
+  }
+
   async function generateProposal() {
     if (authStatus !== "authenticated") {
       scrollFeedElementIntoView("demo-proposal", reduceMotion ? "auto" : "smooth");
@@ -1376,12 +1372,25 @@ export default function CoachPage() {
     setBusyId(proposal.id);
     setError("");
     try {
-      if (proposal.status === "pending") await learnerApi.acceptProposal(proposal.id);
-      await learnerApi.applyProposal(proposal.id);
+      if (proposal.proposal_type === "learning_nudge") {
+        await learnerApi.acceptProposal(proposal.id);
+        await loadContext();
+        setNotice("这条学习提醒已记下，不会修改任何计划数据");
+        return;
+      }
+      const run = await learnerApi.createProposalActionRun(proposal.id);
+      setActionRuns((current) => ({ ...current, [run.id]: run }));
+      setMessages((current) => [...current, {
+        id: `insight-action-${run.id}`,
+        role: "assistant",
+        content: `我已把“${proposal.title}”转换成可跟踪的行动方案。接下来会先展示具体变更，确认前不会修改数据。`,
+        actionRunId: run.id,
+        createdAt: new Date().toISOString(),
+      }]);
       await loadContext();
-      setNotice("建议已确认并应用，变更已记录");
+      setNotice("已生成行动方案，完成风险审查后会请你确认");
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "建议应用失败");
+      setError(reason instanceof Error ? reason.message : "行动方案生成失败");
     } finally {
       setBusyId("");
     }
@@ -1745,30 +1754,60 @@ export default function CoachPage() {
                   exit={{ opacity: 0 }}
                   transition={{ duration: reduceMotion ? 0 : 0.24 }}
                 >
-                  {message.role === "assistant" ? (
-                    <span className="companion-message-avatar is-pilo" aria-hidden="true">
-                      <PiloAvatar mood="listening" size={64} instant />
-                    </span>
-                  ) : (
-                    <UserAvatar className="companion-message-avatar is-user" avatarUrl={user?.avatar_url} username={displayUsername} size={34} alt={`${displayUsername}的头像`} />
-                  )}
-                  <div className="companion-message-bubble">
-                    <header className="companion-message-header">
-                      <span className="companion-message-author">
-                        <strong>{message.role === "assistant" ? "Pilo" : displayUsername}</strong>
-                        {message.role === "user" && formatMessageTime(message.createdAt) && <time dateTime={message.createdAt}>{formatMessageTime(message.createdAt)}</time>}
+                  <span
+                    className={`companion-message-speaker is-${message.role}`}
+                  >
+                    {message.role === "assistant" ? (
+                      <span className="companion-message-avatar is-pilo" aria-hidden="true">
+                        <PiloAvatar mood="listening" size={64} instant />
                       </span>
-                      {message.role === "assistant" && message.content && authStatus === "authenticated" && <button type="button" onClick={() => setContextOpen(true)}><FileSearch size={13} /> 查看依据</button>}
-                    </header>
-                    {message.content ? (
-                      <div className="companion-markdown"><ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown></div>
                     ) : (
+                      <UserAvatar className="companion-message-avatar is-user" avatarUrl={user?.avatar_url} username={displayUsername} size={34} alt={`${displayUsername}的头像`} />
+                    )}
+                  </span>
+                  <div className="companion-message-bubble">
+                    {(message.role === "user" && formatMessageTime(message.createdAt)) || (message.role === "assistant" && message.content && !message.actionRunId && authStatus === "authenticated") ? (
+                      <header className="companion-message-header">
+                        {message.role === "user" && formatMessageTime(message.createdAt) && <time dateTime={message.createdAt}>{formatMessageTime(message.createdAt)}</time>}
+                        {message.role === "assistant" && message.content && !message.actionRunId && authStatus === "authenticated" && <button type="button" onClick={() => setContextOpen(true)}><FileSearch size={13} /> 查看依据</button>}
+                      </header>
+                    ) : null}
+                    {message.content ? <div className="companion-markdown"><ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown></div> : (
                       <div className="companion-thinking"><i /><i /><i /><span>{streamStatus || "我在想…"}</span></div>
+                    )}
+                    {message.actionRunId && actionRuns[message.actionRunId] && (
+                      <ActionRunCard
+                        run={actionRuns[message.actionRunId]}
+                        busy={busyId === `action:${message.actionRunId}`}
+                        onApprove={(approval, highRiskConfirmed) => approveActionRun(actionRuns[message.actionRunId!], approval, highRiskConfirmed)}
+                        onReject={(approval) => rejectActionRun(actionRuns[message.actionRunId!], approval)}
+                        onCancel={() => void updateActionRun(message.actionRunId!, () => productApi.cancelActionRun(message.actionRunId!), "取消行动失败")}
+                        onRetry={() => void updateActionRun(message.actionRunId!, () => productApi.retryActionRun(message.actionRunId!), "重试行动失败")}
+                        onUndo={() => void updateActionRun(message.actionRunId!, () => productApi.undoActionRun(message.actionRunId!), "撤销修改失败")}
+                      />
                     )}
                   </div>
                 </motion.article>
               ))}
             </AnimatePresence>
+
+            {!!recoveredActionRuns.length && (
+              <section className="companion-recovered-actions" aria-label="待处理行动">
+                <header><div><small>可恢复的行动</small><h2>继续上次未完成的处理</h2></div><span>{recoveredActionRuns.length}</span></header>
+                {recoveredActionRuns.slice(0, 3).map((run) => (
+                  <ActionRunCard
+                    key={run.id}
+                    run={run}
+                    busy={busyId === `action:${run.id}`}
+                    onApprove={(approval, highRiskConfirmed) => approveActionRun(run, approval, highRiskConfirmed)}
+                    onReject={(approval) => rejectActionRun(run, approval)}
+                    onCancel={() => void updateActionRun(run.id, () => productApi.cancelActionRun(run.id), "取消行动失败")}
+                    onRetry={() => void updateActionRun(run.id, () => productApi.retryActionRun(run.id), "重试行动失败")}
+                    onUndo={() => void updateActionRun(run.id, () => productApi.undoActionRun(run.id), "撤销修改失败")}
+                  />
+                ))}
+              </section>
+            )}
 
             {!!proposals.length && (
               <section className="companion-proposal-stack companion-proposal-in-chat" id="companion-proposals">
@@ -2094,18 +2133,26 @@ export default function CoachPage() {
                 {!patterns.length && <div className="companion-context-empty">继续完成任务和反馈建议后，这里会形成可追溯的长期判断。</div>}
               </div>}
             </section>
-            {(primaryGap || authStatus !== "authenticated") && <section className={`companion-context-section ${contextSections.retention ? "is-expanded" : "is-collapsed"}`}><button type="button" className="companion-context-section__toggle" aria-expanded={contextSections.retention} aria-controls="context-retention" onClick={() => toggleContextSection("retention")}><span><RefreshCw size={14} /><strong>知识保持</strong><small className="is-attention">待关注</small></span><ChevronDown size={15} /></button>{contextSections.retention && <div id="context-retention" className="companion-gap-card"><FileSearch size={16} /><div><strong>{primaryGap?.name ?? "链表双指针"}</strong><p>{primaryGap ? `当前保持信号 ${Math.round(primaryGap.retention * 100)}%，适合安排一次短复习。` : "预计三天内进入复习窗口，建议安排一次短复习。"}</p></div></div>}</section>}
-            <section className={`companion-context-section ${contextSections.memories ? "is-expanded" : "is-collapsed"}`}><button type="button" className="companion-context-section__toggle" aria-expanded={contextSections.memories} aria-controls="context-memories" onClick={() => toggleContextSection("memories")}><span><BrainCircuit size={14} /><strong>本轮参考的长期记录</strong><small>{semanticMemories.length || 2} 条</small></span><ChevronDown size={15} /></button>{contextSections.memories && <div id="context-memories" className="companion-memory-list">{(semanticMemories.length ? semanticMemories.map((item) => item.summary) : ["延期后先恢复连续性，比集中补偿更有效", "高压周的可持续投入约为 45 分钟"]).slice(0, 3).map((item) => <p key={item}><BrainCircuit size={13} /><span>{item}</span></p>)}</div>}</section>
+            {(primaryGap || authStatus !== "authenticated") && <section className={`companion-context-section ${contextSections.retention ? "is-expanded" : "is-collapsed"}`}><button type="button" className="companion-context-section__toggle" aria-expanded={contextSections.retention} aria-controls="context-retention" onClick={() => toggleContextSection("retention")}><span><RefreshCw size={14} /><strong>知识保持</strong><small className="is-attention">待关注</small></span><ChevronDown size={15} /></button>{contextSections.retention && <div id="context-retention" className="companion-gap-card"><FileSearch size={16} /><div><strong>{primaryGap?.name ?? "Pandas 分组聚合"}</strong><p>{primaryGap ? `当前保持信号 ${Math.round(primaryGap.retention * 100)}%，适合安排一次短复习。` : "预计三天内进入复习窗口，建议安排一次短复习。"}</p></div></div>}</section>}
+            <section className={`companion-context-section ${contextSections.memories ? "is-expanded" : "is-collapsed"}`}><button type="button" className="companion-context-section__toggle" aria-expanded={contextSections.memories} aria-controls="context-memories" onClick={() => toggleContextSection("memories")}><span><BrainCircuit size={14} /><strong>本轮参考的长期记录</strong><small>{semanticMemories.length || 2} 条</small></span><ChevronDown size={15} /></button>{contextSections.memories && <div id="context-memories" className="companion-memory-list">{(semanticMemories.length ? semanticMemories.map((item) => item.summary) : ["延期后先恢复连续性，比集中补偿更有效", "高压周的可持续投入约为 45 分钟"]).slice(0, 3).map((item) => <Link href="/studio/coach/memory" key={item}><BrainCircuit size={13} /><span>{item}</span><ArrowRight size={13} /></Link>)}</div>}</section>
             <section className={`companion-context-section ${contextSections.resources ? "is-expanded" : "is-collapsed"}`}><button type="button" className="companion-context-section__toggle" aria-expanded={contextSections.resources} aria-controls="context-resources" onClick={() => toggleContextSection("resources")}><span><FileSearch size={14} /><strong>本轮可用资料</strong><small>{resources.length} 项</small></span><ChevronDown size={15} /></button>{contextSections.resources && <div id="context-resources" className="companion-resource-list">{resources.slice(0, 4).map((resource) => <Link href={`/studio/work/knowledge?query=${encodeURIComponent(resource)}`} key={resource}><FileSearch size={13} /><span>{resource}</span><ArrowRight size={13} /></Link>)}{!resources.length && <p>当前还没有可检索资料</p>}</div>}</section>
             </div>
           </motion.aside>
         )}
       </AnimatePresence>
 
+      {error && (
+        <DataSyncNotice
+          title={/登录/.test(error) ? "学习伙伴需要登录" : /加载|连接/.test(error) ? "学习伙伴同步失败" : "学习伙伴操作未完成"}
+          message={error}
+          retryLabel="重新加载"
+          onRetry={() => { setError(""); void loadContext(); }}
+        />
+      )}
       <AnimatePresence>
-        {(error || notice) && (
-          <motion.div className={`companion-toast ${error ? "is-error" : "is-success"}`} role={error ? "alert" : "status"} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 12 }}>
-            {error ? <X size={15} /> : <CheckCircle2 size={15} />}<span>{error || notice}</span>{error && <button type="button" onClick={() => { setError(""); void loadContext(); }}><RefreshCw size={13} /> 重试</button>}
+        {notice && (
+          <motion.div className="companion-toast is-success" role="status" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 12 }}>
+            <CheckCircle2 size={15} /><span>{notice}</span>
           </motion.div>
         )}
       </AnimatePresence>

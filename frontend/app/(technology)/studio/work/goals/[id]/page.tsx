@@ -8,20 +8,22 @@ import { useParams, useSearchParams } from "next/navigation";
 import {
   ArrowLeft, CheckCircle2, Circle, Clock,
   Plus, Trash2, Pencil, FileText,
-  Check, X, ChevronLeft, ChevronRight, ChevronDown, ChevronUp,
+  Check, X, ChevronLeft, ChevronRight, ChevronDown,
   Loader2, BookOpen, Calendar, BarChart3,
 } from "lucide-react";
 import { useTasks, type Task, type Priority } from "@/lib/tasks-context";
 import { cn } from "@/lib/utils";
 import { VerificationDialog } from "@/components/agent/VerificationDialog";
-import { ProgressOverview } from "@/components/goal/ProgressOverview";
+import { ProgressOverview, type ProgressData } from "@/components/goal/ProgressOverview";
 import PlanModeSelector, { type KbMode, type PacingMode } from "@/components/goal/PlanModeSelector";
 import { DebtCard } from "@/components/agent/DebtCard";
+import { DataSyncNotice } from "@/components/ui/DataSyncNotice";
 import { api, ApiError } from "@/lib/api";
 import type { Goal } from "@/lib/stores/goalStore";
 import TaskNoteDrawer from "@/components/notes/TaskNoteDrawer";
 import GoalNotesPanel from "@/components/notes/GoalNotesPanel";
 import { signalPiloContext } from "@/lib/technology/piloContext";
+import { ensureGuestDatasetSeeded, guestApiGoals, guestGoalProgress } from "@/lib/technology/guestData";
 import { useAuth } from "@/components/technology/AuthProvider";
 import { PRODUCT_STORAGE_KEYS, readProductArray } from "@/lib/technology/productData";
 
@@ -33,11 +35,9 @@ const STATUS_LABEL: Record<string, string> = {
   active: "进行中", completed: "已完成", paused: "暂停", abandoned: "已放弃",
 };
 
-const GUEST_DEMO_GOALS: Record<string, Goal> = {
-  "1": { id: "1", type: "skill", title: "算法基础体系化", deadline: "2026-09-30", daily_hours: 1, current_level: "intermediate", status: "active", meta: {}, created_at: "2026-08-01T00:00:00Z", work_schedule: "all", kb_id: null },
-  "2": { id: "2", type: "exam", title: "前端面试准备", deadline: "2026-10-18", daily_hours: 0.75, current_level: "intermediate", status: "active", meta: {}, created_at: "2026-08-01T00:00:00Z", work_schedule: "all", kb_id: null },
-  "3": { id: "3", type: "habit", title: "英文技术阅读", deadline: "2027-01-01", daily_hours: 0.33, current_level: "beginner", status: "paused", meta: {}, created_at: "2026-08-01T00:00:00Z", work_schedule: "all", kb_id: null },
-};
+const GUEST_DEMO_GOALS: Record<string, Goal> = Object.fromEntries(
+  guestApiGoals().map((goal) => [goal.id, { ...goal, work_schedule: goal.work_schedule ?? "all", meta: {}, kb_id: null }]),
+);
 
 const LOCAL_GOAL_TYPES: Record<string, Goal["type"]> = {
   "考试备考": "exam",
@@ -57,7 +57,7 @@ function readLocalGoal(id: string): Goal | null {
   const status = stored.status === "已暂停" ? "paused" : stored.status === "已完成" ? "completed" : "active";
   return {
     id,
-    type: LOCAL_GOAL_TYPES[String(stored.type)] ?? "skill",
+    type: (typeof stored.apiType === "string" ? stored.apiType : LOCAL_GOAL_TYPES[String(stored.type)]) as Goal["type"] ?? "skill",
     title: stored.name,
     deadline: String(stored.deadlineDate ?? ""),
     daily_hours: dailyMinutes / 60,
@@ -87,17 +87,20 @@ function GoalExecutionPanel({
   goal,
   tasks,
   daysLeft,
+  progressRefreshKey,
+  useLocalProgress,
+  onSelectDate,
+  onCreateTask,
 }: {
   goal: Goal;
   tasks: Task[];
   daysLeft: number;
+  progressRefreshKey: number;
+  useLocalProgress: boolean;
+  onSelectDate: (date: string) => void;
+  onCreateTask: () => void;
 }) {
-  const priorityOrder: Record<Priority, number> = { high: 0, medium: 1, low: 2 };
   const incompleteTasks = tasks.filter((task) => !task.done);
-  const nextTask = [...incompleteTasks].sort((left, right) =>
-    left.date.localeCompare(right.date)
-    || priorityOrder[left.priority ?? "medium"] - priorityOrder[right.priority ?? "medium"]
-  )[0];
   const remainingMinutes = incompleteTasks.reduce((total, task) => total + task.estimatedMinutes, 0);
   const dailyCapacityMinutes = Math.max(0, Math.round(goal.daily_hours * 60));
   const requiredMinutesPerDay = remainingMinutes
@@ -106,6 +109,18 @@ function GoalExecutionPanel({
   const loadRatio = dailyCapacityMinutes
     ? requiredMinutesPerDay / dailyCapacityMinutes
     : requiredMinutesPerDay > 0 ? 2 : 0;
+  const isOverCapacity = dailyCapacityMinutes > 0 && loadRatio > 1;
+  const overloadMinutes = Math.max(0, requiredMinutesPerDay - dailyCapacityMinutes);
+  const overloadPercent = dailyCapacityMinutes
+    ? Math.round((overloadMinutes / dailyCapacityMinutes) * 100)
+    : 0;
+  const capacityScale = isOverCapacity ? Math.max(1.2, loadRatio * 1.08) : 1;
+  const capacityMarkerPercent = dailyCapacityMinutes
+    ? Math.min(100, 1 / capacityScale * 100)
+    : 0;
+  const requiredFillPercent = dailyCapacityMinutes
+    ? Math.min(100, loadRatio / capacityScale * 100)
+    : requiredMinutesPerDay > 0 ? 100 : 0;
   const dateAtOffset = (offset: number) => {
     const date = new Date(`${TODAY}T12:00:00`);
     date.setDate(date.getDate() + offset);
@@ -119,74 +134,168 @@ function GoalExecutionPanel({
     return {
       date,
       label: offset === 0 ? "今天" : `周${labels[day.getDay()]}`,
+      dateLabel: `${day.getMonth() + 1}/${day.getDate()}`,
       total: dateTasks.length,
       done: dateTasks.filter((task) => task.done).length,
+      plannedMinutes: dateTasks.reduce((total, task) => total + task.estimatedMinutes, 0),
+      completedMinutes: dateTasks.filter((task) => task.done).reduce((total, task) => total + task.estimatedMinutes, 0),
     };
   });
-  const maxDayTasks = Math.max(1, ...weekDays.map((day) => day.total));
   const upcomingCount = weekDays.reduce((total, day) => total + day.total, 0);
+  const maxWeekMinutes = Math.max(dailyCapacityMinutes, ...weekDays.map((day) => day.plannedMinutes), 1);
   const todayPlan = weekDays[0];
+  const completedTasks = tasks.filter((task) => task.done).length;
+  const localProgress: ProgressData | undefined = useLocalProgress
+    ? guestGoalProgress(goal.id) ?? {
+        goal_id: goal.id,
+        title: goal.title,
+        deadline: goal.deadline,
+        total_tasks: tasks.length,
+        completed_tasks: completedTasks,
+        avg_completion_rate: tasks.length ? completedTasks / tasks.length : 0,
+        streak_days: completedTasks ? 1 : 0,
+        debt_count: tasks.filter((task) => !task.done && task.date < TODAY).length,
+        days_ahead_or_behind: null,
+      }
+    : undefined;
   const formatDuration = (minutes: number) => {
     if (minutes < 60) return `${minutes} 分钟`;
     const hours = Math.round((minutes / 60) * 10) / 10;
     return `${hours} 小时`;
   };
-  const nextTaskDate = nextTask
-    ? nextTask.date < TODAY
-      ? "已延期"
-      : nextTask.date === TODAY
-        ? "今天"
-        : `${Number(nextTask.date.slice(5, 7))}月${Number(nextTask.date.slice(8, 10))}日`
-    : "";
-  return (
-    <section className={cn("goal-execution", nextTask ? "has-next-task" : "is-next-task-empty")} aria-label="当前目标执行节奏">
-      <header className="goal-execution-header">
-        <div><span>本轮安排</span><strong>{todayPlan.total ? `今天还剩 ${todayPlan.total - todayPlan.done} 项` : "今天尚未安排任务"}</strong></div>
-        <small>{upcomingCount} 项进入未来 7 天</small>
+  const metrics = (
+    <div className="goal-execution-metrics" role="group" aria-label="目标与执行指标">
+      <header className="goal-execution-section-header">
+        <span><BarChart3 size={14} aria-hidden="true" />目标概览</span>
       </header>
-
+      <ProgressOverview goalId={goal.id} refreshKey={progressRefreshKey} localData={localProgress} />
       <dl className="goal-execution-kpis">
-        <div><dt>今日完成</dt><dd>{todayPlan.done}/{todayPlan.total}</dd></div>
-        <div><dt>七日安排</dt><dd>{upcomingCount}<small>项</small></dd></div>
-        <div><dt>剩余投入</dt><dd>{formatDuration(remainingMinutes)}</dd></div>
+        <div><dt><CheckCircle2 size={14} aria-hidden="true" /><span>今日完成</span></dt><dd>{todayPlan.total ? `${todayPlan.done}/${todayPlan.total}` : "暂无"}</dd></div>
+        <div><dt><Calendar size={14} aria-hidden="true" /><span>未来一周</span></dt><dd>{upcomingCount}<small>项</small></dd></div>
+        <div><dt><Clock size={14} aria-hidden="true" /><span>剩余投入</span></dt><dd>{formatDuration(remainingMinutes)}</dd></div>
       </dl>
+    </div>
+  );
 
-      <section className="goal-execution-capacity" aria-label="投入匹配">
-        <header><span>投入匹配</span><strong>{requiredMinutesPerDay} / {dailyCapacityMinutes} 分钟/日</strong></header>
-        <div className="goal-execution-capacity-track" role="img" aria-label={`每天需要 ${requiredMinutesPerDay} 分钟，当前设置每天投入 ${dailyCapacityMinutes} 分钟`}>
-          <i style={{ width: `${Math.min(100, loadRatio * 100)}%` }} />
-          <span aria-hidden="true" />
+  if (tasks.length === 0) {
+    return (
+      <section className="goal-execution is-empty" aria-label="当前目标执行节奏">
+        <div className="goal-execution-empty-content">
+          <div className="goal-execution-empty-icon" aria-hidden="true"><BarChart3 size={20} /></div>
+          <strong>暂无可分析的执行数据</strong>
+          <p>安排至少一个学习任务后，这里会分析每日投入与未来一周的负荷分布。</p>
+          <button type="button" onClick={onCreateTask}>
+            <Plus size={14} /> 新建任务
+          </button>
         </div>
-        <footer><span>计划所需</span><span>当前日均投入</span></footer>
+      </section>
+    );
+  }
+
+  if (incompleteTasks.length === 0) {
+    return (
+      <section className="goal-execution is-complete" aria-label="当前目标执行节奏">
+        {metrics}
+        <div className="goal-execution-empty-content">
+          <div className="goal-execution-empty-icon" aria-hidden="true"><CheckCircle2 size={20} /></div>
+          <strong>当前任务已全部完成</strong>
+          <p>这个目标暂时没有待完成任务。可以继续查看学习计划，安排下一阶段。</p>
+          <span>{tasks.length} 项任务已完成</span>
+        </div>
+      </section>
+    );
+  }
+
+  const capacityStatus = dailyCapacityMinutes === 0
+    ? "未设置日投入"
+    : isOverCapacity
+      ? `超出 ${overloadPercent}%`
+      : loadRatio > 0.8
+        ? "接近投入上限"
+        : "时间充足";
+  const capacityStatusTone = dailyCapacityMinutes === 0
+    ? "is-unset"
+    : isOverCapacity
+      ? "is-overloaded"
+      : loadRatio > 0.8
+        ? "is-near"
+        : "is-sufficient";
+  const capacityUsagePercent = dailyCapacityMinutes > 0 ? Math.round(loadRatio * 100) : 0;
+  const capacitySummary = dailyCapacityMinutes === 0
+    ? "设置每日可投入时间后显示占用比例"
+    : isOverCapacity
+      ? `超出每日可投入 ${overloadMinutes} 分钟`
+      : `占用 ${capacityUsagePercent}%，还可安排 ${Math.max(0, dailyCapacityMinutes - requiredMinutesPerDay)} 分钟/日`;
+  return (
+    <section className="goal-execution" aria-label="当前目标执行节奏">
+      {metrics}
+
+      <section className={`goal-execution-capacity ${isOverCapacity ? "is-overloaded" : ""}`} aria-label="每日投入">
+        <header className="goal-execution-section-header">
+          <span><Clock size={14} aria-hidden="true" />每日投入</span>
+          <em className={`goal-execution-section-status goal-capacity-status ${capacityStatusTone}`}>{capacityStatus}</em>
+        </header>
+        <div className="goal-execution-capacity-summary">
+          <div>
+            <span>计划所需</span>
+            <strong>{requiredMinutesPerDay}<small>分钟/日</small></strong>
+          </div>
+        </div>
+        <div
+          className={`goal-execution-capacity-track ${isOverCapacity ? "is-overloaded" : ""}`}
+          role="img"
+          aria-label={`每天计划需要 ${requiredMinutesPerDay} 分钟，每日可投入 ${dailyCapacityMinutes} 分钟${isOverCapacity ? `，超出 ${overloadMinutes} 分钟，超出比例 ${overloadPercent}%` : ""}`}
+        >
+          <i style={{ width: `${isOverCapacity ? capacityMarkerPercent : requiredFillPercent}%` }} />
+          {isOverCapacity && (
+            <em
+              aria-hidden="true"
+              style={{
+                left: `${capacityMarkerPercent}%`,
+                width: `${Math.max(0, requiredFillPercent - capacityMarkerPercent)}%`,
+              }}
+            />
+          )}
+          {dailyCapacityMinutes > 0 && <span aria-hidden="true" style={{ left: `${capacityMarkerPercent}%` }} />}
+        </div>
+        <footer>
+          <span>{capacitySummary}</span>
+        </footer>
       </section>
 
-      <section className="goal-execution-week" aria-label="未来七天任务安排">
-        <header><span>未来 7 天</span><strong>{upcomingCount} 项已安排</strong></header>
-        <div className="goal-execution-week-chart" role="img" aria-label={`未来七天共安排 ${upcomingCount} 项任务`}>
+      <section className="goal-execution-week" aria-label="未来一周任务安排">
+        <header className="goal-execution-section-header">
+          <span><Calendar size={14} aria-hidden="true" />未来一周安排</span>
+          <strong className="goal-execution-section-status">{upcomingCount} 项已安排</strong>
+        </header>
+        <div className="goal-execution-week-chart" role="group" aria-label={`未来七天共安排 ${upcomingCount} 项任务`}>
           {weekDays.map((day, index) => (
-            <div key={day.date} aria-label={`${day.label} ${day.total} 项任务，完成 ${day.done} 项`}>
-              <span className="goal-execution-day-count">{day.total || "·"}</span>
-              <span className="goal-execution-day-track">
-                <i
-                  className={day.total ? "has-tasks" : ""}
-                  style={{ height: day.total ? `${Math.max(16, (day.total / maxDayTasks) * 100)}%` : "4px", animationDelay: `${160 + index * 45}ms` }}
-                >
-                  {day.done > 0 && <b style={{ height: `${(day.done / day.total) * 100}%` }} />}
-                </i>
+            <button
+              type="button"
+              key={day.date}
+              className={`${index === 0 ? "is-today" : ""} ${day.total ? "is-planned" : "is-empty"} ${day.done === day.total && day.total > 0 ? "is-complete" : ""} ${day.plannedMinutes > dailyCapacityMinutes && dailyCapacityMinutes > 0 ? "is-risk" : ""}`}
+              style={{ animationDelay: `${120 + index * 40}ms` }}
+              aria-label={`打开${day.dateLabel}${day.label}的任务日历，计划 ${day.plannedMinutes} 分钟，完成 ${day.completedMinutes} 分钟`}
+              onClick={() => onSelectDate(day.date)}
+            >
+              <b>{day.plannedMinutes}<small>m</small></b>
+              <span className="goal-execution-week-track" aria-hidden="true">
+                <i style={{ height: `${Math.max(day.plannedMinutes ? 8 : 0, day.plannedMinutes / maxWeekMinutes * 100)}%` }} />
+                <em style={{ height: `${Math.max(day.completedMinutes ? 4 : 0, day.completedMinutes / maxWeekMinutes * 100)}%` }} />
+                {dailyCapacityMinutes > 0 && <u style={{ bottom: `${Math.min(100, dailyCapacityMinutes / maxWeekMinutes * 100)}%` }} />}
               </span>
-              <small>{day.label}</small>
-            </div>
+              <strong>{day.label}</strong>
+              <small>{day.dateLabel}</small>
+              <span className="goal-execution-week-tooltip" role="tooltip">
+                <strong>{day.dateLabel} · {day.label}</strong>
+                <small>{day.total} 项任务，计划 {day.plannedMinutes} 分钟</small>
+                <small>已完成 {day.completedMinutes} 分钟，剩余 {Math.max(0, day.plannedMinutes - day.completedMinutes)} 分钟</small>
+              </span>
+            </button>
           ))}
         </div>
-        <footer><span><i className="is-planned" />已安排</span><span><i className="is-done" />已完成</span></footer>
+        <footer><span><i className="is-planned" />计划量</span><span><i className="is-done" />已完成量</span><span><i className="is-capacity" />可投入上限</span></footer>
       </section>
-
-      {nextTask && (
-        <div className="goal-execution-next">
-          <span>下一项任务</span>
-          <div><strong>{nextTask.title}</strong><small>{nextTaskDate} · {nextTask.estimatedMinutes} 分钟 · {PRIORITY_LABEL[nextTask.priority ?? "medium"]}优先级</small></div>
-        </div>
-      )}
     </section>
   );
 }
@@ -200,6 +309,13 @@ function MiniCalendar({
   const todayParts = TODAY.split("-");
   const [viewYear, setViewYear] = useState(Number(todayParts[0]));
   const [viewMonth, setViewMonth] = useState(Number(todayParts[1]) - 1);
+
+  useEffect(() => {
+    const [year, month] = selectedDate.split("-").map(Number);
+    if (!year || !month) return;
+    setViewYear(year);
+    setViewMonth(month - 1);
+  }, [selectedDate]);
 
   function prevMonth() {
     if (viewMonth === 0) { setViewMonth(11); setViewYear((y) => y - 1); }
@@ -225,58 +341,61 @@ function MiniCalendar({
   while (cells.length % 7 !== 0) cells.push(null);
 
   return (
-    <div className="mx-auto w-full max-w-[360px]">
-      <div className="mb-2 flex items-center justify-between">
-        <button onClick={prevMonth} className="p-1 rounded-lg hover:bg-gray-100 text-gray-500 transition">
+    <div className="goal-mini-calendar w-full">
+      <div className="goal-mini-calendar-header mb-1.5 flex items-center justify-between">
+        <button type="button" aria-label="上个月" onClick={prevMonth} className="p-1 rounded-lg hover:bg-gray-100 text-gray-500 transition">
           <ChevronLeft size={14} />
         </button>
-        <span className="text-xs font-semibold text-gray-700">{viewYear}年 {MONTH_NAMES[viewMonth]}</span>
-        <button onClick={nextMonth} className="p-1 rounded-lg hover:bg-gray-100 text-gray-500 transition">
+        <div className="goal-mini-calendar-heading">
+          <span className="goal-mini-calendar-title text-gray-700">{viewYear}年 {MONTH_NAMES[viewMonth]}</span>
+          <div className="goal-mini-calendar-legend text-gray-400" aria-label="任务状态图例">
+            <span>
+              <i style={{ backgroundColor: "var(--accent)" }} />已完成
+            </span>
+            <span>
+              <i className="bg-amber-400" />待完成
+            </span>
+          </div>
+        </div>
+        <button type="button" aria-label="下个月" onClick={nextMonth} className="p-1 rounded-lg hover:bg-gray-100 text-gray-500 transition">
           <ChevronRight size={14} />
         </button>
       </div>
 
-      <div className="mb-0.5 grid grid-cols-7">
-        {DAY_NAMES_SHORT.map((d) => (
-          <div key={d} className="py-0.5 text-center text-[11px] text-gray-300">{d}</div>
-        ))}
-      </div>
+      <div className="goal-mini-calendar-body">
+        <div className="goal-mini-calendar-weekdays mb-0.5 grid grid-cols-7">
+          {DAY_NAMES_SHORT.map((d) => (
+            <div key={d} className="py-0.5 text-center text-gray-300">{d}</div>
+          ))}
+        </div>
 
-      <div className="grid grid-cols-7 gap-y-0.5">
-        {cells.map((day, i) => {
-          if (!day) return <div key={i} />;
-          const dateStr = fmt(viewYear, viewMonth, day);
-          const hasTasks = !!tasksByDate[dateStr]?.length;
-          const allDone = hasTasks && tasksByDate[dateStr].every((t) => t.done);
-          const isToday = dateStr === TODAY;
-          const isSelected = dateStr === selectedDate;
-          return (
-            <button key={i} onClick={() => onSelect(dateStr)}
-              className={cn(
-                "relative flex h-7 flex-col items-center justify-center rounded-lg text-[11px] transition",
-                isSelected ? "text-white font-semibold"
-                : isToday ? "font-bold text-gray-900 ring-1 ring-inset ring-gray-300"
-                : "text-gray-600 hover:bg-gray-100",
-              )}
-              style={isSelected ? { backgroundColor: "var(--accent)" } : {}}
-            >
-              {day}
-              {hasTasks && (
-                <span className="absolute bottom-0.5 w-1 h-1 rounded-full"
-                  style={{ backgroundColor: isSelected ? "rgba(255,255,255,0.7)" : allDone ? "var(--accent)" : "#f59e0b" }} />
-              )}
-            </button>
-          );
-        })}
-      </div>
-
-      <div className="mt-2 flex items-center justify-center gap-3 border-t border-gray-50 pt-2 text-[11px] text-gray-400">
-        <span className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full inline-block" style={{ backgroundColor: "var(--accent)" }} /> 已完成
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-amber-400 inline-block" /> 待完成
-        </span>
+        <div className="goal-mini-calendar-days grid grid-cols-7 gap-y-px">
+          {cells.map((day, i) => {
+            if (!day) return <div key={i} />;
+            const dateStr = fmt(viewYear, viewMonth, day);
+            const hasTasks = !!tasksByDate[dateStr]?.length;
+            const allDone = hasTasks && tasksByDate[dateStr].every((t) => t.done);
+            const isToday = dateStr === TODAY;
+            const isSelected = dateStr === selectedDate;
+            return (
+              <button key={i} onClick={() => onSelect(dateStr)}
+                className={cn(
+                  "relative flex flex-col items-center justify-center rounded-md leading-none transition",
+                  isSelected ? "text-white font-semibold"
+                  : isToday ? "font-bold text-gray-900 ring-1 ring-inset ring-gray-300"
+                  : "text-gray-600 hover:bg-gray-100",
+                )}
+                style={isSelected ? { backgroundColor: "var(--accent)" } : {}}
+              >
+                {day}
+                {hasTasks && (
+                  <span className="absolute bottom-0.5 w-1 h-1 rounded-full"
+                    style={{ backgroundColor: isSelected ? "rgba(255,255,255,0.7)" : allDone ? "var(--accent)" : "#f59e0b" }} />
+                )}
+              </button>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
@@ -434,6 +553,7 @@ function GoalTasksWorkspace({
   onToggleTask,
   onVerify,
   focusTaskId,
+  createTaskRequestKey,
 }: {
   goal: Goal;
   tasks: Task[];
@@ -442,6 +562,7 @@ function GoalTasksWorkspace({
   onToggleTask: (taskId: string) => void;
   onVerify: (task: Task) => void;
   focusTaskId?: string | null;
+  createTaskRequestKey: number;
 }) {
   const { addTask, updateTask, deleteTask } = useTasks();
   const [view, setView] = useState<"today" | "calendar">("today");
@@ -462,6 +583,13 @@ function GoalTasksWorkspace({
   }, [showAdd]);
 
   useEffect(() => {
+    if (createTaskRequestKey === 0) return;
+    setView("today");
+    onSelectDate(TODAY);
+    setShowAdd(true);
+  }, [createTaskRequestKey, onSelectDate]);
+
+  useEffect(() => {
     if (!focusTaskId) return;
     const focusedTask = tasks.find((task) => task.id === focusTaskId);
     if (!focusedTask) return;
@@ -476,6 +604,10 @@ function GoalTasksWorkspace({
     }, 120);
     return () => window.clearTimeout(timer);
   }, [focusTaskId, selectedDate, view]);
+
+  useEffect(() => {
+    if (selectedDate !== TODAY) setView("calendar");
+  }, [selectedDate]);
 
   const todayTasks = tasks.filter((task) => task.date === TODAY);
   const doneTasks = todayTasks.filter((task) => task.done).length;
@@ -531,7 +663,7 @@ function GoalTasksWorkspace({
   }
 
   return (
-    <div ref={workspaceRef} className="px-4 py-4 min-h-[260px]">
+    <div ref={workspaceRef} className="goal-tasks-workspace px-4 py-4 min-h-[260px]">
       <div className="goal-task-toolbar mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-gray-100 pb-2">
         <div
           className="goal-task-view-tabs inline-flex items-center gap-4"
@@ -549,33 +681,34 @@ function GoalTasksWorkspace({
                 aria-selected={active}
                 onClick={() => setView(item)}
                 className={cn(
-                  "goal-task-view-tab relative flex items-center gap-1.5 px-0.5 py-1 text-xs font-medium transition",
-                  active ? "is-active" : "text-gray-400 hover:text-gray-600"
+                  "goal-task-view-tab relative flex items-center transition",
+                  active && "is-active"
                 )}
-                style={active ? { color: "var(--accent)" } : {}}
               >
                 <Icon size={13} />
-                {item === "today" ? "今日任务" : "历史任务"}
+                {item === "today" ? "今日任务" : "任务日历"}
               </button>
             );
           })}
         </div>
         {view === "today" ? (
           <div className="goal-task-toolbar-actions ml-auto flex items-center gap-2">
-            <span className="text-[11px] text-gray-400">{doneTasks}/{todayTasks.length} 已完成</span>
-            <button
-              type="button"
-              onClick={() => setShowAdd(true)}
-              className="goal-task-add-button flex h-6 items-center gap-1 rounded-full border px-2 py-0 text-[10px] font-medium transition"
-              style={{
-                color: "var(--accent)",
-                borderColor: "color-mix(in srgb, var(--accent) 28%, transparent)",
-                backgroundColor: "var(--accent-light)",
-              }}
-            >
-              <Plus size={11} />
-              新建任务
-            </button>
+            {todayTasks.length > 0 && <span className="text-xs text-gray-400">{doneTasks}/{todayTasks.length} 已完成</span>}
+            {todayTasks.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowAdd(true)}
+                className="goal-task-add-button flex items-center gap-1 rounded-lg border px-3 font-medium transition"
+                style={{
+                  color: "var(--accent)",
+                  borderColor: "color-mix(in srgb, var(--accent) 28%, transparent)",
+                  backgroundColor: "var(--accent-light)",
+                }}
+              >
+                <Plus size={13} />
+                新建任务
+              </button>
+            )}
           </div>
         ) : selectedDate !== TODAY ? (
             <button
@@ -649,14 +782,11 @@ function GoalTasksWorkspace({
               </div>
             </div>
           )}
-          {todayTasks.length === 0 && (
+          {todayTasks.length === 0 && !showAdd && (
             <div className="goal-task-empty">
               <span className="goal-task-empty-icon" aria-hidden="true"><CheckCircle2 size={19} /></span>
-              <strong>今天还没有任务</strong>
-              <p>添加一个明确的小任务，开始推进这个目标。</p>
-              <button type="button" onClick={() => setShowAdd(true)}>
-                <Plus size={13} /> 新建第一个任务
-              </button>
+              <strong>今天还没有学习任务</strong>
+              <p>添加一个 15–60 分钟的小任务，开始推进“{goal.title}”。</p>
             </div>
           )}
           {todayTasks.map((task) => (
@@ -852,10 +982,19 @@ function PlanOverview({ goalId, goalType, goalTitle, refreshKey, onPlanLoad }: {
 
   if (planError) {
     return (
-      <div className="goal-plan-error flex flex-col items-center gap-2 px-4 py-6 text-center" role="alert">
-        <strong className="text-xs text-gray-700">{planError}</strong>
-        <button type="button" onClick={() => void fetchPlan()} className="text-xs text-accent hover:underline">重试读取计划</button>
-      </div>
+      <>
+        <DataSyncNotice
+          title="学习计划同步失败"
+          message={planError}
+          retryLabel="重新加载"
+          onRetry={() => void fetchPlan()}
+        />
+        <div className="goal-plan-error goal-execution-empty-content" role="status">
+          <span className="goal-execution-empty-icon" aria-hidden="true"><BookOpen size={20} /></span>
+          <strong>学习计划暂未显示</strong>
+          <p>目标和任务仍可正常使用</p>
+        </div>
+      </>
     );
   }
 
@@ -1046,6 +1185,7 @@ export default function GoalDetailPage() {
     setGoalLoadError(null);
     const loadGoal = async () => {
       if (authStatus === "unauthenticated") {
+        ensureGuestDatasetSeeded();
         const localGoal = readLocalGoal(params.id) ?? GUEST_DEMO_GOALS[params.id] ?? null;
         if (active) {
           setGoal(localGoal);
@@ -1091,13 +1231,16 @@ export default function GoalDetailPage() {
   };
 
   const [tab, setTab] = useState<"tasks" | "notes">("tasks");
-  const [rightTab, setRightTab] = useState<"plan" | "execution">("execution");
+  const [rightTab, setRightTab] = useState<"plan" | "execution">(searchParams.get("tab") === "plan" ? "plan" : "execution");
   const [selectedDate, setSelectedDate] = useState(TODAY);
   const [verifyTask, setVerifyTask] = useState<{ taskId: string; taskTitle: string } | null>(null);
-  const [statsCollapsed, setStatsCollapsed] = useState(false);
   const [planRefreshKey, setPlanRefreshKey] = useState(0);
   const [progressRefreshKey, setProgressRefreshKey] = useState(0);
-  const [planTotalDays, setPlanTotalDays] = useState<number | null>(null);
+  const [createTaskRequestKey, setCreateTaskRequestKey] = useState(0);
+
+  useEffect(() => {
+    if (searchParams.get("tab") === "plan") setRightTab("plan");
+  }, [searchParams]);
 
   useEffect(() => {
     if (!goal) return;
@@ -1126,7 +1269,9 @@ export default function GoalDetailPage() {
   }, []);
 
   const [sidebarWidth, setSidebarWidth] = useState(() =>
-    typeof window !== "undefined" ? Math.round(window.innerWidth * 0.4) : 480
+    typeof window !== "undefined"
+      ? Math.min(1080, Math.max(420, Math.round((window.innerWidth - 280) * 0.5)))
+      : 560
   );
   const isDragging = useRef(false);
   const dragStartX = useRef(0);
@@ -1143,14 +1288,14 @@ export default function GoalDetailPage() {
   const resizePanelsByKeyboard = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
     if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
     event.preventDefault();
-    setSidebarWidth((current) => Math.min(700, Math.max(240, current + (event.key === "ArrowRight" ? 20 : -20))));
+    setSidebarWidth((current) => Math.min(1080, Math.max(420, current + (event.key === "ArrowRight" ? 20 : -20))));
   }, []);
 
   useEffect(() => {
     const onMove = (e: MouseEvent) => {
       if (!isDragging.current) return;
       const delta = e.clientX - dragStartX.current;
-      setSidebarWidth(Math.min(700, Math.max(240, dragStartWidth.current + delta)));
+      setSidebarWidth(Math.min(1080, Math.max(420, dragStartWidth.current + delta)));
     };
     const onUp = () => {
       if (!isDragging.current) return;
@@ -1176,9 +1321,17 @@ export default function GoalDetailPage() {
 
   if (!goal) {
     return (
-      <div className="flex flex-col items-center justify-center h-full text-gray-400 gap-3" role="alert">
-        <p className="text-sm">{goalLoadError ?? "目标不存在或无权访问"}</p>
-        {goalLoadError && <button type="button" onClick={() => setGoalLoadAttempt((attempt) => attempt + 1)} className="text-accent text-sm hover:underline">重试读取目标</button>}
+      <div className="flex flex-col items-center justify-center h-full text-gray-400 gap-3" role="status">
+        {goalLoadError && (
+          <DataSyncNotice
+            title="目标数据同步失败"
+            message={goalLoadError}
+            retryLabel="重新加载"
+            onRetry={() => setGoalLoadAttempt((attempt) => attempt + 1)}
+          />
+        )}
+        <p className="text-sm">{goalLoadError ? "目标内容暂未显示" : "目标不存在或无权访问"}</p>
+        {goalLoadError && <span className="text-xs text-gray-400">目标数据没有被清空，连接恢复后可重新加载。</span>}
         <Link href={goalsHref} className="text-accent text-sm hover:underline">返回目标列表</Link>
       </div>
     );
@@ -1188,25 +1341,23 @@ export default function GoalDetailPage() {
 
   return (
     <div className="goal-detail-page flex flex-col h-full overflow-hidden bg-gray-50">
-      {/* 顶部返回栏 */}
-      <div className="goal-detail-header flex items-center gap-3 px-6 py-3 bg-white border-b border-gray-100 flex-shrink-0">
-        <Link href={goalsHref} className="text-gray-400 hover:text-gray-600 transition p-1 -ml-1 rounded-lg hover:bg-gray-100">
-          <ArrowLeft size={18} />
-        </Link>
-        <span className="text-sm text-gray-400">/</span>
-        <Link href={goalsHref} className="text-sm font-medium text-gray-500 hover:text-gray-800 transition">我的目标</Link>
-        <span className="text-sm text-gray-400">/</span>
-        <span className="min-w-0 text-sm font-semibold text-gray-900 truncate">{goal.title}</span>
-        <span className="hidden min-[900px]:inline text-xs text-gray-400 truncate">
-          截止 {goal.deadline} · {planTotalDays != null ? `计划 ${planTotalDays} 天` : `剩余 ${daysLeft} 天`} · 每日 {goal.daily_hours}h
-        </span>
-        <span
-          className="goal-status ml-auto text-xs font-medium px-2.5 py-1 rounded-full"
-          style={{ color: "var(--accent)", backgroundColor: "var(--accent-light)" }}
-        >
-          {STATUS_LABEL[goal.status] ?? goal.status}
-        </span>
-      </div>
+      <header className="goal-detail-header bg-white border-b border-gray-100 flex-shrink-0">
+        <div className="goal-detail-heading-row">
+          <Link href={goalsHref} className="goal-detail-back" aria-label="返回我的目标">
+            <ArrowLeft size={18} />
+          </Link>
+          <div className="goal-detail-heading-copy">
+            <div className="goal-detail-title-line">
+              <h1>{goal.title}</h1>
+              <span className="goal-status">{STATUS_LABEL[goal.status] ?? goal.status}</span>
+            </div>
+            <p>
+              <span>截止 {goal.deadline}</span>
+              <span>每日计划投入 {goal.daily_hours >= 1 ? `${goal.daily_hours} 小时` : `${Math.round(goal.daily_hours * 60)} 分钟`}</span>
+            </p>
+          </div>
+        </div>
+      </header>
 
       <div className="goal-detail-body flex flex-1 overflow-hidden">
         {/* ── 左侧面板 ── */}
@@ -1214,55 +1365,18 @@ export default function GoalDetailPage() {
           className="goal-detail-left flex flex-shrink-0 flex-col overflow-hidden bg-white border-r border-gray-100"
           style={{ width: sidebarWidth }}
         >
-          {/* 数据指标 — 可折叠 */}
-              <div className={cn("goal-detail-stats flex-shrink-0 border-b border-gray-100", statsCollapsed && "is-collapsed")}>
-                <div className="goal-stats-toolbar flex items-center">
-                  <div className="goal-stats-title flex-1 flex items-center px-4 py-3">
-                    <div className="flex items-center gap-1.5" style={{ color: "var(--accent)" }}>
-                      <div className="w-4 h-4 rounded-full flex items-center justify-center" style={{ backgroundColor: "var(--accent)" }}>
-                        <BarChart3 size={9} className="text-white" />
-                      </div>
-                      <span className="text-sm font-semibold">数据指标</span>
-                    </div>
-                  </div>
-                  <div className="goal-stats-controls mr-3" aria-label="数据面板显示控制">
-                    <button
-                      onClick={() => setStatsCollapsed((v) => !v)}
-                      className={cn("goal-stats-heading goal-stats-toggle-button", statsCollapsed && "is-collapsed")}
-                      aria-expanded={!statsCollapsed}
-                      aria-controls="goal-statistics-content"
-                      aria-label={statsCollapsed ? "展开数据指标" : "收起数据指标"}
-                      data-tooltip={statsCollapsed ? "展开指标" : "收起指标"}
-                    >
-                      <ChevronUp size={15} />
-                    </button>
-                  </div>
-                </div>
-                <div
-                  id="goal-statistics-content"
-                  className={cn("goal-stats-content", statsCollapsed && "is-collapsed")}
-                  aria-hidden={statsCollapsed}
-                >
-                  <div className="goal-stats-content-inner">
-                    <div className="space-y-3 px-4 pb-3 pt-2">
-                      <ProgressOverview goalId={goal.id} refreshKey={progressRefreshKey} />
-                      <DebtCard goalId={goal.id} />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
               {/* 顶层只区分任务与笔记；今日/日历在任务组件内部切换 */}
-              <div className="flex items-center border-b border-gray-100 flex-shrink-0">
+              <div className="goal-primary-tabs flex items-center border-b border-gray-100 flex-shrink-0">
                 {(["tasks", "notes"] as const).map((t) => (
                   <button key={t} onClick={() => setTab(t)}
+                    aria-pressed={tab === t}
                     className={cn(`goal-primary-tab goal-primary-tab-${t}`, "flex-1 py-3 text-sm font-semibold transition flex items-center justify-center gap-1.5",
                       tab === t ? "border-b-2 text-gray-900" : "text-gray-400 hover:text-gray-600"
                     )}
-                    style={tab === t ? { borderColor: "var(--accent)", color: "var(--accent)" } : {}}>
+                    style={tab === t ? { borderColor: "var(--accent)" } : {}}>
                     {t === "tasks"
-                      ? <><div className="w-4 h-4 rounded-full flex items-center justify-center" style={{ backgroundColor: "var(--accent)" }}><CheckCircle2 size={9} className="text-white" /></div>任务</>
-                      : <><div className="w-4 h-4 rounded-full flex items-center justify-center" style={{ backgroundColor: "var(--accent)" }}><FileText size={9} className="text-white" /></div>相关笔记</>
+                      ? <><CheckCircle2 size={15} aria-hidden="true" />任务</>
+                      : <><FileText size={15} aria-hidden="true" />相关笔记</>
                     }
                   </button>
                 ))}
@@ -1270,17 +1384,19 @@ export default function GoalDetailPage() {
 
               {/* Tab 内容 */}
               <div className="goal-detail-scroll flex-1 overflow-y-auto">
-                {tab === "tasks" && (
-                  <GoalTasksWorkspace
-                    goal={goal}
-                    tasks={goalTasks}
-                    selectedDate={selectedDate}
-                    onSelectDate={setSelectedDate}
-                    onToggleTask={handleToggleTask}
-                    onVerify={(task) => setVerifyTask({ taskId: task.id, taskTitle: task.title })}
-                    focusTaskId={focusedTaskId}
-                  />
-                )}
+                {tab === "tasks" && (<>
+                    <GoalTasksWorkspace
+                      goal={goal}
+                      tasks={goalTasks}
+                      selectedDate={selectedDate}
+                      onSelectDate={setSelectedDate}
+                      onToggleTask={handleToggleTask}
+                      onVerify={(task) => setVerifyTask({ taskId: task.id, taskTitle: task.title })}
+                      focusTaskId={focusedTaskId}
+                      createTaskRequestKey={createTaskRequestKey}
+                    />
+                    <div className="goal-detail-debt-list"><DebtCard goalId={goal.id} /></div>
+                  </>)}
 
                 {tab === "notes" && <GoalNotesPanel goalId={goal.id} />}
               </div>
@@ -1296,8 +1412,8 @@ export default function GoalDetailPage() {
           role="separator"
           aria-label="调整左右面板宽度"
           aria-orientation="vertical"
-          aria-valuemin={240}
-          aria-valuemax={700}
+          aria-valuemin={420}
+          aria-valuemax={1080}
           aria-valuenow={sidebarWidth}
           tabIndex={0}
         />
@@ -1309,16 +1425,17 @@ export default function GoalDetailPage() {
                   <button
                     key={t}
                     onClick={() => setRightTab(t)}
+                    aria-pressed={rightTab === t}
                     className={cn(
                       `goal-right-tab goal-right-tab-${t}`,
                       "flex items-center gap-1.5 px-4 py-3 text-sm font-semibold border-b-2 transition",
                       rightTab === t ? "text-gray-900" : "border-transparent text-gray-400 hover:text-gray-600"
                     )}
-                    style={rightTab === t ? { borderColor: "var(--accent)", color: "var(--accent)" } : {}}
+                    style={rightTab === t ? { borderColor: "var(--accent)" } : {}}
                   >
                     {t === "execution"
-                      ? <><div className="w-4 h-4 rounded-full flex items-center justify-center" style={{ backgroundColor: "var(--accent)" }}><BarChart3 size={9} className="text-white" /></div>执行节奏</>
-                      : <><div className="w-4 h-4 rounded-full flex items-center justify-center" style={{ backgroundColor: "var(--accent)" }}><BookOpen size={9} className="text-white" /></div>学习计划</>
+                      ? <><BarChart3 size={15} aria-hidden="true" />执行节奏</>
+                      : <><BookOpen size={15} aria-hidden="true" />学习计划</>
                     }
                   </button>
             ))}
@@ -1326,7 +1443,7 @@ export default function GoalDetailPage() {
           {rightTab === "plan" && (
                 <div className="goal-plan-shell flex-1 flex flex-col overflow-hidden">
                   <div className="flex-1 overflow-y-auto px-5 py-4">
-                    <PlanOverview goalId={goal.id} goalType={goal.type} goalTitle={goal.title} deadline={goal.deadline} refreshKey={planRefreshKey} onPlanLoad={setPlanTotalDays} />
+                    <PlanOverview goalId={goal.id} goalType={goal.type} goalTitle={goal.title} deadline={goal.deadline} refreshKey={planRefreshKey} />
                   </div>
                 </div>
           )}
@@ -1335,6 +1452,17 @@ export default function GoalDetailPage() {
                   goal={goal}
                   tasks={goalTasks}
                   daysLeft={daysLeft}
+                  progressRefreshKey={progressRefreshKey}
+                  useLocalProgress={authStatus === "unauthenticated"}
+                  onSelectDate={(date) => {
+                    setTab("tasks");
+                    setSelectedDate(date);
+                  }}
+                  onCreateTask={() => {
+                    setTab("tasks");
+                    setSelectedDate(TODAY);
+                    setCreateTaskRequestKey((key) => key + 1);
+                  }}
                 />
               )}
         </div>

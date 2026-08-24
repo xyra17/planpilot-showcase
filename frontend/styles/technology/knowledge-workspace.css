@@ -2179,6 +2179,10 @@
 .knowledge-reference-page .file-dropzone small,
 .knowledge-reference-page .dialog-library-destination span,
 .knowledge-reference-page .library-settings-note {
+  margin-top: 2px;
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
   font-size: 12px;
 }
 
@@ -2234,8 +2238,8 @@
   }
 }
 
-/* Goal-first resource workspace. A knowledge base is an archive; resource
-   associations and filters live beside the table where they can be inspected. */
+/* Independent classification workspace. Goals describe learning context while
+   personal folders provide optional archival organization. */
 .knowledge-reference-grid {
   height: calc(100vh - 134px);
 }
@@ -2308,25 +2312,7 @@
 }
 
 .knowledge-library-row {
-  display: grid;
   min-width: 0;
-  grid-template-columns: minmax(0, 1fr) 26px;
-  gap: 2px;
-  align-items: center;
-}
-
-.knowledge-library-row>button:last-child {
-  display: grid;
-  width: 26px;
-  height: 26px;
-  place-items: center;
-  color: var(--knowledge-faint);
-  border-radius: 6px;
-}
-
-.knowledge-library-row>button:last-child:hover {
-  color: var(--knowledge-accent);
-  background: var(--knowledge-accent-soft);
 }
 
 .knowledge-resource-filter-row {
@@ -2572,8 +2558,8 @@
   }
 }
 
-/* Goal-first information architecture: goals are the primary way to enter
-   resources; folders are a separate, optional archive layer. */
+/* Goals and personal folders are peer classification systems. A resource may
+   use either one, both, or neither without creating a mirrored category. */
 .knowledge-reference-grid {
   grid-template-columns: minmax(220px, 250px) minmax(0, 1fr);
   gap: 14px;
@@ -2600,17 +2586,6 @@
   color: var(--knowledge-faint);
   font-size: 11px;
   line-height: 1.5;
-}
-
-.knowledge-rail-manage-link {
-  color: var(--knowledge-accent);
-  font-size: 11px;
-  font-weight: 650;
-}
-
-.knowledge-rail-manage-link:hover {
-  text-decoration: underline;
-  text-underline-offset: 3px;
 }
 
 .knowledge-ai-assist-card {
@@ -2645,9 +2620,36 @@
 }
 
 .knowledge-resource-context h2 {
-  margin-top: 4px;
   font-size: 18px;
   letter-spacing: -.02em;
+}
+
+.knowledge-resource-context-title {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 9px;
+  margin-top: 4px;
+}
+
+.knowledge-resource-context-title > button {
+  display: inline-flex;
+  min-height: 26px;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  color: var(--knowledge-muted);
+  border: 1px solid var(--knowledge-line);
+  border-radius: 7px;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.knowledge-resource-context-title > button:hover,
+.knowledge-resource-context-title > button:focus-visible {
+  color: var(--knowledge-accent);
+  border-color: color-mix(in srgb, var(--knowledge-accent) 34%, var(--knowledge-line));
+  background: var(--knowledge-accent-soft);
 }
 
 .knowledge-resource-context p {
@@ -3207,8 +3209,67 @@
 
 .knowledge-rail-column .knowledge-library-rail {
   display: grid;
-  grid-template-rows: auto minmax(112px, 1fr) minmax(96px, auto);
+  grid-template-rows: auto minmax(0, 1fr);
   overflow: hidden;
+}
+
+.knowledge-classification-split {
+  display: grid;
+  min-height: 0;
+  grid-template-rows:
+    minmax(0, var(--knowledge-goal-share, 1fr))
+    12px
+    minmax(0, var(--knowledge-library-share, 1fr));
+  overflow: hidden;
+}
+
+.knowledge-library-rail .knowledge-classification-split > section {
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+  border-bottom: 0;
+}
+
+.knowledge-classification-resizer {
+  position: relative;
+  min-height: 12px;
+  cursor: row-resize;
+  outline: none;
+  touch-action: none;
+}
+
+.knowledge-classification-resizer::before,
+.knowledge-classification-resizer::after {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  content: "";
+  border-radius: 99px;
+  transform: translate(-50%, -50%);
+  transition: background 160ms ease, box-shadow 160ms ease, width 160ms ease;
+}
+
+.knowledge-classification-resizer::before {
+  width: 100%;
+  height: 1px;
+  background: var(--knowledge-line);
+}
+
+.knowledge-classification-resizer::after {
+  width: 38px;
+  height: 3px;
+  background: color-mix(in srgb, var(--knowledge-accent) 24%, var(--knowledge-line));
+  box-shadow: 0 0 0 4px var(--knowledge-panel);
+}
+
+.knowledge-classification-resizer:hover::after,
+.knowledge-classification-resizer:focus-visible::after {
+  width: 50px;
+  background: var(--knowledge-accent);
+}
+
+.knowledge-classification-resizer:focus-visible::after {
+  box-shadow: 0 0 0 4px var(--knowledge-panel), 0 0 0 6px color-mix(in srgb, var(--knowledge-accent) 16%, transparent);
 }
 
 .knowledge-scope-shortcuts,
@@ -4521,7 +4582,7 @@
    regions so neither category can push the other out of view. */
 @media (min-width: 961px) {
   .knowledge-rail-column .knowledge-library-rail {
-    grid-template-rows: auto minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
   }
 
   .knowledge-rail-column .knowledge-goal-list,
@@ -4577,6 +4638,15 @@
   .knowledge-rail-column .knowledge-library-rail {
     display: block;
     overflow: visible;
+  }
+
+  .knowledge-classification-split { display: block; overflow: visible; }
+  .knowledge-classification-resizer { display: none; }
+  .knowledge-library-rail .knowledge-classification-split > section { overflow: visible; }
+  .knowledge-library-rail .knowledge-classification-split > .knowledge-library-list-section {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--knowledge-line);
   }
 
   .knowledge-goal-scroll,
@@ -5901,7 +5971,7 @@
    group; this intentionally comes last so earlier density rules cannot drift. */
 .knowledge-reference-page .knowledge-resource-table-head,
 .knowledge-reference-page .knowledge-resource-table article {
-  grid-template-columns: 26px minmax(258px, 1fr) 92px 92px 92px 120px;
+  grid-template-columns: 26px minmax(240px, 1.35fr) minmax(156px, .9fr) 92px 78px 68px;
   column-gap: 6px;
 }
 
@@ -5941,7 +6011,51 @@
   justify-content: center;
 }
 
+.knowledge-reference-page .knowledge-row-actions button {
+  position: relative;
+}
+
+.knowledge-reference-page .knowledge-row-actions button::after {
+  position: absolute;
+  z-index: 8;
+  bottom: calc(100% + 7px);
+  left: 50%;
+  width: max-content;
+  max-width: 120px;
+  padding: 5px 7px;
+  color: var(--knowledge-panel);
+  border: 1px solid color-mix(in srgb, var(--knowledge-line) 34%, transparent);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--knowledge-text) 94%, transparent);
+  box-shadow: 0 7px 18px color-mix(in srgb, var(--knowledge-text) 16%, transparent);
+  content: attr(data-tooltip);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.35;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, 3px);
+  transition: opacity 140ms ease, transform 140ms ease;
+  white-space: nowrap;
+}
+
+.knowledge-reference-page .knowledge-row-actions button:hover::after,
+.knowledge-reference-page .knowledge-row-actions button:focus-visible::after {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
 @media (min-width: 961px) {
+  /* GuestModeDialog reuses knowledge theme tokens, but it is a viewport
+     overlay rather than a knowledge workspace. Keep the page's desktop flex
+     lock from pulling this dialog to the top of the screen. */
+  .dialog-backdrop.knowledge-demo-intro-backdrop.knowledge-reference-page {
+    display: grid;
+    height: auto;
+    min-height: 0;
+    place-items: center;
+  }
+
   .knowledge-reference-page .knowledge-reference-grid {
     grid-template-columns: minmax(220px, 228px) minmax(0, 1fr);
     gap: 12px;

@@ -27,6 +27,26 @@ services:
       timeout: 3s
       retries: 5
 
+  migrate:
+    build:
+      context: ./backend
+    command: alembic upgrade head
+    env_file:
+      - ./backend/.env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://planpilot:password@postgres:5432/planpilot
+      REDIS_URL: redis://redis:6379/0
+      SECRET_KEY: ${PLANPILOT_DEV_SECRET_KEY:-planpilot-local-compose-secret-2026-only}
+      LOCAL_MODEL_ENABLED: "false"
+      OPENAI_BASE_URL: ""
+      EMBEDDING_BASE_URL: ""
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: "no"
+
   worker:
     build:
       context: ./backend
@@ -39,14 +59,18 @@ services:
     working_dir: /app
     environment:
       TZ: Asia/Shanghai
+      DATABASE_URL: postgresql+asyncpg://planpilot:password@postgres:5432/planpilot
       REDIS_URL: redis://redis:6379/0
-      OPENAI_BASE_URL: http://host.docker.internal:8080/v1
-      EMBEDDING_BASE_URL: http://host.docker.internal:1234/v1
+      SECRET_KEY: ${PLANPILOT_DEV_SECRET_KEY:-planpilot-local-compose-secret-2026-only}
+      OPENAI_BASE_URL: ${PLANPILOT_LOCAL_LLM_URL:-}
+      EMBEDDING_BASE_URL: ${PLANPILOT_EMBEDDING_URL:-}
+      LOCAL_MODEL_MAX_CONCURRENCY: ${PLANPILOT_LOCAL_MODEL_MAX_CONCURRENCY:-1}
+      LOCAL_MODEL_QUEUE_TIMEOUT_SECONDS: ${PLANPILOT_LOCAL_MODEL_QUEUE_TIMEOUT_SECONDS:-2}
     env_file:
       - ./backend/.env
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
     restart: on-failure
@@ -68,14 +92,18 @@ services:
     working_dir: /app
     environment:
       TZ: Asia/Shanghai
+      DATABASE_URL: postgresql+asyncpg://planpilot:password@postgres:5432/planpilot
       REDIS_URL: redis://redis:6379/0
-      OPENAI_BASE_URL: http://host.docker.internal:8080/v1
-      EMBEDDING_BASE_URL: http://host.docker.internal:1234/v1
+      SECRET_KEY: ${PLANPILOT_DEV_SECRET_KEY:-planpilot-local-compose-secret-2026-only}
+      OPENAI_BASE_URL: ${PLANPILOT_LOCAL_LLM_URL:-}
+      EMBEDDING_BASE_URL: ${PLANPILOT_EMBEDDING_URL:-}
+      LOCAL_MODEL_MAX_CONCURRENCY: ${PLANPILOT_LOCAL_MODEL_MAX_CONCURRENCY:-1}
+      LOCAL_MODEL_QUEUE_TIMEOUT_SECONDS: ${PLANPILOT_LOCAL_MODEL_QUEUE_TIMEOUT_SECONDS:-2}
     env_file:
       - ./backend/.env
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
     restart: on-failure
@@ -115,14 +143,18 @@ services:
     working_dir: /app
     environment:
       TZ: Asia/Shanghai
+      DATABASE_URL: postgresql+asyncpg://planpilot:password@postgres:5432/planpilot
       REDIS_URL: redis://redis:6379/0
-      OPENAI_BASE_URL: http://host.docker.internal:8080/v1
-      EMBEDDING_BASE_URL: http://host.docker.internal:1234/v1
+      SECRET_KEY: ${PLANPILOT_DEV_SECRET_KEY:-planpilot-local-compose-secret-2026-only}
+      OPENAI_BASE_URL: ${PLANPILOT_LOCAL_LLM_URL:-}
+      EMBEDDING_BASE_URL: ${PLANPILOT_EMBEDDING_URL:-}
+      LOCAL_MODEL_MAX_CONCURRENCY: ${PLANPILOT_LOCAL_MODEL_MAX_CONCURRENCY:-1}
+      LOCAL_MODEL_QUEUE_TIMEOUT_SECONDS: ${PLANPILOT_LOCAL_MODEL_QUEUE_TIMEOUT_SECONDS:-2}
     env_file:
       - ./backend/.env
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
     restart: on-failure
@@ -137,13 +169,22 @@ services:
     build:
       # One canonical frontend contains both complete UI experiences.
       context: ./frontend
+      target: development
       args:
         NEXT_PUBLIC_API_URL: http://localhost:8000
         API_URL: http://api:8000
+    working_dir: /app
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+      - frontend_next_cache:/app/.next
     environment:
       TZ: Asia/Shanghai
       API_URL: http://api:8000
       HOSTNAME: 0.0.0.0
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+      PLANPILOT_NEXT_DIST_DIR: .next
+      WATCHPACK_POLLING: "true"
     ports:
       - "3000:3000"
     healthcheck:
@@ -160,3 +201,5 @@ volumes:
   postgres_data:
   redis_data:
   minio_data:
+  frontend_node_modules:
+  frontend_next_cache:

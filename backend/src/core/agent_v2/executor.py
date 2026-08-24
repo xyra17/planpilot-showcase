@@ -11,7 +11,13 @@ from src.core.agent_v2.errors import LeaseLost
 from src.core.agent_v2.observer import verify_task_changes
 from src.core.agent_v2.policy import evaluate_policy
 from src.core.agent_v2.registry import ToolRegistry, ToolSpec
-from src.core.agent_v2.schemas import AgentRole, ChangeSet, PolicyOutcome, ToolContext
+from src.core.agent_v2.schemas import (
+    AgentRole,
+    ChangeSet,
+    PolicyOutcome,
+    ReviewOutput,
+    ToolContext,
+)
 from src.core.agent_v2.transitions import has_run_lease
 from src.models import AgentApproval, AgentRun, AgentStep
 from src.services.agent_schedule import undo_task_changes
@@ -32,8 +38,15 @@ async def execute_change_set(
         raise LeaseLost("执行租约已失效")
     raw_change_set = payload.get("change_set", {})
     change_set = ChangeSet.model_validate(raw_change_set)
+    if not payload.get("review"):
+        raise HTTPException(409, "变更集缺少风险审查结论")
+    review = ReviewOutput.model_validate(payload["review"])
     decision = evaluate_policy(
-        spec, role=AgentRole.MAIN, change_set=change_set, run_kind=run.run_kind
+        spec,
+        role=AgentRole.MAIN,
+        change_set=change_set,
+        review=review,
+        run_kind=run.run_kind,
     )
     if decision.outcome == PolicyOutcome.DENY:
         raise HTTPException(403, "; ".join(decision.reasons))
@@ -54,10 +67,26 @@ async def execute_change_set(
             or approval.run_state_version > run.state_version
         ):
             raise HTTPException(409, "审批版本已失效")
-        from src.core.agent_v2.orchestrator import change_hash
+        from src.core.agent_v2.orchestrator import change_hash, review_hash
 
-        if approval.change_hash != change_hash(raw_change_set):
+        current_change_hash = change_hash(raw_change_set)
+        current_review_hash = review_hash(payload["review"])
+        if approval.change_hash != current_change_hash:
             raise HTTPException(409, "获批变更与当前变更不一致")
+        if (
+            approval.reviewed_change_hash != current_change_hash
+            or approval.review_hash != current_review_hash
+            or approval.review_hash != review_hash(approval.review_snapshot or {})
+        ):
+            raise HTTPException(409, "风险审查与获批变更不一致，请重新审批")
+        approved_policy = approval.policy_decision or {}
+        if (
+            approved_policy.get("outcome") != decision.outcome.value
+            or approved_policy.get("policy_version") != decision.policy_version
+            or approved_policy.get("risk") != decision.risk.value
+            or approved_policy.get("review_finding_codes", []) != decision.review_finding_codes
+        ):
+            raise HTTPException(409, "风险审查结论已变化，请重新审批")
     change_set.run_id = run.id
     change_set.plan_version = run.plan_version
     for operation in change_set.operations:
@@ -75,7 +104,7 @@ async def execute_change_set(
         run_id=run.id,
         step_id=step.id,
         event_type="executor.started",
-        actor="main_agent",
+        actor="executor",
         detail={
             "change_set_id": change_set.change_set_id,
             "version": change_set.version,

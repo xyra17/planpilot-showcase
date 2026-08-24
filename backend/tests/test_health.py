@@ -19,4 +19,8 @@ async def test_ai_health_exposes_runtime_status_without_secrets(client: AsyncCli
     assert data["local_reachable"] is True
     assert data["circuit"]["state"] in {"closed", "open"}
     assert set(data["metrics"]) == {"local", "flash", "pro"}
+    assert data["roles"]["interactive"]["primary"] == "local"
+    assert data["roles"]["structured"]["primary"] == "flash"
+    assert data["roles"]["critical"]["primary"] == "pro"
+    assert data["roles"]["embedding"]["primary"] == "embedding-local"
     assert "api_key" not in str(data).lower()

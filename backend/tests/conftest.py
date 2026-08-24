@@ -41,10 +41,25 @@ app.router.lifespan_context = _noop_lifespan
 def _deterministic_agent_planner():
     with (
         patch(
-            "src.core.agent_v2.planner.create_structured_routine_llm",
+            "src.core.agent_v2.planner.create_json_llm",
             side_effect=RuntimeError("model planner disabled in unit tests"),
         ),
         patch.object(_settings, "coach_agent_enabled", False),
+        patch(
+            "src.services.evaluation_v2_service.run_agent_v25_runtime_gate",
+            new_callable=AsyncMock,
+            return_value={
+                "status": "passed",
+                "metrics": {
+                    "critical_safety_pass_rate": 1.0,
+                    "unconfirmed_write_violations": 0,
+                    "cross_user_write_violations": 0,
+                    "duplicate_write_violations": 0,
+                },
+                "failures": [],
+                "dataset_hash": "unit-runtime-gate-stub",
+            },
+        ),
     ):
         yield
 
@@ -65,18 +80,42 @@ async def db() -> AsyncSession:
         yield s
 
 
+@pytest_asyncio.fixture(autouse=True)
+async def _stable_beta_control_between_tests(db: AsyncSession):
+    """A safety-stop test must not disable unrelated tests in the shared SQLite DB."""
+    from src.models import AgentBetaControl
+
+    async def reset() -> None:
+        row = await db.get(AgentBetaControl, "action-beta")
+        if row is not None:
+            row.beta_enabled = False
+            row.new_action_runs_enabled = True
+            row.cohort_mode = "allowlist"
+            row.traffic_percent = 0
+            row.allowlisted_user_ids = []
+            row.paused_reason = None
+            row.safety_snapshot = {}
+            await db.commit()
+
+    await reset()
+    yield
+    await reset()
+
+
 # ── 5. Per-test HTTP client with DB override ──────────────────────
 @pytest_asyncio.fixture
 async def client(db: AsyncSession) -> AsyncClient:
     async def _override():
         yield db
 
+    previous_db_override = app.dependency_overrides.get(get_db)
     app.dependency_overrides[get_db] = _override
     redis_mock = AsyncMock()
     redis_mock.exists.return_value = 0
     with (
         patch("src.tasks.knowledge.process_knowledge_item.apply_async", return_value=None),
         patch("src.tasks.agent_runs.execute_agent_run.apply_async", return_value=None),
+        patch("src.services.checkin_service._dispatch_deviation_check", return_value=None),
         patch(
             "src.tasks.email_verification.send_email_verification.apply_async", return_value=None
         ),
@@ -89,7 +128,10 @@ async def client(db: AsyncSession) -> AsyncClient:
             base_url="http://test",
         ) as c:
             yield c
-    app.dependency_overrides.clear()
+    if previous_db_override is None:
+        app.dependency_overrides.pop(get_db, None)
+    else:
+        app.dependency_overrides[get_db] = previous_db_override
 
 
 # ── 6. Auth helpers ───────────────────────────────────────────────

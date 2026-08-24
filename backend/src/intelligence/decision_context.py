@@ -135,6 +135,7 @@ class DecisionContextBuilder:
                     "supporting_count": evidence.get(pattern.id, {}).get("supporting_count", 0),
                     "opposing_count": evidence.get(pattern.id, {}).get("opposing_count", 0),
                     "neutral_count": evidence.get(pattern.id, {}).get("neutral_count", 0),
+                    "excluded_count": evidence.get(pattern.id, {}).get("excluded_count", 0),
                     "first_observed_at": pattern.first_observed_at.isoformat(),
                     "last_observed_at": evidence.get(pattern.id, {}).get("last_observed_at"),
                     "timezone": (pattern.pattern_value or {}).get("timezone") or timezone_name,
@@ -270,51 +271,78 @@ class DecisionContextBuilder:
             )
         ).all()
         result: dict[str, dict[str, Any]] = {}
+        pattern_map = {pattern.id: pattern for pattern in patterns}
+        grouped: dict[str, list[tuple[PatternEvidence, LearningEvent | None]]] = {}
         for evidence, event in rows:
-            bucket = result.setdefault(
-                evidence.pattern_id,
-                {
-                    "items": [],
-                    "supporting_count": 0,
-                    "opposing_count": 0,
-                    "neutral_count": 0,
-                    "last_observed_at": None,
-                    "last_impacted_proposal_id": None,
-                },
-            )
-            if evidence.contribution > 0:
-                bucket["supporting_count"] += 1
-            elif evidence.contribution < 0:
-                bucket["opposing_count"] += 1
-            else:
-                bucket["neutral_count"] += 1
-            if bucket["last_observed_at"] is None:
-                bucket["last_observed_at"] = evidence.recorded_at.isoformat()
-            if (
-                bucket["last_impacted_proposal_id"] is None
-                and (evidence.meta or {}).get("source") in {
-                    "proposal_accepted", "proposal_feedback"
-                }
-                and event is not None
-            ):
-                bucket["last_impacted_proposal_id"] = event.aggregate_id
-            if len(bucket["items"]) < 3:
-                bucket["items"].append(
-                    {
-                        "event_id": evidence.learning_event_id,
-                        "event_type": event.event_type if event else "system_prior",
-                        "occurred_at": event.occurred_at.isoformat() if event else None,
-                        "contribution": evidence.contribution,
-                        "direction": (
-                            "supporting" if evidence.contribution > 0
-                            else "opposing" if evidence.contribution < 0
-                            else "neutral"
-                        ),
-                        "source": (evidence.meta or {}).get("source"),
-                        "aggregate_type": event.aggregate_type if event else None,
-                        "aggregate_id": event.aggregate_id if event else None,
-                    }
-                )
+            grouped.setdefault(evidence.pattern_id, []).append((evidence, event))
+
+        for pattern_id, evidence_rows in grouped.items():
+            pattern = pattern_map.get(pattern_id)
+            if pattern is None:
+                continue
+            bucket = {
+                "items": [],
+                "supporting_count": 0,
+                "opposing_count": 0,
+                "neutral_count": 0,
+                "excluded_count": 0,
+                "last_observed_at": None,
+                "last_impacted_proposal_id": None,
+            }
+            latest_attribution: dict[str, dict[str, Any]] = {}
+            for evidence, _event in evidence_rows:
+                meta = evidence.meta or {}
+                if meta.get("evidence_kind") == "delay_attribution" and meta.get("target_event_id"):
+                    latest_attribution.setdefault(meta["target_event_id"], meta)
+
+            for evidence, event in evidence_rows:
+                meta = evidence.meta or {}
+                is_delay_observation = pattern.pattern_type == "delay_pattern" and "days_overdue" in meta
+                attribution = latest_attribution.get(evidence.learning_event_id) if is_delay_observation else None
+                if attribution and attribution.get("attribution") == "external_interruption":
+                    direction = "excluded"
+                    bucket["excluded_count"] += 1
+                elif is_delay_observation:
+                    direction = "supporting" if meta.get("days_overdue", 0) > 0 else "opposing"
+                    bucket[f"{direction}_count"] += 1
+                elif evidence.contribution > 0:
+                    direction = "supporting"
+                    bucket["supporting_count"] += 1
+                elif evidence.contribution < 0:
+                    direction = "opposing"
+                    bucket["opposing_count"] += 1
+                else:
+                    direction = "neutral"
+                    bucket["neutral_count"] += 1
+                if bucket["last_observed_at"] is None:
+                    bucket["last_observed_at"] = evidence.recorded_at.isoformat()
+                if (
+                    bucket["last_impacted_proposal_id"] is None
+                    and meta.get("source") in {"proposal_accepted", "proposal_feedback"}
+                    and event is not None
+                ):
+                    bucket["last_impacted_proposal_id"] = event.aggregate_id
+                if len(bucket["items"]) < 6 and meta.get("evidence_kind") != "delay_attribution":
+                    bucket["items"].append(
+                        {
+                            "evidence_id": evidence.id,
+                            "event_id": evidence.learning_event_id,
+                            "event_type": event.event_type if event else "system_prior",
+                            "occurred_at": event.occurred_at.isoformat() if event else None,
+                            "contribution": evidence.contribution,
+                            "direction": direction,
+                            "source": meta.get("source"),
+                            "aggregate_type": event.aggregate_type if event else None,
+                            "aggregate_id": event.aggregate_id if event else None,
+                            "task_title": meta.get("task_title") or ((event.payload or {}).get("title") if event else None),
+                            "days_overdue": meta.get("days_overdue") if "days_overdue" in meta else ((event.payload or {}).get("days_overdue") if event else None),
+                            "attribution": attribution.get("attribution") if attribution else None,
+                            "reason_code": attribution.get("reason_code") if attribution else None,
+                            "note": attribution.get("note") if attribution else None,
+                            "correctable": is_delay_observation and meta.get("days_overdue", 0) > 0,
+                        }
+                    )
+            result[pattern_id] = bucket
         return result
 
     @staticmethod

@@ -1,5 +1,6 @@
 """统一的 OpenAI-compatible Embedding 客户端与查询入口。"""
 
+import asyncio
 from functools import lru_cache
 
 from openai import AsyncOpenAI
@@ -9,6 +10,9 @@ from src.config import settings
 
 class EmbeddingUnavailableError(RuntimeError):
     """Embedding 未配置、不可用或返回内容不符合契约。"""
+
+
+_embedding_semaphore = asyncio.Semaphore(settings.embedding_max_concurrency)
 
 
 @lru_cache(maxsize=1)
@@ -29,10 +33,11 @@ async def embed_text(text: str) -> list[float]:
     if client is None:
         raise EmbeddingUnavailableError("未配置独立 Embedding 服务")
 
-    response = await client.embeddings.create(
-        model=settings.embedding_model_name,
-        input=text,
-    )
+    async with _embedding_semaphore:
+        response = await client.embeddings.create(
+            model=settings.embedding_model_name,
+            input=text,
+        )
     if not response.data:
         raise EmbeddingUnavailableError("Embedding 服务返回空结果")
     vector = response.data[0].embedding

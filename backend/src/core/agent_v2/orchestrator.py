@@ -20,6 +20,7 @@ from src.core.agent_v2.policy import evaluate_policy
 from src.core.agent_v2.registry import ToolRegistry, build_registry
 from src.core.agent_v2.resolver import ready_steps, resolve_inputs, validate_plan
 from src.core.agent_v2.schemas import (
+    ActionIntent,
     AgentPlan,
     AgentRole,
     ChangeSet,
@@ -29,7 +30,7 @@ from src.core.agent_v2.schemas import (
     SubAgentRequest,
     ToolContext,
 )
-from src.core.agent_v2.subagents import invoke_subagent
+from src.core.agent_v2.subagents import invoke_capability
 from src.core.agent_v2.transitions import (
     claim_run_lease,
     has_run_lease,
@@ -44,6 +45,33 @@ from src.services.agent_context import assert_goal_access
 def change_hash(change_set: dict[str, Any]) -> str:
     canonical = json.dumps(change_set, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(canonical.encode()).hexdigest()
+
+
+def review_hash(review: dict[str, Any]) -> str:
+    canonical = json.dumps(review, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode()).hexdigest()
+
+
+def normalize_change_set_for_approval(
+    changes: ChangeSet, *, run_id: str, plan_version: int, source_step_id: str
+) -> ChangeSet:
+    """Apply the production approval invariants before hashing and review."""
+    changes.run_id = run_id
+    changes.plan_version = plan_version
+    changes.operations = [
+        operation for operation in changes.operations if operation.before != operation.after
+    ]
+    for operation in changes.operations:
+        operation.source_step_id = operation.source_step_id or source_step_id
+        operation.idempotency_key = operation.idempotency_key or (
+            f"{run_id}:{changes.version}:{operation.operation_id}"
+        )
+        operation.precondition = operation.precondition or {"before": operation.before}
+        operation.compensation = operation.compensation or {
+            "field": operation.field,
+            "value": operation.before,
+        }
+    return changes
 
 
 async def _owned_run(db: AsyncSession, user_id: str, run_id: str) -> AgentRun:
@@ -221,10 +249,26 @@ async def create_run(
     registry: ToolRegistry | None = None,
     auto_advance: bool = True,
     run_kind: str = "user",
+    action_intent: ActionIntent | None = None,
+    deterministic_plan_only: bool = False,
+    conversation_turn_id: str | None = None,
+    insight_id: str | None = None,
+    trace_context: dict[str, Any] | None = None,
+    commit: bool = True,
 ) -> AgentRun:
     await assert_goal_access(db, user_id, goal_id)
+    from src.services.beta_evidence_service import assert_new_action_run_allowed
+
+    beta = await assert_new_action_run_allowed(db, user_id)
     tools = registry or build_registry()
-    plan, planner_trace = await create_plan(tools, request, goal_id, step_budget=step_budget)
+    plan, planner_trace = await create_plan(
+        tools,
+        request,
+        goal_id,
+        step_budget=step_budget,
+        action_intent=action_intent,
+        deterministic_only=deterministic_plan_only,
+    )
     validate_plan(plan, available_tools=tools.names(), step_budget=step_budget)
     if plan.estimated_tokens > token_budget:
         raise HTTPException(400, "规划已超过 Token 预算")
@@ -233,6 +277,18 @@ async def create_run(
         user_id=user_id,
         goal_id=goal_id,
         request_text=request,
+        conversation_turn_id=conversation_turn_id,
+        insight_id=insight_id,
+        trace_context={
+            **(trace_context or {}),
+            "beta": beta,
+            **(
+                {"action_intent": action_intent.model_dump(mode="json")}
+                if action_intent is not None
+                else {}
+            ),
+        },
+        input_received_at=utc_now(),
         objective=plan.objective,
         plan=[],
         plan_history=[],
@@ -258,9 +314,24 @@ async def create_run(
             "objective": plan.objective,
             "planner": plan.planner,
             "candidate_tools": plan.candidate_tools,
+            "trace_context": run.trace_context,
         },
-        safe_summary="已创建 Agent 任务",
+        safe_summary="已创建 Pilo 行动任务",
     )
+    if action_intent is not None:
+        record_event(
+            db,
+            run_id=run.id,
+            event_type="intent.resolved",
+            actor="action_gateway",
+            detail={
+                "conversation_turn_id": conversation_turn_id,
+                "need_frame": (trace_context or {}).get("need_frame"),
+                "action_intent": action_intent.model_dump(mode="json"),
+                "insight_id": insight_id,
+            },
+            safe_summary="行动意图已解析并进入安全执行链",
+        )
     record_event(
         db,
         run_id=run.id,
@@ -278,6 +349,9 @@ async def create_run(
             detail={"reason": planner_trace.get("fallback_reason")},
             safe_summary=f"计划 v{plan.version} 已降级为确定性规划",
         )
+    if not commit:
+        await db.flush()
+        return run
     await db.commit()
     if auto_advance:
         token = await claim_run_lease(db, user_id=user_id, run_id=run.id, worker_id="inline")
@@ -455,13 +529,22 @@ async def advance_run(
                 await transition_run(
                     db, run, "failed", actor="orchestrator", lease_token=lease_token
                 )
+                from src.services.insight_action_lifecycle import sync_run_lifecycle
+
+                await sync_run_lifecycle(db, run=run, lifecycle="action_failed")
                 await db.commit()
                 return run
             if all(item.status == "completed" for item in current):
                 run.current_step = len(current)
+                last_output = current[-1].output_data if current else None
+                noop_summary = (
+                    last_output.get("summary")
+                    if isinstance(last_output, dict) and last_output.get("noop")
+                    else None
+                )
                 run.result = {
-                    "summary": "Agent 已完成分析和获批操作",
-                    "last_output": current[-1].output_data if current else None,
+                    "summary": noop_summary or "Agent 已完成分析和获批操作",
+                    "last_output": last_output,
                     "undo_available": any(
                         (item.output_data or {}).get("undo_operations") for item in current
                     ),
@@ -480,8 +563,11 @@ async def advance_run(
                     event_type="run.completed",
                     actor="observer",
                     detail=run.result,
-                    safe_summary="Agent 任务已完成",
+                    safe_summary="Pilo 行动任务已完成",
                 )
+                from src.services.insight_action_lifecycle import sync_run_lifecycle
+
+                await sync_run_lifecycle(db, run=run, lifecycle="applied")
                 await db.commit()
             return run
         step = ready[0]
@@ -509,45 +595,122 @@ async def advance_run(
                 ).scalar_one_or_none()
                 if approval is None:
                     changes = ChangeSet.model_validate(payload.get("change_set", {}))
-                    changes.run_id = run.id
-                    changes.plan_version = run.plan_version
                     source_ref = (step.input_refs or {}).get("change_set", {})
                     source_step_id = source_ref.get("step_id", step.step_key)
-                    for operation in changes.operations:
-                        operation.source_step_id = operation.source_step_id or source_step_id
-                        operation.idempotency_key = operation.idempotency_key or (
-                            f"{run.id}:{changes.version}:{operation.operation_id}"
-                        )
-                        operation.precondition = operation.precondition or {
-                            "before": operation.before
-                        }
-                        operation.compensation = operation.compensation or {
-                            "field": operation.field,
-                            "value": operation.before,
-                        }
+                    changes = normalize_change_set_for_approval(
+                        changes,
+                        run_id=run.id,
+                        plan_version=run.plan_version,
+                        source_step_id=source_step_id,
+                    )
                     payload["change_set"] = changes.model_dump(mode="json")
+                    if not changes.operations:
+                        noop_summary = "当前状态已经符合请求，无需修改"
+                        await transition_step(db, step, "running", actor="orchestrator")
+                        step.output_data = {
+                            "summary": noop_summary,
+                            "count": 0,
+                            "noop": True,
+                            "undo_operations": [],
+                        }
+                        step.finished_at = utc_now()
+                        await transition_step(db, step, "completed", actor="observer")
+                        record_event(
+                            db,
+                            run_id=run.id,
+                            step_id=step.id,
+                            event_type="action.noop",
+                            actor="observer",
+                            detail={"change_set_id": changes.change_set_id, "operation_count": 0},
+                            safe_summary=noop_summary,
+                        )
+                        await db.commit()
+                        continue
+                    review_snapshot = payload.get("review") or {}
                     decision = evaluate_policy(
                         spec,
                         role=AgentRole(step.agent_role),
                         change_set=changes,
+                        review=review_snapshot,
                         run_kind=run.run_kind,
                     )
+                    if decision.outcome == PolicyOutcome.DENY:
+                        alternatives = list(review_snapshot.get("blocking_alternatives") or [])
+                        is_deadline_conflict = "deadline_exceeded" in decision.review_finding_codes
+                        public_summary = (
+                            "计划与目标截止日期冲突，未执行任何更改。"
+                            "你可以先延长目标期限、只分析期限风险，或在原期限内减少任务后重建计划。"
+                            if is_deadline_conflict
+                            else "风险审查阻止了这次行动，未执行任何更改。"
+                        )
+                        step.error = "; ".join(decision.reasons)
+                        await transition_step(db, step, "failed", actor="policy")
+                        run.error = public_summary
+                        run.result = {
+                            "outcome": "safe_policy_rejection",
+                            "action_fulfilled": False,
+                            "reason_code": (
+                                "deadline_conflict" if is_deadline_conflict else "policy_blocked"
+                            ),
+                            "summary": public_summary,
+                            "alternatives": alternatives,
+                        }
+                        await transition_run(
+                            db,
+                            run,
+                            "failed",
+                            actor="policy",
+                            detail={"review_findings": decision.review_finding_codes},
+                            lease_token=lease_token,
+                        )
+                        record_event(
+                            db,
+                            run_id=run.id,
+                            step_id=step.id,
+                            event_type="policy.denied",
+                            actor="policy",
+                            detail=decision.model_dump(mode="json"),
+                            safe_summary=public_summary,
+                        )
+                        from src.services.insight_action_lifecycle import sync_run_lifecycle
+
+                        await sync_run_lifecycle(
+                            db,
+                            run=run,
+                            lifecycle="action_failed",
+                            detail={"policy": decision.model_dump(mode="json")},
+                        )
+                        await db.commit()
+                        return run
                     await transition_step(db, step, "waiting_approval", actor="main_agent")
                     await transition_run(
                         db, run, "waiting_approval", actor="main_agent", lease_token=lease_token
                     )
+                    reviewed_hash = change_hash(payload["change_set"])
                     approval = AgentApproval(
                         id=str(uuid.uuid4()),
                         run_id=run.id,
                         step_id=step.id,
                         status="pending",
                         change_set=payload["change_set"],
-                        change_hash=change_hash(payload["change_set"]),
+                        change_hash=reviewed_hash,
                         change_set_version=changes.version,
                         run_state_version=run.state_version,
+                        review_snapshot=review_snapshot,
+                        reviewed_change_hash=reviewed_hash,
+                        review_hash=review_hash(review_snapshot),
                         policy_decision=decision.model_dump(mode="json"),
                     )
                     db.add(approval)
+                    await db.flush()
+                    from src.services.insight_action_lifecycle import mark_preview_ready
+
+                    await mark_preview_ready(
+                        db,
+                        run=run,
+                        change_set_id=changes.change_set_id,
+                        approval_id=approval.id,
+                    )
                     record_event(
                         db,
                         run_id=run.id,
@@ -560,6 +723,17 @@ async def advance_run(
                             "risk": decision.risk.value,
                         },
                         safe_summary="有一组变更等待确认",
+                    )
+                    record_event(
+                        db,
+                        run_id=run.id,
+                        step_id=step.id,
+                        event_type="preview.ready",
+                        actor="reviewer",
+                        detail={
+                            "change_set_id": changes.change_set_id,
+                            "approval_id": approval.id,
+                        },
                     )
                     await db.commit()
                     return run
@@ -603,7 +777,7 @@ async def advance_run(
                 activity = None
             elif step.agent_role != AgentRole.MAIN.value:
                 result, activity = await asyncio.wait_for(
-                    invoke_subagent(
+                    invoke_capability(
                         db,
                         registry=tools,
                         role=AgentRole(step.agent_role),
@@ -754,6 +928,9 @@ async def advance_run(
                 safe_summary=error.safe_message,
             )
             await transition_run(db, run, "failed", actor="observer", lease_token=lease_token)
+            from src.services.insight_action_lifecycle import sync_run_lifecycle
+
+            await sync_run_lifecycle(db, run=run, lifecycle="action_failed")
             await db.commit()
             return run
 
@@ -792,7 +969,22 @@ async def approve_run(
         raise HTTPException(409, "ChangeSet 版本已变化")
     if run_state_version is not None and run_state_version != run.state_version:
         raise HTTPException(409, "Run 状态版本已变化")
-    if (approval.policy_decision or {}).get("risk") == "high" and not high_risk_confirmed:
+    policy = approval.policy_decision or {}
+    if policy.get("outcome") == PolicyOutcome.DENY.value:
+        raise HTTPException(
+            409,
+            {
+                "code": "review_blocked",
+                "message": "编辑后的变更未通过风险审查",
+                "reasons": policy.get("reasons", []),
+                "finding_codes": policy.get("review_finding_codes", []),
+            },
+        )
+    if approval.reviewed_change_hash != approval.change_hash or approval.review_hash != review_hash(
+        approval.review_snapshot or {}
+    ):
+        raise HTTPException(409, "风险审查与当前变更未绑定，请重新编辑或刷新预览")
+    if policy.get("risk") == "high" and not high_risk_confirmed:
         raise HTTPException(409, "高风险变更需要二次确认")
     approval.status = "approved"
     approval.decided_at = utc_now()
@@ -811,6 +1003,15 @@ async def approve_run(
             "change_hash": approval.change_hash,
             "change_set_version": approval.change_set_version,
         },
+    )
+    from src.services.insight_action_lifecycle import sync_run_lifecycle
+
+    await sync_run_lifecycle(
+        db,
+        run=run,
+        lifecycle="action_approved",
+        approval_id=approval.id,
+        change_set_id=str((approval.change_set or {}).get("change_set_id") or "") or None,
     )
     await db.commit()
     if auto_advance:
@@ -839,6 +1040,9 @@ async def edit_approval(
         (item["entity"], item["entity_id"], item["field"]): item
         for item in approval.change_set.get("operations", [])
     }
+    change_set.operations = [
+        operation for operation in change_set.operations if operation.before != operation.after
+    ]
     if len(change_set.operations) > 50 or not {
         (item.entity, item.entity_id, item.field) for item in change_set.operations
     }.issubset(originals):
@@ -858,12 +1062,41 @@ async def edit_approval(
     change_set.plan_version = run.plan_version
     change_set.version = approval.change_set_version + 1
     payload = change_set.model_dump(mode="json")
-    approval.change_set = payload
-    approval.change_set_version = change_set.version
-    approval.change_hash = change_hash(payload)
-    approval_refs = (
-        await db.execute(select(AgentStep.input_refs).where(AgentStep.id == approval.step_id))
+    approval_step = (
+        await db.execute(select(AgentStep).where(AgentStep.id == approval.step_id))
     ).scalar_one()
+    if not change_set.operations:
+        noop_summary = "编辑后没有需要执行的变更"
+        approval.change_set = payload
+        approval.change_hash = change_hash(payload)
+        approval.change_set_version = change_set.version
+        approval.status = "rejected"
+        approval.decided_at = utc_now()
+        approval_step.output_data = {
+            "summary": noop_summary,
+            "count": 0,
+            "noop": True,
+            "undo_operations": [],
+        }
+        await transition_step(db, approval_step, "skipped", actor="user")
+        run.result = {
+            "summary": noop_summary,
+            "last_output": approval_step.output_data,
+            "undo_available": False,
+        }
+        await transition_run(db, run, "completed", actor="observer")
+        record_event(
+            db,
+            run_id=run.id,
+            step_id=approval_step.id,
+            event_type="action.noop",
+            actor="observer",
+            detail={"reason": "approval_edited_to_zero_operations"},
+            safe_summary=noop_summary,
+        )
+        await db.commit()
+        return run
+    approval_refs = approval_step.input_refs or {}
     source_ref = approval_refs.get("change_set")
     if not source_ref:
         raise HTTPException(409, "审批步骤缺少 ChangeSet 来源")
@@ -875,6 +1108,50 @@ async def edit_approval(
     ).scalar_one_or_none()
     if source:
         source.output_data = payload
+    review_ref = approval_refs.get("review")
+    if not review_ref:
+        raise HTTPException(409, "审批步骤缺少 Review 来源")
+    review_step = (
+        await db.execute(
+            select(AgentStep).where(
+                AgentStep.run_id == run.id,
+                AgentStep.step_key == review_ref["step_id"],
+            )
+        )
+    ).scalar_one_or_none()
+    if review_step is None:
+        raise HTTPException(409, "风险审查步骤不存在")
+    tools = build_registry()
+    context = await tools.invoke(
+        db,
+        tools.get("context.load"),
+        ToolContext(user_id=user_id, run_id=run.id, step_id=review_step.id),
+        {"goal_id": run.goal_id, "lookback_days": 14},
+    )
+    reviewed = await tools.invoke(
+        db,
+        tools.get("plan.review"),
+        ToolContext(user_id=user_id, run_id=run.id, step_id=review_step.id),
+        {"change_set": payload, "context": context},
+    )
+    decision = evaluate_policy(
+        tools.get(approval_step.tool_name),
+        role=AgentRole(approval_step.agent_role),
+        change_set=change_set,
+        review=reviewed,
+        run_kind=run.run_kind,
+    )
+    reviewed_hash = change_hash(payload)
+    approval.change_set = payload
+    approval.change_set_version = change_set.version
+    approval.change_hash = reviewed_hash
+    approval.review_snapshot = reviewed
+    approval.reviewed_change_hash = reviewed_hash
+    approval.review_hash = review_hash(reviewed)
+    approval.policy_decision = decision.model_dump(mode="json")
+    approval.run_state_version = run.state_version
+    approval.decided_at = None
+    review_step.output_data = reviewed
     record_event(
         db,
         run_id=run.id,
@@ -884,6 +1161,9 @@ async def edit_approval(
         detail={
             "change_hash": approval.change_hash,
             "change_set_version": approval.change_set_version,
+            "review_hash": approval.review_hash,
+            "review_findings": reviewed.get("findings", []),
+            "policy": decision.model_dump(mode="json"),
         },
     )
     await db.commit()
@@ -918,6 +1198,16 @@ async def reject_run(
         actor="user",
         detail={"reason": reason},
     )
+    from src.services.insight_action_lifecycle import sync_run_lifecycle
+
+    await sync_run_lifecycle(
+        db,
+        run=run,
+        lifecycle="action_rejected",
+        approval_id=approval.id,
+        change_set_id=str((approval.change_set or {}).get("change_set_id") or "") or None,
+        detail={"reason": reason},
+    )
     await db.commit()
     return run
 
@@ -927,6 +1217,9 @@ async def cancel_run(db: AsyncSession, *, user_id: str, run_id: str) -> AgentRun
     if run.status in {"completed", "rolled_back"}:
         raise HTTPException(409, "已完成的任务不能取消")
     await transition_run(db, run, "cancelled", actor="user")
+    from src.services.insight_action_lifecycle import sync_run_lifecycle
+
+    await sync_run_lifecycle(db, run=run, lifecycle="action_cancelled")
     await db.commit()
     return run
 
@@ -963,6 +1256,9 @@ async def retry_run(
     run = await _owned_run(db, user_id, run_id)
     if run.status != "failed" or run.failure_count >= 3:
         raise HTTPException(409, "当前任务不能重试")
+    from src.services.insight_action_lifecycle import reactivate_failed_run
+
+    await reactivate_failed_run(db, run=run)
     step = (
         await db.execute(
             select(AgentStep).where(
@@ -1017,6 +1313,9 @@ async def undo_run(db: AsyncSession, *, user_id: str, run_id: str) -> AgentRun:
             actor="observer",
             detail=result,
         )
+        from src.services.insight_action_lifecycle import sync_run_lifecycle
+
+        await sync_run_lifecycle(db, run=run, lifecycle="rolled_back", detail=result)
         await db.commit()
         return run
     except Exception as exc:
@@ -1033,6 +1332,11 @@ async def undo_run(db: AsyncSession, *, user_id: str, run_id: str) -> AgentRun:
             actor="observer",
             detail={"error": run.error},
             safe_summary=run.error,
+        )
+        from src.services.insight_action_lifecycle import sync_run_lifecycle
+
+        await sync_run_lifecycle(
+            db, run=run, lifecycle="action_failed", detail={"error": run.error}
         )
         await db.commit()
         raise
@@ -1096,6 +1400,16 @@ def serialize_run(
         "id": run.id,
         "goal_id": run.goal_id,
         "request": run.request_text,
+        "trace": {
+            **(run.trace_context or {}),
+            "conversation_turn_id": run.conversation_turn_id,
+            "insight_id": run.insight_id,
+            "run_id": run.id,
+            "input_received_at": run.input_received_at.isoformat()
+            if run.input_received_at
+            else None,
+            "preview_ready_at": run.preview_ready_at.isoformat() if run.preview_ready_at else None,
+        },
         "objective": run.objective,
         "plan": run.plan,
         "plan_history": run.plan_history,
@@ -1155,6 +1469,9 @@ def serialize_run(
                 "change_hash": item.change_hash,
                 "change_set_version": item.change_set_version,
                 "run_state_version": item.run_state_version,
+                "review_snapshot": item.review_snapshot,
+                "reviewed_change_hash": item.reviewed_change_hash,
+                "review_hash": item.review_hash,
                 "policy_decision": item.policy_decision,
                 "created_at": item.created_at.isoformat() if item.created_at else None,
             }

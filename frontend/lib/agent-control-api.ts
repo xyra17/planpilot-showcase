@@ -17,6 +17,16 @@ export interface RuntimeOverview {
     requires_user_confirmation: boolean;
     direct_mutation_allowed: boolean;
   };
+  model_roles: Record<"interactive" | "structured" | "critical" | "embedding", {
+    purpose: string;
+    primary: string;
+    primary_model: string;
+    fallback: string | null;
+    fallback_model: string | null;
+    fallback_policy: string;
+    result: string;
+    max_concurrency: number;
+  }>;
   monitoring: MonitoringOverview;
   feedback_learning: {
     event_count: number;
@@ -272,6 +282,127 @@ export interface AgentVersions {
   }>;
 }
 
+export interface BetaMetrics {
+  metric_version: string;
+  measurement_start: string;
+  measurement_end: string;
+  cohort: "beta" | "stable" | "all";
+  source: "conversation" | "insight" | "scheduler" | "api" | "internal" | "legacy_unattributed" | "all";
+  sample_size: number;
+  insufficient_data: boolean;
+  counts: Record<string, number>;
+  rates: Record<string, number | null>;
+  rate_details: Record<string, { numerator: number; denominator: number; value: number | null }>;
+  source_funnel: Record<string, number>;
+  latency: { preview_p50_ms: number | null; preview_p95_ms: number | null };
+  safety: BetaSafetyStatus;
+  expansion_blocked: boolean;
+}
+
+export interface BetaSafetyStatus {
+  status: "unknown" | "stale" | "observed_clear" | "violated";
+  counts: Record<string, number> | null;
+  observed_at: string | null;
+  expires_at: string | null;
+  source: string | null;
+  source_gate_id?: string | null;
+  audit_window?: { start: string; end: string };
+  deployed_revision?: number | null;
+  migration_head?: string | null;
+  dataset_hash?: string | null;
+  metric_version?: string;
+  blockers: string[];
+}
+
+export interface BetaOverview {
+  control: {
+    id: string;
+    beta_enabled: boolean;
+    new_action_runs_enabled: boolean;
+    cohort_mode: "allowlist" | "percentage";
+    traffic_percent: 0 | 5 | 20 | 50;
+    allowlisted_user_ids: string[];
+    metric_version: string;
+    measurement_started_at: string;
+    paused_reason: string | null;
+    safety_snapshot: Record<string, unknown>;
+    updated_at: string | null;
+  };
+  metrics: BetaMetrics;
+  review_queue_has_pending: boolean;
+  runtime_gate: {
+    id?: string;
+    status: "missing" | "valid" | "invalid";
+    valid: boolean;
+    blockers: string[];
+    critical_safety_pass_rate?: number | null;
+    dataset_hash?: string;
+    decided_at?: string;
+    expires_at?: string | null;
+    proof?: Record<string, unknown>;
+  };
+  safety: BetaSafetyStatus;
+  evidence_state: "infrastructure_ready_no_beta_conclusion";
+}
+
+export interface BetaReviewSample {
+  id: string;
+  source_kind: string;
+  run_id: string | null;
+  conversation_turn_id: string | null;
+  pseudonymous_user_key: string;
+  sample_type: string;
+  structured_context: Record<string, unknown>;
+  redacted_summary: string | null;
+  status: "pending" | "reviewed" | "confirmed" | "dismissed";
+  reviewer_note: string | null;
+  candidate_dataset_id: string | null;
+  created_at: string;
+  retention_expires_at: string;
+}
+
+export type ProductValidationStatus = "insufficient_data" | "supported" | "not_supported";
+
+export interface ProductMetricDetail {
+  numerator: number;
+  denominator: number;
+  value: number | null;
+}
+
+export interface ProductValidationReport {
+  snapshot_id?: string;
+  schema_version: string;
+  status: ProductValidationStatus;
+  generated_at: string;
+  consented_user_count: number;
+  metrics: {
+    survey_count: number;
+    very_disappointed_rate: number | null;
+    goal_creation_10m_cohort: number;
+    goal_created_10m_rate: number | null;
+    activation_cohort: number;
+    first_task_started_24h_rate: number | null;
+    activation_24h_rate: number | null;
+    first_action_evidence_rate: number | null;
+    first_action_evidence_cohort: number;
+    week4_wvlu_cohort: number;
+    week4_wvlu_retention_rate: number | null;
+    week8_wvlu_cohort: number;
+    week8_wvlu_retention_rate: number | null;
+    recovery_72h_cohort: number;
+    recovery_selected_rate: number | null;
+    recovery_72h_rate: number | null;
+    task_outcome_28d_count: number;
+    overload_event_28d_count: number;
+    overload_rate_28d: number | null;
+    quality_ready_rate: number | null;
+  };
+  rate_details: Record<string, ProductMetricDetail>;
+  thresholds: Record<string, number>;
+  metric_definitions: Record<string, string>;
+  measurement_policy: Record<string, string>;
+}
+
 export const agentControlApi = {
   getOverview: () => api.get<RuntimeOverview>("/api/v1/agent-control/overview"),
   getInvocations: (limit = 30) =>
@@ -291,6 +422,47 @@ export const agentControlApi = {
   getVersions: () => api.get<AgentVersions>("/api/v1/agent-control/versions"),
   getOfflineGates: () =>
     api.get<OfflineGate[]>("/api/v1/agent-control/offline-gates"),
+  getLatestProductValidation: () =>
+    api.get<ProductValidationReport | null>("/api/v1/agent-control/admin/product-validation/latest"),
+  getProductValidationHistory: (limit = 30) =>
+    api.get<ProductValidationReport[]>(`/api/v1/agent-control/admin/product-validation/history?limit=${limit}`),
+  aggregateProductValidation: () =>
+    api.post<ProductValidationReport>("/api/v1/agent-control/admin/product-validation/aggregate", {}),
+  getBetaOverview: () =>
+    api.get<BetaOverview>("/api/v1/agent-control/admin/beta/overview"),
+  getBetaMetrics: (params: {
+    cohort?: "beta" | "stable" | "all";
+    source?: "conversation" | "insight" | "scheduler" | "api" | "internal" | "legacy_unattributed" | "all";
+    capability?: string;
+    resolution_quality?: string;
+    start?: string;
+    end?: string;
+  }) => {
+    const query = new URLSearchParams({ metric_version: "action-beta-funnel-v2" });
+    Object.entries(params).forEach(([key, value]) => { if (value) query.set(key, value); });
+    return api.get<BetaMetrics>(`/api/v1/agent-control/admin/beta/metrics?${query.toString()}`);
+  },
+  getBetaReviewSamples: (status = "pending") =>
+    api.get<BetaReviewSample[]>(`/api/v1/agent-control/admin/beta/review-samples?status=${status}`),
+  normalizeBetaReviewSamples: () =>
+    api.post<{ created: number }>("/api/v1/agent-control/admin/beta/review-samples/normalize", {}),
+  scanBetaSafety: () =>
+    api.post<BetaSafetyStatus>("/api/v1/agent-control/admin/beta/safety/scan", {}),
+  updateBetaControl: (body: {
+    beta_enabled?: boolean;
+    new_action_runs_enabled?: boolean;
+    cohort_mode?: "allowlist" | "percentage";
+    traffic_percent?: 0 | 5 | 20 | 50;
+    allowlisted_user_ids?: string[];
+    reason: string;
+  }) => api.patch<BetaOverview["control"]>("/api/v1/agent-control/admin/beta/control", body),
+  reviewBetaSample: (sampleId: string, status: "reviewed" | "confirmed" | "dismissed", note: string) =>
+    api.patch<BetaReviewSample>(`/api/v1/agent-control/admin/beta/review-samples/${sampleId}`, { status, note }),
+  promoteBetaSample: (sampleId: string, datasetKind: "intent-routing" | "action-changeset") =>
+    api.post<{ dataset_id: string; status: string; version: string }>(
+      `/api/v1/agent-control/admin/beta/review-samples/${sampleId}/candidate`,
+      { dataset_kind: datasetKind }
+    ),
   runEvaluation: () =>
     api.post<EvaluationRun>("/api/v1/agent-control/evaluations/run", {}),
   runOfflineGate: () =>
@@ -330,7 +502,7 @@ export const agentControlApi = {
   createModelConfig: (body: {
     name: string;
     version: string;
-    provider: "configured-router" | "local" | "smart";
+    provider: "local" | "smart";
     model_name: string;
     temperature: number;
     max_tokens: number;

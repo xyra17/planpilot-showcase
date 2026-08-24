@@ -2,18 +2,21 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.config import settings
 from src.core.model_gateway import distributed_gateway_status
 from src.database import get_db
 from src.deps import get_current_admin, get_current_user
 from src.models import User
 from src.services import (
     agent_control_service,
+    beta_evidence_service,
     calibration_service,
     canary_service,
     core_experiment_service,
@@ -41,7 +44,7 @@ class PromptVersionCreate(BaseModel):
 class ModelConfigCreate(BaseModel):
     name: str = Field(min_length=2, max_length=100)
     version: str = Field(min_length=1, max_length=30)
-    provider: Literal["configured-router", "local", "smart"]
+    provider: Literal["local", "smart"]
     model_name: str = Field(min_length=1, max_length=200)
     temperature: float = Field(default=0.2, ge=0, le=2)
     max_tokens: int = Field(default=700, ge=64, le=32000)
@@ -116,6 +119,40 @@ class CanaryAction(BaseModel):
     reason: str = Field(min_length=2, max_length=1000)
 
 
+class BetaControlUpdate(BaseModel):
+    beta_enabled: bool | None = None
+    new_action_runs_enabled: bool | None = None
+    cohort_mode: Literal["allowlist", "percentage"] | None = None
+    traffic_percent: Literal[0, 5, 20, 50] | None = None
+    allowlisted_user_ids: list[str] | None = None
+    reason: str = Field(min_length=2, max_length=1000)
+
+
+class BetaReviewUpdate(BaseModel):
+    status: Literal["reviewed", "confirmed", "dismissed"]
+    note: str = Field(min_length=2, max_length=2000)
+    sample_type: Literal[
+        "false_action",
+        "missed_action",
+        "wrong_core_need",
+        "wrong_entity",
+        "unnecessary_clarification",
+        "insufficient_clarification",
+        "heavily_edited_changeset",
+        "quick_rollback",
+        "review_false_positive",
+        "review_false_negative",
+        "review_decision_check",
+        "execution_failure",
+        "routing_anomaly",
+        "clarification_anomaly",
+    ] | None = None
+
+
+class BetaCandidateCreate(BaseModel):
+    dataset_kind: Literal["intent-routing", "action-changeset"]
+
+
 def _raise_service_error(exc: Exception) -> None:
     if isinstance(exc, LookupError):
         raise HTTPException(404, str(exc)) from exc
@@ -176,12 +213,19 @@ async def agent_trace(
 
 @router.get("/gateway/circuits")
 async def gateway_circuits(
-    _: User = Depends(get_current_admin), db: AsyncSession = Depends(get_db)
+    _: User = Depends(get_current_admin), _db: AsyncSession = Depends(get_db)
 ) -> list[dict]:
-    versions = await agent_control_service.list_versions(db)
+    # Only report routes that the current runtime can actually call. Historical
+    # model registrations (including the retired configured-router alias) remain
+    # auditable in version history but are not live gateway routes.
     routes = sorted(
-        {f"{row['provider']}:{row['model_name']}" for row in versions["models"]}
-        | {"configured-router"}
+        route
+        for route in {
+            f"local:{settings.model_name}" if settings.model_name else "",
+            f"smart:{settings.smart_model_name}" if settings.smart_model_name else "",
+            f"pro:{settings.smart_pro_model_name}" if settings.smart_pro_model_name else "",
+        }
+        if route
     )
     return await distributed_gateway_status(routes)
 
@@ -307,7 +351,7 @@ async def evaluation_runs(
 async def run_offline_gate(
     admin: User = Depends(get_current_admin), db: AsyncSession = Depends(get_db)
 ) -> dict:
-    return await evaluation_v2_service.run_production_gate(db, admin.id)
+    return await evaluation_v2_service.run_combined_production_gate(db, admin.id)
 
 
 @router.get("/offline-gates")
@@ -418,6 +462,33 @@ async def production_readiness_decisions(
     return await product_validation_service.list_decisions(db, limit=limit)
 
 
+@router.get("/admin/product-validation/latest")
+async def latest_product_validation(
+    _: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+) -> dict | None:
+    return await product_validation_service.latest_product_validation(db)
+
+
+@router.get("/admin/product-validation/history")
+async def product_validation_history(
+    limit: int = Query(default=30, ge=1, le=120),
+    _: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+) -> list[dict]:
+    return await product_validation_service.list_product_validation_snapshots(
+        db, limit=limit
+    )
+
+
+@router.post("/admin/product-validation/aggregate", status_code=201)
+async def aggregate_product_validation(
+    _: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    return await product_validation_service.generate_product_validation(db)
+
+
 @router.get("/monitoring")
 async def monitoring(
     _: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
@@ -523,3 +594,133 @@ async def aggregate_monitoring(
     _: User = Depends(get_current_admin), db: AsyncSession = Depends(get_db)
 ) -> dict:
     return await monitoring_service.aggregate_daily_metrics(db)
+
+
+@router.get("/admin/beta/overview")
+async def beta_overview(
+    _: User = Depends(get_current_admin), db: AsyncSession = Depends(get_db)
+) -> dict:
+    return await beta_evidence_service.beta_overview(db)
+
+
+@router.get("/admin/beta/metrics")
+async def beta_metrics(
+    start: datetime | None = None,
+    end: datetime | None = None,
+    beta_only: bool = True,
+    cohort: Literal["beta", "stable", "all"] | None = None,
+    source: Literal[
+        "conversation",
+        "insight",
+        "scheduler",
+        "api",
+        "internal",
+        "legacy_unattributed",
+        "all",
+    ] = "conversation",
+    metric_version: Literal["action-beta-funnel-v1", "action-beta-funnel-v2"] = (
+        "action-beta-funnel-v2"
+    ),
+    capability: str | None = None,
+    resolution_quality: str | None = None,
+    _: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    if metric_version == "action-beta-funnel-v1":
+        return await beta_evidence_service.funnel_overview_v1(
+            db,
+            start=start,
+            end=end,
+            beta_only=beta_only,
+            capability=capability,
+            resolution_quality=resolution_quality,
+        )
+    return await beta_evidence_service.funnel_overview(
+        db,
+        start=start,
+        end=end,
+        beta_only=beta_only,
+        cohort=cohort,
+        source=source,
+        capability=capability,
+        resolution_quality=resolution_quality,
+    )
+
+
+@router.patch("/admin/beta/control")
+async def update_beta_control(
+    body: BetaControlUpdate,
+    admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    try:
+        return await beta_evidence_service.update_control(
+            db, actor_id=admin.id, **body.model_dump()
+        )
+    except Exception as exc:
+        _raise_service_error(exc)
+
+
+@router.post("/admin/beta/safety/scan")
+async def scan_beta_safety(
+    admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    return await beta_evidence_service.scan_hard_safety(
+        db, actor_id=admin.id, source="admin_audit_scan"
+    )
+
+
+@router.post("/admin/beta/review-samples/normalize")
+async def normalize_beta_review_samples(
+    _: User = Depends(get_current_admin), db: AsyncSession = Depends(get_db)
+) -> dict[str, int]:
+    return {"created": await beta_evidence_service.normalize_review_samples(db)}
+
+
+@router.get("/admin/beta/review-samples")
+async def beta_review_samples(
+    status: Literal["pending", "reviewed", "confirmed", "dismissed"] | None = None,
+    limit: int = Query(default=100, ge=1, le=200),
+    _: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+) -> list[dict]:
+    return await beta_evidence_service.list_review_samples(db, status=status, limit=limit)
+
+
+@router.patch("/admin/beta/review-samples/{sample_id}")
+async def update_beta_review_sample(
+    sample_id: str,
+    body: BetaReviewUpdate,
+    admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    try:
+        return await beta_evidence_service.review_sample(
+            db,
+            sample_id=sample_id,
+            reviewer_id=admin.id,
+            status=body.status,
+            note=body.note,
+            sample_type=body.sample_type,
+        )
+    except Exception as exc:
+        _raise_service_error(exc)
+
+
+@router.post("/admin/beta/review-samples/{sample_id}/candidate")
+async def promote_beta_review_sample(
+    sample_id: str,
+    body: BetaCandidateCreate,
+    admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    try:
+        return await beta_evidence_service.promote_candidate(
+            db,
+            sample_id=sample_id,
+            reviewer_id=admin.id,
+            dataset_kind=body.dataset_kind,
+        )
+    except Exception as exc:
+        _raise_service_error(exc)

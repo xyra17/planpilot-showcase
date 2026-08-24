@@ -6,9 +6,9 @@ from unittest.mock import patch
 import pytest
 from sqlalchemy import func, select
 
-from src.core.agent_v2.orchestrator import approve_run, change_hash
+from src.core.agent_v2.orchestrator import approve_run, change_hash, review_hash
 from src.core.time import utc_now
-from src.database import AsyncSessionLocal
+from tests.integration.database import IntegrationSessionLocal as AsyncSessionLocal
 from src.models import AgentApproval, AgentAuditEvent, AgentRun, AgentStep, User
 from src.tasks import agent_runs
 
@@ -33,6 +33,7 @@ async def _approval_fixture(user_id: str, round_number: int) -> tuple[str, str, 
     step_id = str(uuid.uuid4())
     approval_id = str(uuid.uuid4())
     payload = {"version": 1, "summary": f"round {round_number}", "operations": []}
+    review = {"risk": "medium", "outcome": "allow", "review_finding_codes": []}
     async with AsyncSessionLocal() as db:
         run = AgentRun(
             id=run_id,
@@ -66,7 +67,10 @@ async def _approval_fixture(user_id: str, round_number: int) -> tuple[str, str, 
                 change_hash=change_hash(payload),
                 change_set_version=1,
                 run_state_version=0,
-                policy_decision={"risk": "medium"},
+                review_snapshot=review,
+                reviewed_change_hash=change_hash(payload),
+                review_hash=review_hash(review),
+                policy_decision=review,
             )
         )
         await db.commit()

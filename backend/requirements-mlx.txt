@@ -1,0 +1,4 @@
+# Optional local inference runtime for macOS on Apple Silicon only.
+# The PlanPilot API talks to it over an OpenAI-compatible HTTP endpoint, so it
+# must not be installed in the Linux backend container.
+mlx-lm>=0.31.3

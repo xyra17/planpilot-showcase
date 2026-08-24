@@ -16,3 +16,7 @@ class AgentState(TypedDict, total=False):
     checkin_text: str
     debt_items: list[dict[str, Any]]
     pilo_preferences: dict[str, Any]
+    chat_context: dict[str, Any]
+    conversation_turn_id: str
+    need_frame: dict[str, Any]
+    actual_context_trace: dict[str, Any]

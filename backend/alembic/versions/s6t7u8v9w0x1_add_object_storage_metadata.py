@@ -4,8 +4,9 @@ Revision ID: s6t7u8v9w0x1
 Revises: r5s6t7u8v9w0
 """
 
-from alembic import op
 import sqlalchemy as sa
+
+from alembic import op
 
 revision = "s6t7u8v9w0x1"
 down_revision = "r5s6t7u8v9w0"

@@ -32,6 +32,53 @@ async def test_ssrf_guard_accepts_and_canonicalizes_public_url():
     assert result == "https://example.com/docs?q=1"
 
 
+async def test_ssrf_guard_resolves_proxy_fake_ip_through_public_dns():
+    system_resolver = await _resolver(["198.18.0.35"])
+    public_resolver = AsyncMock(return_value=["183.2.172.177"])
+
+    result = await normalize_public_http_url(
+        "https://www.baidu.com/",
+        resolver=system_resolver,
+        fallback_resolver=public_resolver,
+    )
+
+    assert result == "https://www.baidu.com/"
+    public_resolver.assert_awaited_once_with("www.baidu.com")
+
+
+@pytest.mark.parametrize(
+    "addresses",
+    [
+        ["10.0.0.5"],
+        ["93.184.216.34", "198.18.0.35"],
+    ],
+)
+async def test_ssrf_guard_does_not_fallback_for_real_private_or_mixed_answers(addresses: list[str]):
+    system_resolver = await _resolver(addresses)
+    public_resolver = AsyncMock(return_value=["93.184.216.34"])
+
+    with pytest.raises(UnsafeUrlError, match="非公网"):
+        await normalize_public_http_url(
+            "https://example.com/",
+            resolver=system_resolver,
+            fallback_resolver=public_resolver,
+        )
+
+    public_resolver.assert_not_awaited()
+
+
+async def test_ssrf_guard_rejects_non_public_fallback_answer():
+    system_resolver = await _resolver(["198.18.0.35"])
+    public_resolver = AsyncMock(return_value=["127.0.0.1"])
+
+    with pytest.raises(UnsafeUrlError, match="非公网"):
+        await normalize_public_http_url(
+            "https://example.com/",
+            resolver=system_resolver,
+            fallback_resolver=public_resolver,
+        )
+
+
 @pytest.mark.parametrize(
     "url",
     [
@@ -39,6 +86,7 @@ async def test_ssrf_guard_accepts_and_canonicalizes_public_url():
         "http://169.254.169.254/latest/meta-data",
         "http://[::1]/",
         "http://2130706433/",
+        "http://198.18.0.35/",
         "file:///etc/passwd",
         "http://user:password@example.com/",
         "https://example.com:444/",

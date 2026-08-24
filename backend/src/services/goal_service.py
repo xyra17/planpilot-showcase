@@ -17,7 +17,7 @@
 from collections import defaultdict
 from datetime import date, timedelta
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, ValidationInfo, field_validator, model_validator
 from sqlalchemy import delete as sql_delete
 from sqlalchemy import select
 from sqlalchemy import update as sql_update
@@ -101,11 +101,24 @@ class GoalCreate(BaseModel):
 
     @field_validator("deadline")
     @classmethod
-    def deadline_valid(cls, v: str) -> str:
+    def deadline_valid(cls, v: str, info: ValidationInfo) -> str:
         d = _parse_deadline(v)
-        if d <= date.today():
+        validation_today = date.today()
+        if info.context and info.context.get("validation_today") is not None:
+            validation_today = info.context["validation_today"]
+        if d <= validation_today:
             raise ValueError("截止日期必须在今天之后")
         return v
+
+    @classmethod
+    def for_evaluation(cls, data: dict, *, validation_today: date) -> "GoalCreate":
+        """Validate historical evaluation input against an explicit simulated date.
+
+        Normal API construction still uses the real local date.  This opt-in entry
+        point avoids process-wide clock monkeypatching and is intentionally not
+        exposed by the HTTP schema.
+        """
+        return cls.model_validate(data, context={"validation_today": validation_today})
 
 
 class GoalOut(BaseModel):

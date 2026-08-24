@@ -1011,76 +1011,207 @@ html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign .set
   box-shadow: 0 8px 18px color-mix(in srgb, var(--workspace-danger, #b64a5b) 12%, transparent);
 }
 
-/* Account operations stay easy to hit without reading as a column of boxed buttons. */
-html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign #settings-account .setting-action button:not(.setting-toggle) {
-  position: relative;
-  min-width: 0;
+/* Account operations form one stable right-hand column. The visible buttons
+ * share geometry while logout keeps a distinct destructive treatment. */
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign #settings-account {
+  --account-action-width: 112px;
+  --account-action-visual-width: 104px;
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign #settings-account :is(.settings-avatar-row, .setting-row-grid) {
+  grid-template-columns: minmax(240px, 1fr) minmax(180px, 248px) 120px;
+  align-items: center;
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign #settings-account .settings-avatar-row {
+  min-height: 96px;
+  grid-template-columns: 76px minmax(0, 1fr) 120px;
+  gap: 16px;
+  padding: 13px 0;
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign #settings-account .setting-row-grid {
+  min-height: 72px;
+  gap: 18px;
+  padding: 13px 0;
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign #settings-account .setting-copy span,
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign #settings-account .settings-avatar-copy strong {
+  font-size: 13px;
+  font-weight: 720;
+  line-height: 1.45;
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign #settings-account .setting-copy small,
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign #settings-account .settings-avatar-copy :is(p, small) {
+  margin-top: 4px;
+  font-size: 11px !important;
+  line-height: 1.55;
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign #settings-account .setting-value-text {
+  color: var(--workspace-secondary);
+  font-size: 11px;
+  font-weight: 620;
+  line-height: 1.55;
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign #settings-account .settings-avatar-row + .setting-row-grid {
+  border-top: 1px solid var(--workspace-border);
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign #settings-account .setting-action {
+  width: var(--account-action-width);
+  align-self: center;
+  justify-self: end;
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign #settings-account .setting-action .account-action-button {
+  width: var(--account-action-width);
+  min-width: var(--account-action-width);
+  height: 44px;
   min-height: 44px;
-  padding: 0 4px 3px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  color: var(--workspace-text);
   border: 0 !important;
-  border-radius: 0;
+  border-radius: 10px;
+  background: transparent !important;
+  box-shadow: none !important;
+  transform: none;
+  transition: opacity 160ms ease;
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign #settings-account .account-action-visual {
+  display: inline-flex;
+  width: var(--account-action-visual-width);
+  min-height: 36px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 10px;
+  color: var(--workspace-text);
+  border: 1px solid var(--workspace-border);
+  border-radius: 9px;
+  background: var(--workspace-panel);
+  box-shadow: none;
+  font-size: 11px;
+  font-weight: 710;
+  line-height: 1;
+  transition: color 160ms ease, border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign #settings-account .account-action-visual > svg {
+  flex: 0 0 auto;
+  color: var(--workspace-secondary);
+  stroke-width: 1.8;
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign #settings-account .setting-action .account-action-button:hover {
+  border: 0 !important;
   background: transparent !important;
   box-shadow: none !important;
   transform: none;
 }
 
-html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign #settings-account .settings-avatar-row .setting-action button {
-  min-width: 0;
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign #settings-account .account-action-button:hover .account-action-visual {
+  color: var(--workspace-accent);
+  border-color: color-mix(in srgb, var(--workspace-accent) 52%, var(--workspace-border));
+  background: color-mix(in srgb, var(--workspace-accent) 7%, var(--workspace-panel));
+  box-shadow: 0 3px 10px color-mix(in srgb, var(--workspace-accent) 7%, transparent);
 }
 
-html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign #settings-account .setting-action button:not(.setting-toggle)::after {
-  content: "";
-  position: absolute;
-  left: 50%;
-  bottom: 10px;
-  width: calc(100% - 8px);
-  height: 2px;
-  border-radius: 999px;
-  background: linear-gradient(90deg, transparent, var(--workspace-accent) 6%, color-mix(in srgb, var(--workspace-accent) 64%, #7ce4ce) 94%, transparent);
-  box-shadow: 0 2px 8px color-mix(in srgb, var(--workspace-accent) 18%, transparent);
-  opacity: .7;
-  transform: translateX(-50%) scaleX(1);
-  transform-origin: center;
-  transition: opacity 170ms ease, transform 170ms ease, box-shadow 170ms ease;
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign #settings-account .account-action-button:hover .account-action-visual > svg {
+  color: var(--workspace-accent);
 }
 
-html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign #settings-account .setting-action button:not(.setting-toggle):hover {
-  border: 0 !important;
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign #settings-account .setting-action .account-action-button:active {
   background: transparent !important;
   box-shadow: none !important;
   transform: none;
 }
 
-html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign #settings-account .setting-action button:not(.setting-toggle):hover::after {
-  opacity: 1;
-  transform: translateX(-50%) scaleX(1.04);
-  box-shadow: 0 3px 12px color-mix(in srgb, var(--workspace-accent) 34%, transparent);
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign #settings-account .account-action-button:active .account-action-visual {
+  background: color-mix(in srgb, var(--workspace-accent) 12%, var(--workspace-panel));
+  box-shadow: inset 0 1px 3px color-mix(in srgb, var(--workspace-text) 9%, transparent);
 }
 
-html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign #settings-account .setting-action button:not(.setting-toggle):focus-visible {
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign #settings-account .setting-action .account-action-button:focus-visible {
   outline: 2px solid color-mix(in srgb, var(--workspace-accent) 62%, transparent);
   outline-offset: 2px;
-  border-radius: 6px;
 }
 
-html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign #settings-account .setting-action .danger-quiet::after {
-  background: linear-gradient(90deg, transparent, var(--workspace-danger, #c84255) 6%, var(--workspace-danger, #c84255) 94%, transparent) !important;
-  box-shadow: 0 2px 8px color-mix(in srgb, var(--workspace-danger, #b64a5b) 18%, transparent);
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign #settings-account .setting-action .account-action-button:disabled {
+  background: transparent !important;
+  box-shadow: none !important;
+  opacity: .55;
 }
 
-html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign #settings-account .setting-action .danger-quiet:hover {
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign #settings-account .account-action-button:disabled .account-action-visual {
+  color: var(--workspace-tertiary);
+  border-color: var(--workspace-border);
+  background: var(--workspace-panel-subtle);
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign #settings-account .setting-action .account-action-button.is-danger {
+  color: var(--workspace-danger, #b64a5b) !important;
   border: 0 !important;
   background: transparent !important;
   box-shadow: none !important;
 }
 
-html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign #settings-account .setting-action .danger-quiet:hover::after {
-  box-shadow: 0 3px 12px color-mix(in srgb, var(--workspace-danger, #b64a5b) 34%, transparent);
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign #settings-account .account-action-button.is-danger .account-action-visual {
+  color: var(--workspace-danger, #b64a5b);
+  border-color: color-mix(in srgb, var(--workspace-danger, #b64a5b) 32%, var(--workspace-border));
+  background: color-mix(in srgb, var(--workspace-danger, #b64a5b) 5%, var(--workspace-panel));
 }
 
-@media (prefers-reduced-motion: reduce) {
-  html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign #settings-account .setting-action button:not(.setting-toggle)::after {
-    transition-duration: 0ms;
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign #settings-account .account-action-button.is-danger:hover .account-action-visual {
+  border-color: color-mix(in srgb, var(--workspace-danger, #b64a5b) 54%, var(--workspace-border));
+  background: color-mix(in srgb, var(--workspace-danger, #b64a5b) 9%, var(--workspace-panel));
+  box-shadow: 0 3px 10px color-mix(in srgb, var(--workspace-danger, #b64a5b) 7%, transparent);
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign #settings-account .account-action-button.is-danger .account-action-visual > svg {
+  color: currentColor;
+}
+
+html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign #settings-account .account-signout-row {
+  border-top-color: color-mix(in srgb, var(--workspace-danger, #b64a5b) 20%, var(--workspace-border));
+}
+
+@media (max-width: 760px) {
+  html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign #settings-account {
+    --account-action-width: 104px;
+    --account-action-visual-width: 96px;
+  }
+
+  html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign #settings-account .setting-row-grid {
+    grid-template-columns: minmax(0, 1fr) var(--account-action-width);
+    gap: 8px 12px;
+  }
+
+  html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign #settings-account .setting-row-grid > .setting-copy {
+    grid-column: 1 / -1;
+  }
+
+  html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign #settings-account .setting-row-grid > .setting-current {
+    grid-column: 1;
+  }
+
+  html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign #settings-account .setting-row-grid > .setting-action {
+    grid-column: 2;
+  }
+
+  html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign #settings-account .settings-avatar-row {
+    grid-template-columns: 68px minmax(0, 1fr);
+  }
+
+  html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign #settings-account .settings-avatar-row > .setting-action {
+    grid-column: 2;
+    justify-self: end;
   }
 }
 

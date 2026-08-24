@@ -12,8 +12,11 @@ from src.core.time import utc_now
 from src.models import (
     AgentFeedbackEvent,
     AgentInvocation,
+    AgentRun,
+    AgentStep,
     AgentTraceSpan,
     DecisionProposal,
+    InsightActionRun,
     LearningEvent,
     Task,
 )
@@ -24,6 +27,14 @@ EVENT_TYPE_MAP = {
     "ProposalApplied": "proposal_applied",
     "ProposalAdjusted": "proposal_adjusted",
     "ProposalFeedbackRecorded": "proposal_feedback",
+    "InsightConverted": "insight_converted",
+    "ActionApproved": "action_approved",
+    "ActionApplied": "action_applied",
+    "ProposalAppliedByActionRun": "action_applied",
+    "ActionRejected": "action_rejected",
+    "ActionCancelled": "action_cancelled",
+    "ActionFailed": "action_failed",
+    "ActionRolledBack": "action_rolled_back",
 }
 
 
@@ -41,20 +52,30 @@ async def normalize_learning_events(db: AsyncSession, *, limit: int = 500) -> in
     created = 0
     for event in events:
         feedback_type = EVENT_TYPE_MAP[event.event_type]
+        run_id = str(event.correlation_id) if event.correlation_id else None
+        proposal_id = str((event.payload or {}).get("insight_id") or event.aggregate_id)
+        if run_id and await db.scalar(
+            select(AgentFeedbackEvent.id).where(
+                AgentFeedbackEvent.run_id == run_id,
+                AgentFeedbackEvent.feedback_type == feedback_type,
+            )
+        ):
+            continue
         dedupe = f"event:{event.id}:{feedback_type}:v1"
         if await db.scalar(
             select(AgentFeedbackEvent.id).where(AgentFeedbackEvent.dedupe_key == dedupe)
         ):
             continue
         invocation = await db.scalar(
-            select(AgentInvocation).where(AgentInvocation.proposal_id == event.aggregate_id)
+            select(AgentInvocation).where(AgentInvocation.proposal_id == proposal_id)
         )
         db.add(
             AgentFeedbackEvent(
                 user_id=event.user_id,
                 goal_id=event.goal_id,
                 agent_invocation_id=invocation.id if invocation else None,
-                proposal_id=event.aggregate_id,
+                proposal_id=proposal_id,
+                run_id=run_id,
                 source_event_id=event.id,
                 feedback_type=feedback_type,
                 value=event.payload or {},
@@ -96,54 +117,61 @@ async def normalize_learning_events(db: AsyncSession, *, limit: int = 500) -> in
 
 async def compute_delayed_outcomes(db: AsyncSession, *, days: int = 7) -> int:
     cutoff = utc_now() - timedelta(days=days)
-    proposals = list(
+    links = list(
         (
             await db.execute(
-                select(DecisionProposal).where(
-                    DecisionProposal.status == "applied",
+                select(InsightActionRun, DecisionProposal, AgentRun)
+                .join(DecisionProposal, DecisionProposal.id == InsightActionRun.insight_id)
+                .join(AgentRun, AgentRun.id == InsightActionRun.run_id)
+                .where(
+                    InsightActionRun.status == "applied",
                     DecisionProposal.applied_at.isnot(None),
                     DecisionProposal.applied_at <= cutoff,
                 )
             )
-        ).scalars()
+        ).all()
     )
     created = 0
-    for proposal in proposals:
-        dedupe = f"proposal:{proposal.id}:completion_rate_{days}d:v1"
+    for link, proposal, run in links:
+        dedupe = f"run:{run.id}:completion_rate_{days}d:v2"
         if await db.scalar(
             select(AgentFeedbackEvent.id).where(AgentFeedbackEvent.dedupe_key == dedupe)
         ):
             continue
-        snapshot = proposal.application_snapshot or {}
-        after_tasks = (snapshot.get("after") or {}).get("tasks") or {}
-        task_ids = [str(value) for value in snapshot.get("target_task_ids") or after_tasks]
-        if not task_ids:
-            # Compatibility for proposals applied before application snapshots existed.
-            changes = proposal.proposed_changes or {}
-            task_ids = [
-                str(row["task_id"])
-                for row in changes.get("task_updates", [])
-                if isinstance(row, dict) and row.get("task_id")
-            ]
-            task_ids.extend(
-                str(changes[key])
-                for key in ("task_id", "original_task_id")
-                if changes.get(key)
+        apply_step = await db.scalar(
+            select(AgentStep)
+            .where(
+                AgentStep.run_id == run.id,
+                AgentStep.tool_name == "tasks.apply_changes",
+                AgentStep.status == "completed",
             )
+            .order_by(AgentStep.plan_version.desc())
+        )
+        operations = (
+            list((apply_step.output_data or {}).get("undo_operations", [])) if apply_step else []
+        )
+        task_operations = [row for row in operations if row.get("entity") == "task"]
+        task_ids = sorted(
+            {str(row.get("entity_id")) for row in task_operations if row.get("entity_id")}
+        )
         due_at = proposal.applied_at + timedelta(days=days)
-        completion_events = list(
-            (
-                await db.execute(
-                    select(LearningEvent).where(
-                        LearningEvent.aggregate_type == "task",
-                        LearningEvent.aggregate_id.in_(task_ids),
-                        LearningEvent.event_type == "TaskCompleted",
-                        LearningEvent.occurred_at >= proposal.applied_at,
-                        LearningEvent.occurred_at <= due_at,
+        completion_events = (
+            list(
+                (
+                    await db.execute(
+                        select(LearningEvent).where(
+                            LearningEvent.aggregate_type == "task",
+                            LearningEvent.aggregate_id.in_(task_ids),
+                            LearningEvent.event_type == "TaskCompleted",
+                            LearningEvent.occurred_at >= proposal.applied_at,
+                            LearningEvent.occurred_at <= due_at,
+                        )
                     )
-                )
-            ).scalars()
-        ) if task_ids else []
+                ).scalars()
+            )
+            if task_ids
+            else []
+        )
         completed_ids = {row.aggregate_id for row in completion_events}
         tasks = (
             list((await db.execute(select(Task).where(Task.id.in_(task_ids)))).scalars())
@@ -153,12 +181,12 @@ async def compute_delayed_outcomes(db: AsyncSession, *, days: int = 7) -> int:
         completed_ids.update(
             row.id
             for row in tasks
-            if row.completed_at is not None
-            and proposal.applied_at <= row.completed_at <= due_at
+            if row.completed_at is not None and proposal.applied_at <= row.completed_at <= due_at
         )
         completion = len(completed_ids) / len(task_ids) if task_ids else None
         baseline_completed = sum(
-            details.get("status") == "completed" for details in after_tasks.values()
+            row.get("field") == "status" and row.get("before") == "completed"
+            for row in task_operations
         )
         baseline = baseline_completed / len(task_ids) if task_ids else None
         invocation = await db.scalar(
@@ -170,6 +198,7 @@ async def compute_delayed_outcomes(db: AsyncSession, *, days: int = 7) -> int:
                 goal_id=proposal.goal_id,
                 agent_invocation_id=invocation.id if invocation else None,
                 proposal_id=proposal.id,
+                run_id=run.id,
                 feedback_type=f"completion_rate_{days}d",
                 value={
                     "completion_rate": completion,
@@ -181,14 +210,12 @@ async def compute_delayed_outcomes(db: AsyncSession, *, days: int = 7) -> int:
                     ),
                     "task_count": len(task_ids),
                     "completed_task_ids": sorted(completed_ids),
-                    "target_versions": {
-                        task_id: details.get("version")
-                        for task_id, details in after_tasks.items()
-                    },
-                    "application_schema_version": snapshot.get("schema_version"),
+                    "change_set_id": link.change_set_id,
+                    "operation_count": len(task_operations),
+                    "application_schema_version": "action-run-v2",
                 },
                 attribution_window=f"{days}d",
-                metric_version="v1",
+                metric_version="v2",
                 dedupe_key=dedupe,
                 occurred_at=utc_now(),
             )

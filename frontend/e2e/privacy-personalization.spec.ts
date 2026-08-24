@@ -112,12 +112,71 @@ test("服务器可携带数据导出与本机缓存范围文案准确", async ({
   await expect((await download).suggestedFilename()).toBe("planpilot-data-export.json");
 });
 
+test("隐私设置使用紧凑层级与完整开关视觉", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await openSettings(page);
+  const privacy = page.locator("#settings-privacy:visible").last();
+  const header = await privacy.locator(".privacy-section-header").boundingBox();
+  const icon = await privacy.locator(".privacy-section-icon").boundingBox();
+  const status = await privacy.locator(".privacy-save-state").boundingBox();
+  expect(header?.height).toBeLessThan(90);
+  expect(icon?.width).toBeLessThanOrEqual(40);
+  expect(status?.height).toBeLessThanOrEqual(30);
+  const toggles = await privacy.locator(".privacy-toggle").evaluateAll((elements) => elements.map((element) => {
+    const button = element as HTMLElement;
+    const rect = button.getBoundingClientRect();
+    const track = getComputedStyle(button, "::before");
+    const thumb = button.querySelector("i")?.getBoundingClientRect();
+    return { width: rect.width, height: rect.height, trackWidth: track.width, trackRadius: track.borderRadius, thumbWidth: thumb?.width ?? 0 };
+  }));
+  expect(toggles).toHaveLength(4);
+  expect(toggles.every(({ width, height, trackWidth, trackRadius, thumbWidth }) => width === 52 && height >= 44 && trackWidth === "36px" && trackRadius === "999px" && thumbWidth === 14)).toBe(true);
+});
+
+test("账户区移除重复隐私入口并垂直对齐操作按钮", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await openSettings(page);
+  const account = page.locator("#settings-account:visible").last();
+  await expect(account.getByText("学习数据与隐私", { exact: true })).toHaveCount(0);
+  await expect(account.getByRole("link", { name: "前往管理" })).toHaveCount(0);
+  const actions = account.locator(".account-action-button");
+  const visuals = account.locator(".account-action-visual");
+  await expect(actions).toHaveCount(4);
+  const desktopGeometry = await actions.evaluateAll((elements) => elements.map((element) => {
+    const rect = element.getBoundingClientRect();
+    const row = element.closest(".settings-avatar-row, .setting-row-grid")?.getBoundingClientRect();
+    return { width: rect.width, height: rect.height, right: rect.right, centerOffset: row ? Math.abs((rect.top + rect.height / 2) - (row.top + row.height / 2)) : 999 };
+  }));
+  expect(desktopGeometry.every(({ width, height, centerOffset }) => width === 112 && height >= 44 && centerOffset <= 1)).toBe(true);
+  expect(Math.max(...desktopGeometry.map(({ right }) => right)) - Math.min(...desktopGeometry.map(({ right }) => right))).toBeLessThanOrEqual(1);
+  const desktopVisualGeometry = await visuals.evaluateAll((elements) => elements.map((element) => {
+    const rect = element.getBoundingClientRect();
+    return { width: rect.width, height: rect.height };
+  }));
+  expect(desktopVisualGeometry.every(({ width, height }) => width === 104 && height === 36)).toBe(true);
+  const editColor = await account.getByRole("button", { name: "编辑", exact: true }).evaluate((element) => getComputedStyle(element).color);
+  const exitColor = await account.getByRole("button", { name: "退出", exact: true }).evaluate((element) => getComputedStyle(element).color);
+  expect(exitColor).not.toBe(editColor);
+
+  await page.setViewportSize({ width: 375, height: 812 });
+  const mobileMetrics = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth }));
+  expect(mobileMetrics.scrollWidth).toBeLessThanOrEqual(mobileMetrics.innerWidth);
+  const mobileRightEdges = await actions.evaluateAll((elements) => elements.map((element) => {
+    const rect = element.getBoundingClientRect();
+    return { width: rect.width, right: rect.right };
+  }));
+  expect(mobileRightEdges.every(({ width }) => width === 104)).toBe(true);
+  expect(Math.max(...mobileRightEdges.map(({ right }) => right)) - Math.min(...mobileRightEdges.map(({ right }) => right))).toBeLessThanOrEqual(1);
+  const mobileVisualWidths = await visuals.evaluateAll((elements) => elements.map((element) => element.getBoundingClientRect().width));
+  expect(mobileVisualWidths.every((width) => width === 96)).toBe(true);
+});
+
 test("隐私设置在 375px 无横向滚动且触控目标达标", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
   await openSettings(page);
   const privacy = page.locator("#settings-privacy:visible").last();
   const metrics = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth }));
   expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.innerWidth);
-  const heights = await privacy.locator(".privacy-purpose-row .setting-toggle").evaluateAll((elements) => elements.map((element) => element.getBoundingClientRect().height));
+  const heights = await privacy.locator(".privacy-purpose-row .privacy-toggle").evaluateAll((elements) => elements.map((element) => element.getBoundingClientRect().height));
   expect(heights.every((height) => height >= 44)).toBe(true);
 });

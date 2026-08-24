@@ -1,17 +1,16 @@
 from datetime import date, datetime, timezone
 
 from celery.utils.log import get_task_logger
-from sqlalchemy import distinct, select
+from sqlalchemy import select
 
 from src.celery_app import celery_app
-from src.core.agent_v2.orchestrator import create_run
 from src.database import AsyncSessionLocal
-from src.models import AgentRun, Goal, Task
-from src.tasks.agent_runs import dispatch_agent_run
+from src.models import DecisionProposal, Goal, Task
+from src.services import proposal_service
 from src.tasks.runtime import run_async
 
 logger = get_task_logger(__name__)
-SUGGESTION_PREFIX = "主动检查最近 14 天"
+SUGGESTION_SOURCE = "scheduled_insight"
 
 
 async def _generate_all() -> dict[str, int]:
@@ -20,47 +19,38 @@ async def _generate_all() -> dict[str, int]:
     )
     created = 0
     async with AsyncSessionLocal() as db:
-        user_ids = (
-            (
-                await db.execute(
-                    select(distinct(Goal.user_id))
-                    .join(Task, Task.goal_id == Goal.id)
-                    .where(
-                        Goal.status == "active",
-                        Task.status != "completed",
-                        Task.scheduled_date < date.today().isoformat(),
-                    )
+        candidates = (
+            await db.execute(
+                select(Goal.user_id, Goal.id)
+                .join(Task, Task.goal_id == Goal.id)
+                .where(
+                    Goal.status == "active",
+                    Task.status != "completed",
+                    Task.scheduled_date < date.today().isoformat(),
                 )
+                .distinct()
             )
-            .scalars()
-            .all()
-        )
-        for user_id in user_ids:
+        ).all()
+        for user_id, goal_id in candidates:
             exists = (
                 await db.execute(
-                    select(AgentRun.id).where(
-                        AgentRun.user_id == user_id,
-                        AgentRun.request_text.startswith(SUGGESTION_PREFIX),
-                        AgentRun.created_at >= today_start,
+                    select(DecisionProposal.id).where(
+                        DecisionProposal.user_id == user_id,
+                        DecisionProposal.goal_id == goal_id,
+                        DecisionProposal.source == SUGGESTION_SOURCE,
+                        DecisionProposal.created_at >= today_start,
                     )
                 )
             ).scalar_one_or_none()
             if exists:
                 continue
-            run = await create_run(
+            proposals = await proposal_service.generate_proposal(
+                user_id,
                 db,
-                user_id=user_id,
-                request=(
-                    f"{SUGGESTION_PREFIX}的执行情况，如有落后任务则生成下周调整建议；"
-                    "只生成建议，任何修改都必须由我确认。"
-                ),
-                goal_id=None,
-                step_budget=10,
-                token_budget=12000,
-                auto_advance=False,
+                goal_id=goal_id,
+                source=SUGGESTION_SOURCE,
             )
-            dispatch_agent_run(run.id, user_id)
-            created += 1
+            created += len(proposals)
     return {"created": created}
 
 
@@ -71,7 +61,7 @@ async def _generate_all() -> dict[str, int]:
     max_retries=2,
 )
 def generate_agent_suggestions() -> dict[str, int]:
-    """Create at most one approval-gated suggestion per eligible user and day."""
+    """Create learning insights, never premature waiting-approval action Runs."""
     result = run_async(_generate_all())
     logger.info("Agent proactive suggestions: %s", result)
     return result

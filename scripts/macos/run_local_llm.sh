@@ -20,4 +20,6 @@ exec "${PYTHON_BIN}" -m mlx_lm server \
   --port 8080 \
   --max-tokens 2048 \
   --prompt-cache-size 4 \
+  --prompt-concurrency 1 \
+  --decode-concurrency 1 \
   --log-level INFO

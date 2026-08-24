@@ -10,12 +10,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.time import utc_now
 from src.models import (
+    AgentApproval,
+    AgentAuditEvent,
     AgentDeployment,
     AgentFeedbackEvent,
     AgentIncident,
     AgentInvocation,
     AgentMetricsDaily,
+    AgentRun,
     DecisionProposal,
+    InsightActionRun,
+    LearningEvent,
+    ModelConfig,
 )
 from src.services.agent_control_service import canonical_hash, ensure_baseline
 
@@ -39,7 +45,9 @@ async def aggregate_daily_metrics(
         (
             await db.execute(
                 select(DecisionProposal).where(
-                    DecisionProposal.created_at >= start, DecisionProposal.created_at < end
+                    DecisionProposal.created_at >= start,
+                    DecisionProposal.created_at < end,
+                    DecisionProposal.proposal_type.notin_({"GOAL_PLAN_CREATE", "CHECKIN_RECORD"}),
                 )
             )
         ).scalars()
@@ -54,12 +62,78 @@ async def aggregate_daily_metrics(
             )
         ).scalars()
     )
-    reviewed = [row for row in proposals if row.status in {"accepted", "applied", "rejected"}]
-    accepted = sum(row.status in {"accepted", "applied"} for row in reviewed)
-    feedback_types = [row.feedback_type for row in feedback]
-    accepted_events = feedback_types.count("proposal_accepted")
-    rejected_events = feedback_types.count("proposal_rejected")
-    applied_events = feedback_types.count("proposal_applied")
+    runs = list(
+        (
+            await db.execute(
+                select(AgentRun).where(AgentRun.created_at >= start, AgentRun.created_at < end)
+            )
+        ).scalars()
+    )
+    run_ids = [run.id for run in runs]
+    approvals = (
+        list(
+            (
+                await db.execute(select(AgentApproval).where(AgentApproval.run_id.in_(run_ids)))
+            ).scalars()
+        )
+        if run_ids
+        else []
+    )
+    audit_events = (
+        list(
+            (
+                await db.execute(select(AgentAuditEvent).where(AgentAuditEvent.run_id.in_(run_ids)))
+            ).scalars()
+        )
+        if run_ids
+        else []
+    )
+    turn_events = list(
+        (
+            await db.execute(
+                select(LearningEvent).where(
+                    LearningEvent.created_at >= start,
+                    LearningEvent.created_at < end,
+                    LearningEvent.event_type.in_(
+                        {"ClarificationRequested", "IntentResolved", "NeedFrameResolved"}
+                    ),
+                )
+            )
+        ).scalars()
+    )
+    proposal_ids = [row.id for row in proposals]
+    converted_insight_ids = (
+        set(
+            (
+                await db.execute(
+                    select(InsightActionRun.insight_id).where(
+                        InsightActionRun.insight_id.in_(proposal_ids)
+                    )
+                )
+            ).scalars()
+        )
+        if proposal_ids
+        else set()
+    )
+    approved_count = sum(item.status == "approved" for item in approvals)
+    rejected_count = sum(item.status == "rejected" for item in approvals)
+    approved_run_ids = {item.run_id for item in approvals if item.status == "approved"}
+    completed_count = sum(
+        run.id in approved_run_ids and run.status in {"completed", "rolled_back"} for run in runs
+    )
+    successful_count = sum(run.id in approved_run_ids and run.status == "completed" for run in runs)
+    rolled_back_count = sum(
+        run.id in approved_run_ids and run.status == "rolled_back" for run in runs
+    )
+    edited_run_ids = {
+        event.run_id for event in audit_events if event.event_type == "approval.edited"
+    }
+    clarified_count = sum(event.event_type == "ClarificationRequested" for event in turn_events)
+    preview_latencies = sorted(
+        (run.preview_ready_at - run.input_received_at).total_seconds() * 1000
+        for run in runs
+        if run.preview_ready_at and run.input_received_at
+    )
     explicit_feedback = [row for row in feedback if row.feedback_type == "proposal_feedback"]
     helpful_events = sum((row.value or {}).get("outcome") == "helpful" for row in explicit_feedback)
     delayed_completion = [
@@ -80,12 +154,43 @@ async def aggregate_daily_metrics(
         "success_rate": round(success_rate, 4) if success_rate is not None else None,
         "fallback_rate": round(fallback_rate, 4) if fallback_rate is not None else None,
         "proposal_count": len(proposals),
-        "accept_rate": (
-            round(accepted_events / (accepted_events + rejected_events), 4)
-            if accepted_events + rejected_events
-            else (round(accepted / len(reviewed), 4) if reviewed else None)
+        "insight_to_action_rate": (
+            round(len(converted_insight_ids) / len(proposals), 4) if proposals else None
         ),
-        "apply_rate": (round(applied_events / accepted_events, 4) if accepted_events else None),
+        "action_approval_rate": (
+            round(approved_count / (approved_count + rejected_count), 4)
+            if approved_count + rejected_count
+            else None
+        ),
+        "changeset_edit_rate": (
+            round(len(edited_run_ids) / len(approvals), 4) if approvals else None
+        ),
+        "execution_success_rate": (
+            round(successful_count / approved_count, 4) if approved_count else None
+        ),
+        "undo_rate": (round(rolled_back_count / completed_count, 4) if completed_count else None),
+        "clarification_rate": (
+            round(clarified_count / len(turn_events), 4) if turn_events else None
+        ),
+        "input_to_preview_p50_ms": (
+            round(preview_latencies[len(preview_latencies) // 2], 1) if preview_latencies else None
+        ),
+        "input_to_preview_p95_ms": (
+            round(
+                preview_latencies[
+                    min(len(preview_latencies) - 1, round(len(preview_latencies) * 0.95))
+                ],
+                1,
+            )
+            if preview_latencies
+            else None
+        ),
+        "accept_rate": (
+            round(approved_count / (approved_count + rejected_count), 4)
+            if approved_count + rejected_count
+            else None
+        ),
+        "apply_rate": (round(successful_count / approved_count, 4) if approved_count else None),
         "helpful_rate": (
             round(helpful_events / len(explicit_feedback), 4) if explicit_feedback else None
         ),
@@ -117,7 +222,7 @@ async def aggregate_daily_metrics(
             AgentMetricsDaily.metric_date == metric_date.isoformat(),
             AgentMetricsDaily.agent_type == "coach",
             AgentMetricsDaily.dimension_key == dimension_key,
-            AgentMetricsDaily.metric_version == "v1",
+            AgentMetricsDaily.metric_version == "v2",
         )
     )
     if row is None:
@@ -126,7 +231,7 @@ async def aggregate_daily_metrics(
             agent_type="coach",
             segment_key="all",
             dimension_key=dimension_key,
-            metric_version="v1",
+            metric_version="v2",
         )
         db.add(row)
     row.metrics = metrics
@@ -304,6 +409,9 @@ async def rollback_deployment(
     target = await db.get(AgentDeployment, target_deployment_id)
     if target is None:
         raise LookupError("目标版本不存在")
+    target_model = await db.get(ModelConfig, target.model_config_id)
+    if target_model is None or target_model.provider not in {"local", "smart"}:
+        raise ValueError("目标修订使用已退役模型路由，仅供历史审计，不能回滚为生产版本")
     current = await db.scalar(
         select(AgentDeployment).where(
             AgentDeployment.agent_type == target.agent_type,

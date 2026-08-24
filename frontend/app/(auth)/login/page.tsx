@@ -6,6 +6,7 @@ import { useState } from "react";
 
 import { AppBrand } from "@/components/app/AppBrand";
 import { ApiError } from "@/lib/api";
+import { safeProductReturnPath } from "@/lib/technology/noticeActions";
 import { useAuthStore } from "@/lib/stores/authStore";
 
 type LoginState =
@@ -79,7 +80,9 @@ export default function LoginPage() {
       setLoginState("success");
       setStatusMessage("登录成功，正在进入 PlanPilot…");
       window.setTimeout(() => {
-        window.location.href = "/studio/work";
+        const searchParams = new URLSearchParams(window.location.search);
+        const returnPath = searchParams.get("next") ?? searchParams.get("returnTo");
+        window.location.href = safeProductReturnPath(returnPath);
       }, 500);
     } catch (error) {
       const result = messageForError(error);

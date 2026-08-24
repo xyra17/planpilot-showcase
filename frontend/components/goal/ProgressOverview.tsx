@@ -1,10 +1,15 @@
 "use client";
-import { useEffect, useState } from "react";
-import { TrendingUp, TrendingDown, Minus, Flame, AlertTriangle, CheckCircle2 } from "lucide-react";
-import { api } from "@/lib/api";
-import { StatusBadge, type StatusTone } from "@/components/ui/StatusBadge";
 
-interface ProgressData {
+import { useEffect, useState } from "react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Flame,
+} from "lucide-react";
+import { api } from "@/lib/api";
+import { DataSyncNotice } from "@/components/ui/DataSyncNotice";
+
+export interface ProgressData {
   goal_id: string;
   title: string;
   deadline: string;
@@ -16,150 +21,109 @@ interface ProgressData {
   days_ahead_or_behind: number | null;
 }
 
-type BadgeKind = "ok" | "warn" | "neutral";
-
-function Badge({ kind, label }: { kind: BadgeKind; label: string }) {
-  const tones: Record<BadgeKind, StatusTone> = {
-    ok: "success",
-    warn: "warning",
-    neutral: "info",
-  };
-  return (
-    <StatusBadge tone={tones[kind]} compact className={`goal-metric-badge goal-metric-badge-${kind}`}>
-      {label}
-    </StatusBadge>
-  );
-}
-
-export function ProgressOverview({ goalId, refreshKey = 0 }: { goalId: string; refreshKey?: number }) {
+export function ProgressOverview({ goalId, refreshKey = 0, localData }: { goalId: string; refreshKey?: number; localData?: ProgressData }) {
   const [data, setData] = useState<ProgressData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [retryKey, setRetryKey] = useState(0);
 
   useEffect(() => {
+    if (localData) return;
     setLoading(true);
+    setError(null);
     api.get<ProgressData>(`/api/v1/goals/${goalId}/progress`)
       .then(setData)
-      .catch(() => null)
+      .catch((reason) => {
+        setData(null);
+        setError(reason instanceof Error ? reason.message : "进度暂不可同步");
+      })
       .finally(() => setLoading(false));
-  }, [goalId, refreshKey]);
+  }, [goalId, localData, refreshKey, retryKey]);
 
-  if (loading) {
+  if (!localData && loading) {
     return (
-      <div className="space-y-2">
-        <div className="flex justify-end gap-3">
-          <div className="h-4 w-14 rounded bg-gray-100 animate-pulse" />
-          <div className="h-4 w-14 rounded bg-gray-100 animate-pulse" />
-        </div>
-        <div className="grid grid-cols-2 gap-2">
-          {Array.from({ length: 2 }).map((_, i) => (
-            <div key={i} className="h-20 rounded-xl bg-gray-100 animate-pulse" />
-          ))}
-        </div>
+      <div className="goal-progress-summary is-loading" aria-label="正在读取目标进度">
+        {Array.from({ length: 3 }).map((_, index) => (
+          <div key={index} className="goal-progress-skeleton" aria-hidden="true">
+            <span />
+            <strong />
+          </div>
+        ))}
       </div>
     );
   }
 
-  if (!data) return null;
-
-  const hasAnyProgress = data.total_tasks > 0 || data.streak_days > 0 || data.avg_completion_rate > 0;
-  if (!hasAnyProgress) {
+  if (!localData && (error || !data)) {
     return (
-      <div className="rounded-xl border border-gray-100 bg-white px-4 py-3 text-center">
-        <p className="text-xs text-gray-400">计划生成后展示</p>
-      </div>
+      <DataSyncNotice
+        title="目标进度同步失败"
+        message={error ?? "进度服务暂时无法连接，目标和任务仍可正常使用。"}
+        retryLabel="重新加载"
+        onRetry={() => setRetryKey((key) => key + 1)}
+      />
     );
   }
 
-  const completionPct = data.total_tasks > 0
-    ? Math.round((data.completed_tasks / data.total_tasks) * 100)
+  const resolvedData = localData ?? data;
+  if (!resolvedData) return null;
+
+  const completionPct = resolvedData.total_tasks > 0
+    ? Math.round((resolvedData.completed_tasks / resolvedData.total_tasks) * 100)
     : 0;
-
-  const daysSign = data.days_ahead_or_behind;
-  const hasTrend = daysSign !== null;
-  const TrendIcon = !hasTrend ? Minus : daysSign > 0 ? TrendingUp : daysSign < 0 ? TrendingDown : Minus;
-  const avgPct = Math.round(data.avg_completion_rate * 100);
-  const cardStyle = { borderColor: "var(--border-subtle)", boxShadow: "0 1px 2px rgba(0,0,0,0.03),0 4px 12px rgba(0,0,0,0.03)" };
+  const progressDetail = `${resolvedData.completed_tasks}/${resolvedData.total_tasks} 项完成`;
+  const debtDetail = resolvedData.debt_count > 0 ? "项待复习" : "暂无逾期知识";
+  const streakDetail = resolvedData.streak_days > 0 ? "保持当前节奏" : "暂无连续记录";
+  const progressStatus = completionPct >= 100 ? "已达标" : completionPct >= 50 ? "进行中" : "待加速";
+  const debtStatus = resolvedData.debt_count > 0 ? "需关注" : "已清零";
 
   return (
-    <div className="grid grid-cols-2 gap-2">
-      {/* 整体进度 */}
-      <div className="goal-metric-card goal-metric-card-progress bg-white rounded-xl border p-2.5" style={cardStyle}>
-        <div className="flex items-center justify-between mb-1.5">
-          <div className="flex items-center gap-1.5">
-            <div className="goal-metric-icon w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "var(--accent-light)" }}>
-              <CheckCircle2 size={10} style={{ color: "var(--accent)" }} />
-            </div>
-            <span className="text-xs font-semibold text-gray-700">整体进度</span>
-          </div>
-          <Badge
-            kind={completionPct >= 100 ? "ok" : completionPct >= 50 ? "neutral" : "warn"}
-            label={completionPct >= 100 ? "已达标" : completionPct >= 50 ? "进行中" : "待加速"}
-          />
+    <div className="goal-progress-summary" aria-label="目标指标摘要">
+      <div
+        className="goal-metric-card goal-metric-card-progress"
+        data-detail={`${progressDetail} · ${progressStatus}`}
+        aria-label={`整体进度 ${completionPct}%，${progressDetail}，${progressStatus}`}
+        tabIndex={0}
+      >
+        <div className="goal-progress-metric-heading">
+          <CheckCircle2 size={15} aria-hidden="true" />
+          <span>整体进度</span>
         </div>
-        <div className="flex items-baseline gap-1 mb-1.5">
-          <span className="text-sm font-semibold tracking-tight text-gray-900">{data.total_tasks > 0 ? `${completionPct}%` : "--"}</span>
-          {data.total_tasks > 0 && <span className="text-[10px] text-gray-400">{data.completed_tasks}/{data.total_tasks}</span>}
-        </div>
-        <div className="w-full h-1 rounded-full bg-gray-100 overflow-hidden">
-          <div className="h-1 rounded-full transition-all" style={{ width: `${completionPct}%`, backgroundColor: "var(--accent)" }} />
-        </div>
+        <strong className="goal-metric-primary-value">{completionPct}%</strong>
+        <span className="goal-metric-hover-detail" aria-hidden="true">
+          <span>{progressDetail}</span>
+          <em className={completionPct >= 100 ? "is-ok" : completionPct >= 50 ? "is-neutral" : "is-warn"}>{progressStatus}</em>
+        </span>
       </div>
 
-      {/* 学习债务 */}
-      <div className={`goal-metric-card goal-metric-card-debt ${data.debt_count > 0 ? "is-alert" : ""} bg-white rounded-xl border p-2.5`} style={cardStyle}>
-        <div className="flex items-center justify-between mb-1.5">
-          <div className="flex items-center gap-1.5">
-            <div className="goal-metric-icon w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0"
-              style={{ backgroundColor: data.debt_count > 0 ? "var(--warn-bg,#F6F1EA)" : "var(--ok-bg,#EEF4F1)" }}>
-              <AlertTriangle size={10} style={{ color: data.debt_count > 0 ? "var(--warn-text,#B07D4A)" : "var(--ok-text,#5B8C74)" }} />
-            </div>
-            <span className="text-xs font-semibold text-gray-700">学习债务</span>
-          </div>
-          <Badge kind={data.debt_count > 0 ? "warn" : "ok"} label={data.debt_count > 0 ? "需关注" : "清零"} />
+      <div
+        className={`goal-metric-card goal-metric-card-debt ${resolvedData.debt_count > 0 ? "is-alert" : ""}`}
+        data-detail={`${debtDetail} · ${debtStatus}`}
+        aria-label={`学习债务 ${resolvedData.debt_count}，${debtDetail}，${debtStatus}`}
+        tabIndex={0}
+      >
+        <div className="goal-progress-metric-heading">
+          <AlertTriangle size={15} aria-hidden="true" />
+          <span>学习债务</span>
         </div>
-        <div className="flex items-baseline gap-1">
-          <span className="text-sm font-semibold tracking-tight text-gray-900">{data.total_tasks > 0 ? data.debt_count : "--"}</span>
-          {data.total_tasks > 0 && data.debt_count > 0 && <span className="text-[10px] text-gray-400">项逾期</span>}
-          {data.total_tasks > 0 && data.debt_count === 0 && <span className="text-[10px] text-gray-400">已清零</span>}
-        </div>
+        <strong className="goal-metric-primary-value">{resolvedData.debt_count}</strong>
+        <span className="goal-metric-hover-detail" aria-hidden="true">
+          <span>{debtDetail}</span>
+          <em className={resolvedData.debt_count > 0 ? "is-warn" : "is-ok"}>{debtStatus}</em>
+        </span>
       </div>
 
-      {/* 近7日 — 数值在右上角 */}
-      <div className="goal-metric-card goal-metric-card-week bg-white rounded-xl border p-2.5" style={cardStyle}>
-        <div className="flex items-center justify-between mb-1">
-          <div className="flex items-center gap-1.5">
-            <div className="goal-metric-icon w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "var(--accent-light)" }}>
-              <TrendIcon size={10} style={{ color: "var(--accent)" }} />
-            </div>
-            <span className="text-xs font-semibold text-gray-700">近7日</span>
-          </div>
-          <span className="text-sm font-semibold tracking-tight text-gray-900">{avgPct > 0 ? `${avgPct}%` : "--"}</span>
+      <div
+        className="goal-metric-card goal-metric-card-streak"
+        data-detail={streakDetail}
+        aria-label={`连续学习 ${resolvedData.streak_days} 天，${streakDetail}`}
+        tabIndex={0}
+      >
+        <div className="goal-progress-metric-heading">
+          <Flame size={15} aria-hidden="true" />
+          <span>连续学习</span>
         </div>
-        <p className="text-[10px]" style={{
-          color: !hasTrend ? "#9ca3af" : daysSign > 0 ? "var(--ok-text,#5B8C74)" : daysSign < 0 ? "var(--warn-text,#B07D4A)" : "#9ca3af"
-        }}>
-          {!hasTrend ? "数据积累中" : daysSign > 0 ? `超前 ${daysSign} 天` : daysSign < 0 ? `落后 ${Math.abs(daysSign)} 天` : "按时"}
-        </p>
-      </div>
-
-      {/* 连续打卡 — 数值在右上角 */}
-      <div className="goal-metric-card goal-metric-card-streak bg-white rounded-xl border p-2.5" style={cardStyle}>
-        <div className="flex items-center justify-between mb-1">
-          <div className="flex items-center gap-1.5">
-            <div className="goal-metric-icon w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0"
-              style={{ backgroundColor: data.streak_days >= 7 ? "#FFF7ED" : "var(--accent-light)" }}>
-              <Flame size={10} style={{ color: data.streak_days >= 7 ? "#F97316" : "var(--accent)" }} />
-            </div>
-            <span className="text-xs font-semibold text-gray-700">连续打卡</span>
-          </div>
-          <div className="flex items-baseline gap-0.5">
-            <span className="text-sm font-semibold tracking-tight text-gray-900">{data.streak_days}</span>
-            <span className="text-[10px] text-gray-400">天</span>
-          </div>
-        </div>
-        <p className="text-[10px]" style={{ color: data.streak_days >= 7 ? "#F97316" : "var(--ok-text,#5B8C74)" }}>
-          {data.streak_days >= 7 ? "习惯养成中 🔥" : data.streak_days > 0 ? "坚持中，继续！" : "暂无打卡记录"}
-        </p>
+        <strong className="goal-metric-primary-value">{resolvedData.streak_days}<small>天</small></strong>
+        <span className="goal-metric-hover-detail" aria-hidden="true"><span>{streakDetail}</span></span>
       </div>
     </div>
   );

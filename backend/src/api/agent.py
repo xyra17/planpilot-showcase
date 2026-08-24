@@ -1,6 +1,8 @@
+import hashlib
 import json
 import logging
 import math
+import time
 import uuid
 from datetime import date, timedelta
 from typing import Literal
@@ -12,25 +14,29 @@ from sqlalchemy import or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sse_starlette.sse import EventSourceResponse
 
+from src.core.agent.dispatch import action_clarification, resolve_need_frame
 from src.core.llm_quality import compact_text
 from src.core.llm_router import (
-    ainvoke_routine_checked,
-    create_pro_llm,
-    create_routine_llm,
+    ainvoke_structured_checked,
+    create_critical_llm,
+    create_interactive_llm,
     require_json_array,
     require_json_object,
 )
-from src.core.time import utc_now
+from src.core.time import local_date_for_timezone, utc_now
 from src.database import get_db
 from src.deps import get_current_user
+from src.events.publisher import emit
 from src.models import (
     CheckinRecord,
     DailyBriefCache,
     Goal,
     KnowledgeItem,
     KnowledgeItemGoalLink,
+    LearningEvent,
     Plan,
     Task,
+    TaskMasteryRecord,
     User,
 )
 
@@ -73,39 +79,6 @@ async def _find_active_goal(db: AsyncSession, user_id: str):
         .limit(1)
     )
     return result.scalar_one_or_none()
-
-
-async def _save_checkin(
-    db: AsyncSession, user_id: str, goal_id: str, text: str, rate: float
-) -> None:
-    today = date.today().isoformat()
-    existing = (
-        await db.execute(
-            select(CheckinRecord).where(
-                CheckinRecord.user_id == user_id,
-                CheckinRecord.goal_id == goal_id,
-                CheckinRecord.date == today,
-            )
-        )
-    ).scalar_one_or_none()
-
-    if existing:
-        existing.completion_rate = rate
-        existing.natural_text = text
-    else:
-        db.add(
-            CheckinRecord(
-                user_id=user_id,
-                goal_id=goal_id,
-                date=today,
-                mode="natural",
-                natural_text=text,
-                completion_rate=rate,
-                stats={},
-                feedback="",
-            )
-        )
-    await db.commit()
 
 
 def _cosine_sim(a: list[float], b: list[float]) -> float:
@@ -167,59 +140,123 @@ async def _match_kb_refs(kb_items: list, task_title: str) -> list[str]:
     return list(matched_ids)[:3]
 
 
-async def _save_plan(db: AsyncSession, user_id: str, message: str, structured: dict) -> str:
-    total_weeks = int(structured.get("total_weeks") or 4)
-    weekly_hours = float(structured.get("weekly_hours") or 7)
-    plan_summary = structured.get("plan_summary") or message[:80]
-
-    # 从 plan_summary 截取标题（最多20字）
-    title = plan_summary[:20] if len(plan_summary) > 20 else plan_summary
-    deadline = (date.today() + timedelta(weeks=total_weeks)).isoformat()
-    daily_hours = round(weekly_hours / 7, 1)
-
-    goal = Goal(
-        id=str(uuid.uuid4()),
-        user_id=user_id,
-        type="skill",
-        title=title,
-        deadline=deadline,
-        daily_hours=max(0.5, min(daily_hours, 12)),
-        current_level="beginner",
-        meta={"plan_summary": plan_summary, "phases": structured.get("phases", [])},
-    )
-    db.add(goal)
-    await db.flush()  # 获取 goal.id 但不提交
-
-    # 获取用户知识库文件，用于关联 kb_refs
-    kb_items = (
-        (await db.execute(select(KnowledgeItem).where(KnowledgeItem.user_id == user_id)))
-        .scalars()
-        .all()
+async def _create_goal_plan_action(
+    db: AsyncSession,
+    user: User,
+    message: str,
+    structured: dict,
+    conversation_turn_id: str,
+    need_frame: dict,
+) -> dict:
+    from src.services.proposal_service import (
+        ProposalCreate,
+        convert_insight_to_action_run,
+        create_proposal,
     )
 
-    sample_tasks = structured.get("sample_tasks") or []
+    today = local_date_for_timezone(user.timezone)
+    total_weeks = max(1, min(int(structured.get("total_weeks") or 4), 260))
+    weekly_hours = max(0.5, min(float(structured.get("weekly_hours") or 7), 84))
+    plan_summary = str(structured.get("plan_summary") or message[:80]).strip()
+    goal_id = str(uuid.uuid4())
+    goal_snapshot = {
+        "id": goal_id,
+        "type": "skill",
+        "title": plan_summary[:20] or "学习目标",
+        "deadline": (today + timedelta(weeks=total_weeks)).isoformat(),
+        "daily_hours": max(0.5, min(round(weekly_hours / 7, 1), 12)),
+        "current_level": "beginner",
+        "status": "active",
+        "meta": {"plan_summary": plan_summary, "phases": structured.get("phases", [])},
+        "version": 1,
+    }
+    sample_tasks = list(structured.get("sample_tasks") or [])[:30]
     if not sample_tasks:
         sample_tasks = [
-            {"title": f"{p['name']}：{p.get('focus', '')[:20]}", "estimated_mins": 60}
-            for p in structured.get("phases") or []
+            {"title": f"{phase['name']}：{str(phase.get('focus', ''))[:20]}", "estimated_mins": 60}
+            for phase in list(structured.get("phases") or [])[:12]
         ]
+    tasks = [
+        {
+            "id": str(uuid.uuid4()),
+            "goal_id": goal_id,
+            "title": str(item.get("title") or f"任务 {index + 1}")[:200],
+            "description": None,
+            "estimated_mins": max(5, min(int(item.get("estimated_mins") or 30), 480)),
+            "status": "pending",
+            "priority": "medium",
+            "scheduled_date": (today + timedelta(days=index)).isoformat(),
+            "mastery_level": "unknown",
+            "type": str(item.get("type") or "study"),
+            "kb_refs": [],
+            "version": 1,
+        }
+        for index, item in enumerate(sample_tasks)
+    ]
+    proposal = await create_proposal(
+        user.id,
+        ProposalCreate(
+            proposal_type="GOAL_PLAN_CREATE",
+            title=f"创建目标“{goal_snapshot['title']}”",
+            summary=plan_summary,
+            reasoning=["这是根据本轮目标描述生成的计划草案，执行前需要确认具体目标与任务。"],
+            proposed_changes={"goal": goal_snapshot, "tasks": tasks},
+            confidence=0.9,
+        ),
+        db,
+        source="ai_agent",
+    )
+    return await convert_insight_to_action_run(
+        user.id,
+        str(proposal["id"]),
+        db,
+        conversation_turn_id=conversation_turn_id,
+        need_frame=need_frame,
+    )
 
-    for i, t in enumerate(sample_tasks):
-        task_title = t.get("title", f"任务 {i + 1}")
-        kb_refs = await _match_kb_refs(kb_items, task_title)
-        task = Task(
-            id=str(uuid.uuid4()),
-            goal_id=goal.id,
-            title=task_title,
-            estimated_mins=int(t.get("estimated_mins") or 30),
-            scheduled_date=(date.today() + timedelta(days=i)).isoformat(),
-            status="pending",
-            kb_refs=kb_refs,
-        )
-        db.add(task)
 
-    await db.commit()
-    return goal.id
+async def _create_checkin_action(
+    db: AsyncSession,
+    user: User,
+    goal_id: str,
+    text: str,
+    rate: float,
+    conversation_turn_id: str,
+    need_frame: dict,
+) -> dict:
+    from src.services.proposal_service import (
+        ProposalCreate,
+        convert_insight_to_action_run,
+        create_proposal,
+    )
+
+    checkin_date = local_date_for_timezone(user.timezone).isoformat()
+    proposal = await create_proposal(
+        user.id,
+        ProposalCreate(
+            goal_id=goal_id,
+            proposal_type="CHECKIN_RECORD",
+            title="确认本次学习打卡",
+            summary=f"Pilo 从你的描述中推断本次完成度约为 {round(rate * 100)}%。",
+            reasoning=["自然语言完成度可能存在理解偏差，因此记录前需要你确认。"],
+            proposed_changes={
+                "goal_id": goal_id,
+                "date": checkin_date,
+                "natural_text": text,
+                "completion_rate": rate,
+            },
+            confidence=0.75,
+        ),
+        db,
+        source="ai_agent",
+    )
+    return await convert_insight_to_action_run(
+        user.id,
+        str(proposal["id"]),
+        db,
+        conversation_turn_id=conversation_turn_id,
+        need_frame=need_frame,
+    )
 
 
 @router.post("/stream")
@@ -233,7 +270,87 @@ async def stream(
     from src.core.agent.graph import get_agent
 
     async def generate():
+        stream_started = time.monotonic()
+        first_token_logged = False
         try:
+            conversation_turn_id = str(uuid.uuid4())
+            need_frame = await resolve_need_frame(
+                db,
+                user_id=current_user.id,
+                session_id=body.session_id,
+                conversation_turn_id=conversation_turn_id,
+                message=body.message,
+                goal_id=body.goal_id,
+            )
+            action_intent = need_frame.action_intent
+            if need_frame.speech_act == "cancel" and action_intent is None:
+                yield {
+                    "event": "token",
+                    "data": json.dumps(
+                        {"text": "好的，刚才那项待补充的操作已经取消，不会生成变更。"},
+                        ensure_ascii=False,
+                    ),
+                }
+                yield {"event": "done", "data": "{}"}
+                return
+            if action_intent is not None and not action_intent.complete:
+                clarification = action_clarification(action_intent)
+                yield {
+                    "event": "token",
+                    "data": json.dumps({"text": clarification}, ensure_ascii=False),
+                }
+                yield {"event": "done", "data": "{}"}
+                return
+            if action_intent is not None:
+                from src.core.agent_v2.orchestrator import create_run, run_detail
+                from src.tasks.agent_runs import dispatch_agent_run
+
+                yield {
+                    "event": "action_start",
+                    "data": json.dumps(
+                        {"capability": action_intent.capability}, ensure_ascii=False
+                    ),
+                }
+                run = await create_run(
+                    db,
+                    user_id=current_user.id,
+                    request=str(action_intent.constraints.get("resolved_request") or body.message),
+                    goal_id=action_intent.goal_id,
+                    step_budget=10,
+                    token_budget=20000,
+                    auto_advance=False,
+                    run_kind="user",
+                    action_intent=action_intent,
+                    deterministic_plan_only=True,
+                    conversation_turn_id=conversation_turn_id,
+                    trace_context={
+                        "conversation_turn_id": conversation_turn_id,
+                        "need_frame": need_frame.model_dump(mode="json"),
+                        "action_intent": action_intent.model_dump(mode="json"),
+                        "source": "pilo",
+                    },
+                )
+                try:
+                    dispatch_agent_run(run.id, current_user.id)
+                except Exception:
+                    logger.exception(
+                        "action_agent_dispatch_failed run_id=%s; recovery will retry",
+                        run.id,
+                    )
+                detail = await run_detail(db, current_user.id, run.id)
+                yield {
+                    "event": "action_run",
+                    "data": json.dumps(detail, ensure_ascii=False),
+                }
+                logger.info(
+                    "agent_request_dispatched mode=action capability=%s run_id=%s latency_ms=%.1f",
+                    action_intent.capability,
+                    run.id,
+                    (time.monotonic() - stream_started) * 1000,
+                )
+                yield {"event": "done", "data": "{}"}
+                return
+
             agent = await get_agent()
             config = {"configurable": {"thread_id": f"user_{current_user.id}_{body.session_id}"}}
             state_input = {
@@ -243,7 +360,36 @@ async def stream(
                 "pilo_preferences": (
                     body.pilo_preferences.model_dump() if body.pilo_preferences else None
                 ),
+                "conversation_turn_id": conversation_turn_id,
+                "need_frame": need_frame.model_dump(mode="json"),
             }
+
+            from src.core.agent.nodes.intent import _keyword_intent
+            from src.services.chat_context import build_chat_context
+
+            fast_intent = _keyword_intent(body.message)
+            if fast_intent in {"goal_setup", "checkin", "verification"}:
+                chat_context: dict = {}
+                context_meta = {
+                    "latency_ms": 0.0,
+                    "quality": "not_required",
+                    "memory_count": 0,
+                    "knowledge_count": 0,
+                }
+            else:
+                yield {"event": "context_start", "data": "{}"}
+                chat_context, context_meta = await build_chat_context(
+                    user_id=current_user.id,
+                    goal_id=body.goal_id,
+                    message=body.message,
+                )
+            state_input["chat_context"] = chat_context
+            yield {
+                "event": "context_ready",
+                "data": json.dumps(context_meta, ensure_ascii=False),
+            }
+
+            from src.core.agent.nodes.chat import sanitize_user_visible_text
 
             async for event in agent.astream_events(state_input, config=config, version="v2"):
                 kind = event["event"]
@@ -255,7 +401,16 @@ async def stream(
                     chunk = event["data"].get("chunk")
                     text = chunk.content if chunk and hasattr(chunk, "content") else ""
                     if text:
-                        yield {"event": "token", "data": json.dumps({"text": text})}
+                        if not first_token_logged:
+                            first_token_logged = True
+                            logger.info(
+                                "agent_stream_first_token latency_ms=%.1f context_latency_ms=%.1f",
+                                (time.monotonic() - stream_started) * 1000,
+                                context_meta["latency_ms"],
+                            )
+                        # The final graph message is emitted after deterministic
+                        # privacy and non-writing output contracts have run.
+                        # Action status continues to use its independent SSE path.
 
                 elif kind == "on_tool_start":
                     yield {
@@ -272,15 +427,44 @@ async def stream(
                         yield {"event": "structured", "data": json.dumps(out["structured_output"])}
 
             final_state = await agent.aget_state(config)
+            final_messages = list(final_state.values.get("messages") or [])
+            final_text = next(
+                (
+                    str(getattr(message, "content", ""))
+                    for message in reversed(final_messages)
+                    if getattr(message, "type", "") == "ai"
+                    and getattr(message, "content", "")
+                ),
+                "",
+            )
+            final_text = sanitize_user_visible_text(final_text)
+            if final_text:
+                yield {"event": "token", "data": json.dumps({"text": final_text})}
+            actual_context_trace = final_state.values.get("actual_context_trace")
+            if isinstance(actual_context_trace, dict):
+                yield {
+                    "event": "context_trace",
+                    "data": json.dumps(actual_context_trace, ensure_ascii=False),
+                }
 
-            # 计划生成完毕后，若无 goal_id 则自动保存
+            # 目标计划只生成草案；实际创建统一进入 Action Run 审批链。
             if not body.goal_id:
                 structured = final_state.values.get("structured_output")
                 if structured:
-                    goal_id = await _save_plan(db, current_user.id, body.message, structured)
-                    yield {"event": "plan_saved", "data": json.dumps({"goal_id": goal_id})}
+                    run_detail_payload = await _create_goal_plan_action(
+                        db,
+                        current_user,
+                        body.message,
+                        structured,
+                        conversation_turn_id,
+                        need_frame.model_dump(mode="json"),
+                    )
+                    yield {
+                        "event": "action_run",
+                        "data": json.dumps(run_detail_payload, ensure_ascii=False),
+                    }
 
-            # checkin intent：保存打卡记录
+            # 自然语言打卡先生成预览；确认后由统一 Executor 保存。
             checkin_rate = final_state.values.get("checkin_rate")
             checkin_text = final_state.values.get("checkin_text")
             if checkin_rate is not None and checkin_text:
@@ -292,19 +476,26 @@ async def stream(
                 )
                 target_goal_id = goal_id_for_checkin or (active_goal.id if active_goal else None)
                 if target_goal_id:
-                    await _save_checkin(
-                        db, current_user.id, target_goal_id, checkin_text, checkin_rate
+                    checkin_run = await _create_checkin_action(
+                        db,
+                        current_user,
+                        target_goal_id,
+                        checkin_text,
+                        checkin_rate,
+                        conversation_turn_id,
+                        need_frame.model_dump(mode="json"),
                     )
                     yield {
-                        "event": "checkin_saved",
-                        "data": json.dumps(
-                            {"goal_id": target_goal_id, "completion_rate": checkin_rate}
-                        ),
+                        "event": "action_run",
+                        "data": json.dumps(checkin_run, ensure_ascii=False),
                     }
 
-                    # 自然语言打卡的比例来自模糊语义估算，仅用于记录和建议。
-                    # 重规划判定只使用结构化“今日打卡”的任务执行率。
-
+            logger.info(
+                "agent_stream_completed latency_ms=%.1f context_latency_ms=%.1f first_token=%s",
+                (time.monotonic() - stream_started) * 1000,
+                context_meta["latency_ms"],
+                first_token_logged,
+            )
             yield {"event": "done", "data": "{}"}
 
         except Exception as e:
@@ -454,7 +645,7 @@ async def get_plan_context(
 
     initial_understanding = ""
     try:
-        llm = create_routine_llm(
+        llm = create_interactive_llm(
             max_tokens=200,
             temperature=0.3,
         )
@@ -498,7 +689,7 @@ async def get_intent_placeholder(
 
     placeholder = ""
     try:
-        llm = create_routine_llm(
+        llm = create_interactive_llm(
             max_tokens=100,
             temperature=0.7,
         )
@@ -703,7 +894,7 @@ async def generate_macro_plan(
         "}"
     )
 
-    result = await ainvoke_routine_checked(
+    result = await ainvoke_structured_checked(
         [HumanMessage(content=prompt)],
         validator=require_json_object,
         max_tokens=2048,
@@ -877,7 +1068,7 @@ async def _generate_review_questions(
         "只输出 JSON 数组，不含其他文字：\n"
         '[{"question":"...","hint":"..."}]'
     )
-    llm = create_routine_llm(temperature=0.3)
+    llm = create_interactive_llm(temperature=0.3)
     resp = await llm.ainvoke([HumanMessage(content=prompt)])
     raw = resp.content.strip()
     if "```" in raw:
@@ -1279,7 +1470,7 @@ async def verify_start(
         "严格按以下JSON格式输出，不加任何额外内容：\n"
         '{"question": "问题内容", "answer_hint": "要点1\\n要点2\\n要点3"}'
     )
-    result = await ainvoke_routine_checked(
+    result = await ainvoke_structured_checked(
         [HumanMessage(content=prompt)],
         validator=require_json_object,
         max_tokens=500,
@@ -1323,7 +1514,7 @@ async def verify_answer(
         f"谈谈你对「{task.title}」的理解",
     )
 
-    llm = create_pro_llm(max_tokens=700)
+    llm = create_critical_llm(max_tokens=700)
     eval_prompt = (
         f"任务：「{task.title}」\n"
         f"考查问题：{question}\n"
@@ -1359,9 +1550,84 @@ async def verify_answer(
         suggestion = None
         follow_up = None
 
+    assessment_key = hashlib.sha256(
+        f"{current_user.id}:{task.id}:{question}:{body.answer}".encode("utf-8")
+    ).hexdigest()
+    await emit(
+        db,
+        user_id=current_user.id,
+        goal_id=task.goal_id,
+        aggregate_type="mastery_assessment",
+        aggregate_id=task.id,
+        event_type="MasteryAssessmentSubmitted",
+        payload={
+            "task_id": task.id,
+            "evidence_type": "explanation",
+            "score": score,
+            "passed": passed,
+            "contains_user_content": False,
+        },
+        idempotency_key=f"verification-assessment:{assessment_key}",
+    )
+
     if passed:
-        task.mastery_level = "L3" if score < 90 else "L4"
-        await db.commit()
+        mastery_level = "L3" if score < 90 else "L4"
+        evidence_key = assessment_key
+        evidence_idempotency_key = f"verification-evidence:{evidence_key}"
+        existing_evidence = await db.scalar(
+            select(LearningEvent).where(
+                LearningEvent.idempotency_key == evidence_idempotency_key
+            )
+        )
+        previous_level = task.mastery_level
+        task.mastery_level = mastery_level
+        if existing_evidence is None:
+            await emit(
+                db,
+                user_id=current_user.id,
+                goal_id=task.goal_id,
+                aggregate_type="task",
+                aggregate_id=task.id,
+                event_type="MasteryRecorded",
+                payload={
+                    "task_title": task.title,
+                    "from_level": previous_level,
+                    "to_level": mastery_level,
+                    "submission_mode": "verification",
+                    "score": score,
+                    "aggregate_version": task.version + 1,
+                },
+                idempotency_key=f"verification-mastery:{evidence_key}",
+            )
+            await emit(
+                db,
+                user_id=current_user.id,
+                goal_id=task.goal_id,
+                aggregate_type="mastery_evidence",
+                aggregate_id=task.id,
+                event_type="MasteryEvidenceAdded",
+                payload={
+                    "task_id": task.id,
+                    "evidence_type": "explanation",
+                    "quality": "model_scored",
+                    "score": score,
+                    "passed": True,
+                    "mastery_level": mastery_level,
+                    "contains_user_content": False,
+                },
+                idempotency_key=evidence_idempotency_key,
+            )
+            db.add(
+                TaskMasteryRecord(
+                    task_id=task.id,
+                    goal_id=task.goal_id,
+                    user_id=current_user.id,
+                    mastery_level=mastery_level,
+                    source="ai_assessment",
+                    notes=f"verification_score={score}",
+                )
+            )
+    await db.commit()
 
     out: dict = {"passed": passed, "score": score, "feedback": feedback}
     if suggestion:
@@ -1527,7 +1793,7 @@ async def generate_daily_tasks(
 
         suggestions = []
         try:
-            res = await ainvoke_routine_checked(
+            res = await ainvoke_structured_checked(
                 [HumanMessage(content=prompt)],
                 validator=require_json_array,
                 temperature=0.3,
@@ -1596,7 +1862,7 @@ async def note_assist(
     }
     prompt_text = prompts.get(body.command, prompts["summarize"])
 
-    llm = create_routine_llm(
+    llm = create_interactive_llm(
         max_tokens=600,
         temperature=0.7,
     )

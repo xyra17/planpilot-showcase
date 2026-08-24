@@ -8,7 +8,11 @@ export type ApiGoal = {
   daily_hours: number;
   current_level: string;
   status: "active" | "completed" | "paused" | "abandoned";
+  meta?: Record<string, unknown>;
   created_at: string;
+  work_schedule?: "weekday" | "weekend" | "all";
+  kb_id?: string | null;
+  version?: number;
 };
 
 export type GoalProgress = {
@@ -28,6 +32,7 @@ export type ApiTask = {
   goalId: string;
   goalTitle: string;
   done: boolean;
+  status: "pending" | "in_progress" | "completed" | "skipped" | "abandoned";
   estimatedMinutes: number;
   actualMinutes: number | null;
   date: string;
@@ -108,6 +113,66 @@ export type AgentStreamEvent = {
   data: Record<string, unknown>;
 };
 
+export type AgentActionOperation = {
+  operation_id: string;
+  entity: string;
+  entity_id: string;
+  field: string;
+  before: unknown;
+  after: unknown;
+  label: string;
+  reason: string;
+};
+
+export type AgentActionApproval = {
+  id: string;
+  status: string;
+  change_hash: string;
+  change_set_version: number;
+  run_state_version: number;
+  policy_decision: { risk?: "low" | "medium" | "high"; reasons?: string[] };
+  change_set: {
+    summary?: string;
+    warnings?: string[];
+    operations?: AgentActionOperation[];
+  };
+};
+
+export type AgentActionAlternative = {
+  id: "preview_goal_deadline_extension" | "analyze_deadline_risk_only" | "rebuild_within_deadline" | string;
+  label: string;
+  description: string;
+};
+
+export type AgentActionResult = {
+  summary?: string;
+  undo_available?: boolean;
+  outcome?: "safe_policy_rejection" | string;
+  action_fulfilled?: boolean;
+  reason_code?: "deadline_conflict" | string;
+  alternatives?: AgentActionAlternative[];
+};
+
+export type AgentActionRun = {
+  id: string;
+  goal_id: string | null;
+  request: string;
+  status: "queued" | "executing" | "waiting_approval" | "retrying" | "replanning" | "paused" | "completed" | "failed" | "rejected" | "cancelled" | "compensating" | "rolled_back";
+  current_step: number;
+  error: string | null;
+  result: AgentActionResult | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  plan: Array<{ index?: number; title?: string; tool_name?: string }>;
+  steps: Array<{ id: string; index: number; tool_name: string; status: string; risk: string; error?: string | null }>;
+  approvals: AgentActionApproval[];
+  events: Array<{ id: string; sequence: number; type: string; summary: string }>;
+  budgets: {
+    steps: { used: number; limit: number };
+    tokens: { used: number; limit: number };
+  };
+};
+
 export type CoachArchiveMessage = { id: string; role: "user" | "assistant"; content: string; created_at?: string };
 export type CoachArchiveConversation = {
   id: string;
@@ -183,7 +248,24 @@ export async function streamAgentMessage(
 }
 
 export const productApi = {
+  listActionRuns: (limit = 20) => api.get<AgentActionRun[]>(`/api/v2/agent/runs?limit=${limit}`),
+  getActionRun: (runId: string) => api.get<AgentActionRun>(`/api/v2/agent/runs/${encodeURIComponent(runId)}`),
+  approveActionRun: (runId: string, approval: AgentActionApproval, highRiskConfirmed: boolean) => api.post<AgentActionRun>(`/api/v2/agent/runs/${encodeURIComponent(runId)}/approve`, {
+    approval_id: approval.id,
+    change_hash: approval.change_hash,
+    change_set_version: approval.change_set_version,
+    run_state_version: approval.run_state_version,
+    high_risk_confirmed: highRiskConfirmed,
+  }),
+  rejectActionRun: (runId: string, approvalId: string) => api.post<AgentActionRun>(`/api/v2/agent/runs/${encodeURIComponent(runId)}/reject`, {
+    approval_id: approvalId,
+    reason: "用户在学习伙伴中选择保留原计划",
+  }),
+  cancelActionRun: (runId: string) => api.post<AgentActionRun>(`/api/v2/agent/runs/${encodeURIComponent(runId)}/cancel`, {}),
+  retryActionRun: (runId: string) => api.post<AgentActionRun>(`/api/v2/agent/runs/${encodeURIComponent(runId)}/retry`, {}),
+  undoActionRun: (runId: string) => api.post<AgentActionRun>(`/api/v2/agent/runs/${encodeURIComponent(runId)}/undo`, {}),
   listGoals: () => api.get<ApiGoal[]>("/api/v1/goals"),
+  getGoal: (id: string) => api.get<ApiGoal>(`/api/v1/goals/${id}`),
   getGoalsProgress: () => api.get<GoalProgress[]>("/api/v1/goals/progress"),
   getGoalProgress: (id: string) => api.get<GoalProgress>(`/api/v1/goals/${id}/progress`),
   createGoal: (body: {
@@ -194,7 +276,8 @@ export const productApi = {
     current_level: string;
     work_schedule: string;
   }) => api.post<ApiGoal>("/api/v1/goals", body),
-  updateGoal: (id: string, body: Partial<Pick<ApiGoal, "title" | "deadline" | "daily_hours" | "current_level" | "status">>) => api.patch<ApiGoal>(`/api/v1/goals/${id}`, body),
+  updateGoal: (id: string, body: Partial<Pick<ApiGoal, "type" | "title" | "deadline" | "daily_hours" | "current_level" | "work_schedule" | "status">>) => api.patch<ApiGoal>(`/api/v1/goals/${id}`, body),
+  getGoalPlan: (id: string) => api.get<{ plan: unknown | null }>(`/api/v1/goals/${id}/plan`),
   deleteGoal: (id: string) => api.del(`/api/v1/goals/${id}`),
   listTasks: (date?: string, range?: { dateFrom?: string; dateTo?: string }) => {
     const params = new URLSearchParams();
@@ -230,7 +313,11 @@ export const productApi = {
       progress?: number;
     }>;
   }) => api.post<ApiTask>("/api/v1/tasks/with-schedule", body),
-  updateTask: (id: string, body: Partial<Pick<ApiTask, "title" | "description" | "done" | "estimatedMinutes" | "date" | "priority">>) => api.patch<ApiTask>(`/api/v1/tasks/${id}`, body),
+  updateTask: (id: string, body: Partial<Pick<ApiTask, "title" | "description" | "done" | "estimatedMinutes" | "date" | "priority">> & {
+    rescheduleTrigger?: "user_manual" | "overload_recovery" | "deviation_recovery";
+    recoveryStrategy?: "minimum" | "standard" | "sprint";
+  }) => api.patch<ApiTask>(`/api/v1/tasks/${id}`, body),
+  observeTaskStart: (id: string) => api.post<ApiTask>(`/api/v1/tasks/${id}/observe-start`, {}),
   deleteTask: (id: string) => api.del(`/api/v1/tasks/${id}`),
   recordActualMinutes: (id: string, actualMinutes: number) => api.patch<ApiTask>(`/api/v1/tasks/${id}`, { actual_mins: actualMinutes }),
   listNotes: () => api.get<ApiNote[]>("/api/v1/knowledge/notes"),

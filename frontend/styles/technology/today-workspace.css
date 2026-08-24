@@ -8,7 +8,9 @@
 
 .app-shell .today-task-empty {
   display: grid;
+  width: 100%;
   min-height: 148px;
+  flex: 1 1 auto;
   align-content: center;
   justify-items: center;
   gap: 7px;
@@ -17,6 +19,17 @@
   text-align: center;
   border: 1px dashed var(--workspace-border-strong);
   border-radius: 10px;
+}
+
+.app-shell .today-panel .task-list:has(> .today-task-empty) {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+
+.app-shell .today-panel .task-list > .today-task-empty {
+  min-height: 100%;
 }
 
 .app-shell .today-task-empty strong {
@@ -29,6 +42,54 @@
 .app-shell .task-submit-error {
   font-size: 12px;
   line-height: 1.55;
+}
+
+.app-shell .dashboard-page .today-plan-actions > button {
+  white-space: nowrap;
+  word-break: keep-all;
+}
+
+/* Keep the primary Today/Rhythm controls equally readable without changing
+ * their established button geometry. */
+[data-theme] .app-shell .today-plan-actions > :is(
+  .today-plan-mode-switch,
+  .today-plan-add,
+  .today-schedule-auto
+),
+[data-theme] .app-shell .rhythm-week-entry {
+  font-size: 12px;
+}
+
+[data-theme] .app-shell .today-plan-actions > :is(
+  .today-plan-mode-switch,
+  .today-plan-add,
+  .today-schedule-auto
+) {
+  width: 88px;
+  gap: 5px;
+  padding-inline: 7px;
+  white-space: nowrap;
+  word-break: keep-all;
+}
+
+[data-theme] .app-shell .rhythm-week-entry {
+  width: 81px;
+}
+
+@media (min-width: 761px) {
+  [data-theme] .app-shell .today-plan-actions > :is(
+    .today-plan-mode-switch,
+    .today-plan-add,
+    .today-schedule-auto
+  ) {
+    height: 34px;
+    min-height: 34px;
+  }
+}
+
+.app-shell .rhythm-summary > article > div:first-child > span,
+.app-shell .rhythm-summary-aside > span {
+  font-size: 11px;
 }
 
 .app-shell .task-submit-error {
@@ -244,6 +305,140 @@
   outline: none;
 }
 
+/* Keep time and priority on separate compact lines so task metadata does not
+ * spill into the following row when the Today card is narrow. */
+.app-shell .dashboard-page .task-meta:not(.is-completed) {
+  display: grid;
+  min-width: 120px;
+  grid-template-columns: minmax(80px, 1fr);
+  grid-template-areas:
+    "time"
+    "priority";
+  align-items: center;
+  justify-items: end;
+  gap: 2px;
+}
+
+.app-shell .dashboard-page .task-list > .task-item {
+  flex: 0 0 auto;
+}
+
+.app-shell .dashboard-page .task-meta:not(.is-completed) > small {
+  position: static;
+  grid-area: time;
+  padding-right: 1px;
+}
+
+.app-shell .dashboard-page .task-meta:not(.is-completed) > .task-priority-picker {
+  grid-area: priority;
+}
+
+.app-shell .dashboard-page .task-item {
+  grid-template-columns: 36px 3px minmax(0, 1fr) auto;
+  gap: 6px;
+  min-height: 68px;
+  padding-left: 4px;
+}
+
+.app-shell .dashboard-page .task-item.is-navigable {
+  grid-template-columns: 36px 3px minmax(0, 1fr) auto 18px;
+}
+
+.app-shell .dashboard-page .task-checkbox {
+  transform: translateX(-3px);
+}
+
+.app-shell .dashboard-page .task-open-button {
+  position: relative;
+}
+
+.app-shell .dashboard-page .task-item.is-navigable:hover .task-open-indicator,
+.app-shell .dashboard-page .task-item.is-navigable:focus-within .task-open-indicator {
+  opacity: 1;
+  transform: translateX(4px) scale(1.12);
+  transform-origin: center;
+}
+
+.app-shell .dashboard-page .task-schedule-rail {
+  width: 4px;
+  height: 40px;
+  align-self: center;
+  transform: translateX(-1px);
+  background: transparent;
+  border-radius: 999px;
+}
+
+.app-shell .dashboard-page .task-schedule-rail.is-scheduled {
+  filter: saturate(88%) brightness(1.06);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--workspace-accent) 18%, transparent);
+}
+
+.app-shell .dashboard-page .task-elapsed-progress {
+  display: grid;
+  min-width: 104px;
+  grid-area: priority;
+  gap: 2px;
+  justify-items: end;
+  color: var(--workspace-secondary);
+  cursor: default;
+  outline: none;
+}
+
+.app-shell .dashboard-page .task-meta:not(.is-completed) {
+  margin-right: 4px;
+}
+
+.app-shell .dashboard-page .task-meta.is-scheduled:not(.is-completed) {
+  transform: translateX(-4px);
+}
+
+.app-shell .dashboard-page .task-elapsed-progress > .task-elapsed-bar {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.app-shell .dashboard-page .task-elapsed-progress > .task-elapsed-copy {
+  display: none;
+  color: color-mix(in srgb, var(--workspace-accent) 88%, var(--workspace-text));
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.app-shell .dashboard-page .task-elapsed-progress:hover > .task-elapsed-bar,
+.app-shell .dashboard-page .task-elapsed-progress:focus-visible > .task-elapsed-bar {
+  display: none;
+}
+
+.app-shell .dashboard-page .task-elapsed-progress:hover > .task-elapsed-copy,
+.app-shell .dashboard-page .task-elapsed-progress:focus-visible > .task-elapsed-copy {
+  display: inline-flex;
+  min-height: 16px;
+  align-items: center;
+}
+
+.app-shell .dashboard-page .task-elapsed-progress:focus-visible {
+  border-radius: 4px;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--workspace-accent) 26%, transparent);
+}
+
+.app-shell .dashboard-page .task-elapsed-progress i {
+  display: block;
+  width: 72px;
+  height: 5px;
+  overflow: hidden;
+  background: var(--workspace-border);
+  border-radius: 99px;
+}
+
+.app-shell .dashboard-page .task-elapsed-progress i b {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+}
+
 .app-shell .dashboard-page .task-actual-editor {
   gap: 7px;
 }
@@ -443,6 +638,11 @@
 
 [data-theme="default"] .app-shell .dashboard-page > .theme-lead-tech {
   margin-bottom: 12px;
+  box-shadow: none;
+}
+
+[data-theme="default"] .app-shell .dashboard-page > .theme-lead-tech:hover {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--workspace-accent) 8%, transparent);
 }
 
 /* On desktop the two work cards remain equal peers, but their row is sized by
@@ -592,24 +792,164 @@
   }
 }
 
+/* Rhythm v2: one compact visual system for the weekly signal and its
+ * summary. The task calendar already owns "next item" timing, so the
+ * summary uses this space for the derived rhythm judgment instead. */
+[data-theme] .app-shell .dashboard-page .rhythm-panel {
+  padding: 18px;
+}
+
+[data-theme] .app-shell .dashboard-page .rhythm-panel .panel-header {
+  margin-bottom: 12px;
+}
+
+[data-theme] .app-shell .dashboard-page .rhythm-panel .panel-header h2 {
+  font-size: 18px;
+  line-height: 1.2;
+}
+
+[data-theme] .app-shell .dashboard-page .rhythm-heatmap {
+  gap: 10px;
+}
+
+[data-theme] .app-shell .dashboard-page .rhythm-heatmap > header > span {
+  color: var(--workspace-text);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+[data-theme] .app-shell .dashboard-page .rhythm-heatmap > header > small {
+  font-size: 10px;
+}
+
+[data-theme] .app-shell .dashboard-page .rhythm-heatmap-grid {
+  gap: 6px;
+}
+
+[data-theme] .app-shell .dashboard-page .rhythm-heatmap-grid article {
+  min-height: 92px;
+  gap: 1px;
+  padding: 8px 4px;
+  border-radius: 10px;
+}
+
+[data-theme] .app-shell .dashboard-page .rhythm-heatmap-grid article > span {
+  font-size: 12px;
+}
+
+[data-theme] .app-shell .dashboard-page .rhythm-heatmap-grid article > strong {
+  font-size: 22px;
+}
+
+[data-theme] .app-shell .dashboard-page .rhythm-heatmap-grid article > small {
+  font-size: 10px;
+}
+
+[data-theme] .app-shell .dashboard-page .rhythm-heatmap-grid article > em {
+  margin-top: 3px;
+  font-size: 10px;
+}
+
+[data-theme] .app-shell .dashboard-page .rhythm-peak-note {
+  min-height: 56px;
+  gap: 10px;
+  padding: 10px 12px;
+  background: color-mix(in srgb, var(--workspace-accent) 4%, var(--workspace-panel));
+  border: 1px solid color-mix(in srgb, var(--workspace-accent) 18%, var(--workspace-border));
+  border-radius: 10px;
+}
+
+[data-theme] .app-shell .dashboard-page .rhythm-peak-note > span {
+  width: 32px;
+  height: 32px;
+  flex-basis: 32px;
+  border-radius: 8px;
+}
+
+[data-theme] .app-shell .dashboard-page .rhythm-peak-note strong {
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+[data-theme] .app-shell .dashboard-page .rhythm-peak-note small {
+  margin-top: 2px;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+[data-theme] .app-shell .dashboard-page .rhythm-summary {
+  gap: 8px;
+  margin-top: 12px;
+}
+
+[data-theme] .app-shell .dashboard-page .rhythm-summary > article {
+  min-height: 70px;
+  gap: 12px;
+  padding: 11px 13px;
+  background: color-mix(in srgb, var(--workspace-panel-subtle) 72%, var(--workspace-panel));
+  border: 1px solid var(--workspace-border);
+  border-radius: 10px;
+}
+
+[data-theme] .app-shell .dashboard-page .rhythm-summary b {
+  font-size: 17px;
+  line-height: 1.15;
+}
+
+[data-theme] .app-shell .dashboard-page .rhythm-summary > article > div:first-child span,
+[data-theme] .app-shell .dashboard-page .rhythm-summary-aside span {
+  font-size: 10px;
+}
+
+[data-theme] .app-shell .dashboard-page .rhythm-summary-aside {
+  min-width: 78px;
+  flex-basis: 78px;
+  padding-left: 13px;
+}
+
+[data-theme] .app-shell .dashboard-page .rhythm-summary-aside strong {
+  font-size: 12px;
+}
+
+@media (max-width: 760px) {
+  [data-theme] .app-shell .dashboard-page .rhythm-panel {
+    padding: 15px;
+  }
+
+  [data-theme] .app-shell .dashboard-page .rhythm-heatmap-grid article {
+    min-height: 82px;
+  }
+
+  [data-theme] .app-shell .dashboard-page .rhythm-heatmap-grid article > strong {
+    font-size: 17px;
+  }
+
+  [data-theme] .app-shell .dashboard-page .rhythm-summary > article {
+    min-height: 66px;
+    padding-inline: 10px;
+  }
+}
+
 @media (max-width: 420px) {
   .app-shell .today-plan-actions > button {
     flex: 1 1 100%;
   }
 
   .app-shell .task-item {
-    grid-template-columns: 38px minmax(0, 1fr) auto;
-    gap: 8px;
+    grid-template-columns: 38px 3px minmax(0, 1fr) auto;
+    gap: 6px;
+    min-height: 68px;
+    padding-left: 2px;
   }
 
   .app-shell .task-item .task-meta {
-    grid-column: 2 / -1;
+    grid-column: 3 / -1;
     justify-content: flex-start;
     padding-left: 0;
   }
 
   .app-shell .task-open-button {
-    grid-column: 3;
+    grid-column: 4;
     grid-row: 1;
   }
 

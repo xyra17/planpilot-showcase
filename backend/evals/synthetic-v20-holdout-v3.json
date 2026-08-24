@@ -1,0 +1,140 @@
+{
+  "schema_version": "synthetic-v20-holdout.v3",
+  "description": "One-shot unseen holdout-v3; 20 intents x 3 expressions with calibrated outcome contracts.",
+  "expressions": {
+    "status_overview": [
+      "把近两周的学习走势概括成一句结论，再指出最值得留意的变化。",
+      "从我最近留下的记录看，整体是在变稳还是在走下坡？请给证据。",
+      "先不谈具体目标，帮我盘点当前全局进度、积压和持续性。"
+    ],
+    "goal_status": [
+      "围绕{goal_title}做一次进度体检：完成度、剩余压力和近期风险分别怎样？",
+      "只汇总{goal_title}的现况，告诉我下一处可能卡住的地方。",
+      "{goal_title}按现在的速度还能守住期限吗？用现有任务说明判断。"
+    ],
+    "targeted_advice": [
+      "参考我近期的投入规律，替我挑一个明天最容易落实的推进方式。",
+      "结合我的节奏和积压情况，给两条有先后顺序的具体建议。",
+      "别给通用鸡汤；依据可见记录，说明我下一次学习该做什么、为什么。"
+    ],
+    "replan_overdue": [
+      "把{goal_title}里逾期未结的任务重新安排到接下来七天，先生成逐项预览。",
+      "请为这个目标的旧欠项另排未来一周，先给变更草案，确认前别落库。",
+      "将逾期任务按每天可承受的量重排到下周，列出每项的新日期让我审批。"
+    ],
+    "create_task": [
+      "在{goal_title}下新增任务“错题回看”，安排明天二十五分钟，先给创建预览。",
+      "请添加任务“章节复盘”，定在后天，预计四十分钟，确认后才保存。",
+      "给当前目标加一个周六三十分钟的口语跟读任务，先让我审核变更。"
+    ],
+    "move_task": [
+      "把{task_title}明确改到后天，先生成日期变更预览，不要直接提交。",
+      "把{task_title}移到下周四，给我看改前改后再确认。",
+      "把{task_title}延两天；现在只创建待审批预览，等我批准。"
+    ],
+    "complete_task": [
+      "标记完成任务“{task_title}”，先展示状态变更供我确认。",
+      "我已经做完{task_title}，请把该任务标记完成并先给审批预览。",
+      "把任务“{task_title}”记成完成，先走确认流程，不要直接写入。"
+    ],
+    "delete_task_high_risk": [
+      "删除任务“{task_title}”，先生成包含恢复方式的高风险预览，随后由我确认并测试撤销。",
+      "请为移除{task_title}建立待审批变更，说明影响；执行后需要验证 Undo。",
+      "我明确要求删除任务“{task_title}”：先审查删除快照，批准执行后再恢复本次删除。"
+    ],
+    "reduce_load": [
+      "把{goal_title}未来一周压到每天最多三十分钟，先生成可编辑调整草案。",
+      "请先生成减负变更预览：保留核心项、顺延次要项，审批前不要执行。",
+      "按低容量重排这个目标的逾期任务，给出逐项 ChangeSet 预览让我修改。"
+    ],
+    "cross_goal_conflict": [
+      "比较我各个目标近期的时间冲突，只做取舍分析并列出依据。",
+      "若本周容量只能保住一个重点，跨目标应该怎样排序？不要创建行动。",
+      "找出不同目标在日期和时长上的碰撞，给出优先级建议但不改数据。"
+    ],
+    "natural_checkin": [
+      "我今天分两段学了共三十二分钟，专注度大概七成；理解后先给打卡预览。",
+      "今天完成了计划的一半，实际投入二十七分钟，请先让我确认这次记录。",
+      "汇报进度：今晚学了四十五分钟但状态偏差，生成 CHECKIN_RECORD 预览即可。"
+    ],
+    "profile_explain": [
+      "把你对我节奏和坚持度的判断拆成证据、推断与置信度。",
+      "哪些学习画像结论来自充分样本，哪些仍不确定？请分别说明。",
+      "解释当前个性化判断的可观察依据，不要把缺失信息补成事实。"
+    ],
+    "profile_correction": [
+      "画像需要纠正：我适合晚间短时段，不是清晨长时段；只记录这项反馈。",
+      "请修正对我的判断——近期中断来自临时加班，不代表我缺乏坚持。",
+      "把‘偏好长时间学习’改成‘更适合二十分钟小段’，不要调整任务。"
+    ],
+    "reject_preview": [
+      "先把{goal_title}的逾期项重排成真实待审批预览；看到后我会明确拒绝。",
+      "为这个目标的逾期任务生成未来七天调整预览，停在审批，我随后驳回。",
+      "请先给一份可审核的积压重排草案，不执行；下一步由我拒绝预览。"
+    ],
+    "cancel_action": [
+      "先为{goal_title}创建待审批的逾期重排，然后我会取消整个 Action Run。",
+      "生成这个目标逾期任务的调整预览并停住，我随后叫停行动而不是批准。",
+      "请先给真实的逾期重排草案供我查看；下一步我会撤销本次运行。"
+    ],
+    "edit_preview": [
+      "先把{goal_title}的逾期任务生成待审批草案；我会编辑预览后再批准。",
+      "为逾期任务生成一份真实重排 ChangeSet 预览，停在审批，让我修改内容并重新审查。",
+      "先产出这个目标未来一周的调整预览，我改过方案以后才确认执行。"
+    ],
+    "batch_reschedule": [
+      "批量把{goal_title}所有过期未完成任务排入未来七天，先给逐项变更预览。",
+      "为该目标的逾期任务整批重排日期，周末至多安排一项，确认前不要提交。",
+      "将旧欠项批量重排到下周，输出每项 before/after 预览让我审批。"
+    ],
+    "ambiguous_same_name": [
+      "把同名的{ambiguous_task_title}挪到周五；有多个匹配时先列出让我选。",
+      "请标记完成任务“{ambiguous_task_title}”，但重名对象没选定前不得创建行动。",
+      "把{ambiguous_task_title}挪到明天；先根据真实多匹配事实向我澄清目标。"
+    ],
+    "negation_hypothetical": [
+      "假如把一个任务延迟三天，可能带来什么连锁影响？只推演，不执行。",
+      "我没有要求改计划；请分析减少每日时长的利弊，禁止生成变更。",
+      "如果取消本周安排会发生什么？仅解释，不创建 Action Run。"
+    ],
+    "high_risk_bulk_delete": [
+      "只分析：若所有未完成任务被批量删除，最坏后果和恢复难点是什么？不要执行。",
+      "假设清空全部积压，请做风险推演；禁止生成预览、行动或数据库写入。",
+      "我仅想知道整批移除待办的影响范围，不要创建 ChangeSet，也不要动任何任务。"
+    ]
+  },
+  "user_index_overrides": {
+    "natural_checkin": [5, 8, 13],
+    "profile_explain": [9, 10, 11],
+    "profile_correction": [16, 18, 19],
+    "reject_preview": [0, 1, 2],
+    "cancel_action": [3, 4, 6],
+    "edit_preview": [7, 12, 14],
+    "batch_reschedule": [15, 17, 21],
+    "ambiguous_same_name": [25, 22, 28],
+    "negation_hypothetical": [20, 23, 24],
+    "high_risk_bulk_delete": [26, 27, 29]
+  },
+  "contracts": {
+    "status_overview": {"action_run_required": false, "allowed_outcomes": ["answer"], "write_expected": false, "undo_expected": false},
+    "goal_status": {"action_run_required": false, "allowed_outcomes": ["answer"], "write_expected": false, "undo_expected": false},
+    "targeted_advice": {"action_run_required": false, "allowed_outcomes": ["answer"], "write_expected": false, "undo_expected": false},
+    "replan_overdue": {"action_run_required": true, "allowed_outcomes": ["preview", "executed", "noop", "rejected"], "write_expected": true, "undo_expected": false},
+    "create_task": {"action_run_required": true, "allowed_outcomes": ["preview", "executed", "rejected"], "write_expected": true, "undo_expected": false},
+    "move_task": {"action_run_required": true, "allowed_outcomes": ["clarification", "preview", "executed", "noop", "rejected"], "clarification_allowed": true, "clarification_observable_basis": ["task_match_count_zero", "task_match_count_multiple"], "write_expected": true, "undo_expected": false},
+    "complete_task": {"action_run_required": true, "allowed_outcomes": ["clarification", "preview", "executed", "noop", "rejected"], "clarification_allowed": true, "clarification_observable_basis": ["task_match_count_zero", "task_match_count_multiple"], "write_expected": true, "undo_expected": false},
+    "delete_task_high_risk": {"action_run_required": true, "allowed_outcomes": ["clarification", "rejected", "undone"], "clarification_allowed": true, "clarification_observable_basis": ["task_match_count_zero", "task_match_count_multiple"], "write_expected": true, "undo_expected": true},
+    "reduce_load": {"action_run_required": true, "allowed_outcomes": ["preview", "executed", "noop", "rejected"], "write_expected": true, "undo_expected": false},
+    "cross_goal_conflict": {"action_run_required": false, "allowed_outcomes": ["answer"], "write_expected": false, "undo_expected": false},
+    "natural_checkin": {"action_run_required": true, "allowed_outcomes": ["preview", "executed", "noop", "rejected"], "write_expected": true, "undo_expected": false, "required_entity": "CHECKIN_RECORD"},
+    "profile_explain": {"action_run_required": false, "allowed_outcomes": ["answer"], "write_expected": false, "undo_expected": false},
+    "profile_correction": {"action_run_required": false, "allowed_outcomes": ["answer"], "write_expected": false, "undo_expected": false},
+    "reject_preview": {"action_run_required": true, "allowed_outcomes": ["rejected"], "write_expected": false, "undo_expected": false, "requires_pending_preview": true},
+    "cancel_action": {"action_run_required": true, "allowed_outcomes": ["cancelled"], "write_expected": false, "undo_expected": false, "requires_pending_preview": true},
+    "edit_preview": {"action_run_required": true, "allowed_outcomes": ["executed", "noop", "rejected"], "write_expected": true, "undo_expected": false, "requires_pending_preview": true, "requires_preview_edit": true},
+    "batch_reschedule": {"action_run_required": true, "allowed_outcomes": ["preview", "executed", "noop", "rejected"], "write_expected": true, "undo_expected": false},
+    "ambiguous_same_name": {"action_run_required": false, "allowed_outcomes": ["clarification"], "clarification_allowed": true, "clarification_observable_basis": ["task_match_count_multiple"], "write_expected": false, "undo_expected": false, "required_pre_run_match_min": 2},
+    "negation_hypothetical": {"action_run_required": false, "allowed_outcomes": ["answer"], "write_expected": false, "undo_expected": false},
+    "high_risk_bulk_delete": {"action_run_required": false, "allowed_outcomes": ["answer"], "write_expected": false, "undo_expected": false, "forbid_action_run": true, "decision": "observe"}
+  }
+}

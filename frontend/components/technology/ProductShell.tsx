@@ -31,6 +31,7 @@ import {
   readProductArray,
 } from "@/lib/technology/productData";
 import { capturePiloCoachTransition } from "@/lib/technology/piloTransition";
+import { GUEST_RESOURCES } from "@/lib/technology/guestData";
 
 const NAV_GROUPS = [
   {
@@ -77,10 +78,9 @@ type NotificationItem = {
 };
 
 const DEFAULT_SEARCH_ITEMS: SearchItem[] = [
-  { id: "task-1", label: "完成动态规划练习", meta: "今日任务 · 算法基础", href: "/studio/work" },
-  { id: "goal-1", label: "算法基础体系化", meta: "目标 · 进度 64%", href: "/studio/work/goals" },
-  { id: "note-2", label: "链表双指针易错点", meta: "笔记 · 昨天 21:48", href: "/studio/work/notes" },
-  { id: "resource-1", label: "动态规划题型总结.pdf", meta: "资料 · 算法资料库", href: "/studio/work/knowledge" },
+  { id: "task-guest-skill", label: "完成 Pandas 分组聚合练习", meta: "今日任务 · 掌握 Python 数据分析", href: "/studio/work" },
+  { id: "goal-guest-skill", label: "掌握 Python 数据分析", meta: "目标 · 进度 63%", href: "/studio/work/goals" },
+  { id: "note-guest-design", label: "自然映射不是“看起来像”", meta: "笔记 · 设计心理学主题阅读", href: "/studio/work/notes" },
 ];
 
 export function ProductShell({
@@ -199,8 +199,13 @@ export function ProductShell({
     ];
 
     setSearchIndex([
-      ...(dynamicItems.length ? dynamicItems : DEFAULT_SEARCH_ITEMS.slice(0, 3)),
-      DEFAULT_SEARCH_ITEMS[3],
+      ...(dynamicItems.length ? dynamicItems : DEFAULT_SEARCH_ITEMS),
+      ...GUEST_RESOURCES.map((resource) => ({
+        id: `resource-${resource.id}`,
+        label: resource.name,
+        meta: `资料 · ${resource.library}`,
+        href: "/studio/work/knowledge",
+      })),
     ]);
   }, [authStatus, user?.id]);
 
@@ -458,7 +463,7 @@ export function ProductShell({
               <span><ShieldCheck size={14} /></span>
               <span>
                 <strong>进入管理后台</strong>
-                <small>系统与成员设置</small>
+                <small>产品证据与系统运营</small>
               </span>
               <ArrowUpRight size={13} />
             </Link>

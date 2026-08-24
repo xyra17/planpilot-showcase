@@ -10,7 +10,7 @@ from sqlalchemy import select
 from src.api.agent_v2 import _event_cursor, _stream_run_events
 from src.core.agent_v2.orchestrator import advance_run, approve_run, create_run
 from src.core.agent_v2.registry import build_registry
-from src.database import AsyncSessionLocal
+from tests.integration.database import IntegrationSessionLocal as AsyncSessionLocal
 from src.models import AgentApproval, AgentAuditEvent, AgentRun, AgentStep, Goal
 
 pytestmark = pytest.mark.integration

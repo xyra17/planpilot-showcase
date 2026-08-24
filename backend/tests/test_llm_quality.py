@@ -1,4 +1,7 @@
+from langchain_core.messages import HumanMessage
+
 from src.core.agent.nodes.intent import _keyword_intent
+from src.core.agent.nodes.intent import node as intent_node
 from src.core.llm_quality import compact_text, enforce_chinese_only, ensure_nonempty_text
 
 
@@ -17,6 +20,13 @@ def test_generated_v2_intent_boundaries():
     assert _keyword_intent("学完了，给我出几道题") == "verification"
     assert _keyword_intent("只背了20个，帮我记录一下") == "checkin"
     assert _keyword_intent("想系统学习，帮我看看怎么开始") == "goal_setup"
+    assert _keyword_intent("要是清空未完成项影响多大？只分析别执行。") is None
+    assert _keyword_intent("假如把未完成任务删掉会怎样？只说影响，不要写入。") is None
+
+
+async def test_ordinary_chat_skips_model_intent_classification():
+    result = await intent_node({"messages": [HumanMessage(content="这个概念我还是没太懂")]})
+    assert result == {"intent": "chat"}
 
 
 def test_compact_text_prefers_complete_first_sentence():

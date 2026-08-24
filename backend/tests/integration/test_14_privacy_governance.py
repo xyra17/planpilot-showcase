@@ -7,7 +7,7 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy import func, select
 
-from src.database import AsyncSessionLocal
+from tests.integration.database import IntegrationSessionLocal as AsyncSessionLocal
 from src.models import (
     ConsentAuditEvent,
     DataExportAudit,

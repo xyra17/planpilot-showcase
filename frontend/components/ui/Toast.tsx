@@ -1,7 +1,8 @@
 "use client";
 
 import { createContext, useCallback, useContext, useMemo, useState } from "react";
-import { AlertCircle, CheckCircle2, Info, X } from "lucide-react";
+import { AlertCircle, CheckCircle2, Info, LogIn, X } from "lucide-react";
+import { navigateToLogin, noticeRequiresLogin } from "@/lib/technology/noticeActions";
 
 type ToastTone = "success" | "error" | "info";
 type ToastItem = { id: number; message: string; tone: ToastTone };
@@ -37,9 +38,29 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <ToastContext.Provider value={value}>
       {children}
-      <div className="pointer-events-none fixed right-4 top-4 z-[100] flex w-[min(22rem,calc(100vw-2rem))] flex-col gap-2" aria-live="polite">
+      <div className="pp-toast-stack pointer-events-none fixed z-[100] flex w-[min(23.125rem,calc(100vw-2rem))] flex-col gap-2" aria-live="polite">
         {items.map((item) => {
           const Icon = ToneIcon[item.tone];
+          if (item.tone === "error") {
+            const requiresLogin = noticeRequiresLogin(item.message);
+            const ActionIcon = requiresLogin ? LogIn : X;
+            return (
+              <aside key={item.id} className="pp-data-sync-notice is-error pointer-events-auto" role="alert" aria-live="assertive">
+                <span className="pp-data-sync-notice-icon" aria-hidden="true"><Icon size={18} /></span>
+                <span className="pp-data-sync-notice-copy">
+                  <strong>当前操作未完成</strong>
+                  <small>{item.message}</small>
+                </span>
+                <button
+                  type="button"
+                  onClick={requiresLogin ? () => navigateToLogin() : () => remove(item.id)}
+                  aria-label={requiresLogin ? "去登录" : "关闭错误提示"}
+                >
+                  <ActionIcon size={14} aria-hidden="true" />{requiresLogin ? "去登录" : "关闭"}
+                </button>
+              </aside>
+            );
+          }
           return (
             <div key={item.id} className={`pp-toast pointer-events-auto ${toneClass[item.tone]}`}>
               <span className="pp-toast-icon"><Icon size={15} /></span>

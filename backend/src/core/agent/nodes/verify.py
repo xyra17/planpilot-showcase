@@ -3,7 +3,7 @@ from sqlalchemy import select
 
 from src.core.agent.state import AgentState
 from src.core.llm_quality import compact_text
-from src.core.llm_router import create_routine_llm
+from src.core.llm_router import create_interactive_llm
 from src.database import AsyncSessionLocal
 from src.models import Goal
 
@@ -28,7 +28,7 @@ async def node(state: AgentState) -> dict:
         except Exception:
             pass
 
-    llm = create_routine_llm(max_tokens=200)
+    llm = create_interactive_llm(max_tokens=200)
     messages = [SystemMessage(content=_SYSTEM_TPL.format(goal_title=goal_title))] + list(
         state.get("messages", [])
     )

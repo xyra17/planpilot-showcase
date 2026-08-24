@@ -68,8 +68,9 @@ class PatternUpdateEngine:
         if await cls._evidence_exists(db, pattern.id, event.id):
             return
 
-        # 3. 计算 contribution
-        contribution = rule.contribution  # base_contribution × reliability
+        # 3. 延期模式是有方向的观测：按时完成是反向证据，逾期完成是支持证据，
+        # 归因事件只触发重算而不新增一条任务事实。
+        contribution = cls._resolve_contribution(pattern.pattern_type, rule, features)
 
         now = utc_now()
 
@@ -81,6 +82,11 @@ class PatternUpdateEngine:
         recent_metas = await cls._get_recent_evidence_metas(
             db, pattern.id, limit=EVIDENCE_WINDOW - 1
         )
+        features = {
+            **features,
+            "observation_event_id": event.id,
+            "_recorded_at": now.isoformat(),
+        }
         recent_metas.append(features)  # 追加当前（尚未持久化）
 
         # 5. 更新 pattern_value
@@ -101,13 +107,17 @@ class PatternUpdateEngine:
         )
 
         # 7. 更新 confidence 和 evidence_count
-        pattern.confidence = cls._update_confidence(
-            confidence_old=pattern.confidence,
-            contribution=contribution,
-            evidence_count=pattern.evidence_count,
-        )
+        if pattern.pattern_type == "delay_pattern":
+            pattern.confidence = cls._delay_confidence(pattern.pattern_value)
+        else:
+            pattern.confidence = cls._update_confidence(
+                confidence_old=pattern.confidence,
+                contribution=contribution,
+                evidence_count=pattern.evidence_count,
+            )
         pattern.evidence_count += 1
-        pattern.last_confirmed_at = now
+        if features.get("evidence_kind") != "delay_attribution":
+            pattern.last_confirmed_at = now
 
         # 8. Lifecycle 状态机
         pattern.status = cls._run_lifecycle(pattern)
@@ -179,6 +189,23 @@ class PatternUpdateEngine:
 
     # ── _evidence_exists ────────────────────────────────────────────────────
 
+    @staticmethod
+    def _resolve_contribution(
+        pattern_type: str,
+        rule: "ExtractionRule",
+        features: dict[str, Any],
+    ) -> float:
+        if pattern_type != "delay_pattern":
+            return rule.contribution
+        if features.get("evidence_kind") == "delay_attribution":
+            return 0.0
+        return rule.contribution if features.get("days_overdue", 0) > 0 else -rule.contribution
+
+    @staticmethod
+    def _delay_confidence(pattern_value: dict[str, Any]) -> float:
+        """延期模式的 confidence 表示证据强度，不表示用户动机概率。"""
+        return max(0.0, min(1.0, float(pattern_value.get("evidence_strength", 0.0))))
+
     @classmethod
     async def _evidence_exists(
         cls,
@@ -226,12 +253,19 @@ class PatternUpdateEngine:
     ) -> list[dict[str, Any]]:
         """读取最近 N 条 PatternEvidence 的 meta 字段（用于 pattern_value 重算）。"""
         rows = await db.execute(
-            select(PatternEvidence.meta)
+            select(PatternEvidence.meta, PatternEvidence.learning_event_id, PatternEvidence.recorded_at)
             .where(PatternEvidence.pattern_id == pattern_id)
             .order_by(PatternEvidence.recorded_at.desc())
             .limit(limit)
         )
-        return [row for (row,) in rows]
+        return [
+            {
+                **(meta or {}),
+                "observation_event_id": event_id,
+                "_recorded_at": recorded_at.isoformat() if recorded_at else None,
+            }
+            for meta, event_id, recorded_at in rows
+        ]
 
     # ── _aggregate_pattern_value ─────────────────────────────────────────────
 
@@ -260,6 +294,19 @@ class PatternUpdateEngine:
         status = pattern.status
         c = pattern.confidence
         ec = pattern.evidence_count
+
+        if pattern.pattern_type == "delay_pattern":
+            value = pattern.pattern_value or {}
+            effective_n = int(value.get("effective_sample_count", 0) or 0)
+            delay_rate = float(value.get("adjusted_delay_rate", 0.0) or 0.0)
+            qualifies = effective_n >= 5 and delay_rate > 0.5 and c >= 0.5
+            if status == "candidate":
+                return "active" if qualifies else "candidate"
+            if status == "active":
+                return "active" if qualifies else "decayed"
+            if status == "decayed":
+                return "active" if qualifies else "decayed"
+            return status
 
         if status == "candidate":
             if ec >= CANDIDATE_TO_ACTIVE_EVIDENCE and c >= CANDIDATE_TO_ACTIVE_CONFIDENCE:
@@ -469,18 +516,64 @@ def _agg_mastery_velocity(metas: list[dict]) -> dict:
 
 
 def _agg_delay_pattern(metas: list[dict]) -> dict:
-    """avg_days_overdue + chronic_delay_rate（days_overdue > 3 的比例）。"""
-    overdue_vals = [m["days_overdue"] for m in metas if "days_overdue" in m]
+    """延期事实与有效行为证据的可解释投影。"""
+    corrections: dict[str, dict] = {}
+    observations: list[dict] = []
+    for meta in metas:
+        if meta.get("evidence_kind") == "delay_attribution":
+            target = meta.get("target_event_id")
+            if target:
+                previous = corrections.get(target)
+                if previous is None or str(meta.get("_recorded_at") or "") >= str(previous.get("_recorded_at") or ""):
+                    corrections[target] = meta
+        elif "days_overdue" in meta:
+            observations.append(meta)
+
+    overdue_vals = [m["days_overdue"] for m in observations]
     if not overdue_vals:
         return {}
     avg = round(statistics.mean(overdue_vals), 2)
+    effective: list[dict] = []
+    excluded = 0
+    by_category: dict[str, dict[str, int]] = {}
+    for meta in observations:
+        correction = corrections.get(meta.get("observation_event_id"))
+        if meta.get("days_overdue", 0) > 0 and correction and correction.get("attribution") == "external_interruption":
+            excluded += 1
+            continue
+        effective.append(meta)
+        category = str(meta.get("task_category") or "未分类任务")
+        bucket = by_category.setdefault(category, {"sample_count": 0, "delayed_count": 0})
+        bucket["sample_count"] += 1
+        bucket["delayed_count"] += int(meta.get("days_overdue", 0) > 0)
+
+    support = sum(1 for m in effective if m.get("days_overdue", 0) > 0)
+    opposing = sum(1 for m in effective if m.get("days_overdue", 0) <= 0)
+    effective_n = support + opposing
+    adjusted_rate = (1.0 + support) / (2.0 + effective_n) if effective_n else 0.0
+    observed_rate = round(sum(1 for v in overdue_vals if v > 0) / len(overdue_vals), 4)
     chronic = round(sum(1 for v in overdue_vals if v > 3) / len(overdue_vals), 4)
     on_time_rate = round(sum(1 for v in overdue_vals if v <= 0) / len(overdue_vals), 4)
     return {
         "avg_days_overdue": avg,
         "chronic_delay_rate": chronic,
         "on_time_rate": on_time_rate,
+        "observed_delay_rate": observed_rate,
+        "adjusted_delay_rate": round(adjusted_rate, 4),
         "sample_count": len(overdue_vals),
+        "effective_sample_count": effective_n,
+        "supporting_count": support,
+        "opposing_count": opposing,
+        "excluded_count": excluded,
+        "evidence_strength": round(effective_n / (effective_n + 3.0), 4) if effective_n else 0.0,
+        "by_category": {
+            key: {
+                **value,
+                "delay_rate": round(value["delayed_count"] / value["sample_count"], 4)
+                if value["sample_count"] else 0.0,
+            }
+            for key, value in by_category.items()
+        },
     }
 
 

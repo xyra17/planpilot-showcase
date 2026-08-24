@@ -33,6 +33,7 @@ from src.models import (
     ExperimentExposure,
     Goal,
     GoalVersion,
+    InsightActionRun,
     KnowledgeBase,
     KnowledgeChunk,
     KnowledgeEdge,
@@ -50,6 +51,7 @@ from src.models import (
     LearningEvent,
     LearningMemory,
     PatternEvidence,
+    PendingActionIntent,
     Plan,
     PredictionObservation,
     ProductFeedbackSignal,
@@ -286,6 +288,7 @@ async def build_user_export(db: AsyncSession, user: User) -> dict[str, Any]:
         "proposals": (DecisionProposal, {"agent_trace"}),
         "proposal_feedback": (ProposalFeedback, set()),
         "prediction_observations": (PredictionObservation, set()),
+        "pending_action_intents": (PendingActionIntent, set()),
         "agent_runs": (AgentRun, {"worker_id", "trace_context"}),
         "agent_invocations": (
             AgentInvocation,
@@ -319,6 +322,7 @@ async def build_user_export(db: AsyncSession, user: User) -> dict[str, Any]:
 
     pattern_ids = [row["id"] for row in sections["learner_patterns"]]
     run_ids = [row["id"] for row in sections["agent_runs"]]
+    proposal_ids = [row["id"] for row in sections["proposals"]]
     assignment_ids = [row["id"] for row in sections["experiment_assignments"]]
     agent_steps = await linked_rows(AgentStep, AgentStep.run_id, run_ids)
     sections.update(
@@ -361,6 +365,12 @@ async def build_user_export(db: AsyncSession, user: User) -> dict[str, Any]:
             "agent_audit_events": [
                 _public_row(row)
                 for row in await linked_rows(AgentAuditEvent, AgentAuditEvent.run_id, run_ids)
+            ],
+            "insight_action_runs": [
+                _public_row(row)
+                for row in await linked_rows(
+                    InsightActionRun, InsightActionRun.insight_id, proposal_ids
+                )
             ],
             "experiment_exposures": [
                 _public_row(row, omit={"context_hash"})

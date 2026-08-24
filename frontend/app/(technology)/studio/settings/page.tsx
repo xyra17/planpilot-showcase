@@ -6,9 +6,11 @@ import {
   CalendarClock,
   Camera,
   Check,
+  ChevronDown,
   CircleHelp,
   Clock3,
   Copy,
+  Database,
   Download,
   LayoutDashboard,
   LoaderCircle,
@@ -652,32 +654,38 @@ export default function SettingsPage() {
         </article>
 
         <article id="settings-privacy" className="settings-card settings-task-card settings-privacy-card">
-          <header className="settings-section-head"><span><ShieldCheck size={17} /></span><div><h2>AI 与个性化 / 数据与隐私</h2><p>分别控制系统可用于建议、实验和分析的数据用途。你的选择会同步到账号。</p></div><span className={`privacy-save-state is-${privacyState}`} role="status" aria-live="polite">{privacyState === "loading" ? "加载中…" : privacyState === "saving" ? "保存中…" : privacyState === "saved" ? "已保存" : privacyState === "error" ? (privacyConsent ? "保存失败" : "加载失败") : "已同步"}</span></header>
+          <header className="settings-compact-section-header privacy-section-header">
+            <span className="settings-compact-section-icon privacy-section-icon" aria-hidden="true"><ShieldCheck size={18} /></span>
+            <div className="settings-compact-section-copy privacy-section-copy"><h2>AI、个性化与数据隐私</h2><p>按用途决定系统如何使用你的数据，所有选择都会同步到账号。</p></div>
+            <span className={`privacy-save-state is-${privacyState}`} role="status" aria-live="polite">{privacyState === "loading" ? "加载中…" : privacyState === "saving" ? "保存中…" : privacyState === "saved" ? "已保存" : privacyState === "error" ? (privacyConsent ? "保存失败" : "加载失败") : "已同步"}</span>
+          </header>
           {status !== "authenticated" ? <div className="privacy-login-note"><p>登录后可以管理账号级 AI 与数据选择。</p><Link href="/login?next=%2Fstudio%2Fsettings%23settings-privacy">登录管理</Link></div> : <>
-            {([
-              ["personalization_enabled", "个性化建议", "允许系统根据学习记录形成可纠正的观察，并用于调整建议。"],
-              ["experiments_enabled", "产品实验参与", "允许加入用于比较产品方案效果的实验；关闭后会退出实验分组。"],
-              ["product_analytics_enabled", "产品分析", "允许使用产品使用情况改进稳定性与功能体验。"],
-              ["sensitive_inference_enabled", "敏感推断", "明确开启后，系统才会生成和使用拖延、坚持、挑战与反馈倾向等行为推断；关闭时会停止使用并清除这些既有推断。默认关闭。"],
-            ] as Array<[PrivacyPurpose, string, string]>).map(([purpose, label, description]) => {
-              const enabled = privacyConsent?.[purpose] ?? false;
-              return <div className={`privacy-purpose-row ${purpose === "sensitive_inference_enabled" ? "is-sensitive" : ""}`} key={purpose}>
-                <div><strong>{label}</strong>{purpose === "sensitive_inference_enabled" && <em>默认关闭</em>}<p>{description}</p></div>
-                <button type="button" className={`setting-toggle ${enabled ? "is-on" : ""}`} aria-pressed={enabled} aria-label={`${label}：${enabled ? "已开启" : "已关闭"}`} disabled={!privacyConsent || privacyState === "loading" || privacyState === "saving"} onClick={() => void togglePrivacyPurpose(purpose)}><i /></button>
-              </div>;
-            })}
+            <div className="privacy-purpose-list" aria-label="AI 与数据用途">
+              {([
+                ["personalization_enabled", "个性化建议", "根据学习记录形成可纠正的观察，并用来调整建议。"],
+                ["experiments_enabled", "产品实验参与", "加入用于比较产品方案效果的实验；关闭后会退出实验分组。"],
+                ["product_analytics_enabled", "产品分析", "使用产品使用情况改进稳定性与功能体验。"],
+                ["sensitive_inference_enabled", "敏感推断", "生成和使用拖延、坚持、挑战与反馈倾向等行为推断。关闭后会停止使用，并清除已有推断。"],
+              ] as Array<[PrivacyPurpose, string, string]>).map(([purpose, label, description]) => {
+                const enabled = privacyConsent?.[purpose] ?? false;
+                return <div className={`privacy-purpose-row ${purpose === "sensitive_inference_enabled" ? "is-sensitive" : ""}`} key={purpose}>
+                  <div className="privacy-purpose-copy"><div className="privacy-purpose-title"><strong>{label}</strong>{purpose === "sensitive_inference_enabled" && <em>需主动开启</em>}</div><p>{description}</p></div>
+                  <div className="privacy-purpose-control"><span aria-hidden="true">{enabled ? "开启" : "关闭"}</span><button type="button" className={`privacy-toggle ${enabled ? "is-on" : ""}`} aria-pressed={enabled} aria-label={`${label}：${enabled ? "已开启" : "已关闭"}`} disabled={!privacyConsent || privacyState === "loading" || privacyState === "saving"} onClick={() => void togglePrivacyPurpose(purpose)}><i /></button></div>
+                </div>;
+              })}
+            </div>
             {showPersonalizationChoice && <div className="personalization-off-choice" role="group" aria-label="关闭个性化的方式"><div><strong>如何关闭个性化？</strong><p>两种方式都会停止新的个性化建议；你可以决定是否同时清除系统生成的派生数据。</p></div><div><button type="button" onClick={() => void updatePrivacyConsent({ personalization_enabled: false }, "个性化建议已关闭，现有派生数据已保留")}>仅关闭</button><button type="button" className="is-danger" onClick={() => void eraseDerivedData()}><Trash2 size={14} />关闭并清除派生数据</button><button type="button" className="is-quiet" onClick={() => setShowPersonalizationChoice(false)}>取消</button></div></div>}
             {privacyState === "error" && <div className="privacy-inline-error" role="alert"><span>{privacyError}</span><button type="button" onClick={() => failedConsentPatch ? void updatePrivacyConsent(failedConsentPatch) : setPrivacyLoadAttempt((value) => value + 1)}>重试</button></div>}
-            <details className="privacy-data-actions"><summary>数据导出与清除</summary><div>
-              <div><strong>导出服务器端可携带数据</strong><p>包含账号资料、授权历史、目标与任务、笔记和知识正文及关联行、学习记录和账号相关的 Agent 交互数据；不包含密码或令牌、服务器文件路径、向量索引和内部运维 trace。</p><button type="button" disabled={exportBusy} onClick={() => void exportData()}>{exportBusy ? <LoaderCircle size={14} className="is-spinning" /> : <Download size={14} />}{exportBusy ? "生成中…" : "导出服务器数据"}</button></div>
-              <div><strong>导出本机缓存</strong><p>只导出当前浏览器中的离线缓存和界面偏好，不代表服务器端完整学习数据。</p><button type="button" disabled={localExportBusy} onClick={() => void exportLocalCache()}>{localExportBusy ? <LoaderCircle size={14} className="is-spinning" /> : <Download size={14} />}{localExportBusy ? "生成中…" : "导出本机缓存"}</button></div>
-              <div className="privacy-danger-action"><strong>清除系统生成的学习画像 / 派生数据</strong><p>{privacyConsent?.personalization_enabled === false ? "个性化已关闭；你仍可清除此前选择保留的" : "会关闭个性化并清除"}学习观察、画像、认知推断和学习记忆。不会删除你创建的目标、任务、笔记或知识内容。</p><button type="button" disabled={!privacyConsent || privacyState === "saving"} onClick={() => void eraseDerivedData()}><Trash2 size={14} />{privacyConsent?.personalization_enabled === false ? "清除已保留的派生数据" : "关闭并清除派生数据"}</button></div>
+            <details className="privacy-data-actions"><summary><span className="privacy-data-icon" aria-hidden="true"><Database size={16} /></span><span><strong>数据导出与清除</strong><small>获取数据副本，或清除系统生成的派生数据</small></span><ChevronDown size={16} aria-hidden="true" /></summary><div className="privacy-data-list">
+              <div className="privacy-data-row"><div><strong>服务器数据副本</strong><p>包含账号资料、授权历史、目标与任务、笔记和知识正文及关联行、学习记录和账号相关的 Agent 交互数据；不包含密码或令牌、服务器文件路径、向量索引和内部运维 trace。</p></div><button type="button" disabled={exportBusy} onClick={() => void exportData()}>{exportBusy ? <LoaderCircle size={14} className="is-spinning" /> : <Download size={14} />}{exportBusy ? "生成中…" : "导出服务器数据"}</button></div>
+              <div className="privacy-data-row"><div><strong>本机缓存副本</strong><p>只导出当前浏览器中的离线缓存和界面偏好，不代表服务器端完整学习数据。</p></div><button type="button" disabled={localExportBusy} onClick={() => void exportLocalCache()}>{localExportBusy ? <LoaderCircle size={14} className="is-spinning" /> : <Download size={14} />}{localExportBusy ? "生成中…" : "导出本机缓存"}</button></div>
+              <div className="privacy-data-row privacy-danger-action"><div><strong>清除学习画像与派生数据</strong><p>{privacyConsent?.personalization_enabled === false ? "个性化已关闭；你仍可清除此前选择保留的" : "会关闭个性化并清除"}学习观察、画像、认知推断和学习记忆。不会删除你创建的目标、任务、笔记或知识内容。</p></div><button type="button" disabled={!privacyConsent || privacyState === "saving"} onClick={() => void eraseDerivedData()}><Trash2 size={14} />{privacyConsent?.personalization_enabled === false ? "清除已保留的派生数据" : "关闭并清除派生数据"}</button></div>
             </div></details>
           </>}
         </article>
 
         <article id="settings-account" className="settings-card settings-task-card">
-          <header className="settings-section-head"><span><UserRound size={17} /></span><div><h2>账户</h2><p>{status === "authenticated" ? "资料修改会自动同步到账号。" : "登录后可修改资料并跨设备同步。"}</p></div></header>
+          <header className="settings-compact-section-header account-section-header"><span className="settings-compact-section-icon" aria-hidden="true"><UserRound size={18} /></span><div className="settings-compact-section-copy"><h2>账户</h2><p>{status === "authenticated" ? "资料修改会自动同步到账号。" : "登录后可修改资料并跨设备同步。"}</p></div></header>
           {status !== "authenticated" || !user ? <div className="guest-account-panel">
             <div className="guest-account-copy"><span><UserRound size={18} /></span><div><strong>登录或创建账号</strong><p>登录后可同步资料、修改用户名，并在不同设备继续学习。</p></div></div>
             <div className="guest-account-actions"><Link href="/login">登录<ArrowRight size={14} /></Link><Link href="/register" className="is-secondary">创建账号</Link></div>
@@ -690,13 +698,12 @@ export default function SettingsPage() {
               <div className="settings-avatar-copy"><strong>个人头像</strong><p>会显示在你与 Pilo 的对话和工作区中，登录后跨设备同步。</p><small>支持 JPG、PNG、WebP，最大 5 MB；上传前可调整取景</small></div>
               <div className="setting-action">
                 <input ref={avatarInputRef} className="settings-avatar-input" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => void changeAvatar(event)} />
-                <button type="button" disabled={avatarBusy} onClick={() => avatarInputRef.current?.click()}>{avatarBusy ? <LoaderCircle size={14} className="is-spinning" /> : <Camera size={14} />}{avatarBusy ? "上传中…" : user.avatar_url ? "更换头像" : "上传头像"}</button>
+                <button type="button" className="account-action-button" disabled={avatarBusy} onClick={() => avatarInputRef.current?.click()}><span className="account-action-visual">{avatarBusy ? <LoaderCircle size={14} className="is-spinning" /> : <Camera size={14} />}<span>{avatarBusy ? "上传中…" : user.avatar_url ? "更换头像" : "上传头像"}</span></span></button>
               </div>
             </div>
-            <div className="setting-row setting-row-grid"><div className="setting-copy"><span>用户名</span><small>用于工作区中的身份展示</small></div><div className="setting-current"><span className="setting-value-text">{user.username}</span></div><div className="setting-action"><button type="button" onClick={() => setEditingProfile(true)}>编辑</button></div></div>
-            <div className="setting-row setting-row-grid"><div className="setting-copy"><span>邮箱</span><small>用于登录、验证和重要账号通知</small></div><div className="setting-current"><span className="setting-value-text">{user.email}</span></div><div className="setting-action"><button type="button" onClick={() => setEditingProfile(true)}>修改</button></div></div>
-            <div className="setting-row setting-row-grid account-export-row"><div className="setting-copy"><span>学习数据与隐私</span><small>完整导出、个性化选择与派生数据清除已集中到隐私区域</small></div><div className="setting-current"><span className="setting-value-text">账号级控制</span></div><div className="setting-action"><a className="setting-action-link" href="#settings-privacy">前往管理</a></div></div>
-            <div className="setting-row setting-row-grid account-signout-row"><div className="setting-copy"><span>退出当前账号</span><small>只结束当前会话，本地学习数据不会被删除</small></div><div className="setting-current"><span className="setting-value-text">{user.username}</span></div><div className="setting-action"><button type="button" className="danger-quiet" onClick={() => { logout(); window.location.assign("/login"); }}><LogOut size={14} />退出</button></div></div>
+            <div className="setting-row setting-row-grid"><div className="setting-copy"><span>用户名</span><small>用于工作区中的身份展示</small></div><div className="setting-current"><span className="setting-value-text">{user.username}</span></div><div className="setting-action"><button type="button" className="account-action-button" onClick={() => setEditingProfile(true)}><span className="account-action-visual"><PencilLine size={14} /><span>编辑</span></span></button></div></div>
+            <div className="setting-row setting-row-grid"><div className="setting-copy"><span>邮箱</span><small>用于登录、验证和重要账号通知</small></div><div className="setting-current"><span className="setting-value-text">{user.email}</span></div><div className="setting-action"><button type="button" className="account-action-button" onClick={() => setEditingProfile(true)}><span className="account-action-visual"><PencilLine size={14} /><span>修改</span></span></button></div></div>
+            <div className="setting-row setting-row-grid account-signout-row"><div className="setting-copy"><span>退出当前账号</span><small>只结束当前会话，本地学习数据不会被删除</small></div><div className="setting-current"><span className="setting-value-text">{user.username}</span></div><div className="setting-action"><button type="button" className="account-action-button is-danger danger-quiet" onClick={() => { logout(); window.location.assign("/login"); }}><span className="account-action-visual"><LogOut size={14} /><span>退出</span></span></button></div></div>
           </>}
         </article>
       </section>

@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { TasksProvider } from "@/lib/tasks-context";
 import { KnowledgeProvider } from "@/lib/knowledge-context";
 
 export const metadata: Metadata = {
@@ -13,7 +12,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="zh-CN" data-scroll-behavior="smooth" suppressHydrationWarning>
       <body>
         <KnowledgeProvider>
-          <TasksProvider>{children}</TasksProvider>
+          {children}
         </KnowledgeProvider>
       </body>
     </html>

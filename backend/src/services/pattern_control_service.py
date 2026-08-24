@@ -9,8 +9,17 @@ from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.time import utc_now
+from src.events.publisher import emit
 from src.intelligence.decision_context import DecisionContextBuilder
-from src.models import Goal, LearnerPattern, LearnerPatternAudit, LearnerPatternSuppression
+from src.intelligence.event_processor import process_event
+from src.models import (
+    Goal,
+    LearnerPattern,
+    LearnerPatternAudit,
+    LearnerPatternSuppression,
+    LearningEvent,
+    PatternEvidence,
+)
 
 
 class PatternControlError(ValueError):
@@ -33,8 +42,9 @@ def _snapshot(pattern: LearnerPattern) -> dict[str, Any]:
     }
 
 
-def _public_pattern(pattern: LearnerPattern) -> dict[str, Any]:
+def _public_pattern(pattern: LearnerPattern, evidence: dict[str, Any] | None = None) -> dict[str, Any]:
     override = pattern.user_override or {}
+    evidence = evidence or {}
     return {
         "id": pattern.id,
         "goal_id": pattern.goal_id,
@@ -49,6 +59,16 @@ def _public_pattern(pattern: LearnerPattern) -> dict[str, Any]:
         "paused_at": pattern.paused_at.isoformat() if pattern.paused_at else None,
         "first_observed_at": pattern.first_observed_at.isoformat(),
         "last_confirmed_at": pattern.last_confirmed_at.isoformat() if pattern.last_confirmed_at else None,
+        "pattern_value": pattern.pattern_value or {},
+        "evidence": evidence.get("items", []),
+        "evidence_summary": {
+            "supporting_count": evidence.get("supporting_count", 0),
+            "opposing_count": evidence.get("opposing_count", 0),
+            "neutral_count": evidence.get("neutral_count", 0),
+            "excluded_count": evidence.get("excluded_count", 0),
+            "first_observed_at": pattern.first_observed_at.isoformat(),
+            "last_observed_at": evidence.get("last_observed_at"),
+        },
     }
 
 
@@ -62,7 +82,8 @@ async def list_patterns(
             raise PatternControlNotFound("goal does not exist")
         stmt = stmt.where(or_(LearnerPattern.goal_id == goal_id, LearnerPattern.goal_id.is_(None)))
     rows = list((await db.execute(stmt.order_by(LearnerPattern.updated_at.desc()))).scalars())
-    return [_public_pattern(row) for row in rows]
+    evidence = await DecisionContextBuilder._load_pattern_evidence(db, rows)
+    return [_public_pattern(row, evidence.get(row.id)) for row in rows]
 
 
 async def list_audits(
@@ -196,6 +217,111 @@ async def apply_action(
     await db.commit()
     await db.refresh(pattern)
     return {"pattern": _public_pattern(pattern), "audit_id": audit.id, "deleted": False}
+
+
+async def record_delay_attribution(
+    db: AsyncSession,
+    *,
+    user_id: str,
+    pattern_id: str,
+    evidence_id: str,
+    reason_code: str,
+    note: str | None = None,
+) -> dict[str, Any]:
+    """Record a user correction for one concrete overdue observation.
+
+    The overdue event remains immutable. The attribution event only changes whether
+    that observation participates in the adjusted delay-pattern projection.
+    """
+    allowed_reasons = {
+        "business_trip",
+        "illness_or_care",
+        "temporary_capacity",
+        "other_external",
+        "unexplained",
+    }
+    if reason_code not in allowed_reasons:
+        raise PatternControlError("unsupported delay attribution reason")
+    pattern = await db.scalar(
+        select(LearnerPattern).where(
+            LearnerPattern.id == pattern_id,
+            LearnerPattern.user_id == user_id,
+            LearnerPattern.pattern_type == "delay_pattern",
+        )
+    )
+    if pattern is None:
+        raise PatternControlNotFound("延期观察不存在")
+    evidence = await db.scalar(
+        select(PatternEvidence).where(
+            PatternEvidence.id == evidence_id,
+            PatternEvidence.pattern_id == pattern_id,
+        )
+    )
+    if evidence is None or evidence.learning_event_id is None:
+        raise PatternControlNotFound("延期证据不存在")
+    source_event = await db.get(LearningEvent, evidence.learning_event_id)
+    if source_event is None or source_event.event_type != "TaskCompleted":
+        raise PatternControlError("只能纠正具体的任务延期记录")
+    payload = source_event.payload or {}
+    if int(payload.get("days_overdue") or 0) <= 0:
+        raise PatternControlError("按时完成记录不能标记为延期中断")
+
+    attribution = "external_interruption" if reason_code != "unexplained" else "unexplained"
+    now = utc_now()
+    before_confidence = pattern.confidence
+    before_pattern_value = pattern.pattern_value or {}
+    event = await emit(
+        db,
+        user_id=user_id,
+        goal_id=source_event.goal_id,
+        aggregate_type="task",
+        aggregate_id=source_event.aggregate_id,
+        event_type="DelayAttributionRecorded",
+        payload={
+            "target_event_id": source_event.id,
+            "target_evidence_id": evidence.id,
+            "task_id": source_event.aggregate_id,
+            "task_title": payload.get("title"),
+            "days_overdue": payload.get("days_overdue"),
+            "attribution": attribution,
+            "reason_code": reason_code,
+            "note": (note or "").strip()[:500] or None,
+        },
+        occurred_at=now,
+    )
+    await db.flush()
+    await process_event(db, event)
+    pattern.user_review_status = "corrected"
+    pattern.user_reviewed_at = now
+    audit = LearnerPatternAudit(
+        pattern_id=pattern.id,
+        user_id=user_id,
+        action="correct_evidence",
+        actor_type="user",
+        reason=(note or reason_code).strip()[:500],
+        before_state={
+            "confidence": before_confidence,
+            "pattern_value": before_pattern_value,
+            "evidence_id": evidence.id,
+        },
+        after_state={
+            "attribution": attribution,
+            "reason_code": reason_code,
+            "evidence_id": evidence.id,
+        },
+        reversible=False,
+        created_at=now,
+    )
+    db.add(audit)
+    await db.commit()
+    await db.refresh(pattern)
+    evidence_summary = await DecisionContextBuilder._load_pattern_evidence(db, [pattern])
+    return {
+        "pattern": _public_pattern(pattern, evidence_summary.get(pattern.id)),
+        "audit_id": audit.id,
+        "evidence_id": evidence.id,
+        "attribution": attribution,
+    }
 
 
 async def undo_action(

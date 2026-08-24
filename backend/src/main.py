@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -7,6 +8,7 @@ import sentry_sdk
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.routing import APIRoute, request_response
 from fastapi.staticfiles import StaticFiles
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -63,16 +65,24 @@ async def lifespan(app: FastAPI):
     if settings.local_model_enabled and settings.openai_base_url:
         from openai import AsyncOpenAI
 
+        from src.core.agent.nodes.chat import _SYSTEM_BASE
+
         try:
             local_client = AsyncOpenAI(
                 api_key=settings.openai_api_key or "local",
                 base_url=settings.openai_base_url,
             )
-            await local_client.chat.completions.create(
-                model=settings.model_name,
-                messages=[{"role": "user", "content": "hi"}],
-                max_tokens=1,
-                extra_body={"chat_template_kwargs": {"enable_thinking": False}},
+            await asyncio.wait_for(
+                local_client.chat.completions.create(
+                    model=settings.model_name,
+                    messages=[
+                        {"role": "system", "content": _SYSTEM_BASE},
+                        {"role": "user", "content": "回复好"},
+                    ],
+                    max_tokens=1,
+                    extra_body={"chat_template_kwargs": {"enable_thinking": False}},
+                ),
+                timeout=15.0,
             )
             logger.info("本地模型热身完成 (base_url=%s)", settings.openai_base_url)
         except Exception as e:
@@ -177,6 +187,16 @@ for domain_router in (
     notifications.router,
     schedule.router,
 ):
+    for route in domain_router.routes:
+        # ``routes.extend`` bypasses FastAPI.include_router(), which normally
+        # binds the application's dependency override provider to each route.
+        # Preserve that binding so test/app-scoped dependency injection cannot
+        # silently fall back to a different database session factory.
+        if isinstance(route, APIRoute):
+            route.dependency_overrides_provider = app
+            # APIRoute builds its ASGI handler in __init__; refreshing the
+            # provider attribute alone leaves that closure bound to None.
+            route.app = request_response(route.get_route_handler())
     app.router.routes.extend(domain_router.routes)
 
 

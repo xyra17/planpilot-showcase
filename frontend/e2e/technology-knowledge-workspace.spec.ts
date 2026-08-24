@@ -5,49 +5,65 @@ test.beforeEach(async ({ page }) => {
     localStorage.clear();
   });
   await page.goto("/studio/work/knowledge");
-  const intro = page.getByRole("dialog", { name: "访客模式" });
-  await expect(intro).toBeVisible();
-  await intro.getByRole("button", { name: "继续浏览" }).click();
+  await expect(page.getByRole("dialog", { name: "访客体验" })).toHaveCount(0);
 });
 
-test("访客进入知识空间时统一说明 Mock 数据并提供登录注册入口", async ({ page }) => {
-  await page.reload();
-  const intro = page.getByRole("dialog", { name: "访客模式" });
+test("访客说明只在首页展示并提供登录注册入口", async ({ page }) => {
+  await page.goto("/studio/work");
+  const intro = page.getByRole("dialog", { name: "访客体验" });
   await expect(intro).toBeVisible();
-  await expect(intro).toContainText("这里展示的是 Mock 数据");
-  await expect(intro.getByRole("heading", { name: "访客模式" })).toHaveCSS("font-size", "18px");
+  await expect(intro).toContainText("页面展示的是一组体验数据");
+  await expect(intro.getByRole("heading", { name: "访客体验" })).toHaveCSS("font-size", "18px");
   await expect(intro.locator(".knowledge-demo-intro-icon .lucide-sparkles")).toBeVisible();
-  await expect(intro.locator(".knowledge-demo-intro-heading p")).toHaveText("你可以先体验知识空间");
+  await expect(intro.locator(".knowledge-demo-intro-heading p")).toHaveText("先看看一个完整的学习工作区");
   await expect(intro.locator(".knowledge-demo-intro-heading p")).toHaveCSS("font-size", "13px");
-  await expect(intro.locator(".knowledge-guest-gate-message strong")).toHaveText("这里展示的是 Mock 数据");
-  await expect(intro.locator(".knowledge-guest-gate-message span")).toContainText("登录后可上传、编辑、资料问答");
-  await expect(intro).not.toContainText("操作前我们会再次提醒");
+  await expect(intro.locator(".knowledge-guest-gate-message strong")).toHaveText("页面展示的是一组体验数据");
+  await expect(intro.locator(".knowledge-guest-gate-message span")).toContainText("目标、任务、笔记、资料与 Pilo 对话互相关联");
   await expect(intro.getByRole("link", { name: "注册", exact: true })).toHaveAttribute("href", "/register");
   await expect(intro.getByRole("link", { name: "登录", exact: true })).toHaveAttribute("href", "/login");
-  await expect(page.locator(".knowledge-demo-badge")).toHaveCount(0);
-  await expect(page.locator(".knowledge-guest-demo-bar")).toHaveCount(0);
+
+  const desktopDialog = await intro.boundingBox();
+  expect(Math.abs(((desktopDialog?.y ?? 0) + (desktopDialog?.height ?? 0) / 2) - 360)).toBeLessThanOrEqual(24);
 
   await page.setViewportSize({ width: 375, height: 667 });
   const mobileDialog = await intro.boundingBox();
   expect(mobileDialog?.x ?? -1).toBeGreaterThanOrEqual(16);
   expect((mobileDialog?.x ?? 999) + (mobileDialog?.width ?? 999)).toBeLessThanOrEqual(359);
-  await expect(intro.getByRole("button", { name: "继续浏览" })).toBeVisible();
+  await expect(intro.getByRole("button", { name: "继续体验" })).toBeVisible();
   await expect(intro.getByRole("link", { name: "注册", exact: true })).toBeVisible();
   await expect(intro.getByRole("link", { name: "登录", exact: true })).toBeVisible();
+
+  await intro.getByRole("button", { name: "继续体验" }).click();
+  await page.goto("/studio/work/knowledge");
+  await expect(page.getByRole("dialog", { name: "访客体验" })).toHaveCount(0);
 });
 
-test("知识空间以目标为主入口，文件夹仅承担归档职责", async ({ page }) => {
+test("知识空间独立组织目标与个人文件夹", async ({ page }) => {
   const rail = page.locator(".knowledge-library-rail");
   const aiCard = page.locator(".knowledge-ai-assist-card");
   const table = page.getByRole("table", { name: "知识空间资料" });
 
-  await expect(page.getByText("英语学术阅读", { exact: true }).first()).toBeVisible();
-  await expect(page.getByText("数据分析入门", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("读完《设计心理学》并输出卡片", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("掌握 Python 数据分析", { exact: true }).first()).toBeVisible();
 
   await expect(rail.getByRole("heading", { name: /^按目标/ })).toBeVisible();
+  await expect(rail.getByRole("link", { name: "管理", exact: true })).toHaveCount(0);
   await expect(rail.getByRole("heading", { name: /^个人文件夹/ })).toBeVisible();
+  await expect(rail.locator(".knowledge-library-list-section").getByText("稍后精读", { exact: true })).toBeVisible();
+  await expect(rail.locator(".knowledge-library-list-section").getByText("常用模板", { exact: true })).toBeVisible();
+  await expect(rail.locator(".knowledge-library-list-section").getByText("Python 数据分析", { exact: true })).toHaveCount(0);
+  await expect(rail.locator(".knowledge-scope-shortcuts").getByRole("button", { name: "未关联资料 1" })).toBeVisible();
+  await expect(page.getByText("学习目标与个人文件夹独立分类，可任选一种或同时关联", { exact: true })).toBeVisible();
+  const classificationResizer = rail.getByRole("separator", { name: "调整目标与个人文件夹区域高度" });
+  await expect(classificationResizer).toBeVisible();
+  await expect(classificationResizer).toHaveAttribute("aria-orientation", "horizontal");
+  await expect(classificationResizer).toHaveAttribute("aria-valuenow", "50");
+  await classificationResizer.press("ArrowDown");
+  await expect(classificationResizer).toHaveAttribute("aria-valuenow", "55");
+  await classificationResizer.press("ArrowUp");
+  await expect(classificationResizer).toHaveAttribute("aria-valuenow", "50");
   await expect(aiCard.getByRole("heading", { name: /资料助手/ })).toBeVisible();
-  await expect(rail.locator(".knowledge-goal-scroll > button").filter({ hasText: /^agent 开发/ })).toBeVisible();
+  await expect(rail.locator(".knowledge-goal-scroll > button").filter({ hasText: /^掌握 Python 数据分析/ })).toBeVisible();
   await expect(page.getByText("资料库列表", { exact: true })).toHaveCount(0);
   await expect(page.getByText("快捷访问", { exact: true })).toHaveCount(0);
   await expect(page.getByText("资料库分组", { exact: true })).toHaveCount(0);
@@ -87,17 +103,48 @@ test("知识空间以目标为主入口，文件夹仅承担归档职责", async
   await aiTrigger.click();
   await expect(aiTrigger).toHaveAttribute("aria-expanded", "false");
 
-  await rail.locator(".knowledge-goal-scroll > button").filter({ hasText: /^agent 开发/ }).click();
-  await expect(page.locator(".knowledge-resource-context h2")).toHaveText("agent 开发");
+  await rail.locator(".knowledge-goal-scroll > button").filter({ hasText: /^掌握 Python 数据分析/ }).click();
+  await expect(page.locator(".knowledge-resource-context h2")).toHaveText("掌握 Python 数据分析");
   await expect(page.locator(".knowledge-resource-context p")).toContainText("已关联到当前学习目标");
-  await expect(table.getByText("Agent 系统设计.pdf", { exact: true })).toBeVisible();
-  await expect(table.getByText("agent 开发", { exact: true }).first()).toBeVisible();
+  await expect(table.getByText("电商订单数据分析实战.md", { exact: true })).toBeVisible();
+  await expect(table.getByText("掌握 Python 数据分析", { exact: true }).first()).toBeVisible();
+
+  await rail.locator(".knowledge-library-row > button:first-child").filter({ hasText: /^稍后精读/ }).click();
+  await expect(page.locator(".knowledge-resource-context h2")).toHaveText("稍后精读");
+  await expect(table.getByText("英语二阅读结构识别清单.pdf", { exact: true })).toBeVisible();
+  await expect(table.getByText("《设计心理学》概念卡片.md", { exact: true })).toBeVisible();
+
+  await rail.locator(".knowledge-scope-shortcuts").getByRole("button", { name: "未关联资料 1" }).click();
+  await expect(table.getByText("晨间写作 30 天题目卡.md", { exact: true })).toBeVisible();
+  await expect(page.locator(".knowledge-resource-table article")).toHaveCount(1);
+});
+
+test("资料表为关联目标留出空间，并说明收藏与编辑操作", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const firstRow = page.locator(".knowledge-resource-table article").first();
+  const cells = firstRow.locator(":scope > *");
+  const goalCell = await cells.nth(2).boundingBox();
+  const dateCell = await cells.nth(4).boundingBox();
+  const actionCell = await cells.nth(5).boundingBox();
+
+  expect(dateCell?.width ?? 999).toBeLessThanOrEqual(78);
+  expect(actionCell?.width ?? 999).toBeLessThanOrEqual(68);
+  expect(goalCell?.width ?? 0).toBeGreaterThan((dateCell?.width ?? 999) * 2);
+
+  const favorite = firstRow.locator(".knowledge-row-actions button").first();
+  const edit = firstRow.locator(".knowledge-row-actions button").nth(1);
+  await expect(favorite).toHaveAttribute("data-tooltip", "收藏资料");
+  await expect(edit).toHaveAttribute("data-tooltip", "编辑资料");
+  await favorite.hover();
+  await expect.poll(() => favorite.evaluate((button) => getComputedStyle(button, "::after").opacity)).toBe("1");
+  await edit.focus();
+  await expect.poll(() => edit.evaluate((button) => getComputedStyle(button, "::after").opacity)).toBe("1");
 });
 
 test("资料全屏预览只占工作区并保留桌面导航", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 820 });
-  await page.locator(".knowledge-resource-identity").filter({ hasText: "RAG 检索增强生成.md" }).click();
-  const preview = page.getByRole("dialog", { name: "RAG 检索增强生成.md 预览" });
+  await page.locator(".knowledge-resource-identity").filter({ hasText: "电商订单数据分析实战.md" }).click();
+  const preview = page.getByRole("dialog", { name: "电商订单数据分析实战.md 预览" });
   await preview.getByRole("button", { name: "全屏预览" }).click();
 
   const geometry = await page.evaluate(() => {
@@ -166,8 +213,8 @@ test("访客导入网页和创建文件夹使用同一账号提示", async ({ pa
 });
 
 test("访客可预览资料，但修改归档或正文时需要账号", async ({ page }) => {
-  await page.locator(".knowledge-resource-identity").filter({ hasText: "RAG 检索增强生成.md" }).click();
-  const preview = page.getByRole("dialog", { name: "RAG 检索增强生成.md 预览" });
+  await page.locator(".knowledge-resource-identity").filter({ hasText: "电商订单数据分析实战.md" }).click();
+  const preview = page.getByRole("dialog", { name: "电商订单数据分析实战.md 预览" });
 
   await expect(preview.getByLabel("归档到")).toBeVisible();
   const archiveToggle = preview.getByRole("button", { name: /^归档到/ });
@@ -182,11 +229,11 @@ test("访客可预览资料，但修改归档或正文时需要账号", async ({
   await expect(goalDestinationsToggle).toHaveAttribute("aria-expanded", "true");
   await expect(libraryDestinationsToggle).toHaveAttribute("aria-expanded", "false");
   await expect(preview.locator("#document-goal-destinations")).toHaveCSS("overflow-y", "auto");
-  await expect(preview.getByRole("checkbox", { name: "agent 开发", exact: true })).toBeChecked();
+  await expect(preview.getByRole("checkbox", { name: "掌握 Python 数据分析", exact: true })).toBeChecked();
   await libraryDestinationsToggle.click();
   await expect(libraryDestinationsToggle).toHaveAttribute("aria-expanded", "true");
   await expect(preview.locator("#document-library-destinations")).toHaveCSS("overflow-y", "auto");
-  await preview.getByRole("checkbox", { name: "项目资料" }).click();
+  await preview.getByRole("checkbox", { name: "稍后精读", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "继续使用完整知识空间" })).toContainText("保存资料的归档与目标关联");
   await page.getByRole("button", { name: "关闭", exact: true }).click();
 
@@ -196,16 +243,16 @@ test("访客可预览资料，但修改归档或正文时需要账号", async ({
 });
 
 test("AI 可用说明仅在状态标签悬浮或聚焦时显示", async ({ page }) => {
-  await page.locator(".knowledge-resource-identity").filter({ hasText: "Agent 系统设计.pdf" }).click();
-  const preview = page.getByRole("dialog", { name: "Agent 系统设计.pdf 预览" });
+  await page.locator(".knowledge-resource-identity").filter({ hasText: "英语二阅读结构识别清单.pdf" }).click();
+  const preview = page.getByRole("dialog", { name: "英语二阅读结构识别清单.pdf 预览" });
   const previewPane = preview.locator(".document-preview-pane");
   const previewSummary = preview.locator(".knowledge-demo-document-preview");
   const previewSpacing = await Promise.all([previewPane.boundingBox(), previewSummary.boundingBox()]);
 
   expect((previewSpacing[1]?.y ?? 999) - (previewSpacing[0]?.y ?? 0)).toBeLessThanOrEqual(32);
-  await expect(preview.locator(".document-identity-title-row")).toContainText("Agent 系统设计.pdf资料预览");
+  await expect(preview.locator(".document-identity-title-row")).toContainText("英语二阅读结构识别清单.pdf资料预览");
   await expect(previewSummary.getByText("资料预览", { exact: true })).toHaveCount(0);
-  await expect(previewSummary.getByRole("heading", { name: "Agent 系统设计" })).toHaveCSS("font-size", "26px");
+  await expect(previewSummary.getByRole("heading", { name: "英语二阅读结构识别清单" })).toHaveCSS("font-size", "26px");
   const status = preview.locator(".document-ai-status > span");
   const tooltip = preview.getByRole("tooltip");
 
@@ -221,8 +268,8 @@ test("AI 可用说明仅在状态标签悬浮或聚焦时显示", async ({ page 
 
 test("资料信息栏可拖动调宽并完整收起", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 820 });
-  await page.locator(".knowledge-resource-identity").filter({ hasText: "Agent 系统设计.pdf" }).click();
-  const preview = page.getByRole("dialog", { name: "Agent 系统设计.pdf 预览" });
+  await page.locator(".knowledge-resource-identity").filter({ hasText: "英语二阅读结构识别清单.pdf" }).click();
+  const preview = page.getByRole("dialog", { name: "英语二阅读结构识别清单.pdf 预览" });
   const resizer = preview.getByRole("separator", { name: "调整资料信息栏宽度" });
   const infoPane = preview.locator(".document-info-pane");
   const previewPane = preview.locator(".document-preview-pane");
@@ -246,8 +293,8 @@ test("资料信息栏可拖动调宽并完整收起", async ({ page }) => {
 });
 
 test("访客不能进入会产生未持久化内容的 Markdown 编辑器", async ({ page }) => {
-  await page.locator(".knowledge-resource-identity").filter({ hasText: "RAG 检索增强生成.md" }).click();
-  const preview = page.getByRole("dialog", { name: "RAG 检索增强生成.md 预览" });
+  await page.locator(".knowledge-resource-identity").filter({ hasText: "电商订单数据分析实战.md" }).click();
+  const preview = page.getByRole("dialog", { name: "电商订单数据分析实战.md 预览" });
   await preview.getByRole("button", { name: "编辑", exact: true }).click();
   await expect(page.getByRole("dialog", { name: "继续使用完整知识空间" })).toBeVisible();
   await expect(preview.getByRole("tab", { name: "编辑" })).toHaveCount(0);
@@ -260,9 +307,11 @@ test("登录用户复用笔记编辑器，但 Markdown 资料只写入资料存�
     size: "1.2 KB",
     uploadDate: "2026-08-14T09:30:00+08:00",
     type: "md",
-    goalIds: ["goal-1"],
+    // Simulate legacy data: the goal relation only exists through the goal's
+    // internal knowledge-base id, not through an explicit goalIds field.
+    goalIds: [],
     kbId: "kb-1",
-    kbIds: ["kb-1"],
+    kbIds: ["kb-1", "goal-kb-1"],
     taskId: "",
     status: "ready",
     error: null,
@@ -287,15 +336,22 @@ test("登录用户复用笔记编辑器，但 Markdown 资料只写入资料存�
       return;
     }
     if (apiPath === "/api/v1/knowledge/kbs") {
-      await route.fulfill({ json: { items: [{ id: "kb-1", name: "个人资料", description: "", goal_id: null, item_count: 1, created_at: "2026-08-14" }] } });
+      await route.fulfill({ json: { items: [
+        { id: "kb-1", name: "个人资料", description: "", goal_id: null, item_count: 1, created_at: "2026-08-14" },
+        { id: "goal-kb-1", name: "学习方法目标资料", description: "", goal_id: "goal-1", item_count: 1, created_at: "2026-08-14" },
+      ] } });
       return;
     }
     if (apiPath === "/api/v1/goals") {
-      await route.fulfill({ json: [{ id: "goal-1", type: "skill", title: "学习方法", deadline: "2026-09-01", daily_hours: 1, current_level: "入门", status: "active", created_at: "2026-08-01" }] });
+      await route.fulfill({ json: [{ id: "goal-1", type: "skill", title: "学习方法", deadline: "2026-09-01", daily_hours: 1, current_level: "入门", status: "active", created_at: "2026-08-01", kb_id: "goal-kb-1" }] });
       return;
     }
     if (apiPath === "/api/v1/knowledge/files" && request.method() === "GET") {
       await route.fulfill({ json: { items: [resource] } });
+      return;
+    }
+    if (apiPath === "/api/v1/knowledge/files/resource-md-1/serve" && request.method() === "GET") {
+      await route.fulfill({ status: 200, contentType: "text/markdown", body: resource.content });
       return;
     }
     if (apiPath === "/api/v1/knowledge/files/resource-md-1" && request.method() === "PATCH") {
@@ -312,8 +368,16 @@ test("登录用户复用笔记编辑器，但 Markdown 资料只写入资料存�
   await page.reload();
 
   await expect(page.getByRole("dialog", { name: "访客模式" })).toHaveCount(0);
-  await page.getByRole("button", { name: "编辑或删除文件夹 个人资料" }).click();
-  const folderSettings = page.getByRole("dialog", { name: "管理 个人资料" });
+  await expect(page.locator(".knowledge-library-list-section").getByText("学习方法目标资料", { exact: true })).toHaveCount(0);
+  await expect(page.locator(".knowledge-library-list-section").getByText("个人资料", { exact: true })).toBeVisible();
+  await expect(page.locator(".knowledge-goal-scroll > button").filter({ hasText: /^学习方法/ })).toContainText("1");
+  await expect(page.locator(".knowledge-resource-table").getByText("学习方法", { exact: true })).toBeVisible();
+  await expect(page.locator(".knowledge-library-list-section").getByRole("button", { name: /编辑|管理|设置/ })).toHaveCount(0);
+  await page.locator(".knowledge-library-row > button").filter({ hasText: /^个人资料/ }).click();
+  await page.getByRole("button", { name: "文件夹设置 个人资料" }).click();
+  const folderSettings = page.getByRole("dialog", { name: "文件夹设置 个人资料" });
+  await expect(folderSettings.locator(".library-settings-note")).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+  await expect(folderSettings.locator(".library-settings-note")).toHaveCSS("padding", "0px");
   await folderSettings.getByRole("button", { name: "删除文件夹" }).click();
   const deleteFolderDialog = page.getByRole("alertdialog", { name: "删除文件夹“个人资料”？" });
   await expect(deleteFolderDialog).toBeVisible();
@@ -460,6 +524,10 @@ test("纯文本资料按原格式编辑并继续保存为 plain", async ({ page 
       await route.fulfill({ json: { items: [resource] } });
       return;
     }
+    if (apiPath === "/api/v1/knowledge/files/resource-txt-1/serve" && request.method() === "GET") {
+      await route.fulfill({ status: 200, contentType: "text/plain", body: resource.content });
+      return;
+    }
     if (apiPath === "/api/v1/knowledge/files/resource-txt-1" && request.method() === "PATCH") {
       savedBody = request.postDataJSON() as { content?: string; content_format?: string };
       await route.fulfill({ json: { ...resource, content: savedBody.content, contentFormat: savedBody.content_format } });
@@ -494,9 +562,10 @@ test("纯文本资料按原格式编辑并继续保存为 plain", async ({ page 
 
 test("窄屏优先展示资料，并保留目标和文件夹的范围选择", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.getByRole("separator", { name: "调整目标与个人文件夹区域高度" })).toBeHidden();
   await expect(page.getByLabel("移动端资料范围")).toBeVisible();
-  await page.getByLabel("移动端资料范围").selectOption("goal:sample-agent-goal");
-  await expect(page.locator(".knowledge-resource-context h2")).toHaveText("agent 开发");
+  await page.getByLabel("移动端资料范围").selectOption("goal:guest-skill");
+  await expect(page.locator(".knowledge-resource-context h2")).toHaveText("掌握 Python 数据分析");
 
   const geometry = await page.evaluate(() => {
     const rail = document.querySelector<HTMLElement>(".knowledge-library-rail")?.getBoundingClientRect();

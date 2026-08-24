@@ -38,7 +38,9 @@ def _mean(values: list[float]) -> float | None:
     return round(mean(values), 4) if values else None
 
 
-def _difference_ci(left: list[float], right: list[float]) -> tuple[float | None, list[float] | None]:
+def _difference_ci(
+    left: list[float], right: list[float]
+) -> tuple[float | None, list[float] | None]:
     if not left or not right:
         return None, None
     difference = mean(left) - mean(right)
@@ -83,11 +85,11 @@ async def pattern_experiment(db: AsyncSession, *, window_days: int) -> dict[str,
                 )
             ).scalars()
         )
-    timezones = dict(
-        (
-            await db.execute(select(User.id, User.timezone).where(User.id.in_(eligible)))
-        ).all()
-    ) if eligible else {}
+    timezones = (
+        dict((await db.execute(select(User.id, User.timezone).where(User.id.in_(eligible)))).all())
+        if eligible
+        else {}
+    )
     buckets: dict[str, list[float]] = {"afternoon": [], "evening": []}
     for event in events:
         value = (event.payload or {}).get("completion_rate")
@@ -98,9 +100,7 @@ async def pattern_experiment(db: AsyncSession, *, window_days: int) -> dict[str,
             buckets["afternoon"].append(float(value))
         elif 18 <= hour < 24:
             buckets["evening"].append(float(value))
-    difference, confidence_interval = _difference_ci(
-        buckets["evening"], buckets["afternoon"]
-    )
+    difference, confidence_interval = _difference_ci(buckets["evening"], buckets["afternoon"])
     sufficient = all(len(values) >= MIN_PATTERN_BUCKET for values in buckets.values())
     status = "insufficient_data"
     if sufficient:
@@ -130,22 +130,23 @@ async def pattern_experiment(db: AsyncSession, *, window_days: int) -> dict[str,
 async def prediction_experiment(db: AsyncSession, *, window_days: int) -> dict[str, Any]:
     eligible = await _eligible_user_ids(db)
     since = utc_now() - timedelta(days=window_days)
-    rows = list(
-        (
-            await db.execute(
-                select(PredictionObservation).where(
-                    PredictionObservation.user_id.in_(eligible),
-                    PredictionObservation.predicted_at >= since,
-                    PredictionObservation.actual_outcome.isnot(None),
+    rows = (
+        list(
+            (
+                await db.execute(
+                    select(PredictionObservation).where(
+                        PredictionObservation.user_id.in_(eligible),
+                        PredictionObservation.predicted_at >= since,
+                        PredictionObservation.actual_outcome.isnot(None),
+                    )
                 )
-            )
-        ).scalars()
-    ) if eligible else []
-    brier = (
-        mean(
-            (row.predicted_probability - float(bool(row.actual_outcome))) ** 2
-            for row in rows
+            ).scalars()
         )
+        if eligible
+        else []
+    )
+    brier = (
+        mean((row.predicted_probability - float(bool(row.actual_outcome))) ** 2 for row in rows)
         if rows
         else None
     )
@@ -176,7 +177,9 @@ async def prediction_experiment(db: AsyncSession, *, window_days: int) -> dict[s
     ece = weighted_error / len(rows) if rows else None
     status = "insufficient_data"
     if len(rows) >= MIN_CALIBRATION_OUTCOMES:
-        status = "supported" if brier is not None and brier <= 0.22 and ece <= 0.05 else "not_supported"
+        status = (
+            "supported" if brier is not None and brier <= 0.22 and ece <= 0.05 else "not_supported"
+        )
     return {
         "experiment_key": "prediction_calibration",
         "status": status,
@@ -186,43 +189,62 @@ async def prediction_experiment(db: AsyncSession, *, window_days: int) -> dict[s
         "brier_score": round(brier, 6) if brier is not None else None,
         "expected_calibration_error": round(ece, 6) if ece is not None else None,
         "reliability_bins": bins,
-        "thresholds": {"minimum_outcomes": MIN_CALIBRATION_OUTCOMES, "max_brier": 0.22, "max_ece": 0.05},
+        "thresholds": {
+            "minimum_outcomes": MIN_CALIBRATION_OUTCOMES,
+            "max_brier": 0.22,
+            "max_ece": 0.05,
+        },
     }
 
 
 async def proposal_utility_experiment(db: AsyncSession, *, window_days: int) -> dict[str, Any]:
     eligible = await _eligible_user_ids(db)
     since = utc_now() - timedelta(days=window_days)
-    proposals = list(
-        (
-            await db.execute(
-                select(DecisionProposal).where(
-                    DecisionProposal.user_id.in_(eligible),
-                    DecisionProposal.created_at >= since,
+    proposals = (
+        list(
+            (
+                await db.execute(
+                    select(DecisionProposal).where(
+                        DecisionProposal.user_id.in_(eligible),
+                        DecisionProposal.created_at >= since,
+                        DecisionProposal.proposal_type.notin_(
+                            {"GOAL_PLAN_CREATE", "CHECKIN_RECORD"}
+                        ),
+                    )
                 )
-            )
-        ).scalars()
-    ) if eligible else []
+            ).scalars()
+        )
+        if eligible
+        else []
+    )
     proposal_ids = [row.id for row in proposals]
-    feedback_rows = list(
-        (
-            await db.execute(
-                select(ProposalFeedback).where(ProposalFeedback.proposal_id.in_(proposal_ids))
-            )
-        ).scalars()
-    ) if proposal_ids else []
-    outcomes = list(
-        (
-            await db.execute(
-                select(AgentFeedbackEvent).where(
-                    AgentFeedbackEvent.proposal_id.in_(proposal_ids),
-                    AgentFeedbackEvent.feedback_type.in_(
-                        ["completion_rate_1d", "completion_rate_7d"]
-                    ),
+    feedback_rows = (
+        list(
+            (
+                await db.execute(
+                    select(ProposalFeedback).where(ProposalFeedback.proposal_id.in_(proposal_ids))
                 )
-            )
-        ).scalars()
-    ) if proposal_ids else []
+            ).scalars()
+        )
+        if proposal_ids
+        else []
+    )
+    outcomes = (
+        list(
+            (
+                await db.execute(
+                    select(AgentFeedbackEvent).where(
+                        AgentFeedbackEvent.proposal_id.in_(proposal_ids),
+                        AgentFeedbackEvent.feedback_type.in_(
+                            ["completion_rate_1d", "completion_rate_7d"]
+                        ),
+                    )
+                )
+            ).scalars()
+        )
+        if proposal_ids
+        else []
+    )
     by_window: dict[str, list[float]] = defaultdict(list)
     deltas: dict[str, list[float]] = defaultdict(list)
     for row in outcomes:
@@ -231,14 +253,23 @@ async def proposal_utility_experiment(db: AsyncSession, *, window_days: int) -> 
             by_window[row.attribution_window].append(float(value["completion_rate"]))
         if value.get("completion_delta") is not None:
             deltas[row.attribution_window].append(float(value["completion_delta"]))
-    reviewed = [row for row in proposals if row.status in {"accepted", "applied", "rejected"}]
-    accepted = [row for row in reviewed if row.status in {"accepted", "applied"}]
+    reviewed = [
+        row
+        for row in proposals
+        if row.lifecycle_status
+        in {"action_approved", "applied", "action_rejected", "action_cancelled", "rolled_back"}
+    ]
+    accepted = [row for row in reviewed if row.lifecycle_status in {"action_approved", "applied"}]
     helpful = [row for row in feedback_rows if row.outcome == "helpful"]
     seven_day_samples = len(by_window["7d"])
     seven_day_delta = _mean(deltas["7d"])
     status = "insufficient_data"
     if seven_day_samples >= MIN_PROPOSAL_OUTCOMES:
-        status = "supported" if seven_day_delta is not None and seven_day_delta > 0.05 else "not_supported"
+        status = (
+            "supported"
+            if seven_day_delta is not None and seven_day_delta > 0.05
+            else "not_supported"
+        )
     return {
         "experiment_key": "proposal_utility",
         "status": status,
@@ -277,9 +308,7 @@ async def personalization_experiment(
     variants = list(
         (
             await db.execute(
-                select(ExperimentVariant).where(
-                    ExperimentVariant.experiment_id == experiment.id
-                )
+                select(ExperimentVariant).where(ExperimentVariant.experiment_id == experiment.id)
             )
         ).scalars()
     )
@@ -301,21 +330,21 @@ async def personalization_experiment(
         user_ids = [row.user_id for row in assigned]
         assignment_times = {row.user_id: row.assigned_at for row in assigned}
         earliest = min((row.assigned_at for row in assigned), default=utc_now())
-        events = list(
-            (
-                await db.execute(
-                    select(LearningEvent).where(
-                        LearningEvent.user_id.in_(user_ids),
-                        LearningEvent.occurred_at >= earliest,
+        events = (
+            list(
+                (
+                    await db.execute(
+                        select(LearningEvent).where(
+                            LearningEvent.user_id.in_(user_ids),
+                            LearningEvent.occurred_at >= earliest,
+                        )
                     )
-                )
-            ).scalars()
-        ) if user_ids else []
-        events = [
-            row
-            for row in events
-            if row.occurred_at >= assignment_times[row.user_id]
-        ]
+                ).scalars()
+            )
+            if user_ids
+            else []
+        )
+        events = [row for row in events if row.occurred_at >= assignment_times[row.user_id]]
         completed = [row for row in events if row.event_type == "TaskCompleted"]
         skipped = [row for row in events if row.event_type == "TaskSkipped"]
         rescheduled = [row for row in events if row.event_type == "TaskRescheduled"]
@@ -323,16 +352,20 @@ async def personalization_experiment(
         high_mastery = [
             row for row in mastery if (row.payload or {}).get("to_level") in {"L3", "L4"}
         ]
-        retention = list(
-            (
-                await db.execute(
-                    select(LearnerCognitiveProfile.retention_rate).where(
-                        LearnerCognitiveProfile.user_id.in_(user_ids),
-                        LearnerCognitiveProfile.retention_rate.isnot(None),
+        retention = (
+            list(
+                (
+                    await db.execute(
+                        select(LearnerCognitiveProfile.retention_rate).where(
+                            LearnerCognitiveProfile.user_id.in_(user_ids),
+                            LearnerCognitiveProfile.retention_rate.isnot(None),
+                        )
                     )
-                )
-            ).scalars()
-        ) if user_ids else []
+                ).scalars()
+            )
+            if user_ids
+            else []
+        )
         outcomes = len(completed) + len(skipped)
         activity = max(1, outcomes + len(rescheduled))
         results.append(
@@ -346,7 +379,9 @@ async def personalization_experiment(
                     sum(int((row.payload or {}).get("days_overdue") or 0) > 0 for row in completed)
                     / len(completed),
                     4,
-                ) if completed else None,
+                )
+                if completed
+                else None,
                 "mastery": round(len(high_mastery) / len(mastery), 4) if mastery else None,
                 "retention": _mean([float(value) for value in retention]),
                 "overload": round((len(skipped) + len(rescheduled)) / activity, 4),
@@ -368,8 +403,7 @@ async def personalization_experiment(
     sample_sufficient = bool(
         control
         and treatment
-        and min(control["user_count"], treatment["user_count"])
-        >= experiment.minimum_sample_size
+        and min(control["user_count"], treatment["user_count"]) >= experiment.minimum_sample_size
     )
     status = "insufficient_data"
     if sample_sufficient:
@@ -478,9 +512,7 @@ async def latest_public_snapshot(db: AsyncSession) -> dict[str, Any]:
     latest: dict[str, LearningExperimentReport] = {}
     for row in rows:
         latest.setdefault(row.experiment_key, row)
-    latest_generated_at = max(
-        (row.generated_at for row in latest.values()), default=None
-    )
+    latest_generated_at = max((row.generated_at for row in latest.values()), default=None)
     return {
         "schema_version": SCHEMA_VERSION,
         "generated_at": latest_generated_at.isoformat() if latest_generated_at else None,

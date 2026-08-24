@@ -19,7 +19,6 @@ import {
   Sparkles,
   Target,
   Timer,
-  Trash2,
   X,
 } from "lucide-react";
 import Link from "next/link";
@@ -28,6 +27,7 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/technology/AuthProvider";
 import { ClockTimePicker } from "@/components/technology/ClockTimePicker";
+import { GuestModeDialog } from "@/components/technology/GuestModeDialog";
 import { QuickTaskSelect, type QuickTaskSelectOption } from "@/components/technology/QuickTaskSelect";
 import { ThemeDashboardLead, type DashboardLeadData } from "@/components/technology/ThemeDashboardLead";
 import { DataSyncNotice } from "@/components/ui/DataSyncNotice";
@@ -53,6 +53,7 @@ import {
   type WeeklyAvailability,
 } from "@/lib/technology/dayScheduler";
 import { readScopedJson, writeScopedJson } from "@/lib/technology/scopedStorage";
+import { ensureGuestDatasetSeeded, guestTasks } from "@/lib/technology/guestData";
 
 type DashboardTask = {
   id: string | number;
@@ -63,6 +64,7 @@ type DashboardTask = {
   duration: string;
   time: string;
   done: boolean;
+  status?: ApiTask["status"];
   actualMinutes?: number | null;
   priority: string;
 };
@@ -82,16 +84,13 @@ type WeekDayAggregate = {
   tasks: DashboardTask[];
 };
 
+function effectiveCompletedMinutes(task: Pick<DashboardTask, "done" | "actualMinutes" | "duration">) {
+  if (!task.done) return 0;
+  return task.actualMinutes ?? (Number.parseInt(task.duration, 10) || 0);
+}
+
 const WEEKDAY_CN = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
 const WEEKDAY_EN = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
-
-const DEMO_GOAL_ID_BY_TITLE: Record<string, string> = {
-  算法基础: "1",
-  算法基础体系化: "1",
-  面试准备: "2",
-  前端面试准备: "2",
-  英文技术阅读: "3",
-};
 
 const TASK_PRIORITY_OPTIONS = [
   { label: "核心", shortLabel: "核心", value: "核心", apiValue: "high", description: "优先完成" },
@@ -224,9 +223,9 @@ type ScheduleBlock = DayScheduleBlock;
 
 const SCHEDULE_COLORS = [
   "var(--workspace-accent)",
-  "#8879ee",
-  "#7184df",
-  "#9b8fe7",
+  "#806bed",
+  "#6688e0",
+  "#b178df",
 ];
 
 function formatScheduleHour(hour: number) {
@@ -253,11 +252,7 @@ function formatTaskTimeRange(time: string, duration: string) {
 const EMPTY_TASKS: DashboardTask[] = [];
 
 function guestDemoTasks(todayIso: string): DashboardTask[] {
-  return [
-    { id: 1, goalId: "1", date: todayIso, title: "完成动态规划练习", goal: "算法基础", duration: "45 分钟", time: "21:00", done: true, priority: "核心" },
-    { id: 2, goalId: "1", date: todayIso, title: "复习链表双指针", goal: "算法基础", duration: "20 分钟", time: "22:00", done: false, priority: "低优先级" },
-    { id: 3, goalId: "2", date: todayIso, title: "整理今日错题", goal: "面试准备", duration: "15 分钟", time: "22:30", done: false, priority: "低优先级" },
-  ];
+  return guestTasks().map((task) => ({ ...task, date: task.date || todayIso }));
 }
 
 function getIsoWeek(date: Date) {
@@ -355,14 +350,32 @@ function habitInsightFromPattern(pattern: ActivePattern): DashboardLeadData["hab
 export default function WorkPage() {
   const router = useRouter();
   const { status: authStatus, user } = useAuth();
+  const [guestIntroOpen, setGuestIntroOpen] = useState(false);
   const userTimezone = user?.timezone ?? (typeof Intl !== "undefined" ? Intl.DateTimeFormat().resolvedOptions().timeZone : "UTC");
   const [todayIso, setTodayIso] = useState(() => getIsoDateForTimezone(userTimezone));
+  const [executionClockMinute, setExecutionClockMinute] = useState(() => getCurrentMinute(userTimezone));
   const weekDates = useMemo(() => getWeekDatesForIsoDate(todayIso), [todayIso]);
   const previousTodayIsoRef = useRef(todayIso);
+  const closeGuestIntro = useCallback(() => {
+    window.sessionStorage.setItem("planpilot:guest-home-intro-seen:v1", "1");
+    setGuestIntroOpen(false);
+  }, []);
+
+  useEffect(() => {
+    if (authStatus !== "unauthenticated") {
+      setGuestIntroOpen(false);
+      return;
+    }
+    ensureGuestDatasetSeeded();
+    setGuestIntroOpen(window.sessionStorage.getItem("planpilot:guest-home-intro-seen:v1") !== "1");
+  }, [authStatus]);
+
   useEffect(() => {
     let active = true;
     const refreshLocalDate = () => {
-      if (active) setTodayIso(getIsoDateForTimezone(userTimezone));
+      if (!active) return;
+      setTodayIso(getIsoDateForTimezone(userTimezone));
+      setExecutionClockMinute(getCurrentMinute(userTimezone));
     };
     refreshLocalDate();
     const timer = window.setInterval(refreshLocalDate, 30_000);
@@ -401,6 +414,9 @@ export default function WorkPage() {
   const [addTaskOpen, setAddTaskOpen] = useState(false);
   const [workspaceView, setWorkspaceView] = useState<"today" | "week">("today");
   const [todayPlanMode, setTodayPlanMode] = useState<"tasks" | "schedule">("tasks");
+  // Legacy schedule-result view (the former image-1 state) is intentionally
+  // disabled in the current flow, but its branch remains below for future use.
+  const legacyScheduleViewEnabled = false && todayPlanMode === "schedule";
   const [scheduleBlocks, setScheduleBlocks] = useState<ScheduleBlock[]>([]);
   const [scheduleConfirmed, setScheduleConfirmed] = useState(false);
   const [scheduleLoaded, setScheduleLoaded] = useState(false);
@@ -409,15 +425,17 @@ export default function WorkPage() {
   const [scheduleError, setScheduleError] = useState("");
   const [scheduleSyncState, setScheduleSyncState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [scheduleRetryNonce, setScheduleRetryNonce] = useState(0);
+  const observedScheduleStartsRef = useRef(new Set<string>());
   const [schedulePlannerOpen, setSchedulePlannerOpen] = useState(false);
   const [plannerStrategy, setPlannerStrategy] = useState<ScheduleStrategy>("balanced");
   const [plannerNowMinute, setPlannerNowMinute] = useState(0);
-  const [activeScheduleScroll, setActiveScheduleScroll] = useState<"preview" | "availability" | null>(null);
+  const [activeScheduleScroll, setActiveScheduleScroll] = useState<"preview" | "availability" | "schedule" | null>(null);
   const [localWeeklyAvailability, setLocalWeeklyAvailability] = useState<WeeklyAvailability | null>(null);
   const [selectedWeekDay, setSelectedWeekDay] = useState("");
   const [weekLoadDetailOpen, setWeekLoadDetailOpen] = useState(false);
   const [weekActionPending, setWeekActionPending] = useState(false);
   const [weekActionNotice, setWeekActionNotice] = useState("");
+  const [weekActionError, setWeekActionError] = useState("");
   const [weekAdjustmentPreview, setWeekAdjustmentPreview] = useState<{
     task: DashboardTask;
     from: WeekDayAggregate;
@@ -504,6 +522,7 @@ export default function WorkPage() {
     ? "今天"
     : `${Number(pageDate.slice(5, 7))}月${Number(pageDate.slice(8, 10))}日`;
   const scheduleTimezone = user?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const scheduleNoticeDateRef = useRef(pageDate);
   useEffect(() => {
     const previous = previousTodayIsoRef.current;
     if (selectedWeekDay === previous || selectedWeekDay === "") setSelectedWeekDay(todayIso);
@@ -555,12 +574,11 @@ export default function WorkPage() {
 
   function taskFromApi(task: ApiTask): DashboardTask {
     const priority = task.priority === "high" ? "核心" : task.priority === "low" ? "低优先级" : "普通优先级";
-    return { id: task.id, goalId: task.goalId, date: task.date, title: task.title, goal: task.goalTitle, duration: `${task.estimatedMinutes} 分钟`, time: "待安排", done: task.done, priority, actualMinutes: task.actualMinutes };
+    return { id: task.id, goalId: task.goalId, date: task.date, title: task.title, goal: task.goalTitle, duration: `${task.estimatedMinutes} 分钟`, time: "待安排", done: task.done, status: task.status, priority, actualMinutes: task.actualMinutes };
   }
 
   function resolveTaskGoalId(task: DashboardTask) {
-    return task.goalId ?? goalOptions.find((goal) => goal.title === task.goal)?.id
-      ?? (authStatus === "authenticated" ? undefined : DEMO_GOAL_ID_BY_TITLE[task.goal]);
+    return task.goalId ?? goalOptions.find((goal) => goal.title === task.goal)?.id;
   }
 
   function openTask(task: DashboardTask) {
@@ -631,11 +649,11 @@ export default function WorkPage() {
     });
   }, [selectedTaskId, tasks]);
   const actualTodayMinutes = tasks.reduce(
-    (sum, task) => sum + (task.done ? (task.actualMinutes ?? 0) : 0),
+    (sum, task) => sum + effectiveCompletedMinutes(task),
     0,
   );
   const hasActualTodayMinutes = tasks.some(
-    (task) => task.done && task.actualMinutes !== null && task.actualMinutes !== undefined,
+    (task) => task.done,
   );
   const completedTodayMinutes = hasActualTodayMinutes ? actualTodayMinutes : null;
   const taskPlannedTodayMinutes = tasks.reduce(
@@ -656,7 +674,7 @@ export default function WorkPage() {
         .filter((task) => task.done)
         .reduce((sum, task) => sum + (Number.parseInt(task.duration, 10) || 0), 0);
       const actualMinutes = dayTasks.reduce(
-        (sum, task) => sum + (task.done ? (task.actualMinutes ?? 0) : 0),
+        (sum, task) => sum + effectiveCompletedMinutes(task),
         0,
       );
       const isPast = isoDate < todayIso;
@@ -753,6 +771,7 @@ export default function WorkPage() {
     };
   }), [plannedTodayMinutes, todayRhythmIndex, weekPlan]);
   const rhythmActualDays = rhythmDays.filter((item) => item.phase !== "future" && item.actualMinutes > 0);
+  const hasActualWeekMinutes = rhythmActualDays.length > 0;
   const rhythmPeak = rhythmActualDays.reduce<(typeof rhythmDays)[number] | null>(
     (peak, item) => !peak || item.actualMinutes > peak.actualMinutes ? item : peak,
     null,
@@ -762,6 +781,13 @@ export default function WorkPage() {
   const averageActualMinutes = elapsedWeekDays
     ? Math.round(weekActualMinutes / elapsedWeekDays)
     : 0;
+  const rhythmJudgment = !hasActualWeekMinutes
+    ? "等待记录"
+    : hasWeekOverload
+      ? "需要减负"
+      : rhythmActualDays.length >= 2
+        ? "节奏稳定"
+        : "初步形成";
   const scheduleAvailability = useMemo(
     () => availabilityForDate(effectiveWeeklyAvailability, pageDate),
     [effectiveWeeklyAvailability, pageDate],
@@ -800,6 +826,43 @@ export default function WorkPage() {
         ]),
     );
   }, [scheduleBlocks, scheduleConfirmed]);
+  const scheduledProgressByTaskId = useMemo(() => {
+    if (!scheduleConfirmed) return new Map<string, { elapsed: number; color: string; startMinute: number; endMinute: number }>();
+    const currentMinute = pageDate === todayIso ? executionClockMinute : 0;
+    return new Map(
+      scheduleBlocks
+        .filter((block) => block.taskId)
+        .map((block) => {
+          const startMinute = Math.round(block.startHour * 60);
+          const endMinute = startMinute + block.durationMinutes;
+          const elapsed = currentMinute <= startMinute
+            ? 0
+            : currentMinute >= endMinute
+              ? 100
+              : Math.round(((currentMinute - startMinute) / (endMinute - startMinute)) * 100);
+          return [String(block.taskId), { elapsed, color: block.color, startMinute, endMinute }];
+        }),
+    );
+  }, [executionClockMinute, pageDate, scheduleBlocks, scheduleConfirmed, todayIso]);
+  const displayedTasks = useMemo(() => {
+    if (!scheduleConfirmed || scheduleBlocks.length === 0) return tasks;
+    const scheduledStartByTaskId = new Map(
+      scheduleBlocks
+        .filter((block) => block.taskId)
+        .map((block) => [String(block.taskId), Math.round(block.startHour * 60)]),
+    );
+    return tasks
+      .map((task, index) => ({ task, index, startMinute: scheduledStartByTaskId.get(String(task.id)) }))
+      .sort((left, right) => {
+        if (left.startMinute !== undefined && right.startMinute === undefined) return -1;
+        if (left.startMinute === undefined && right.startMinute !== undefined) return 1;
+        if (left.startMinute !== undefined && right.startMinute !== undefined && left.startMinute !== right.startMinute) {
+          return left.startMinute - right.startMinute;
+        }
+        return left.index - right.index;
+      })
+      .map(({ task }) => task);
+  }, [scheduleBlocks, scheduleConfirmed, tasks]);
   const nextTask = useMemo(() => {
     const pending = tasks.filter((task) => !task.done);
     if (!pending.length) return null;
@@ -865,9 +928,6 @@ export default function WorkPage() {
     0,
   );
   const lowRetentionGapCount = knowledgeGaps.filter((gap) => gap.retention < 0.5).length;
-  const hasActualWeekMinutes = weekPlan.some((day) => day.tasks.some(
-    (task) => task.done && task.actualMinutes !== null && task.actualMinutes !== undefined,
-  ));
   const leadData = useMemo<DashboardLeadData>(() => {
     return {
       nextTaskTitle: nextTask?.title ?? null,
@@ -959,8 +1019,31 @@ export default function WorkPage() {
         ...task,
         date: task.date ?? todayIso,
       }));
-      const storedGoals = readProductArray<ApiGoal>(PRODUCT_STORAGE_KEYS.goals, [])
-        .filter((goal) => goal.status === "active" && Number.isFinite(goal.daily_hours));
+      const storedGoals = readProductArray<Record<string, unknown>>(PRODUCT_STORAGE_KEYS.goals, [])
+        .map((goal): ApiGoal | null => {
+          const id = String(goal.id ?? "");
+          const title = String(goal.title ?? goal.name ?? "").trim();
+          if (!id || !title) return null;
+          const dailyHours = typeof goal.daily_hours === "number"
+            ? goal.daily_hours
+            : Number.parseFloat(String(goal.daily ?? "0")) / 60;
+          const rawStatus = String(goal.status ?? "active");
+          const status: ApiGoal["status"] = rawStatus === "completed" || rawStatus === "paused" || rawStatus === "abandoned" ? rawStatus : "active";
+          const rawType = String(goal.apiType ?? "skill");
+          const type: ApiGoal["type"] = rawType === "exam" || rawType === "certification" || rawType === "reading" || rawType === "language" || rawType === "habit" ? rawType : "skill";
+          return {
+            id,
+            title,
+            type,
+            deadline: String(goal.deadlineDate ?? goal.deadline ?? ""),
+            daily_hours: Number.isFinite(dailyHours) ? dailyHours : 0,
+            current_level: String(goal.current_level ?? "beginner"),
+            status,
+            created_at: String(goal.created_at ?? new Date().toISOString()),
+            work_schedule: "all",
+          };
+        })
+        .filter((goal): goal is ApiGoal => Boolean(goal && goal.status === "active"));
       const validGoalIds = new Set(storedGoals.map((goal) => String(goal.id)));
       // Keep the built-in guest preview intact when no local goal collection
       // exists yet. Once the user has a local goal collection, its IDs become
@@ -979,7 +1062,7 @@ export default function WorkPage() {
       if (cleanedTasks.length !== storedTasks.length) {
         writeProductArray(PRODUCT_STORAGE_KEYS.tasks, cleanedTasks, { notifyPilo: true });
       }
-      setNewTask((current) => ({ ...current, goal: current.goal || "算法基础" }));
+      setNewTask((current) => ({ ...current, goal: current.goal || storedGoals[0]?.title || "" }));
       setStorageReady(true);
       return;
     }
@@ -1095,8 +1178,6 @@ export default function WorkPage() {
     let active = true;
     setScheduleLoaded(false);
     setScheduleError("");
-    setScheduleNotice("");
-    setScheduleSyncState("idle");
     const loadSchedule = async () => {
       try {
         if (authStatus === "authenticated") {
@@ -1137,6 +1218,13 @@ export default function WorkPage() {
   }, [authStatus, pageDate, scheduleRetryNonce, scheduleDirty]);
 
   useEffect(() => {
+    if (scheduleNoticeDateRef.current === pageDate) return;
+    scheduleNoticeDateRef.current = pageDate;
+    setScheduleNotice("");
+    setScheduleSyncState("idle");
+  }, [pageDate]);
+
+  useEffect(() => {
     if (!scheduleLoaded || !scheduleConfirmed || !scheduleDirty) return;
     if (authStatus === "authenticated") {
       setScheduleSyncState("saving");
@@ -1159,6 +1247,43 @@ export default function WorkPage() {
     setScheduleDirty(false);
     setScheduleSyncState("saved");
   }, [authStatus, pageDate, scheduleBlocks, scheduleConfirmed, scheduleDirty, scheduleLoaded]);
+
+  useEffect(() => {
+    if (
+      authStatus !== "authenticated"
+      || pageDate !== todayIso
+      || !scheduleLoaded
+      || !scheduleConfirmed
+      || scheduleDirty
+      || scheduleSyncState === "saving"
+    ) return;
+
+    for (const block of scheduleBlocks) {
+      if (!block.taskId) continue;
+      const startMinute = Math.round(block.startHour * 60);
+      const endMinute = startMinute + block.durationMinutes;
+      if (executionClockMinute < startMinute || executionClockMinute >= endMinute) continue;
+      const task = tasks.find((item) => String(item.id) === String(block.taskId));
+      if (!task || task.done || task.status !== "pending" || typeof task.id !== "string") continue;
+
+      const observationKey = `${todayIso}:${block.id}:${task.id}`;
+      if (observedScheduleStartsRef.current.has(observationKey)) continue;
+      observedScheduleStartsRef.current.add(observationKey);
+      void productApi.observeTaskStart(task.id)
+        .then((updated) => {
+          setTasks((current) => current.map((item) => item.id === task.id
+            ? { ...item, status: updated.status }
+            : item));
+          setWeekTasks((current) => current.map((item) => item.id === task.id
+            ? { ...item, status: updated.status }
+            : item));
+        })
+        .catch(() => {
+          // 埋点观察失败不阻塞任务操作；留待下一个 30 秒时钟周期重试。
+          observedScheduleStartsRef.current.delete(observationKey);
+        });
+    }
+  }, [authStatus, executionClockMinute, pageDate, scheduleBlocks, scheduleConfirmed, scheduleDirty, scheduleLoaded, scheduleSyncState, tasks, todayIso]);
 
   useEffect(() => {
     if (!storageReady || authStatus === "authenticated") return;
@@ -1237,10 +1362,10 @@ export default function WorkPage() {
     });
     const nextDone = !target.done;
     setTasks((current) => current.map((task) =>
-      task.id === id ? { ...task, done: nextDone } : task,
+      task.id === id ? { ...task, done: nextDone, status: nextDone ? "completed" : "pending" } : task,
     ));
     setWeekTasks((current) => current.map((task) =>
-      task.id === id ? { ...task, done: nextDone } : task,
+      task.id === id ? { ...task, done: nextDone, status: nextDone ? "completed" : "pending" } : task,
     ));
     if (authStatus === "authenticated" && typeof id === "string") {
       void productApi.updateTask(id, { done: nextDone }).catch((reason) => {
@@ -1285,6 +1410,7 @@ export default function WorkPage() {
   }
 
   async function toggleWeekTask(task: DashboardTask) {
+    setWeekActionError("");
     const previousWeekTasks = weekTasks;
     const nextDone = !task.done;
     const nextWeekTasks = weekTasks.map((item) => item.id === task.id ? { ...item, done: nextDone } : item);
@@ -1298,12 +1424,14 @@ export default function WorkPage() {
       } catch (reason) {
         setWeekTasks(previousWeekTasks);
         setTasks(previousWeekTasks.filter((item) => item.date === pageDate));
-        setWeekActionNotice(reason instanceof Error ? reason.message : "任务状态同步失败");
+        setWeekActionNotice("");
+        setWeekActionError(reason instanceof Error ? reason.message : "任务状态同步失败");
       }
     }
   }
 
   function openWeekAdjustmentPreview() {
+    setWeekActionError("");
     if (!hasWeekOverload || !peakAdjustmentTask || !weekAdjustmentDestination || weekActionPending) {
       setWeekActionNotice(weekPlannedMinutes === 0 ? "先为任务补充日期与预计时长。" : "当前没有需要移动的待完成任务。");
       return;
@@ -1314,6 +1442,7 @@ export default function WorkPage() {
 
   async function confirmWeekAdjustment() {
     if (!weekAdjustmentPreview || weekActionPending) return;
+    setWeekActionError("");
     const { task, from, to } = weekAdjustmentPreview;
 
     const previousWeekTasks = weekTasks;
@@ -1331,13 +1460,18 @@ export default function WorkPage() {
 
     if (authStatus === "authenticated" && typeof task.id === "string") {
       try {
-        await productApi.updateTask(task.id, { date: to.isoDate });
+        await productApi.updateTask(task.id, {
+          date: to.isoDate,
+          rescheduleTrigger: "overload_recovery",
+          recoveryStrategy: "standard",
+        });
       } catch (reason) {
         setWeekTasks(previousWeekTasks);
         setTasks(previousWeekTasks.filter((item) => item.date === pageDate));
         setSelectedWeekDay(from.isoDate);
         updatePageUrl({ date: from.isoDate });
-        setWeekActionNotice(reason instanceof Error ? reason.message : "本周调整同步失败");
+        setWeekActionNotice("");
+        setWeekActionError(reason instanceof Error ? reason.message : "本周调整同步失败");
         setWeekActionPending(false);
         setWeekAdjustmentPreview(null);
         return;
@@ -1400,7 +1534,7 @@ export default function WorkPage() {
     setSchedulePlannerOpen(true);
   }
 
-  function revealScheduleScrollbar(region: "preview" | "availability") {
+  function revealScheduleScrollbar(region: "preview" | "availability" | "schedule") {
     setActiveScheduleScroll(region);
     if (scheduleScrollTimerRef.current !== null) window.clearTimeout(scheduleScrollTimerRef.current);
     scheduleScrollTimerRef.current = window.setTimeout(() => {
@@ -1412,13 +1546,15 @@ export default function WorkPage() {
   function applySchedulePreview() {
     if (!schedulePreview) return;
     setScheduleBlocks(schedulePreview.blocks);
-    setScheduleConfirmed(false);
-    setScheduleDirty(false);
+    setScheduleConfirmed(true);
+    setScheduleDirty(true);
+    setTodayPlanMode("tasks");
+    updatePageUrl({ mode: null });
     const strategyLabel = plannerStrategy === "balanced" ? "均衡" : "紧凑";
     if (schedulePreview.unscheduled.length) {
       setScheduleNotice(`已按${strategyLabel}方式安排 ${schedulePreview.scheduledTaskIds.length} 项，${schedulePreview.unscheduled.length} 项暂未排入。`);
     } else {
-      setScheduleNotice(`已按${strategyLabel}方式生成安排，请确认后保存。`);
+      setScheduleNotice(`已按${strategyLabel}方式生成安排，任务列表已同步更新。`);
     }
     setSchedulePlannerOpen(false);
   }
@@ -1511,7 +1647,7 @@ export default function WorkPage() {
       const localTaskId = Date.now();
       setTasks((current) => [...current, {
         id: localTaskId,
-        goalId: DEMO_GOAL_ID_BY_TITLE[newTask.goal],
+        goalId: goalOptions.find((goal) => goal.title === newTask.goal)?.id,
         date: pageDate,
         goal: newTask.goal,
         time: newTask.time,
@@ -1542,13 +1678,19 @@ export default function WorkPage() {
 
   return (
     <div className="dashboard-page" data-today-iso={todayIso}>
-      {(dataLoading || dataError) && (
+      {(dataLoading || dataError || scheduleError || weekActionError) && (
         <DataSyncNotice
-          loading={dataLoading && !dataError}
-          title={dataError ? "今日计划同步失败" : "正在同步今日计划"}
-          message={dataError || undefined}
+          loading={dataLoading && !dataError && !scheduleError && !weekActionError}
+          title={dataError ? "今日计划同步失败" : scheduleError ? "时间规划同步失败" : weekActionError ? "本周计划同步失败" : "正在同步今日计划"}
+          message={dataError || scheduleError || weekActionError || undefined}
           retryLabel="重新加载"
-          onRetry={() => window.location.reload()}
+          onRetry={dataError
+            ? () => window.location.reload()
+            : scheduleError
+              ? () => setScheduleRetryNonce((value) => value + 1)
+              : weekActionError
+                ? () => window.location.reload()
+              : undefined}
         />
       )}
 
@@ -1557,7 +1699,7 @@ export default function WorkPage() {
           <ThemeDashboardLead data={leadData} />
 
           <section className="workspace-grid">
-        <article id="today-plan" className={`panel today-panel ${todayPlanMode === "schedule" ? "is-schedule" : ""}`}>
+        <article id="today-plan" className={`panel today-panel ${legacyScheduleViewEnabled ? "is-schedule" : ""}`}>
           <header className="panel-header">
             <div>
               <small>TODAY</small>
@@ -1567,15 +1709,11 @@ export default function WorkPage() {
               <button
                 type="button"
                 className="today-plan-mode-switch"
-                aria-label={todayPlanMode === "tasks" ? "打开时间规划" : "返回任务"}
-                onClick={() => {
-                  const nextMode = todayPlanMode === "tasks" ? "schedule" : "tasks";
-                  setTodayPlanMode(nextMode);
-                  updatePageUrl({ mode: nextMode === "tasks" ? null : nextMode });
-                }}
+                aria-label={scheduleBlocks.length > 0 ? "重新规划" : "打开时间规划"}
+                onClick={openSchedulePlanner}
               >
-                {todayPlanMode === "tasks" ? <CalendarClock size={14} /> : <ArrowLeft size={14} />}
-                {todayPlanMode === "tasks" ? "时间规划" : "返回任务"}
+                <CalendarClock size={14} />
+                {scheduleBlocks.length > 0 ? "重新规划" : "时间规划"}
               </button>
               <button
                 ref={addTaskButtonRef}
@@ -1589,21 +1727,27 @@ export default function WorkPage() {
             </div>
           </header>
 
-          {todayPlanMode === "tasks" && (
-            <div className="plan-progress">
-              <div>
-                <span>{completed} / {tasks.length} 已完成</span>
-                <b>{progress}%</b>
-              </div>
-              <i><span style={{ width: `${progress}%` }} /></i>
+          <div className="plan-progress">
+            <div>
+              <span>{completed} / {tasks.length} 已完成</span>
+              <b>{progress}%</b>
             </div>
+            <i><span style={{ width: `${progress}%` }} /></i>
+          </div>
+
+          {scheduleNotice && (
+            <p className="today-schedule-notice today-task-schedule-notice" role="status">
+              {scheduleNotice}
+            </p>
           )}
 
-          {todayPlanMode === "tasks" ? (
+          {/* The legacy schedule-result branch remains below but is disabled. */}
+          {!legacyScheduleViewEnabled ? (
             <div className="task-list">
-              {tasks.map((task) => {
+              {displayedTasks.map((task) => {
                 const canOpenTask = Boolean(resolveTaskGoalId(task));
                 const isEditingActual = Boolean(actualEntryTask && String(actualEntryTask.id) === String(task.id));
+                const scheduledProgress = scheduledProgressByTaskId.get(String(task.id));
                 return (
                   <article
                     key={task.id}
@@ -1623,6 +1767,11 @@ export default function WorkPage() {
                         {task.done && <Check size={13} />}
                       </span>
                     </button>
+                    <span
+                      className={`task-schedule-rail ${scheduledProgress ? "is-scheduled" : ""}`}
+                      style={scheduledProgress ? { backgroundColor: task.done ? "var(--workspace-border-strong)" : scheduledProgress.color } : undefined}
+                      aria-hidden="true"
+                    />
                     <div>
                       <strong>{task.title}</strong>
                       <span>{task.goal} · {task.duration}</span>
@@ -1659,7 +1808,7 @@ export default function WorkPage() {
                         </button>
                       </form>
                     ) : (
-                      <span className={`task-meta ${task.done ? "is-completed" : ""}`}>
+                      <span className={`task-meta ${task.done ? "is-completed" : ""} ${scheduledProgress ? "is-scheduled" : ""}`}>
                         {task.done ? (
                           <button
                             type="button"
@@ -1675,11 +1824,25 @@ export default function WorkPage() {
                         ) : (
                           <>
                             <small>{scheduledTimeByTaskId.get(String(task.id)) ?? formatTaskTimeRange(task.time, task.duration)}</small>
-                            <TaskPriorityPicker
-                              taskTitle={task.title}
-                              value={task.priority}
-                              onChange={(nextPriority) => updateTaskPriority(task.id, nextPriority)}
-                            />
+                            {scheduledProgress ? (
+                              <span
+                                className="task-elapsed-progress"
+                                tabIndex={0}
+                                aria-label={`时间流逝度 ${scheduledProgress.elapsed}%`}
+                                title={scheduledProgress.elapsed >= 100 ? "该学习时段已经结束" : scheduledProgress.elapsed > 0 ? `当前时段已进行 ${scheduledProgress.elapsed}%` : "该学习时段尚未开始"}
+                              >
+                                <span className="task-elapsed-bar">
+                                  <i><b style={{ width: `${scheduledProgress.elapsed}%`, backgroundColor: scheduledProgress.color }} /></i>
+                                </span>
+                                <span className="task-elapsed-copy" aria-hidden="true">时间流逝度 · {scheduledProgress.elapsed}%</span>
+                              </span>
+                            ) : (
+                              <TaskPriorityPicker
+                                taskTitle={task.title}
+                                value={task.priority}
+                                onChange={(nextPriority) => updateTaskPriority(task.id, nextPriority)}
+                              />
+                            )}
                           </>
                         )}
                       </span>
@@ -1689,6 +1852,7 @@ export default function WorkPage() {
                         type="button"
                         className="task-open-button"
                         aria-label={`打开任务：${task.title}`}
+                        title={`跳转到目标详情：${task.goal}`}
                         onClick={(event) => {
                           event.stopPropagation();
                           openTask(task);
@@ -1709,49 +1873,13 @@ export default function WorkPage() {
             </div>
           ) : (
             <div className="today-schedule-view">
-              <div className="today-schedule-toolbar">
-                <div>
-                  <strong>{pageDateLabel}的时间安排</strong>
-                  <span>{scheduleBlocks.length ? `${scheduleBlocks.length} 个时间块` : "还没有生成时间块"}</span>
-                </div>
-                <div className="today-schedule-actions">
-                  <button
-                    type="button"
-                    className="today-schedule-auto"
-                    onClick={openSchedulePlanner}
-                    title={scheduleBlocks.length ? "保留已开始的时间块，重新规划后续任务" : `根据任务和可用时段生成${pageDateLabel}安排`}
-                  >
-                    <CalendarClock size={12} />
-                    自动规划
-                  </button>
-                  {scheduleBlocks.length > 0 && (
-                    <button
-                      type="button"
-                      className={`today-schedule-confirm ${scheduleConfirmed ? "is-confirmed" : ""}`}
-                      onClick={confirmTechnologySchedule}
-                      disabled={scheduleConfirmed}
-                    >
-                      <Check size={12} />
-                      {scheduleConfirmed ? "已确认" : "确认安排"}
-                    </button>
-                  )}
-                  {scheduleBlocks.length > 0 && (
-                    <button type="button" className="today-schedule-clear" onClick={clearTechnologySchedule} title={`清空${pageDateLabel}的时间安排`}>
-                      <Trash2 size={12} />
-                    </button>
-                  )}
-                </div>
-              </div>
               {scheduleNotice && <p className="today-schedule-notice" role="status">{scheduleNotice}</p>}
-              {scheduleError && (
-                <div className="today-schedule-error" role="alert">
-                  <span>时间规划同步失败：{scheduleError}</span>
-                  <button type="button" onClick={() => setScheduleRetryNonce((value) => value + 1)}>重试</button>
-                </div>
-              )}
               {scheduleSyncState === "saving" && <p className="today-schedule-sync" role="status">正在同步时间安排…</p>}
               {scheduleBlocks.length > 0 ? (
-                <div className="today-schedule-list">
+                <div
+                  className={`today-schedule-list ${activeScheduleScroll === "schedule" ? "is-scrolling" : ""}`}
+                  onScroll={() => revealScheduleScrollbar("schedule")}
+                >
                   {(() => {
                     const currentMinute = pageDate === todayIso ? getCurrentMinute(scheduleTimezone) : 0;
                     return scheduleBlocks.map((block) => {
@@ -1803,6 +1931,35 @@ export default function WorkPage() {
                   </div>
                 </div>
               )}
+              {scheduleBlocks.length > 0 && (
+                <footer className="today-schedule-footer">
+                  <button
+                    type="button"
+                    className="today-schedule-replan"
+                    onClick={openSchedulePlanner}
+                    title="保留已开始的时间块，重新规划后续任务"
+                  >
+                    <CalendarClock size={13} />
+                    重新规划
+                  </button>
+                  <div>
+                    <button type="button" className="today-schedule-cancel" onClick={clearTechnologySchedule}>
+                      <X size={13} />
+                      取消
+                    </button>
+                    <button
+                      type="button"
+                      className="today-schedule-apply"
+                      onClick={confirmTechnologySchedule}
+                      disabled={scheduleConfirmed}
+                      aria-label={scheduleConfirmed ? "安排已应用" : "应用安排"}
+                    >
+                      <Check size={13} />
+                      应用
+                    </button>
+                  </div>
+                </footer>
+              )}
             </div>
           )}
           {schedulePlannerOpen && schedulePreview && (
@@ -1812,7 +1969,12 @@ export default function WorkPage() {
                 if (event.target === event.currentTarget) setSchedulePlannerOpen(false);
               }}
             >
-              <section className="today-schedule-planner" role="dialog" aria-modal="true" aria-label={`自动规划${pageDateLabel}的任务`}>
+              <section
+                className="today-schedule-planner"
+                role="dialog"
+                aria-modal="true"
+                aria-label={`自动规划${pageDateLabel}的任务`}
+              >
                 <header>
                   <div className="today-schedule-planner-title">
                     <span aria-hidden="true"><CalendarClock size={15} /></span>
@@ -1858,34 +2020,38 @@ export default function WorkPage() {
                       ))}
                     </div>
                   ) : (
-                    <div className="today-schedule-planner-empty">{pageDateLabel}剩余的可用时段不足以安排任务</div>
+                    <div className="today-schedule-planner-empty">
+                      <CalendarRange size={14} aria-hidden="true" />
+                      <span>{pageDateLabel}剩余的可用时段不足以安排任务</span>
+                    </div>
                   )}
                   {schedulePreview.unscheduled.length > 0 && (
                     <p className="today-schedule-planner-unresolved">
-                      <Clock size={12} />
-                      {schedulePreview.unscheduled.length} 项暂未排入，可切换节奏比较结果
+                      <ListTodo size={14} aria-hidden="true" />
+                      <span>{schedulePreview.unscheduled.length} 项暂未排入，可切换节奏比较结果</span>
                     </p>
                   )}
                 </div>
 
-                <div className="today-schedule-planner-availability">
-                  <Clock size={14} />
-                  <span>{pageDateLabel}可用</span>
-                  <strong
-                    className={activeScheduleScroll === "availability" ? "is-scrolling" : ""}
-                    aria-label="今天剩余可用时段"
-                    tabIndex={0}
-                    onScroll={() => revealScheduleScrollbar("availability")}
-                  >{remainingAvailability.length
-                      ? remainingAvailability.map((range) => `${formatScheduleHour(range.startMinute / 60)}–${formatScheduleHour(range.endMinute / 60)}`).join("、")
-                      : `${pageDateLabel}已没有剩余可用时间`}</strong>
-                  <Link href="/studio/settings?returnTo=%2Fstudio%2Fwork">调整</Link>
-                </div>
                 <footer>
-                  <button type="button" onClick={() => setSchedulePlannerOpen(false)}>取消</button>
-                  <button type="button" className="is-primary" disabled={!schedulePreview.blocks.length} onClick={applySchedulePreview}>
-                    <Check size={13} />应用
-                  </button>
+                  <div className="today-schedule-planner-availability">
+                    <span>{pageDateLabel === "今天" ? "今日可用时段" : `${pageDateLabel}可用时段`}</span>
+                    <strong
+                      className={activeScheduleScroll === "availability" ? "is-scrolling" : ""}
+                      aria-label="今天剩余可用时段"
+                      tabIndex={0}
+                      onScroll={() => revealScheduleScrollbar("availability")}
+                    >{remainingAvailability.length
+                        ? remainingAvailability.map((range) => `${formatScheduleHour(range.startMinute / 60)}–${formatScheduleHour(range.endMinute / 60)}`).join("、")
+                        : `${pageDateLabel}已没有剩余可用时间`}</strong>
+                    <Link href="/studio/settings?returnTo=%2Fstudio%2Fwork">调整</Link>
+                  </div>
+                  <div className="today-schedule-planner-footer-actions">
+                    <button type="button" onClick={() => setSchedulePlannerOpen(false)}>取消</button>
+                    <button type="button" className="is-primary" disabled={!schedulePreview.blocks.length} onClick={applySchedulePreview}>
+                      <Check size={13} />应用
+                    </button>
+                  </div>
                 </footer>
               </section>
             </div>
@@ -1965,8 +2131,8 @@ export default function WorkPage() {
             <div className="rhythm-peak-note">
               <span><Clock3 size={16} /></span>
               <div>
-                <strong>{rhythmPeak ? `截至今天，${rhythmPeak.day}投入最高` : "本周实际投入正在积累"}</strong>
-                <small>{rhythmPeak ? `已投入 ${rhythmPeak.actualMinutes} 分钟；未来日期仅展示计划量` : "完成一次学习后，这里会生成节奏判断"}</small>
+                <strong>{rhythmPeak ? `截至今天，${rhythmPeak.day}投入最高` : hasActualWeekMinutes ? "本周实际投入正在积累" : "本周实际投入等待记录"}</strong>
+                <small>{rhythmPeak ? `已投入 ${rhythmPeak.actualMinutes} 分钟；未来日期仅展示计划量` : hasActualWeekMinutes ? `已完成学习 ${weekActualMinutes} 分钟，节奏判断已生成` : "完成一次学习后，这里会生成节奏判断"}</small>
               </div>
             </div>
           </div>
@@ -1974,8 +2140,8 @@ export default function WorkPage() {
           <div className="rhythm-summary" aria-label="本周节奏摘要">
             <article>
               <div>
-                <b>{leadData.nextTaskTime ?? "—"}</b>
-                <span>下一项开始</span>
+                <b>{rhythmJudgment}</b>
+                <span>本周节奏判断</span>
               </div>
               <div className="rhythm-summary-aside">
                 <span>平均每日</span>
@@ -2465,6 +2631,8 @@ export default function WorkPage() {
           </form>
         </div>
       )}
+
+      {guestIntroOpen && <GuestModeDialog onClose={closeGuestIntro} />}
 
     </div>
   );

@@ -361,7 +361,18 @@
 
 [data-theme="default"] .app-shell .sidebar-admin-entry small {
   color: rgba(174, 187, 218, 0.46);
-  font-size: 7px;
+  font-size: 9px;
+}
+
+[data-theme] .app-shell .sidebar-admin-entry strong {
+  font-size: 12px;
+  font-weight: 680;
+  line-height: 1.25;
+}
+
+[data-theme] .app-shell .sidebar-admin-entry small {
+  font-size: 11px !important;
+  line-height: 1.25;
 }
 
 [data-theme="default"] .app-shell .sidebar-admin-entry:hover {

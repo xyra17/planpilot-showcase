@@ -1,3 +1,9 @@
+@property --goal-progress-value {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 0%;
+}
+
 /*
  * Goal workspace bridge
  *
@@ -14,6 +20,7 @@
   --goal-tech-accent: var(--workspace-accent);
   --goal-tech-accent-soft: var(--workspace-accent-soft);
   --goal-ring-progress: #6f61eb;
+  --goal-ring-progress-end: color-mix(in srgb, var(--goal-tech-accent) 56%, var(--workspace-positive, #35b9a4));
   --goal-ring-track: #e9e8f6;
   --goal-ring-risk: #f0b36b;
   --goal-ring-done: #61c7ae;
@@ -22,6 +29,17 @@
   --goal-tech-border: var(--workspace-border);
   --goal-tech-text: var(--workspace-text);
   --goal-tech-muted: var(--workspace-secondary);
+  --goal-popover-surface:
+    radial-gradient(circle at 92% 0%, color-mix(in srgb, var(--goal-tech-accent) 9%, transparent), transparent 46%),
+    color-mix(in srgb, var(--goal-tech-panel) 98%, white);
+  --goal-popover-border: color-mix(in srgb, var(--goal-tech-accent) 22%, var(--goal-tech-border));
+  --goal-popover-row-height: 44px;
+  --goal-popover-row-radius: 8px;
+  --goal-popover-row-padding: 6px 10px;
+  --goal-popover-shadow:
+    0 16px 38px color-mix(in srgb, var(--goal-tech-text) 14%, transparent),
+    0 2px 8px color-mix(in srgb, var(--goal-tech-accent) 8%, transparent),
+    inset 0 1px 0 color-mix(in srgb, white 62%, transparent);
   display: flex;
   min-height: calc(100dvh - 46px);
   flex-direction: column;
@@ -352,7 +370,7 @@
 
 .app-shell .tech-goals-page .goals-task-search-results > header span {
   color: var(--goal-tech-muted);
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.35;
 }
 
@@ -454,7 +472,7 @@
   margin: 0;
   padding: 22px 14px;
   color: var(--goal-tech-muted);
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1.65;
   text-align: center;
 }
@@ -487,17 +505,76 @@
 }
 
 .app-shell .tech-goals-page :is(.goals-filter-shell .filter-tabs button, .goals-list-panel .filter-tabs button) {
+  --goal-filter-tone: var(--goal-tech-accent);
+  display: inline-flex;
   min-width: 62px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   padding: 9px 13px;
   color: var(--goal-tech-muted);
   font-size: 11px;
+  font-weight: 560;
+  border: 1px solid transparent;
   border-radius: 7px;
+  transition: color 180ms ease, background-color 180ms ease, border-color 180ms ease, box-shadow 220ms ease, transform 180ms cubic-bezier(.22, 1, .36, 1);
+}
+
+.app-shell .tech-goals-page :is(.goals-filter-shell .filter-tabs button, .goals-list-panel .filter-tabs button)::before {
+  width: 5px;
+  height: 5px;
+  flex: 0 0 auto;
+  content: "";
+  background: var(--goal-filter-tone);
+  border-radius: 50%;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--goal-filter-tone) 10%, transparent);
+  opacity: .5;
+  transition: opacity 180ms ease, box-shadow 220ms ease, transform 220ms cubic-bezier(.22, 1, .36, 1);
+}
+
+.app-shell .tech-goals-page :is(.goals-filter-shell .filter-tabs button, .goals-list-panel .filter-tabs button)[data-filter="进行中"] {
+  --goal-filter-tone: var(--goal-ring-progress);
+}
+
+.app-shell .tech-goals-page :is(.goals-filter-shell .filter-tabs button, .goals-list-panel .filter-tabs button)[data-filter="已完成"] {
+  --goal-filter-tone: var(--goal-ring-done);
+}
+
+.app-shell .tech-goals-page :is(.goals-filter-shell .filter-tabs button, .goals-list-panel .filter-tabs button)[data-filter="已暂停"] {
+  --goal-filter-tone: color-mix(in srgb, var(--goal-tech-muted) 76%, #7c89aa);
+}
+
+.app-shell .tech-goals-page :is(.goals-filter-shell .filter-tabs button, .goals-list-panel .filter-tabs button)[data-filter="已归档"] {
+  --goal-filter-tone: color-mix(in srgb, var(--goal-tech-muted) 86%, var(--goal-tech-text));
 }
 
 .app-shell .tech-goals-page :is(.goals-filter-shell .filter-tabs button.is-active, .goals-list-panel .filter-tabs button.is-active) {
-  color: var(--goal-tech-text);
-  background: var(--goal-tech-panel);
-  box-shadow: 0 2px 8px color-mix(in srgb, var(--goal-tech-text) 8%, transparent);
+  color: color-mix(in srgb, var(--goal-filter-tone) 78%, var(--goal-tech-text));
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--goal-filter-tone) 12%, var(--goal-tech-panel)), var(--goal-tech-panel));
+  border-color: color-mix(in srgb, var(--goal-filter-tone) 20%, var(--goal-tech-border));
+  box-shadow:
+    0 5px 14px color-mix(in srgb, var(--goal-filter-tone) 10%, transparent),
+    inset 0 1px 0 color-mix(in srgb, white 64%, transparent);
+}
+
+.app-shell .tech-goals-page :is(.goals-filter-shell .filter-tabs button.is-active, .goals-list-panel .filter-tabs button.is-active)::before {
+  opacity: 1;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--goal-filter-tone) 15%, transparent), 0 0 9px color-mix(in srgb, var(--goal-filter-tone) 42%, transparent);
+  transform: scale(1.08);
+}
+
+.app-shell .tech-goals-page :is(.goals-filter-shell .filter-tabs button, .goals-list-panel .filter-tabs button):focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--goal-filter-tone) 52%, transparent);
+  outline-offset: 2px;
+}
+
+@media (hover: hover) {
+  .app-shell .tech-goals-page :is(.goals-filter-shell .filter-tabs button, .goals-list-panel .filter-tabs button):hover:not(.is-active) {
+    color: color-mix(in srgb, var(--goal-filter-tone) 62%, var(--goal-tech-text));
+    background: color-mix(in srgb, var(--goal-filter-tone) 6%, transparent);
+    transform: translateY(-1px);
+  }
 }
 
 .app-shell .tech-goals-page .goals-filter-actions {
@@ -570,31 +647,51 @@
   top: calc(100% + 8px);
   right: 0;
   display: grid;
-  width: 150px;
-  gap: 3px;
+  width: 172px;
+  gap: 2px;
   padding: 6px;
-  background: var(--goal-tech-panel);
-  border: 1px solid var(--goal-tech-border);
-  border-radius: 10px;
-  box-shadow: var(--goals-panel-shadow);
+  background: var(--goal-popover-surface);
+  border: 1px solid var(--goal-popover-border);
+  border-radius: 12px;
+  box-shadow: var(--goal-popover-shadow);
+  animation: goal-popover-in 160ms cubic-bezier(.22, 1, .36, 1) both;
 }
 
 .app-shell .tech-goals-page .goals-filter-menu button {
-  min-height: 38px;
-  padding: 8px 12px;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) 16px;
+  min-height: var(--goal-popover-row-height);
+  align-items: center;
+  gap: 8px;
+  padding: var(--goal-popover-row-padding);
   color: var(--goal-tech-muted);
   font-size: 14px;
+  font-weight: 560;
   line-height: 1.35;
   text-align: left;
   background: transparent;
   border: 0;
-  border-radius: 7px;
+  border-radius: var(--goal-popover-row-radius);
   cursor: pointer;
+  transition: color 150ms ease, background-color 150ms ease, box-shadow 180ms ease;
 }
 
-.app-shell .tech-goals-page .goals-filter-menu button:hover {
-  color: var(--goal-tech-text);
-  background: var(--goal-tech-accent-soft);
+.app-shell .tech-goals-page .goals-filter-menu button > svg {
+  opacity: .76;
+}
+
+.app-shell .tech-goals-page .goals-filter-menu button > svg:last-child:not(:first-child) {
+  color: var(--goal-tech-accent);
+  opacity: 1;
+}
+
+.app-shell .tech-goals-page .goals-filter-menu button:hover,
+.app-shell .tech-goals-page .goals-filter-menu button:focus-visible,
+.app-shell .tech-goals-page .goals-filter-menu button.is-selected {
+  color: var(--goal-tech-accent);
+  background: color-mix(in srgb, var(--goal-tech-accent) 8%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--goal-tech-accent) 10%, transparent);
+  outline: 0;
 }
 
 .app-shell .tech-goals-page .goals-redesign-grid {
@@ -790,41 +887,39 @@
   top: calc(100% + 4px);
   right: 0;
   display: grid;
-  width: 196px;
+  width: 216px;
   gap: 2px;
   padding: 6px;
-  background:
-    radial-gradient(circle at 92% 0%, color-mix(in srgb, var(--goal-tech-accent) 10%, transparent), transparent 44%),
-    color-mix(in srgb, var(--goal-tech-panel) 97%, white);
-  border: 1px solid color-mix(in srgb, var(--goal-tech-accent) 15%, var(--goal-tech-border));
-  border-radius: 11px;
-  box-shadow: 0 14px 36px rgba(37, 41, 76, 0.14), 0 2px 8px rgba(63, 53, 139, 0.06);
-  animation: goal-milestone-menu-in 150ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  background: var(--goal-popover-surface);
+  border: 1px solid var(--goal-popover-border);
+  border-radius: 12px;
+  box-shadow: var(--goal-popover-shadow);
+  animation: goal-popover-in 160ms cubic-bezier(.22, 1, .36, 1) both;
 }
 
 .app-shell .tech-goals-page .goal-milestone-switcher-menu > button {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 14px;
+  grid-template-columns: 18px minmax(0, 1fr) 16px;
   align-items: center;
-  gap: 7px;
-  min-height: 38px;
-  padding: 6px 7px;
+  gap: 8px;
+  min-height: 52px;
+  padding: var(--goal-popover-row-padding);
   color: var(--goal-tech-muted);
   background: transparent;
   border: 0;
-  border-radius: 7px;
+  border-radius: var(--goal-popover-row-radius);
   text-align: left;
   cursor: pointer;
-  transition: color 140ms ease, background-color 140ms ease, transform 160ms ease;
+  transition: color 150ms ease, background-color 150ms ease, box-shadow 180ms ease;
 }
 
 .app-shell .tech-goals-page .goal-milestone-switcher-menu > button:hover,
 .app-shell .tech-goals-page .goal-milestone-switcher-menu > button:focus-visible,
 .app-shell .tech-goals-page .goal-milestone-switcher-menu > button.is-selected {
   color: var(--goal-tech-accent);
-  background: color-mix(in srgb, var(--goal-tech-accent) 7%, transparent);
+  background: color-mix(in srgb, var(--goal-tech-accent) 8%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--goal-tech-accent) 10%, transparent);
   outline: 0;
-  transform: translateX(1px);
 }
 
 .app-shell .tech-goals-page .goal-milestone-switcher-menu > button > span {
@@ -832,6 +927,16 @@
   min-width: 0;
   flex-direction: column;
   gap: 2px;
+}
+
+.app-shell .tech-goals-page .goal-milestone-switcher-menu > button > svg {
+  color: currentColor;
+  opacity: .76;
+}
+
+.app-shell .tech-goals-page .goal-milestone-switcher-menu > button > svg:last-child:not(:first-child) {
+  color: var(--goal-tech-accent);
+  opacity: 1;
 }
 
 .app-shell .tech-goals-page .goal-milestone-switcher-menu strong {
@@ -846,17 +951,15 @@
 
 .app-shell .tech-goals-page .goal-milestone-switcher-menu small {
   overflow: hidden;
-  color: color-mix(in srgb, var(--goal-tech-muted) 88%, transparent);
+  color: var(--goal-tech-muted);
   font-size: 12px;
-  font-weight: 430;
+  font-weight: 460;
   line-height: 1.3;
   text-overflow: ellipsis;
-  transform: scale(0.88);
-  transform-origin: left center;
   white-space: nowrap;
 }
 
-@keyframes goal-milestone-menu-in {
+@keyframes goal-popover-in {
   from { opacity: 0; transform: translateY(-4px) scale(0.985); }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
@@ -899,7 +1002,7 @@
   align-self: start;
   gap: 8px 12px;
   padding: 14px 14px 11px;
-  color: var(--goal-tech-text);
+  color: var(--goal-tech-muted);
   background: color-mix(in srgb, var(--goal-tech-panel) 78%, var(--goal-tech-panel-soft));
   border: 1px solid var(--goal-tech-border);
   border-radius: 12px;
@@ -1112,6 +1215,80 @@
   padding: 2px 0 0;
 }
 
+.app-shell .tech-goals-page .goal-overview-heading-copy {
+  display: grid;
+  gap: 3px;
+}
+
+.app-shell .tech-goals-page .goal-overview-heading-copy > small {
+  color: var(--goal-tech-muted);
+  font-size: 10px;
+  font-weight: 450;
+  line-height: 1.4;
+}
+
+.app-shell .tech-goals-page .goal-overview-unavailable-copy {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
+  color: var(--goal-tech-text);
+}
+
+.app-shell .tech-goals-page .goal-overview-unavailable-copy > span {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  color: var(--workspace-warning, #b87820);
+  border: 1px solid color-mix(in srgb, var(--workspace-warning, #b87820) 22%, var(--goal-tech-border));
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--workspace-warning, #b87820) 7%, var(--goal-tech-panel));
+}
+
+.app-shell .tech-goals-page .goal-overview-unavailable-copy > div {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.app-shell .tech-goals-page .goal-overview-unavailable-copy strong {
+  font-size: 12px;
+  font-weight: 720;
+  line-height: 1.4;
+}
+
+.app-shell .tech-goals-page .goal-overview-unavailable-copy small {
+  color: var(--goal-tech-muted);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.app-shell .tech-goals-page .goal-overview-unavailable-copy > button {
+  display: inline-flex;
+  min-height: 30px;
+  grid-column: 2;
+  justify-self: start;
+  align-items: center;
+  gap: 5px;
+  margin-top: 3px;
+  padding: 0 8px;
+  color: var(--goal-tech-accent);
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--goal-tech-accent) 36%, transparent);
+  border-radius: 0;
+  background: transparent;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.app-shell .tech-goals-page .goal-overview-unavailable-copy > button:is(:hover, :focus-visible) {
+  border-bottom-color: var(--goal-tech-accent);
+  outline: none;
+}
+
 .app-shell .tech-goals-page .goal-insight-panel {
   position: relative;
   display: flex;
@@ -1141,10 +1318,25 @@
   height: 118px;
   flex: 0 0 auto;
   place-items: center;
+  background:
+    conic-gradient(
+      from -90deg,
+      var(--goal-ring-progress) 0%,
+      var(--goal-ring-progress-end) var(--goal-progress-value),
+      var(--goal-ring-track) var(--goal-progress-value) 100%
+    );
   border-radius: 50%;
   box-shadow:
-    0 10px 24px color-mix(in srgb, var(--goal-ring-progress) 10%, transparent),
+    0 12px 28px color-mix(in srgb, var(--goal-ring-progress) 16%, transparent),
+    0 0 0 5px color-mix(in srgb, var(--goal-ring-progress) 5%, transparent),
     inset 0 0 0 1px color-mix(in srgb, white 44%, transparent);
+  isolation: isolate;
+  animation: goal-donut-progress-in 760ms cubic-bezier(.22, 1, .36, 1) both;
+}
+
+.app-shell .tech-goals-page .goal-donut.is-unavailable {
+  background: var(--goal-ring-track);
+  animation: none;
 }
 
 .app-shell .tech-goals-page .goal-donut::before {
@@ -1153,20 +1345,29 @@
   width: 88px;
   height: 88px;
   content: "";
-  background: linear-gradient(145deg, var(--goal-tech-panel), color-mix(in srgb, var(--goal-tech-panel-soft) 65%, var(--goal-tech-panel)));
+  background:
+    radial-gradient(circle at 32% 24%, color-mix(in srgb, white 54%, transparent), transparent 42%),
+    linear-gradient(145deg, var(--goal-tech-panel), color-mix(in srgb, var(--goal-tech-panel-soft) 72%, var(--goal-tech-panel)));
   border-radius: 50%;
   box-shadow:
     inset 0 0 0 1px color-mix(in srgb, var(--goal-tech-border) 78%, transparent),
+    inset 0 -8px 18px color-mix(in srgb, var(--goal-ring-progress) 5%, transparent),
+    0 3px 12px color-mix(in srgb, var(--goal-tech-text) 8%, transparent),
     0 1px 0 color-mix(in srgb, white 76%, transparent);
 }
 
 .app-shell .tech-goals-page .goal-donut::after {
   position: absolute;
-  inset: 5px;
+  inset: 3px;
+  z-index: 3;
   content: "";
-  border: 1px solid color-mix(in srgb, white 42%, transparent);
+  background: conic-gradient(from 210deg, transparent 0 70%, color-mix(in srgb, white 80%, transparent) 77%, transparent 85%);
   border-radius: 50%;
-  opacity: 0.7;
+  opacity: 0;
+  pointer-events: none;
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 4px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 4px));
+  animation: goal-donut-glint 980ms cubic-bezier(.22, 1, .36, 1) 180ms both;
 }
 
 .app-shell .tech-goals-page .goal-donut > div {
@@ -1181,7 +1382,9 @@
   color: var(--goal-tech-text);
   font-size: 25px;
   font-weight: 720;
+  font-variant-numeric: tabular-nums;
   letter-spacing: -0.04em;
+  text-shadow: 0 5px 18px color-mix(in srgb, var(--goal-ring-progress) 18%, transparent);
 }
 
 .app-shell .tech-goals-page .goal-donut span {
@@ -1196,6 +1399,7 @@
 }
 
 .app-shell .tech-goals-page .goal-legend > span {
+  --goal-stat-tone: var(--goal-ring-progress);
   display: grid;
   grid-template-columns: 9px minmax(0, 1fr) auto;
   align-items: center;
@@ -1207,24 +1411,40 @@
   font-weight: 400;
   line-height: 1.5;
   letter-spacing: -0.084px;
-  border: 1px solid transparent;
+  background:
+    linear-gradient(100deg, color-mix(in srgb, var(--goal-stat-tone) 8%, var(--goal-tech-panel)), color-mix(in srgb, var(--goal-tech-panel) 96%, transparent));
+  border: 1px solid color-mix(in srgb, var(--goal-stat-tone) 15%, var(--goal-tech-border));
   border-radius: 8px;
+  cursor: pointer;
   white-space: nowrap;
+  transition: color 180ms ease, border-color 180ms ease, box-shadow 220ms ease, transform 220ms cubic-bezier(.22, 1, .36, 1);
 }
 
-.app-shell .tech-goals-page .goal-legend > span:nth-child(1) {
-  background: color-mix(in srgb, var(--goal-ring-progress) 7%, var(--goal-tech-panel));
-  border-color: color-mix(in srgb, var(--goal-ring-progress) 13%, var(--goal-tech-border));
+.app-shell .tech-goals-page .goal-legend > span[data-tone="risk"] {
+  --goal-stat-tone: var(--goal-ring-risk);
 }
 
-.app-shell .tech-goals-page .goal-legend > span:nth-child(2) {
-  background: color-mix(in srgb, var(--goal-ring-risk) 7%, var(--goal-tech-panel));
-  border-color: color-mix(in srgb, var(--goal-ring-risk) 13%, var(--goal-tech-border));
+.app-shell .tech-goals-page .goal-legend > span[data-tone="done"] {
+  --goal-stat-tone: var(--goal-ring-done);
 }
 
-.app-shell .tech-goals-page .goal-legend > span:nth-child(3) {
-  background: color-mix(in srgb, var(--goal-ring-done) 7%, var(--goal-tech-panel));
-  border-color: color-mix(in srgb, var(--goal-ring-done) 13%, var(--goal-tech-border));
+.app-shell .tech-goals-page .goal-legend > span[data-tone="unplanned"] {
+  --goal-stat-tone: color-mix(in srgb, var(--goal-tech-muted) 82%, var(--goal-tech-text));
+}
+
+.app-shell .tech-goals-page .goal-legend > span:focus-visible {
+  border-color: color-mix(in srgb, var(--goal-stat-tone) 48%, var(--goal-tech-border));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--goal-stat-tone) 12%, transparent);
+  outline: 0;
+}
+
+@media (hover: hover) {
+  .app-shell .tech-goals-page .goal-legend > span:hover {
+    color: color-mix(in srgb, var(--goal-stat-tone) 54%, var(--goal-tech-text));
+    border-color: color-mix(in srgb, var(--goal-stat-tone) 30%, var(--goal-tech-border));
+    box-shadow: 0 7px 18px color-mix(in srgb, var(--goal-stat-tone) 9%, transparent);
+    transform: translateX(2px);
+  }
 }
 
 .app-shell .tech-goals-page .goal-legend i {
@@ -1237,17 +1457,37 @@
 .app-shell .tech-goals-page .goal-legend i.is-planned { background: var(--goal-ring-progress); }
 .app-shell .tech-goals-page .goal-legend i.is-risk { background: var(--goal-ring-risk); }
 .app-shell .tech-goals-page .goal-legend i.is-done { background: var(--goal-ring-done); }
+.app-shell .tech-goals-page .goal-legend i.is-unplanned { background: color-mix(in srgb, var(--goal-tech-muted) 82%, var(--goal-tech-text)); }
 
 .app-shell .tech-goals-page .goal-legend strong {
   min-width: 34px;
   padding: 3px 5px;
-  color: var(--goal-tech-text);
+  color: color-mix(in srgb, var(--goal-stat-tone) 76%, var(--goal-tech-text));
   font-size: 10px;
   font-weight: 700;
+  font-variant-numeric: tabular-nums;
   text-align: center;
-  background: var(--goal-tech-panel);
-  border: 1px solid var(--goal-tech-border);
+  background: color-mix(in srgb, var(--goal-stat-tone) 8%, var(--goal-tech-panel));
+  border: 1px solid color-mix(in srgb, var(--goal-stat-tone) 18%, var(--goal-tech-border));
   border-radius: 5px;
+}
+
+@keyframes goal-donut-progress-in {
+  from {
+    --goal-progress-value: 0%;
+    opacity: .62;
+    transform: scale(.94) rotate(-5deg);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+  }
+}
+
+@keyframes goal-donut-glint {
+  0% { opacity: 0; transform: rotate(-24deg); }
+  36% { opacity: .72; }
+  100% { opacity: 0; transform: rotate(88deg); }
 }
 
 .app-shell .tech-goals-page .goal-milestones-list {
@@ -1255,7 +1495,7 @@
   min-height: 0;
   flex: 1 1 auto;
   align-content: start;
-  gap: 1px;
+  gap: 4px;
   max-height: 188px;
   margin-right: -8px;
   padding: 2px 15px 2px 3px;
@@ -1296,18 +1536,47 @@
 }
 
 .app-shell .tech-goals-page .goal-milestone {
+  --goal-milestone-tone: var(--goal-tech-accent);
   position: relative;
   display: grid;
   grid-template-columns: 17px 1fr;
   gap: 10px;
-  min-height: 40px;
-  padding: 2px 0;
+  min-height: 46px;
+  padding: 5px 6px 5px 0;
+  border-radius: 8px;
+  transition: background-color 180ms ease, box-shadow 220ms ease, transform 220ms cubic-bezier(.22, 1, .36, 1);
+}
+
+.app-shell .tech-goals-page .goal-milestone.tone-attention {
+  --goal-milestone-tone: var(--goal-ring-risk);
+}
+
+.app-shell .tech-goals-page .goal-milestone.tone-ready,
+.app-shell .tech-goals-page .goal-milestone.tone-done {
+  --goal-milestone-tone: var(--goal-ring-done);
+}
+
+.app-shell .tech-goals-page .goal-milestone.tone-neutral {
+  --goal-milestone-tone: var(--goal-tech-muted);
+}
+
+.app-shell .tech-goals-page .goal-milestone:focus-visible {
+  background: color-mix(in srgb, var(--goal-milestone-tone) 7%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--goal-milestone-tone) 28%, transparent);
+  outline: 0;
+}
+
+@media (hover: hover) {
+  .app-shell .tech-goals-page .goal-milestone:hover {
+    background: linear-gradient(90deg, color-mix(in srgb, var(--goal-milestone-tone) 8%, transparent), transparent 84%);
+    transform: translateX(2px);
+  }
 }
 
 .app-shell .tech-goals-page .goal-milestone:not(:last-child)::after {
   position: absolute;
   top: 14px;
-  bottom: -2px;
+  bottom: -5px;
   left: 5px;
   width: 1px;
   content: "";
@@ -1321,13 +1590,16 @@
   height: 11px;
   margin-top: 3px;
   background: var(--goal-tech-panel);
-  border: 2px solid var(--goal-tech-accent);
+  border: 2px solid var(--goal-milestone-tone);
   border-radius: 50%;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--goal-milestone-tone) 9%, transparent);
+  transition: background-color 180ms ease, box-shadow 220ms ease, transform 220ms cubic-bezier(.22, 1, .36, 1);
 }
 
 .app-shell .tech-goals-page .goal-milestone-dot.is-current {
-  background: var(--goal-tech-accent);
-  box-shadow: 0 0 0 4px var(--goal-tech-accent-soft);
+  background: var(--goal-milestone-tone);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--goal-milestone-tone) 16%, transparent), 0 0 12px color-mix(in srgb, var(--goal-milestone-tone) 36%, transparent);
+  animation: goal-current-status-pulse 2.4s ease-in-out 1.1s infinite;
 }
 
 .app-shell .tech-goals-page .goal-milestone > div {
@@ -1339,24 +1611,50 @@
 }
 
 .app-shell .tech-goals-page .goal-milestone-title {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+  padding: 0 8px 1px;
   color: var(--goal-tech-text);
-  font-size: 11.5px;
-  font-weight: 400;
-  line-height: 1.4;
+  font-size: 12px;
+  line-height: 1.35;
   letter-spacing: -0.01em;
+}
+
+.app-shell .tech-goals-page .goal-milestone-title > strong {
+  overflow: hidden;
+  color: color-mix(in srgb, var(--goal-tech-text) 92%, var(--goal-milestone-tone));
+  font-size: 12px;
+  font-weight: 680;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-shell .tech-goals-page .goal-milestone-title > span {
+  display: block;
+  overflow: hidden;
+  min-width: 0;
+  color: color-mix(in srgb, var(--goal-tech-muted) 80%, var(--goal-tech-text));
+  font-size: 12px;
+  font-weight: 450;
+  line-height: 1.45;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .app-shell .tech-goals-page .goal-milestone small {
   align-self: start;
-  padding: 0;
-  color: var(--goal-tech-muted);
-  font-size: 9.5px;
-  font-weight: 450;
-  line-height: 1.4;
+  padding: 2px 5px;
+  color: color-mix(in srgb, var(--goal-milestone-tone) 78%, var(--goal-tech-text));
+  font-size: 9px !important;
+  font-weight: 620;
+  line-height: 1.3;
   letter-spacing: 0;
-  background: transparent;
-  border: 0;
-  border-radius: 0;
+  background: color-mix(in srgb, var(--goal-milestone-tone) 8%, var(--goal-tech-panel));
+  border: 1px solid color-mix(in srgb, var(--goal-milestone-tone) 16%, var(--goal-tech-border));
+  border-radius: 99px;
   white-space: nowrap;
 }
 
@@ -1373,7 +1671,7 @@
 }
 
 .app-shell .tech-goals-page .goal-milestone.tone-active small {
-  color: color-mix(in srgb, var(--goal-tech-accent) 82%, var(--goal-tech-text));
+  color: color-mix(in srgb, var(--goal-tech-accent) 78%, var(--goal-tech-text));
 }
 
 .app-shell .tech-goals-page .goal-milestone.tone-ready small,
@@ -1386,6 +1684,37 @@
   color: var(--goal-tech-muted);
   font-size: 11px;
   line-height: 1.55;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .app-shell .tech-goals-page .goal-milestone {
+    animation: goal-status-item-in 360ms cubic-bezier(.22, 1, .36, 1) var(--goal-milestone-delay, 0ms) both;
+  }
+
+}
+
+@keyframes goal-status-item-in {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes goal-current-status-pulse {
+  0%, 100% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--goal-milestone-tone) 14%, transparent), 0 0 9px color-mix(in srgb, var(--goal-milestone-tone) 24%, transparent); }
+  50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--goal-milestone-tone) 7%, transparent), 0 0 15px color-mix(in srgb, var(--goal-milestone-tone) 38%, transparent); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-shell .tech-goals-page .goal-donut,
+  .app-shell .tech-goals-page .goal-donut::after,
+  .app-shell .tech-goals-page .goal-milestone,
+  .app-shell .tech-goals-page .goal-milestone::after,
+  .app-shell .tech-goals-page .goal-milestone-dot.is-current,
+  .app-shell .tech-goals-page .goals-filter-menu,
+  .app-shell .tech-goals-page .goal-milestone-switcher-menu,
+  .app-shell .tech-goals-page .goal-list-menu > div {
+    animation: none !important;
+    transition-duration: 0ms !important;
+  }
 }
 
 .app-shell .tech-goals-page .goal-actions-list {
@@ -1538,6 +1867,7 @@
   --accent-light: var(--workspace-accent-soft);
   --accent-muted: var(--workspace-accent-soft);
   --accent-dark: color-mix(in srgb, var(--workspace-accent) 82%, black);
+  --goal-ring-done: var(--workspace-positive, #42b49d);
   --theme-bg: var(--workspace-bg);
   --theme-surface: var(--workspace-panel);
   --theme-border: var(--workspace-border);
@@ -1659,7 +1989,7 @@
 }
 
 .app-shell .tech-goal-workspace-scope .goal-stats-heading {
-  color: var(--workspace-accent);
+  color: color-mix(in srgb, var(--workspace-accent) 70%, var(--workspace-text));
   background: transparent;
   border: 0;
   border-radius: 0;
@@ -1700,7 +2030,7 @@
 
 .app-shell .tech-goal-workspace-scope .goal-stats-heading:hover .goal-stats-toggle-icon,
 .app-shell .tech-goal-workspace-scope .goal-panel-collapse-button:hover {
-  color: var(--workspace-accent);
+  color: color-mix(in srgb, var(--workspace-accent) 70%, var(--workspace-text));
   background: var(--workspace-accent-soft);
   border-color: color-mix(in srgb, var(--workspace-accent) 30%, var(--workspace-border));
   box-shadow: 0 6px 16px color-mix(in srgb, var(--workspace-accent) 12%, transparent);
@@ -1824,7 +2154,7 @@
   height: 42px;
   margin-bottom: 3px;
   place-items: center;
-  color: var(--workspace-accent);
+  color: color-mix(in srgb, var(--workspace-accent) 70%, var(--workspace-text));
   background: var(--workspace-accent-soft);
   border: 1px solid color-mix(in srgb, var(--workspace-accent) 15%, transparent);
   border-radius: 13px;
@@ -1832,7 +2162,7 @@
 
 .app-shell .tech-goal-workspace-scope .goal-task-empty strong {
   color: var(--workspace-text);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
 }
 
@@ -2323,8 +2653,8 @@
 
 .app-shell .tech-goal-workspace-scope .goal-right-tab-plan[style],
 .app-shell .tech-goal-workspace-scope .goal-primary-tab-notes[style] {
-  color: #5875c5 !important;
-  border-color: #6d86cf !important;
+  color: var(--workspace-accent) !important;
+  border-color: transparent !important;
 }
 
 .app-shell .tech-goal-workspace-scope .goal-task-toolbar-actions {
@@ -2413,11 +2743,11 @@
   display: grid;
   height: 100%;
   min-height: 0;
-  grid-template-rows: auto auto auto minmax(104px, 1fr) auto;
-  gap: clamp(7px, 1.6cqh, 10px);
+  grid-template-rows: auto auto minmax(160px, 1fr);
+  gap: clamp(28px, 4cqh, 36px);
   align-content: start;
   overflow: hidden;
-  padding: clamp(12px, 2.2cqh, 18px) clamp(22px, 3vw, 32px);
+  padding: clamp(15px, 2.8cqh, 22px) clamp(22px, 3vw, 32px);
   color: var(--workspace-text);
   background:
     radial-gradient(circle at 100% 0, color-mix(in srgb, var(--workspace-accent) 6%, transparent), transparent 32%),
@@ -2441,16 +2771,16 @@
 
 .app-shell .tech-goal-workspace-scope .goal-execution.is-next-task-empty .goal-execution-capacity {
   display: grid;
-  grid-template-rows: auto auto auto;
+  grid-template-rows: auto auto auto auto;
   align-content: center;
 }
 
 .app-shell .tech-goal-workspace-scope .goal-execution.is-next-task-empty :is(.goal-execution-capacity, .goal-execution-week) > header span {
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .app-shell .tech-goal-workspace-scope .goal-execution.is-next-task-empty :is(.goal-execution-capacity, .goal-execution-week) > header strong {
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .app-shell .tech-goal-workspace-scope .goal-execution.is-next-task-empty .goal-execution-capacity > footer,
@@ -2476,63 +2806,33 @@
   font-size: 11px;
 }
 
-.app-shell .tech-goal-workspace-scope .goal-execution-header {
-  display: flex;
-  min-height: 36px;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
+.app-shell .tech-goal-workspace-scope .goal-execution-metrics {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border-top: 0;
+  border-bottom: 1px solid var(--workspace-border);
 }
 
-.app-shell .tech-goal-workspace-scope .goal-execution-header > div {
-  display: flex;
-  align-items: baseline;
-  gap: 9px;
-}
-
-.app-shell .tech-goal-workspace-scope .goal-execution-header > div span {
-  color: var(--workspace-secondary);
-  font-size: 11px;
-  font-weight: 620;
-}
-
-.app-shell .tech-goal-workspace-scope .goal-execution-header > div strong {
-  color: var(--workspace-text);
-  font-size: 17px;
-  font-weight: 760;
-}
-
-.app-shell .tech-goal-workspace-scope .goal-execution-header > small {
-  display: inline-flex;
-  min-height: 24px;
-  align-items: center;
-  gap: 6px;
-  padding: 0 9px;
-  color: var(--workspace-secondary);
-  background: color-mix(in srgb, var(--workspace-secondary) 6%, transparent);
-  border: 1px solid color-mix(in srgb, var(--workspace-secondary) 14%, var(--workspace-border));
-  border-radius: 999px;
-  font-size: 10px;
-  font-weight: 650;
-  white-space: nowrap;
+.app-shell .tech-goal-workspace-scope .goal-execution-metrics > .goal-execution-section-header {
+  grid-column: 1 / -1;
+  padding-inline: 10px;
+  border-bottom: 1px solid var(--workspace-border);
 }
 
 .app-shell .tech-goal-workspace-scope .goal-execution-kpis {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  min-width: 0;
-  border-block: 1px solid var(--workspace-border);
+  display: contents;
 }
 
 .app-shell .tech-goal-workspace-scope .goal-execution-kpis > div {
   display: grid;
   min-width: 0;
-  gap: 4px;
-  padding: 9px 12px;
-}
-
-.app-shell .tech-goal-workspace-scope .goal-execution-kpis > div:first-child {
-  padding-left: 0;
+  align-content: center;
+  justify-items: center;
+  gap: 3px;
+  min-height: 46px;
+  padding: 3px 14px;
+  border-top: 1px solid var(--workspace-border);
 }
 
 .app-shell .tech-goal-workspace-scope .goal-execution-kpis > div + div {
@@ -2540,24 +2840,51 @@
 }
 
 .app-shell .tech-goal-workspace-scope .goal-execution-kpis dt {
+  position: relative;
+  display: grid;
+  width: 100%;
+  grid-template-columns: 15px minmax(0, auto) 15px;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
   color: var(--workspace-secondary);
-  font-size: 11px;
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 1.25;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-execution-kpis dt::after {
+  width: 15px;
+  content: "";
+}
+
+.app-shell .tech-goal-workspace-scope .goal-execution-kpis dt > span {
+  min-width: 0;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-execution-kpis dt > svg {
+  flex: 0 0 auto;
+  color: var(--workspace-accent);
+  opacity: 0.78;
 }
 
 .app-shell .tech-goal-workspace-scope .goal-execution-kpis dd {
+  width: 100%;
   margin: 0;
   color: var(--workspace-text);
-  font-size: 14px;
+  font-size: 13px;
   font-variant-numeric: tabular-nums;
   font-weight: 720;
-  text-align: left;
+  text-align: center;
 }
 
 .app-shell .tech-goal-workspace-scope .goal-execution-kpis dd small {
   margin-left: 3px;
-  color: var(--workspace-secondary);
-  font-size: 10px;
-  font-weight: 560;
+  color: inherit;
+  font-size: inherit;
+  font-weight: inherit;
 }
 
 .app-shell .tech-goal-workspace-scope .goal-execution-capacity,
@@ -2565,52 +2892,151 @@
   min-height: 0;
 }
 
-.app-shell .tech-goal-workspace-scope :is(.goal-execution-capacity, .goal-execution-week) > header {
+.app-shell .tech-goal-workspace-scope .goal-execution-capacity {
+  margin-inline: 0;
+  padding: 5px 0 7px;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-execution-section-header {
   display: flex;
-  align-items: baseline;
+  min-height: 30px;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
+  padding-inline: 10px;
 }
 
-.app-shell .tech-goal-workspace-scope :is(.goal-execution-capacity, .goal-execution-week) > header span {
+.app-shell .tech-goal-workspace-scope {
+  --goal-title-accent: #6c56e8;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-execution-section-header > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--goal-title-accent);
+  font-size: 14px;
+  font-weight: 740;
+  line-height: 1;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-execution-section-header > span > svg {
+  flex: 0 0 auto;
+  color: currentColor;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-execution-section-status {
+  display: inline-flex;
+  min-height: 0;
+  align-items: center;
+  padding: 0;
+  color: var(--workspace-secondary);
+  background: transparent;
+  border-radius: 0;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-capacity-status.is-unset {
+  color: var(--workspace-secondary);
+  background: transparent;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-capacity-status.is-sufficient {
+  color: color-mix(in srgb, var(--workspace-positive, #42b49d) 82%, var(--workspace-text));
+  background: transparent;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-capacity-status.is-near {
+  color: var(--workspace-warning, #b87820);
+  background: transparent;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-capacity-status.is-overloaded {
+  color: var(--workspace-danger, #cc5f68);
+  background: transparent;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-execution-capacity-summary {
+  display: block;
+  margin-inline: 24px;
+  margin-top: 1px;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-execution-capacity-summary > div {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 7px;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-execution-capacity-summary span {
+  color: var(--workspace-secondary);
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-execution-capacity-summary strong {
   color: var(--workspace-text);
   font-size: 12px;
-  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  font-weight: 760;
+  white-space: nowrap;
 }
 
-.app-shell .tech-goal-workspace-scope :is(.goal-execution-capacity, .goal-execution-week) > header strong {
+.app-shell .tech-goal-workspace-scope .goal-execution-capacity-summary strong small {
+  margin-left: 3px;
   color: var(--workspace-secondary);
-  font-size: 10px;
-  font-weight: 620;
+  font-size: inherit;
+  font-weight: inherit;
 }
 
 .app-shell .tech-goal-workspace-scope .goal-execution-capacity-track {
   position: relative;
   height: 8px;
-  margin-top: 7px;
-  overflow: hidden;
-  background: color-mix(in srgb, var(--workspace-accent) 7%, var(--workspace-border));
+  margin-inline: 24px;
+  margin-top: 6px;
+  overflow: visible;
+  background: linear-gradient(90deg, color-mix(in srgb, #efa8d3 15%, var(--workspace-panel)), color-mix(in srgb, var(--workspace-accent) 17%, var(--workspace-panel)));
   border-radius: 999px;
 }
 
 .app-shell .tech-goal-workspace-scope .goal-execution-capacity-track > i {
   display: block;
   height: 100%;
-  background: linear-gradient(90deg, color-mix(in srgb, var(--workspace-accent) 68%, var(--goal-ring-done)), var(--workspace-accent));
+  background: linear-gradient(90deg, #efa0cf, color-mix(in srgb, #c77edb 62%, var(--workspace-accent)), var(--workspace-accent));
   border-radius: inherit;
   transform-origin: left;
   animation: goal-execution-load-reveal 560ms cubic-bezier(0.22, 1, 0.36, 1) 120ms both;
 }
 
+.app-shell .tech-goal-workspace-scope .goal-execution-capacity-track > em {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  display: block;
+  background: linear-gradient(90deg, color-mix(in srgb, #c878da 72%, var(--workspace-accent)), color-mix(in srgb, var(--workspace-accent) 82%, var(--workspace-text)));
+  border-radius: 0 999px 999px 0;
+  transform-origin: left;
+  animation: goal-execution-load-reveal 560ms cubic-bezier(0.22, 1, 0.36, 1) 160ms both;
+}
+
 .app-shell .tech-goal-workspace-scope .goal-execution-capacity-track > span {
   position: absolute;
   top: -2px;
-  right: 0;
+  margin-left: -1px;
   width: 2px;
   height: 12px;
-  background: var(--workspace-text);
+  background: color-mix(in srgb, var(--workspace-text) 72%, var(--workspace-panel));
   border-radius: 2px;
   opacity: 0.42;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-execution-capacity-track.is-overloaded > span {
+  opacity: 0.72;
 }
 
 .app-shell .tech-goal-workspace-scope .goal-execution-capacity > footer,
@@ -2622,78 +3048,271 @@
   font-size: 9px;
 }
 
+.app-shell .tech-goal-workspace-scope .goal-execution-capacity > footer {
+  justify-content: flex-start;
+  margin-inline: 24px;
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 580;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-execution-capacity.is-overloaded > footer {
+  color: color-mix(in srgb, var(--workspace-accent) 78%, var(--workspace-text));
+}
+
+.app-shell .tech-goal-workspace-scope .goal-execution-capacity > footer > strong {
+  margin-inline: auto;
+  color: var(--workspace-warning, #b87820);
+  font-weight: 680;
+}
+
 .app-shell .tech-goal-workspace-scope .goal-execution-week {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
-  padding-top: 9px;
+  align-content: stretch;
+  row-gap: 10px;
+  padding-top: 10px;
   border-top: 1px solid var(--workspace-border);
 }
 
-.app-shell .tech-goal-workspace-scope .goal-execution-week-chart {
-  display: grid;
-  height: auto;
-  min-height: 0;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 7px;
-  align-items: end;
-  margin-top: 5px;
+.app-shell .tech-goal-workspace-scope .goal-execution-week > header {
+  min-height: 30px;
 }
 
-.app-shell .tech-goal-workspace-scope .goal-execution-week-chart > div {
+.app-shell .tech-goal-workspace-scope .goal-execution-week-chart {
+  position: relative;
+  z-index: 1;
   display: grid;
+  width: min(88%, 420px);
+  height: min(100%, clamp(120px, 30cqh, 270px));
+  min-height: 120px;
+  grid-template-columns: repeat(7, minmax(42px, 1fr));
+  gap: clamp(5px, 0.8vw, 8px);
+  align-self: end;
+  align-items: end;
+  justify-self: center;
+  margin-top: 0;
+  background-image: repeating-linear-gradient(to bottom, color-mix(in srgb, var(--workspace-border) 60%, transparent) 0 1px, transparent 1px 54px);
+  border-bottom: 1px solid color-mix(in srgb, var(--workspace-border) 86%, transparent);
+  isolation: isolate;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-execution-week-chart > button {
+  position: relative;
+  display: grid;
+  min-width: 0;
   height: 100%;
-  grid-template-rows: 14px minmax(0, 1fr) 13px;
+  min-height: 0;
+  grid-template-rows: 16px minmax(88px, 1fr) auto auto;
+  align-content: end;
   justify-items: center;
   gap: 3px;
-}
-
-.app-shell .tech-goal-workspace-scope .goal-execution-day-count {
+  padding: 0 3px 3px;
   color: var(--workspace-secondary);
-  font-size: 9px;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+  animation: goal-execution-bar-reveal 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  transition: color 180ms ease, background 180ms ease, opacity 180ms ease, filter 180ms ease, transform 180ms ease;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-execution-week-chart:hover > button:not(:hover) {
+  opacity: 0.7;
+  transform: translateY(1px) scale(0.98);
+}
+
+.app-shell .tech-goal-workspace-scope .goal-execution-week-chart > button:hover,
+.app-shell .tech-goal-workspace-scope .goal-execution-week-chart > button:focus-visible {
+  z-index: 20;
+  color: var(--workspace-accent);
+  background: color-mix(in srgb, var(--workspace-accent) 6%, transparent);
+  outline: none;
+  transform: translateY(-3px) scale(1.02);
+}
+
+.app-shell .tech-goal-workspace-scope .goal-execution-week-chart > button:focus-visible {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--workspace-accent) 34%, transparent);
+}
+
+.app-shell .tech-goal-workspace-scope .goal-execution-week-chart > button > b {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 1px;
+  color: currentColor;
+  font-size: 11px;
   font-variant-numeric: tabular-nums;
+  font-weight: 680;
 }
 
-.app-shell .tech-goal-workspace-scope .goal-execution-day-track {
-  display: flex;
-  width: 100%;
-  align-items: flex-end;
-  justify-content: center;
-  border-bottom: 1px solid color-mix(in srgb, var(--workspace-border) 80%, transparent);
+.app-shell .tech-goal-workspace-scope .goal-execution-week-chart > button > b small {
+  color: var(--workspace-tertiary);
+  font-size: 7px;
+  font-weight: 540;
 }
 
-.app-shell .tech-goal-workspace-scope .goal-execution-day-track > i {
+.app-shell .tech-goal-workspace-scope .goal-execution-week-track {
   position: relative;
   display: block;
-  width: min(18px, 62%);
-  min-height: 4px;
-  overflow: hidden;
-  background: color-mix(in srgb, var(--workspace-secondary) 10%, var(--workspace-border));
-  border-radius: 5px 5px 2px 2px;
-  transform-origin: bottom;
+  width: min(78%, 68px);
+  height: 100%;
+  min-height: 0;
+  justify-self: center;
+  overflow: visible;
+  overflow: visible;
+  padding: 4px;
+  background: color-mix(in srgb, #edf0f8 82%, var(--workspace-panel));
+  border: 1px solid color-mix(in srgb, var(--workspace-accent) 8%, var(--workspace-border));
+  border-radius: 7px;
 }
 
-.app-shell .tech-goal-workspace-scope .goal-execution-day-track > i.has-tasks {
-  background: color-mix(in srgb, var(--workspace-accent) 72%, var(--workspace-panel));
-  animation: goal-execution-bar-reveal 480ms cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
-.app-shell .tech-goal-workspace-scope .goal-execution-day-track b {
+.app-shell .tech-goal-workspace-scope .goal-execution-week-track > i,
+.app-shell .tech-goal-workspace-scope .goal-execution-week-track > em {
   position: absolute;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  background: var(--goal-ring-done);
+  right: 4px;
+  bottom: 4px;
+  left: 4px;
+  display: block;
+  border-radius: 6px 6px 4px 4px;
+  transform-origin: center bottom;
 }
 
-.app-shell .tech-goal-workspace-scope .goal-execution-week-chart small {
+.app-shell .tech-goal-workspace-scope .goal-execution-week-track > i {
+  background: linear-gradient(180deg, #9aa9f8, #6f7ee8);
+  border: 0;
+  box-shadow: 0 7px 15px rgba(99, 112, 219, 0.16);
+}
+
+.app-shell .tech-goal-workspace-scope .goal-execution-week-track > em {
+  z-index: 2;
+  right: 7px;
+  left: 7px;
+  background: linear-gradient(180deg, #73d5c4, var(--goal-ring-done));
+  border-radius: 4px 4px 3px 3px;
+  box-shadow: 0 0 0 1px color-mix(in srgb, white 34%, transparent);
+}
+
+.app-shell .tech-goal-workspace-scope .goal-execution-week-chart > button.is-risk .goal-execution-week-track > i {
+  background: linear-gradient(180deg, #f2b269, #dc7952);
+  box-shadow: 0 7px 17px rgba(220, 121, 82, 0.18);
+}
+
+.app-shell .tech-goal-workspace-scope .goal-execution-week-chart > button.is-complete .goal-execution-week-track > i {
+  background: linear-gradient(180deg, #74d8c0, #42af99);
+  box-shadow: 0 6px 14px rgba(66, 175, 153, 0.15);
+}
+
+.app-shell .tech-goal-workspace-scope .goal-execution-week-chart > button.is-today:not(.is-risk) .goal-execution-week-track > i {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--workspace-accent) 66%, white), var(--workspace-accent));
+  box-shadow: 0 7px 17px color-mix(in srgb, var(--workspace-accent) 20%, transparent);
+}
+
+.app-shell .tech-goal-workspace-scope .goal-execution-week-chart > button.is-empty .goal-execution-week-track > i {
+  height: 3px !important;
+  background: color-mix(in srgb, var(--workspace-secondary) 18%, transparent);
+  box-shadow: none;
+  opacity: 0.75;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-execution-week-track > u {
+  position: absolute;
+  z-index: 3;
+  right: calc(-1 * clamp(10px, 1.4vw, 18px));
+  left: calc(-1 * clamp(10px, 1.4vw, 18px));
+  display: block;
+  border-top: 1px dashed color-mix(in srgb, var(--workspace-text) 42%, transparent);
+  text-decoration: none;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-execution-week-chart > button:first-of-type .goal-execution-week-track > u {
+  left: 0;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-execution-week-chart > button:last-of-type .goal-execution-week-track > u {
+  right: 0;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-execution-week-chart > button > strong {
+  color: var(--workspace-text);
+  font-size: 11px;
+  font-weight: 680;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-execution-week-chart > button.is-today > strong {
+  color: var(--workspace-accent);
+}
+
+.app-shell .tech-goal-workspace-scope .goal-execution-week-chart > button > small {
   color: var(--workspace-secondary);
-  font-size: 9px;
-  white-space: nowrap;
+  font-size: 10px;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-execution-week-tooltip {
+  position: absolute;
+  bottom: calc(100% - 24px);
+  left: 50%;
+  z-index: 80;
+  display: grid;
+  width: 178px;
+  gap: 3px;
+  padding: 9px 10px;
+  color: var(--workspace-secondary);
+  background: color-mix(in srgb, var(--workspace-panel) 96%, transparent);
+  border: 1px solid color-mix(in srgb, var(--workspace-accent) 18%, var(--workspace-border));
+  border-radius: 9px;
+  box-shadow: 0 12px 28px color-mix(in srgb, var(--workspace-text) 14%, transparent);
+  text-align: left;
+  opacity: 0;
+  transform: translate(-50%, 5px);
+  transition: opacity 160ms ease, transform 160ms ease;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-execution-week-chart > button:first-child .goal-execution-week-tooltip {
+  left: 0;
+  transform: translate(0, 5px);
+}
+
+.app-shell .tech-goal-workspace-scope .goal-execution-week-chart > button:last-child .goal-execution-week-tooltip {
+  right: 0;
+  left: auto;
+  transform: translate(0, 5px);
+}
+
+.app-shell .tech-goal-workspace-scope .goal-execution-week-chart > button:hover .goal-execution-week-tooltip,
+.app-shell .tech-goal-workspace-scope .goal-execution-week-chart > button:focus-visible .goal-execution-week-tooltip {
+  opacity: 1;
+  transform: translate(-50%, 0);
+  visibility: visible;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-execution-week-chart > button:first-child:hover .goal-execution-week-tooltip,
+.app-shell .tech-goal-workspace-scope .goal-execution-week-chart > button:first-child:focus-visible .goal-execution-week-tooltip,
+.app-shell .tech-goal-workspace-scope .goal-execution-week-chart > button:last-child:hover .goal-execution-week-tooltip,
+.app-shell .tech-goal-workspace-scope .goal-execution-week-chart > button:last-child:focus-visible .goal-execution-week-tooltip {
+  transform: translate(0, 0);
+}
+
+.app-shell .tech-goal-workspace-scope .goal-execution-week-tooltip > strong {
+  color: var(--workspace-text);
+  font-size: 12px;
+  font-weight: 680;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-execution-week-tooltip > small {
+  color: var(--workspace-secondary);
+  font-size: 10px;
+  line-height: 1.35;
 }
 
 .app-shell .tech-goal-workspace-scope .goal-execution-week > footer {
   justify-content: flex-start;
   gap: 14px;
+  margin-top: -3px;
+  padding-left: calc(6% - 1px);
+  font-size: 10px;
+  font-weight: 560;
 }
 
 .app-shell .tech-goal-workspace-scope .goal-execution-week > footer span {
@@ -2705,46 +3324,89 @@
 .app-shell .tech-goal-workspace-scope .goal-execution-week > footer i {
   width: 7px;
   height: 7px;
-  background: var(--workspace-accent);
+  background: color-mix(in srgb, var(--workspace-secondary) 18%, var(--workspace-panel));
+  border: 1px solid color-mix(in srgb, var(--workspace-secondary) 28%, var(--workspace-border));
   border-radius: 2px;
 }
 
 .app-shell .tech-goal-workspace-scope .goal-execution-week > footer i.is-done {
   background: var(--goal-ring-done);
+  border-color: color-mix(in srgb, var(--goal-ring-done) 72%, var(--workspace-border));
 }
 
-.app-shell .tech-goal-workspace-scope .goal-execution-next {
-  display: grid;
-  grid-template-columns: 78px minmax(0, 1fr);
-  gap: 12px;
-  align-items: start;
-  padding: 8px 0;
-  border-block: 1px solid var(--workspace-border);
+.app-shell .tech-goal-workspace-scope .goal-execution-week > footer i.is-capacity {
+  width: 10px;
+  height: 0;
+  background: transparent;
+  border-top: 1px dashed color-mix(in srgb, var(--workspace-text) 48%, transparent);
+  border-right: 0;
+  border-bottom: 0;
+  border-left: 0;
+  border-radius: 0;
 }
 
-.app-shell .tech-goal-workspace-scope .goal-execution-next > span {
-  color: var(--workspace-secondary);
-  font-size: 10px;
+.app-shell .tech-goal-workspace-scope .goal-mini-calendar button {
+  min-height: 26px !important;
+  padding-block: 1px;
 }
 
-.app-shell .tech-goal-workspace-scope .goal-execution-next > div {
-  display: grid;
+.app-shell .tech-goal-workspace-scope .goal-mini-calendar-header > button {
+  min-width: 30px;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-mini-calendar-heading {
+  display: flex;
   min-width: 0;
-  gap: 3px;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
 }
 
-.app-shell .tech-goal-workspace-scope .goal-execution-next strong {
-  overflow: hidden;
+.app-shell .tech-goal-workspace-scope .goal-mini-calendar-title {
   color: var(--workspace-text);
-  font-size: 12px;
-  font-weight: 700;
-  text-overflow: ellipsis;
+  font-size: 14px;
+  font-weight: 720;
   white-space: nowrap;
 }
 
-.app-shell .tech-goal-workspace-scope .goal-execution-next small {
+.app-shell .tech-goal-workspace-scope .goal-mini-calendar-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
   color: var(--workspace-secondary);
-  font-size: 9px;
+  font-size: 11px;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-mini-calendar-legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-mini-calendar-legend i {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-mini-calendar-body {
+  width: min(100%, 390px);
+  margin-inline: auto;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-mini-calendar-weekdays {
+  font-size: 12px;
+  line-height: 1.1;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-mini-calendar-days {
+  row-gap: 1px;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-mini-calendar-days > button {
+  font-size: 12px;
 }
 
 @keyframes goal-execution-enter {
@@ -2758,23 +3420,15 @@
 }
 
 @keyframes goal-execution-bar-reveal {
-  from { opacity: 0.35; transform: scaleY(0.08); }
-  to { opacity: 1; transform: scaleY(1); }
+  from { opacity: 0; transform: translateY(6px) scaleY(0.94); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 @container goal-right-panel (max-height: 500px) {
   .app-shell .tech-goal-workspace-scope .goal-execution {
-    grid-template-rows: auto auto auto minmax(76px, 1fr) auto;
+    grid-template-rows: auto auto minmax(104px, 1fr);
     gap: 6px;
     padding-block: 10px;
-  }
-
-  .app-shell .tech-goal-workspace-scope .goal-execution-header {
-    min-height: 30px;
-  }
-
-  .app-shell .tech-goal-workspace-scope .goal-execution-header > div strong {
-    font-size: 15px;
   }
 
   .app-shell .tech-goal-workspace-scope .goal-execution-kpis > div {
@@ -2786,31 +3440,42 @@
     margin-top: 5px;
   }
 
-  .app-shell .tech-goal-workspace-scope .goal-execution-capacity > footer,
-  .app-shell .tech-goal-workspace-scope .goal-execution-week > footer {
+  .app-shell .tech-goal-workspace-scope .goal-execution-capacity {
+    padding-block: 4px;
+  }
+
+  .app-shell .tech-goal-workspace-scope .goal-execution-capacity > footer {
     margin-top: 3px;
   }
 
+  .app-shell .tech-goal-workspace-scope .goal-execution-week > footer {
+    margin-top: -2px;
+  }
+
   .app-shell .tech-goal-workspace-scope .goal-execution-week {
+    row-gap: 7px;
     padding-top: 6px;
   }
 
-  .app-shell .tech-goal-workspace-scope .goal-execution-next {
-    padding-block: 6px;
+  .app-shell .tech-goal-workspace-scope .goal-execution-week-chart {
+    height: 100%;
+    min-height: 104px;
   }
 
-  .app-shell .tech-goal-workspace-scope .goal-execution.is-next-task-empty {
-    grid-template-rows: auto auto minmax(50px, 0.32fr) minmax(96px, 1.68fr);
+  .app-shell .tech-goal-workspace-scope .goal-execution-week-chart > button {
+    min-height: 0;
+    grid-template-rows: 12px minmax(58px, 1fr) auto auto;
   }
 
-  .app-shell .tech-goal-workspace-scope .goal-execution.is-next-task-empty .goal-execution-week-chart {
-    height: clamp(118px, 32cqh, 155px);
+  .app-shell .tech-goal-workspace-scope .goal-execution-week-track {
+    min-height: 0;
   }
+
 }
 
 @container goal-right-panel (max-height: 410px) {
   .app-shell .tech-goal-workspace-scope .goal-execution {
-    grid-template-rows: auto auto auto minmax(62px, 1fr) auto;
+    grid-template-rows: auto auto minmax(92px, 1fr);
     gap: 4px;
     padding-block: 7px;
   }
@@ -2820,19 +3485,79 @@
     display: none;
   }
 
-  .app-shell .tech-goal-workspace-scope .goal-execution.is-next-task-empty {
-    grid-template-rows: auto auto minmax(40px, 0.28fr) minmax(74px, 1.72fr);
+  .app-shell .tech-goal-workspace-scope .goal-execution-capacity {
+    padding-block: 2px;
   }
 
-  .app-shell .tech-goal-workspace-scope .goal-execution.is-next-task-empty .goal-execution-week-chart {
-    height: 100%;
-    max-height: 106px;
+  .app-shell .tech-goal-workspace-scope .goal-execution-week-chart > button {
+    min-height: 0;
+    grid-template-rows: 9px minmax(28px, 1fr) auto auto;
+    gap: 1px;
   }
+
+  .app-shell .tech-goal-workspace-scope .goal-execution-week-track {
+    min-height: 0;
+  }
+
+  .app-shell .tech-goal-workspace-scope .goal-execution-week-chart {
+    height: 100%;
+    min-height: 72px;
+  }
+
 }
 
 @media (max-width: 520px) {
   .app-shell .tech-goal-workspace-scope .goal-execution {
-    padding-inline: 20px;
+    padding-inline: 14px;
+  }
+
+  .app-shell .tech-goal-workspace-scope :is(
+    .goal-progress-summary .goal-metric-card,
+    .goal-execution-kpis > div
+  ) {
+    padding-inline: 7px;
+  }
+
+  .app-shell .tech-goal-workspace-scope .goal-progress-metric-heading,
+  .app-shell .tech-goal-workspace-scope .goal-execution-kpis dt {
+    gap: 4px;
+    font-size: 12px;
+  }
+
+  .app-shell .tech-goal-workspace-scope .goal-progress-metric-heading .goal-metric-badge {
+    display: none;
+  }
+
+  .app-shell .tech-goal-workspace-scope .goal-execution-week-chart {
+    height: clamp(140px, 32cqh, 220px);
+    min-height: 140px;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 4px;
+  }
+
+  .app-shell .tech-goal-workspace-scope .goal-execution-week-chart > button {
+    min-height: 0;
+    grid-template-rows: 11px minmax(38px, 1fr) auto auto;
+    padding-inline: 2px;
+  }
+
+  .app-shell .tech-goal-workspace-scope .goal-execution-week {
+    padding-right: 0;
+  }
+
+  .app-shell .tech-goal-workspace-scope .goal-execution-week > footer {
+    display: flex;
+    gap: 10px;
+    padding-left: calc(6% - 7px);
+    font-size: 9px;
+  }
+
+  .app-shell .tech-goal-workspace-scope .goal-execution-week-chart > button > :is(strong, small) {
+    font-size: 8px;
+  }
+
+  .app-shell .tech-goal-workspace-scope .goal-execution-week-tooltip {
+    display: none;
   }
 
 }
@@ -2840,7 +3565,8 @@
 @media (prefers-reduced-motion: reduce) {
   .app-shell .tech-goal-workspace-scope .goal-execution,
   .app-shell .tech-goal-workspace-scope .goal-execution-capacity-track > i,
-  .app-shell .tech-goal-workspace-scope .goal-execution-day-track > i.has-tasks {
+  .app-shell .tech-goal-workspace-scope .goal-execution-capacity-track > em,
+  .app-shell .tech-goal-workspace-scope .goal-execution-week-chart > button {
     animation: none;
   }
 
@@ -2943,6 +3669,787 @@
 @keyframes goal-plan-icon-float {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-4px); }
+}
+
+/* Goal detail task-first redesign. The goal name and progress form one quiet
+   header; tasks stay primary while execution and planning remain contextual. */
+.app-shell .tech-goal-workspace-scope .goal-detail-header {
+  display: grid;
+  min-height: 0;
+  margin: 14px 16px 0 0;
+  padding: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 94% 0, color-mix(in srgb, var(--workspace-accent) 8%, transparent), transparent 34%),
+    var(--workspace-panel);
+  border: 1px solid color-mix(in srgb, var(--workspace-accent) 10%, var(--workspace-border));
+  border-radius: 14px;
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--workspace-text) 4%, transparent);
+}
+
+.app-shell .tech-goal-workspace-scope .goal-detail-heading-row {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 40px minmax(0, 1fr);
+  align-items: center;
+  gap: 13px;
+  min-height: 86px;
+  padding: 17px 24px;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-detail-back {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  place-items: center;
+  color: var(--workspace-secondary);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  transition: color 160ms ease, background-color 160ms ease, border-color 160ms ease;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-detail-back:is(:hover, :focus-visible) {
+  color: var(--workspace-text);
+  background: var(--workspace-hover);
+  border-color: var(--workspace-border);
+  outline: none;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-detail-heading-copy {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  gap: 5px;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-detail-title-line {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-detail-title-line h1 {
+  overflow: hidden;
+  margin: 0;
+  color: var(--workspace-text);
+  font-size: 21px;
+  font-weight: 720;
+  line-height: 1.25;
+  letter-spacing: -0.025em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-detail-title-line .goal-status {
+  display: inline-flex;
+  min-height: 24px;
+  flex: 0 0 auto;
+  align-items: center;
+  padding: 0 9px;
+  color: var(--workspace-accent) !important;
+  background: color-mix(in srgb, var(--workspace-accent) 7%, var(--workspace-panel)) !important;
+  border: 1px solid color-mix(in srgb, var(--workspace-accent) 22%, var(--workspace-border));
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 680;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-detail-heading-copy > p {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px 0;
+  margin: 0;
+  color: var(--workspace-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-detail-heading-copy > p > span {
+  display: inline-flex;
+  align-items: center;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-detail-heading-copy > p > span + span::before {
+  margin: 0 8px;
+  color: color-mix(in srgb, var(--workspace-secondary) 42%, transparent);
+  content: "·";
+}
+
+.app-shell .tech-goal-workspace-scope .goal-progress-summary {
+  display: contents;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-progress-summary .goal-metric-card {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  grid-template-columns: auto;
+  align-content: center;
+  justify-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-height: 46px;
+  padding: 3px 14px;
+  color: var(--workspace-text);
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0;
+  box-shadow: none !important;
+  animation: goal-metric-enter 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-progress-summary .goal-metric-card:nth-child(2) { animation-delay: 35ms; }
+.app-shell .tech-goal-workspace-scope .goal-progress-summary .goal-metric-card:nth-child(3) { animation-delay: 70ms; }
+
+.app-shell .tech-goal-workspace-scope .goal-progress-summary .goal-metric-card + .goal-metric-card {
+  border-left: 1px solid var(--workspace-border) !important;
+}
+
+@keyframes goal-metric-enter {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.app-shell .tech-goal-workspace-scope .goal-progress-metric-heading {
+  display: grid;
+  min-width: 0;
+  grid-column: 1 / -1;
+  width: 100%;
+  grid-template-columns: 15px minmax(0, auto) 15px;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  color: var(--workspace-secondary);
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-progress-metric-heading::after {
+  width: 15px;
+  content: "";
+}
+
+.app-shell .tech-goal-workspace-scope .goal-progress-metric-heading > svg {
+  flex: 0 0 auto;
+  width: 15px;
+  height: 15px;
+  color: var(--workspace-accent);
+}
+
+.app-shell .tech-goal-workspace-scope .goal-progress-metric-heading > span:not(.goal-metric-badge) {
+  min-width: max-content;
+  line-height: 1.2;
+  text-align: center;
+  white-space: nowrap;
+  word-break: keep-all;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-metric-card-debt.is-alert .goal-progress-metric-heading > svg {
+  color: var(--workspace-warning, #b87820);
+}
+
+.app-shell .tech-goal-workspace-scope .goal-progress-summary .goal-metric-card > strong {
+  display: inline-flex;
+  height: 18px;
+  grid-column: 1 / -1;
+  grid-row: 2;
+  align-items: baseline;
+  align-self: center;
+  justify-content: center;
+  color: var(--workspace-text);
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 730;
+  line-height: 1.2;
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 150ms ease, transform 150ms ease;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-progress-summary .goal-metric-card > strong > small {
+  margin-left: 2px;
+  color: var(--workspace-secondary);
+  font-size: 9px;
+  font-weight: 560;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-metric-hover-detail {
+  display: inline-flex;
+  min-width: 0;
+  grid-column: 1 / -1;
+  grid-row: 2;
+  align-items: baseline;
+  justify-content: center;
+  gap: 4px;
+  overflow: hidden;
+  color: var(--workspace-secondary);
+  font-size: 12px;
+  font-weight: 680;
+  line-height: 1.2;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateY(2px);
+  transition: opacity 150ms ease, transform 150ms ease;
+  pointer-events: none;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-metric-hover-detail > em {
+  flex: 0 0 auto;
+  font-style: normal;
+  font-weight: 740;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-metric-hover-detail > em.is-warn {
+  color: color-mix(in srgb, #d05ca8 78%, var(--workspace-text));
+}
+
+.app-shell .tech-goal-workspace-scope .goal-metric-hover-detail > em.is-ok {
+  color: color-mix(in srgb, var(--workspace-positive, #42b49d) 82%, var(--workspace-text));
+}
+
+.app-shell .tech-goal-workspace-scope .goal-metric-hover-detail > em.is-neutral {
+  color: color-mix(in srgb, var(--workspace-accent) 80%, var(--workspace-text));
+}
+
+.app-shell .tech-goal-workspace-scope .goal-metric-card:is(:hover, :focus-visible) > .goal-metric-primary-value {
+  opacity: 0;
+  transform: translateY(-2px);
+}
+
+.app-shell .tech-goal-workspace-scope .goal-metric-card:is(:hover, :focus-visible) > .goal-metric-hover-detail {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.app-shell .tech-goal-workspace-scope .goal-metric-card:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--workspace-accent) 34%, transparent) !important;
+  outline-offset: -2px;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-progress-summary .goal-metric-card > small {
+  align-self: end;
+  overflow: visible;
+  color: var(--workspace-secondary);
+  font-size: 9px;
+  line-height: 1.3;
+  text-align: center;
+  text-overflow: clip;
+  white-space: nowrap;
+}
+
+@container goal-right-panel (max-width: 520px) {
+  .app-shell .tech-goal-workspace-scope .goal-progress-summary .goal-metric-card,
+  .app-shell .tech-goal-workspace-scope .goal-execution-kpis > div {
+    padding-inline: 6px;
+  }
+
+  .app-shell .tech-goal-workspace-scope .goal-progress-metric-heading {
+    grid-template-columns: 14px minmax(0, auto) 14px;
+    gap: 4px;
+    font-size: 13px;
+  }
+
+  .app-shell .tech-goal-workspace-scope .goal-progress-metric-heading::after {
+    width: 14px;
+  }
+
+  .app-shell .tech-goal-workspace-scope .goal-execution-kpis dt {
+    font-size: 13px;
+  }
+
+  .app-shell .tech-goal-workspace-scope .goal-progress-metric-heading > svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  .app-shell .tech-goal-workspace-scope .goal-progress-summary .goal-metric-card > strong {
+    font-size: 14px;
+  }
+
+  .app-shell .tech-goal-workspace-scope .goal-metric-hover-detail {
+    font-size: 12px;
+  }
+
+  .app-shell .tech-goal-workspace-scope .goal-execution-kpis dd {
+    font-size: 12px;
+  }
+
+  .app-shell .tech-goal-workspace-scope .goal-progress-summary .goal-metric-card > small {
+    font-size: 9px;
+  }
+}
+
+.app-shell .tech-goal-workspace-scope .goal-progress-feedback {
+  display: grid;
+  min-height: 48px;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  color: var(--workspace-warning, #b87820);
+  background: color-mix(in srgb, var(--workspace-warning, #b87820) 5%, var(--workspace-panel));
+  border-left: 1px solid color-mix(in srgb, var(--workspace-warning, #b87820) 22%, var(--workspace-border));
+  border-radius: 8px;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-progress-feedback.is-neutral {
+  grid-template-columns: 24px minmax(0, 1fr);
+  color: var(--workspace-secondary);
+  background: var(--workspace-panel-subtle);
+  border-left-color: var(--workspace-border);
+}
+
+.app-shell .tech-goal-workspace-scope .goal-progress-feedback > div {
+  display: grid;
+  gap: 1px;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-progress-feedback strong {
+  color: var(--workspace-text);
+  font-size: 12px;
+  font-weight: 680;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-progress-feedback span {
+  color: var(--workspace-secondary);
+  font-size: 10px;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-progress-feedback button {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  gap: 5px;
+  padding: 0 10px;
+  color: var(--workspace-accent);
+  background: var(--workspace-panel);
+  border: 1px solid color-mix(in srgb, var(--workspace-accent) 22%, var(--workspace-border));
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 680;
+  cursor: pointer;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-progress-feedback button:is(:hover, :focus-visible) {
+  background: var(--workspace-accent-soft);
+  border-color: color-mix(in srgb, var(--workspace-accent) 42%, var(--workspace-border));
+  outline: none;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-progress-skeleton {
+  display: grid;
+  align-content: center;
+  gap: 7px;
+  padding: 7px 14px;
+  border-left: 1px solid var(--workspace-border);
+}
+
+.app-shell .tech-goal-workspace-scope .goal-progress-skeleton span,
+.app-shell .tech-goal-workspace-scope .goal-progress-skeleton strong {
+  display: block;
+  height: 8px;
+  background: var(--workspace-border);
+  border-radius: 99px;
+  animation: pulse 1.8s ease-in-out infinite;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-progress-skeleton span { width: 58%; }
+.app-shell .tech-goal-workspace-scope .goal-progress-skeleton strong { width: 38%; height: 13px; }
+
+.app-shell .tech-goal-workspace-scope .goal-detail-body {
+  gap: 12px;
+  padding: 14px 16px 16px 0;
+}
+
+.app-shell .tech-goal-workspace-scope :is(.goal-detail-left, .goal-detail-right) {
+  border-color: var(--workspace-border);
+  border-radius: 12px;
+  box-shadow: 0 7px 22px color-mix(in srgb, var(--workspace-text) 3.5%, transparent);
+}
+
+.app-shell .tech-goal-workspace-scope .goal-primary-tabs,
+.app-shell .tech-goal-workspace-scope .goal-right-tabs {
+  display: grid;
+  min-height: 54px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: stretch;
+  padding: 0 14px;
+  background: var(--workspace-panel);
+  border-bottom: 0 !important;
+}
+
+.app-shell .tech-goal-workspace-scope :is(.goal-primary-tab, .goal-right-tab) {
+  position: relative;
+  min-height: 53px;
+  justify-content: center;
+  padding: 0 14px !important;
+  color: var(--workspace-text);
+  font-size: 15px;
+  font-weight: 740;
+  line-height: 1;
+  border-bottom: 0 !important;
+}
+
+.app-shell .tech-goal-workspace-scope :is(.goal-primary-tab, .goal-right-tab) > svg {
+  width: 18px;
+  height: 18px;
+  color: currentColor;
+}
+
+.app-shell .tech-goal-workspace-scope :is(.goal-primary-tab, .goal-right-tab)[aria-pressed="true"] {
+  color: var(--goal-title-accent);
+}
+
+.app-shell .tech-goal-workspace-scope :is(.goal-primary-tab, .goal-right-tab)::after {
+  position: absolute;
+  right: 18px;
+  bottom: 4px;
+  left: 18px;
+  height: 3px;
+  content: "";
+  background: transparent;
+  border-radius: 999px;
+}
+
+.app-shell .tech-goal-workspace-scope :is(.goal-primary-tab, .goal-right-tab)[aria-pressed="true"]::after {
+  background: var(--goal-title-accent);
+}
+
+.app-shell .tech-goal-workspace-scope .goal-tasks-workspace {
+  min-height: 100%;
+  padding: 4px 20px 8px;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-execution {
+  padding-top: 8px;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-task-toolbar {
+  min-height: 36px;
+  margin-bottom: 6px;
+  padding-bottom: 0;
+  border-bottom: 0 !important;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-task-view-tabs {
+  margin-left: 8px;
+  gap: 20px;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-task-view-tab {
+  min-height: 36px;
+  gap: 6px;
+  padding-inline: 0;
+  color: var(--workspace-text);
+  font-size: 14px;
+  font-weight: 740;
+  line-height: 1;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-task-view-tab::after {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  content: "";
+  background: color-mix(in srgb, var(--workspace-accent) 16%, transparent);
+  border-radius: 999px;
+  transition: background-color 160ms ease;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-task-view-tab > svg {
+  width: 14px;
+  height: 14px;
+  color: currentColor;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-task-view-tab:is(:hover, :focus-visible),
+.app-shell .tech-goal-workspace-scope .goal-task-view-tab.is-active {
+  color: var(--goal-title-accent);
+}
+
+.app-shell .tech-goal-workspace-scope .goal-task-view-tab:is(:hover, :focus-visible)::after,
+.app-shell .tech-goal-workspace-scope .goal-task-view-tab.is-active::after {
+  background: color-mix(in srgb, var(--goal-title-accent) 54%, transparent);
+}
+
+.app-shell .tech-goal-workspace-scope .goal-task-add-button {
+  height: 36px;
+  min-height: 36px;
+  margin-left: 2px;
+  font-size: 12px;
+  border-radius: 9px;
+  box-shadow: none;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-task-empty {
+  min-height: clamp(280px, 47vh, 430px);
+  gap: 9px;
+  padding: 36px 18px 54px;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-task-empty-icon {
+  width: 48px;
+  height: 48px;
+  margin-bottom: 5px;
+  border-radius: 50%;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-task-empty strong {
+  font-size: 16px;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-task-empty p {
+  max-width: none;
+  font-size: 13px;
+  line-height: 1.55;
+  white-space: nowrap;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-task-empty button {
+  min-height: 40px;
+  margin-top: 8px;
+  padding-inline: 16px;
+  color: var(--workspace-panel);
+  background: var(--workspace-accent);
+  border-color: var(--workspace-accent);
+  border-radius: 9px;
+  font-size: 13px;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-task-empty button:is(:hover, :focus-visible) {
+  color: var(--workspace-panel);
+  background: color-mix(in srgb, var(--workspace-accent) 88%, var(--workspace-text));
+  border-color: color-mix(in srgb, var(--workspace-accent) 88%, var(--workspace-text));
+}
+
+.app-shell .tech-goal-workspace-scope .goal-detail-debt-list {
+  padding: 10px 20px 20px;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-detail-debt-list:empty {
+  display: none;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-execution:is(.is-empty, .is-complete) {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  align-content: stretch;
+  padding: 18px 28px 32px;
+  overflow-y: auto;
+  text-align: center;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-execution.is-empty {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.app-shell .tech-goal-workspace-scope .goal-execution-empty-content {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 9px;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-execution-empty-icon {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  margin-bottom: 5px;
+  place-items: center;
+  color: var(--workspace-accent);
+  background: var(--workspace-accent-soft);
+  border: 1px solid color-mix(in srgb, var(--workspace-accent) 18%, var(--workspace-border));
+  border-radius: 50%;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-execution.is-complete .goal-execution-empty-icon {
+  color: var(--workspace-positive, #3b8f7c);
+  background: color-mix(in srgb, var(--workspace-positive, #3b8f7c) 9%, var(--workspace-panel));
+  border-color: color-mix(in srgb, var(--workspace-positive, #3b8f7c) 22%, var(--workspace-border));
+}
+
+.app-shell .tech-goal-workspace-scope .goal-execution-empty-content > strong {
+  color: var(--workspace-text);
+  font-size: 17px;
+  font-weight: 720;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-execution-empty-content > p {
+  max-width: none;
+  margin: 0;
+  color: var(--workspace-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-execution.is-empty .goal-execution-empty-content {
+  transform: none;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-execution-empty-content > span {
+  margin-top: 5px;
+  color: var(--workspace-secondary);
+  font-size: 11px;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-execution-empty-content > button {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding-inline: 16px;
+  color: var(--workspace-panel);
+  background: var(--workspace-accent);
+  border: 1px solid var(--workspace-accent);
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 680;
+  transition: background-color 160ms ease, border-color 160ms ease, transform 160ms ease;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-execution-empty-content > button:is(:hover, :focus-visible) {
+  background: color-mix(in srgb, var(--workspace-accent) 88%, var(--workspace-text));
+  border-color: color-mix(in srgb, var(--workspace-accent) 88%, var(--workspace-text));
+  outline: none;
+  transform: translateY(-1px);
+}
+
+.app-shell .tech-goal-workspace-scope .goal-plan-error {
+  min-height: 100%;
+  text-align: center;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-detail-resizer {
+  width: 12px !important;
+  flex-basis: 12px;
+  margin-inline: -6px;
+  z-index: 2;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-detail-resizer::after {
+  width: 2px;
+  height: 52px;
+}
+
+@media (max-width: 1120px) {
+  .app-shell .tech-goal-workspace-scope .goal-detail-heading-row {
+    grid-template-columns: 40px minmax(0, 1fr);
+  }
+
+  .app-shell .tech-goal-workspace-scope .goal-progress-summary .goal-metric-card {
+    padding-inline: 9px;
+  }
+
+  .app-shell .tech-goal-workspace-scope .goal-progress-metric-heading .goal-metric-badge {
+    display: none;
+  }
+}
+
+@media (max-width: 920px) {
+  .app-shell .tech-goal-workspace-scope .goal-detail-header {
+    margin: 10px 10px 0;
+  }
+
+  .app-shell .tech-goal-workspace-scope .goal-detail-heading-row {
+    padding-inline: 16px;
+  }
+
+  .app-shell .tech-goal-workspace-scope .goal-detail-body {
+    gap: 10px;
+    padding: 10px;
+  }
+
+  .app-shell .tech-goal-workspace-scope .goal-detail-resizer {
+    display: none;
+  }
+}
+
+@media (max-width: 560px) {
+  .app-shell .tech-goal-workspace-scope .goal-primary-tabs,
+  .app-shell .tech-goal-workspace-scope .goal-right-tabs {
+    padding-inline: 8px;
+  }
+
+  .app-shell .tech-goal-workspace-scope :is(.goal-primary-tab, .goal-right-tab) {
+    padding-inline: 8px !important;
+  }
+
+  .app-shell .tech-goal-workspace-scope :is(.goal-primary-tab, .goal-right-tab)::after {
+    right: 10px;
+    left: 10px;
+  }
+
+  .app-shell .tech-goal-workspace-scope .goal-execution.is-empty .goal-execution-empty-content {
+    transform: none;
+  }
+
+  .app-shell .tech-goal-workspace-scope .goal-execution-empty-content > p {
+    max-width: 300px;
+    white-space: normal;
+  }
+
+  .app-shell .tech-goal-workspace-scope .goal-detail-heading-row {
+    align-items: flex-start;
+    padding: 12px;
+  }
+
+  .app-shell .tech-goal-workspace-scope .goal-detail-title-line {
+    align-items: flex-start;
+  }
+
+  .app-shell .tech-goal-workspace-scope .goal-detail-title-line h1 {
+    font-size: 19px;
+    white-space: normal;
+  }
+
+  .app-shell .tech-goal-workspace-scope .goal-progress-summary {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .app-shell .tech-goal-workspace-scope .goal-progress-summary .goal-metric-card {
+    min-height: 52px;
+  }
+
+  .app-shell .tech-goal-workspace-scope .goal-progress-feedback {
+    grid-template-columns: 22px minmax(0, 1fr);
+  }
+
+  .app-shell .tech-goal-workspace-scope .goal-progress-feedback button {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .app-shell .tech-goal-workspace-scope .goal-tasks-workspace {
+    padding-inline: 14px;
+  }
+
+  .app-shell .tech-goal-workspace-scope .goal-task-empty {
+    min-height: 300px;
+  }
+
+  .app-shell .tech-goal-workspace-scope .goal-task-empty p {
+    max-width: 300px;
+    white-space: normal;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-shell .tech-goal-workspace-scope .goal-progress-summary .goal-metric-card {
+    animation: none;
+  }
+
+  .app-shell .tech-goal-workspace-scope :is(.goal-metric-primary-value, .goal-metric-hover-detail) {
+    transition: none;
+  }
 }
 
 /* Technology new-goal flow. The form keeps the goal workspace density while
@@ -4120,10 +5627,10 @@
   }
 }
 
-/* Semantic goal health scale: progress stays action-oriented purple, risk is
+/* Semantic goal health scale: progress uses a calm deep blue, risk is
    reserved for warm amber, and archived states recede to neutral slate. */
 .app-shell .tech-goals-page .goal-list-progress strong {
-  color: #5f55d9;
+  color: color-mix(in srgb, #174a8b 86%, var(--goal-tech-text));
   font-weight: 760;
 }
 .app-shell .tech-goals-page .goal-list-actions > small.status-进行中 {
@@ -4452,13 +5959,14 @@
   right: 0;
   z-index: 30;
   display: grid;
-  width: 108px;
+  width: 128px;
   gap: 2px;
-  padding: 5px;
-  background: var(--goal-tech-panel);
-  border: 1px solid var(--goal-tech-border);
-  border-radius: 9px;
-  box-shadow: 0 12px 30px color-mix(in srgb, var(--goal-tech-text) 14%, transparent);
+  padding: 6px;
+  background: var(--goal-popover-surface);
+  border: 1px solid var(--goal-popover-border);
+  border-radius: 12px;
+  box-shadow: var(--goal-popover-shadow);
+  animation: goal-popover-in 160ms cubic-bezier(.22, 1, .36, 1) both;
 }
 
 .app-shell .tech-goals-page .goal-list-row:has(.goal-list-menu[open]) {
@@ -4471,23 +5979,40 @@
 }
 
 .app-shell .tech-goals-page .goal-list-menu > div > button {
-  display: flex;
-  min-height: 36px;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) 16px;
+  min-height: var(--goal-popover-row-height);
   align-items: center;
   gap: 8px;
-  padding: 0 10px;
-  color: var(--goal-tech-text);
-  font-size: 14px;
+  padding: var(--goal-popover-row-padding);
+  color: var(--goal-tech-muted);
+  font-size: 13px;
   font-weight: 560;
   line-height: 1.35;
-  border-radius: 6px;
+  background: transparent;
+  border: 0;
+  border-radius: var(--goal-popover-row-radius);
   text-align: left;
+  cursor: pointer;
+  transition: color 150ms ease, background-color 150ms ease, box-shadow 180ms ease;
+}
+
+.app-shell .tech-goals-page .goal-list-menu > div > button > svg {
+  flex: 0 0 auto;
+  opacity: .78;
+}
+
+.app-shell .tech-goals-page .goal-list-menu > div > button::after {
+  width: 16px;
+  height: 1px;
+  content: "";
 }
 
 .app-shell .tech-goals-page .goal-list-menu > div > button:hover,
 .app-shell .tech-goals-page .goal-list-menu > div > button:focus-visible {
   color: var(--goal-tech-accent);
-  background: var(--goal-tech-accent-soft);
+  background: color-mix(in srgb, var(--goal-tech-accent) 8%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--goal-tech-accent) 10%, transparent);
   outline: none;
 }
 
@@ -4495,6 +6020,7 @@
 .app-shell .tech-goals-page .goal-list-menu > div > button:last-child:focus-visible {
   color: var(--workspace-danger, #cc5f68);
   background: color-mix(in srgb, var(--workspace-danger, #cc5f68) 9%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--workspace-danger, #cc5f68) 11%, transparent);
 }
 
 @media (max-width: 560px) {
@@ -4503,7 +6029,19 @@
   }
 
   .app-shell .tech-goals-page .goals-list-panel .filter-tabs {
+    display: flex;
     width: 100%;
+  }
+
+  .app-shell .tech-goals-page .goals-list-panel .filter-tabs button {
+    min-width: 0;
+    flex: 1 1 0;
+    padding-inline: 4px;
+    white-space: nowrap;
+  }
+
+  .app-shell .tech-goals-page .goals-list-panel .filter-tabs button::before {
+    display: none;
   }
 
   .app-shell .tech-goals-page .goals-panel-create {
@@ -4536,7 +6074,7 @@
   }
 
   .app-shell .tech-goals-page .goal-list-menu > div > button {
-    min-height: 40px;
+    min-height: var(--goal-popover-row-height);
   }
 
   .app-shell .tech-goals-page .goal-list-detail-line {
@@ -4557,17 +6095,21 @@
 
 @media (min-width: 821px) {
   .app-shell .tech-goals-page {
-    min-height: calc(100dvh - 42px);
+    height: calc(100dvh - 42px);
+    min-height: 0;
+    overflow: hidden;
   }
 
   .app-shell .tech-goals-page .goals-redesign-grid {
     height: auto;
-    min-height: 448px;
+    min-height: 0;
+    grid-template-rows: minmax(0, 1fr);
     flex: 1 1 auto;
   }
 
   .app-shell .tech-goals-page .goals-list-panel {
     height: 100%;
+    min-height: 0;
     align-self: stretch;
   }
 
@@ -4599,6 +6141,7 @@
 
   .app-shell .tech-goals-page .goals-side-stack {
     height: 100%;
+    min-height: 0;
     grid-template-rows: 178px minmax(0, 1fr);
   }
 
@@ -4640,13 +6183,6 @@
     min-height: 29px;
     padding: 0 7px;
   }
-}
-
-.app-shell .tech-goals-page .goal-list-menu > div {
-  border-color: color-mix(in srgb, var(--goal-tech-accent) 32%, var(--goal-tech-border));
-  box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--goal-tech-accent) 7%, transparent),
-    0 12px 30px color-mix(in srgb, var(--goal-tech-accent) 13%, transparent);
 }
 
 /* Compact new-goal composition: one focused form surface and one supporting
@@ -5787,6 +7323,10 @@
 }
 
 .app-shell .tech-goal-form-page .tech-goal-preference-grid {
+  margin-top: 0;
+}
+
+.app-shell .tech-goal-form-page .tech-goal-preference-grid + .tech-goal-create-two-column {
   margin-top: 10px;
 }
 
@@ -5936,7 +7476,8 @@
 }
 
 .app-shell .tech-goal-form-page .tech-goal-status-section {
-  margin-top: 22px;
+  margin-top: 0;
+  margin-bottom: 18px;
 }
 
 .app-shell .tech-goal-form-page .tech-goal-status-control {

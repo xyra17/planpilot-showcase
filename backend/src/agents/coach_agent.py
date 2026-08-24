@@ -14,7 +14,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from pydantic import BaseModel, Field
 
 from src.config import settings
-from src.core.llm_router import create_structured_routine_llm
+from src.core.llm_router import create_json_llm
 from src.core.model_gateway import ModelGateway, ModelGatewayError
 
 logger = logging.getLogger(__name__)
@@ -126,7 +126,14 @@ class CoachAgent:
             ).encode("utf-8")
         ).hexdigest()
         try:
-            llm = create_structured_routine_llm(
+            fallback_provider = (
+                "local"
+                if model_provider == "smart" and settings.local_model_enabled
+                else "smart"
+                if model_provider == "local" and settings.smart_api_key
+                else None
+            )
+            llm = create_json_llm(
                 provider=model_provider,
                 model_name=model_name,
                 timeout_ms=timeout_ms,
@@ -145,16 +152,17 @@ class CoachAgent:
                     )
                 ),
                 fallback_factory=(
-                    (
-                        lambda: create_structured_routine_llm(
-                            provider="configured-router",
+                    lambda: (
+                        create_json_llm(
+                            provider=fallback_provider,
                             temperature=temperature,
                             max_tokens=max_tokens,
                         )
+                        if fallback_provider
+                        else None
                     )
-                    if model_provider not in {"configured-router", None}
-                    else None
                 ),
+                fallback_route=fallback_provider or "none",
             )
             response = gateway_result.response
             raw = response.content

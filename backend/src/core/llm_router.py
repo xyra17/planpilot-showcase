@@ -1,7 +1,8 @@
-"""PlanPilot 的生成模型路由。
+"""PlanPilot generation-model roles and bounded routing.
 
-日常任务优先使用本地 MLX 模型，调用失败时自动回退 DeepSeek Flash；
-复杂重规划与最终审核显式使用 DeepSeek Pro。
+Interactive text uses local Qwen with Flash as availability fallback.
+Structured JSON uses Flash with local Qwen as availability fallback.
+Critical judgments use Pro without silent degradation.
 """
 
 import asyncio
@@ -120,6 +121,51 @@ class ModelMetrics:
 local_circuit = LocalModelCircuitBreaker()
 model_metrics = ModelMetrics()
 _local_semaphore = asyncio.Semaphore(settings.local_model_max_concurrency)
+_flash_semaphore = asyncio.Semaphore(settings.cloud_routine_max_concurrency)
+_pro_semaphore = asyncio.Semaphore(settings.cloud_pro_max_concurrency)
+
+MODEL_ROLE_CONTRACTS = {
+    "interactive": {
+        "purpose": "普通聊天、打卡回应、短解释和笔记辅助",
+        "primary": "local",
+        "primary_model": settings.model_name,
+        "fallback": "flash",
+        "fallback_model": settings.smart_model_name,
+        "fallback_policy": "本地模型不可用、报错或队列超时后回退；不因主观回答质量自动切换",
+        "result": "简短中文自然语言，可流式返回",
+        "max_concurrency": settings.local_model_max_concurrency,
+    },
+    "structured": {
+        "purpose": "宏观计划、每日任务、验收出题、Agent 规划和建议 JSON",
+        "primary": "flash",
+        "primary_model": settings.smart_model_name,
+        "fallback": "local",
+        "fallback_model": settings.model_name,
+        "fallback_policy": "主模型不可用时回退；使用契约校验入口时，JSON 或业务契约失败也会换路重试一次",
+        "result": "经过 JSON 或业务契约校验的结构化结果",
+        "max_concurrency": settings.cloud_routine_max_concurrency,
+    },
+    "critical": {
+        "purpose": "学习答案评分和需要高质量终审的复杂决策",
+        "primary": "pro",
+        "primary_model": settings.smart_pro_model_name,
+        "fallback": None,
+        "fallback_model": None,
+        "fallback_policy": "不静默降级；调用失败时向上游返回明确错误",
+        "result": "高质量判断；失败时显式报错，不静默降低模型等级",
+        "max_concurrency": settings.cloud_pro_max_concurrency,
+    },
+    "embedding": {
+        "purpose": "知识库向量化和语义检索",
+        "primary": "embedding-local",
+        "primary_model": settings.embedding_model_name,
+        "fallback": "keyword-search",
+        "fallback_model": None,
+        "fallback_policy": "Embedding 不可用或向量无有效结果时使用数据库原文包含匹配",
+        "result": f"{settings.embedding_dimensions} 维向量；不可用时退化为关键词检索",
+        "max_concurrency": settings.embedding_max_concurrency,
+    },
+}
 
 
 class _RouteMetricsCallback(BaseCallbackHandler):
@@ -196,8 +242,14 @@ def _flash_llm(**kwargs: Any) -> ChatOpenAI:
     )
 
 
-def _limit_local_concurrency(runnable: Any) -> Any:
-    """限制共享 MLX 服务并发；排队超时会作为异常触发云端回退。"""
+def _limit_concurrency(
+    runnable: Any,
+    *,
+    semaphore: asyncio.Semaphore,
+    queue_timeout_seconds: float,
+    route: str,
+) -> Any:
+    """Bound one model role per process while preserving fallback semantics."""
 
     def invoke_sync(value: Any, config: Any = None) -> Any:
         return runnable.invoke(value, config=config)
@@ -205,41 +257,97 @@ def _limit_local_concurrency(runnable: Any) -> Any:
     async def invoke_async(value: Any, config: Any = None) -> Any:
         try:
             await asyncio.wait_for(
-                _local_semaphore.acquire(),
-                timeout=settings.local_model_queue_timeout_seconds,
+                semaphore.acquire(),
+                timeout=queue_timeout_seconds,
             )
         except TimeoutError:
             logger.warning(
-                "llm_local_queue_timeout timeout_seconds=%.1f",
-                settings.local_model_queue_timeout_seconds,
+                "llm_queue_timeout route=%s timeout_seconds=%.1f",
+                route,
+                queue_timeout_seconds,
             )
             raise
         try:
             return await runnable.ainvoke(value, config=config)
         finally:
-            _local_semaphore.release()
+            semaphore.release()
 
     return RunnableLambda(invoke_sync, afunc=invoke_async)
 
 
-def create_routine_llm(*, tools: Sequence[Any] | None = None, **kwargs: Any) -> Any:
-    """创建“本地优先、Flash 回退”的日常任务模型。"""
+def _limit_local_concurrency(runnable: Any) -> Any:
+    return _limit_concurrency(
+        runnable,
+        semaphore=_local_semaphore,
+        queue_timeout_seconds=settings.local_model_queue_timeout_seconds,
+        route="local",
+    )
+
+
+def _limit_flash_concurrency(runnable: Any) -> Any:
+    return _limit_concurrency(
+        runnable,
+        semaphore=_flash_semaphore,
+        queue_timeout_seconds=settings.cloud_model_queue_timeout_seconds,
+        route="flash",
+    )
+
+
+def _limit_pro_concurrency(runnable: Any) -> Any:
+    return _limit_concurrency(
+        runnable,
+        semaphore=_pro_semaphore,
+        queue_timeout_seconds=settings.cloud_model_queue_timeout_seconds,
+        route="pro",
+    )
+
+
+def create_interactive_llm(*, tools: Sequence[Any] | None = None, **kwargs: Any) -> Any:
+    """Local Qwen first for user-facing conversation; Flash is availability fallback."""
     candidates: list[Any] = []
     local_added = (
         settings.local_model_enabled and settings.openai_base_url and local_circuit.allow_request()
     )
     if local_added:
-        candidates.append(_local_llm(**kwargs))
+        local = _local_llm(**kwargs)
+        if tools:
+            local = local.bind_tools(tools)
+        candidates.append(_limit_local_concurrency(local))
     if settings.smart_api_key and settings.smart_model_name:
-        candidates.append(_flash_llm(**kwargs))
+        flash = _flash_llm(**kwargs)
+        if tools:
+            flash = flash.bind_tools(tools)
+        candidates.append(_limit_flash_concurrency(flash))
     if not candidates:
         raise RuntimeError("没有可用的日常模型：请配置本地模型或 DeepSeek Flash")
 
-    if tools:
-        candidates = [candidate.bind_tools(tools) for candidate in candidates]
-    if local_added:
-        candidates[0] = _limit_local_concurrency(candidates[0])
+    primary, *fallbacks = candidates
+    return primary.with_fallbacks(fallbacks) if fallbacks else primary
 
+
+def create_routine_llm(*, tools: Sequence[Any] | None = None, **kwargs: Any) -> Any:
+    """Backward-compatible alias for the interactive role."""
+    return create_interactive_llm(tools=tools, **kwargs)
+
+
+def create_structured_llm(*, tools: Sequence[Any] | None = None, **kwargs: Any) -> Any:
+    """Flash first for contract-bound JSON; local Qwen is availability fallback."""
+    candidates: list[Any] = []
+    if settings.smart_api_key and settings.smart_model_name:
+        flash = _flash_llm(**kwargs)
+        if tools:
+            flash = flash.bind_tools(tools)
+        candidates.append(_limit_flash_concurrency(flash))
+    local_added = (
+        settings.local_model_enabled and settings.openai_base_url and local_circuit.allow_request()
+    )
+    if local_added:
+        local = _local_llm(**kwargs)
+        if tools:
+            local = local.bind_tools(tools)
+        candidates.append(_limit_local_concurrency(local))
+    if not candidates:
+        raise RuntimeError("没有可用的结构化生成模型：请配置 DeepSeek Flash 或本地模型")
     primary, *fallbacks = candidates
     return primary.with_fallbacks(fallbacks) if fallbacks else primary
 
@@ -254,8 +362,8 @@ def create_structured_routine_llm(
     """创建强制 JSON 输出的版本化模型或兼容日常路由。"""
     model_kwargs = dict(kwargs.pop("model_kwargs", {}))
     model_kwargs["response_format"] = {"type": "json_object"}
-    if provider in {None, "configured-router"}:
-        return create_routine_llm(model_kwargs=model_kwargs, **kwargs)
+    if provider in {None, "configured-router", "structured"}:
+        return create_structured_llm(model_kwargs=model_kwargs, **kwargs)
     timeout = timeout_ms / 1000 if timeout_ms else None
     if provider == "local":
         if not settings.openai_base_url:
@@ -275,17 +383,24 @@ def create_structured_routine_llm(
     if provider == "smart":
         if not settings.smart_api_key:
             raise RuntimeError("云端模型 Provider 未配置")
-        return ChatOpenAI(
-            model=model_name or settings.smart_model_name,
-            api_key=settings.smart_api_key,
-            base_url=settings.smart_base_url or None,
-            timeout=timeout or settings.cloud_routine_timeout_seconds,
-            max_retries=settings.cloud_model_max_retries,
-            callbacks=[_RouteMetricsCallback("flash")],
-            model_kwargs=model_kwargs,
-            **kwargs,
+        return _limit_flash_concurrency(
+            ChatOpenAI(
+                model=model_name or settings.smart_model_name,
+                api_key=settings.smart_api_key,
+                base_url=settings.smart_base_url or None,
+                timeout=timeout or settings.cloud_routine_timeout_seconds,
+                max_retries=settings.cloud_model_max_retries,
+                callbacks=[_RouteMetricsCallback("flash")],
+                model_kwargs=model_kwargs,
+                **kwargs,
+            )
         )
     raise ValueError(f"不支持的模型 Provider: {provider}")
+
+
+def create_json_llm(**kwargs: Any) -> Any:
+    """Explicit public factory for the structured JSON role."""
+    return create_structured_routine_llm(**kwargs)
 
 
 def _json_payload(content: str, opening: str, closing: str) -> Any:
@@ -308,15 +423,15 @@ def require_json_array(content: str) -> None:
         raise ValueError("模型输出不是 JSON 数组")
 
 
-async def ainvoke_routine_checked(
+async def ainvoke_structured_checked(
     messages: Any,
     *,
     validator: Any,
     tools: Sequence[Any] | None = None,
     **kwargs: Any,
 ) -> Any:
-    """调用日常路由，并在本地输出不满足契约时显式改用云端模型。"""
-    routed = create_routine_llm(tools=tools, **kwargs)
+    """Invoke the structured role and retry a quality failure on the other provider."""
+    routed = create_structured_llm(tools=tools, **kwargs)
     response = await routed.ainvoke(messages)
     try:
         validator(response.content)
@@ -331,30 +446,61 @@ async def ainvoke_routine_checked(
             route,
             used_model or "unknown",
         )
-        if not used_local or not settings.smart_api_key or not settings.smart_model_name:
-            raise
-
-    cloud = _flash_llm(**kwargs)
-    if tools:
-        cloud = cloud.bind_tools(tools)
-    response = await cloud.ainvoke(messages)
+        if used_local:
+            if not settings.smart_api_key or not settings.smart_model_name:
+                raise
+            retry = _flash_llm(**kwargs)
+            if tools:
+                retry = retry.bind_tools(tools)
+            retry = _limit_flash_concurrency(retry)
+        else:
+            if not settings.local_model_enabled or not settings.openai_base_url:
+                raise
+            retry = _local_llm(**kwargs)
+            if tools:
+                retry = retry.bind_tools(tools)
+            retry = _limit_local_concurrency(retry)
+    response = await retry.ainvoke(messages)
     validator(response.content)
     return response
 
 
-def create_pro_llm(**kwargs: Any) -> ChatOpenAI:
-    """创建仅用于复杂重规划和最终质量审核的 DeepSeek Pro。"""
-    if not settings.smart_api_key or not settings.smart_pro_model_name:
-        raise RuntimeError("DeepSeek Pro 未配置")
-    return ChatOpenAI(
-        model=settings.smart_pro_model_name,
-        api_key=settings.smart_api_key,
-        base_url=settings.smart_base_url or None,
-        timeout=settings.cloud_pro_timeout_seconds,
-        max_retries=settings.cloud_model_max_retries,
-        callbacks=[_RouteMetricsCallback("pro")],
+async def ainvoke_routine_checked(
+    messages: Any,
+    *,
+    validator: Any,
+    tools: Sequence[Any] | None = None,
+    **kwargs: Any,
+) -> Any:
+    """Backward-compatible alias for structured, contract-checked generation."""
+    return await ainvoke_structured_checked(
+        messages,
+        validator=validator,
+        tools=tools,
         **kwargs,
     )
+
+
+def create_pro_llm(**kwargs: Any) -> Any:
+    """Create the critical role; it intentionally has no lower-quality fallback."""
+    if not settings.smart_api_key or not settings.smart_pro_model_name:
+        raise RuntimeError("DeepSeek Pro 未配置")
+    return _limit_pro_concurrency(
+        ChatOpenAI(
+            model=settings.smart_pro_model_name,
+            api_key=settings.smart_api_key,
+            base_url=settings.smart_base_url or None,
+            timeout=settings.cloud_pro_timeout_seconds,
+            max_retries=settings.cloud_model_max_retries,
+            callbacks=[_RouteMetricsCallback("pro")],
+            **kwargs,
+        )
+    )
+
+
+def create_critical_llm(**kwargs: Any) -> Any:
+    """Explicit public factory for critical judgments."""
+    return create_pro_llm(**kwargs)
 
 
 def get_llm_runtime_status() -> dict[str, Any]:
@@ -367,4 +513,5 @@ def get_llm_runtime_status() -> dict[str, Any]:
         "circuit": local_circuit.snapshot(),
         "metrics": model_metrics.snapshot(),
         "gateway_circuits": gateway_status(),
+        "roles": MODEL_ROLE_CONTRACTS,
     }

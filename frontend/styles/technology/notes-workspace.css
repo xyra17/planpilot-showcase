@@ -4506,9 +4506,10 @@
 }
 
 .app-shell .tech-notes-migrated .note-card-delete {
+  right: -2px;
   color: var(--workspace-danger, #c45d67);
   opacity: .52;
-  transform: translateY(calc(-50% - 1.5px));
+  transform: translateY(calc(-50% + 1px));
   transition: color 160ms ease, background-color 160ms ease, opacity 160ms ease;
 }
 

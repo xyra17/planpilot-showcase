@@ -35,6 +35,9 @@ frontend/.env.local
 
 # ==== 本地生成输出 ====
 output/
+backups/
+uploads/
+planpilot project/
 
 # ==== 独立站点仓库（单独维护 Git 历史）====
 website/
@@ -47,6 +50,8 @@ archive/*.zip
 # ==== 测试报告（本地生成）====
 backend/tests/integration/reports/*.html
 backend/tests/integration/reports/test_data_snapshot.json
+documents/evaluations/
+frontend/e2e/artifacts/
 
 # ==== 系统 ====
 .DS_Store

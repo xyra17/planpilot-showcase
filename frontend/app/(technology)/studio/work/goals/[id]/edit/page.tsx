@@ -10,7 +10,7 @@ export default function EditGoalPage() {
   return (
     <GoalEditDialog
       goalId={params.id}
-      onClose={() => router.push(`/studio/work/goals/${params.id}`)}
+      onClose={() => router.replace(`/studio/work/goals/${params.id}`)}
     />
   );
 }

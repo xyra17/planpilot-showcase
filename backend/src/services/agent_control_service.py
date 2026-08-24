@@ -13,6 +13,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config import settings
+from src.core.llm_router import MODEL_ROLE_CONTRACTS
 from src.core.time import utc_now
 from src.models import (
     AgentDeployment,
@@ -96,16 +97,16 @@ async def ensure_baseline(db: AsyncSession, *, environment: str | None = None) -
         await db.flush()
     model = await db.scalar(
         select(ModelConfig).where(
-            ModelConfig.name == "coach-routine",
-            ModelConfig.version == "v1",
+            ModelConfig.name == "coach-structured",
+            ModelConfig.version == "v2",
         )
     )
     if model is None:
         model = ModelConfig(
-            name="coach-routine",
-            version="v1",
-            provider="configured-router",
-            model_name=settings.smart_model_name or settings.model_name or "routine",
+            name="coach-structured",
+            version="v2",
+            provider="smart",
+            model_name=settings.smart_model_name or "structured-unavailable",
             temperature=0.2,
             max_tokens=700,
             timeout_ms=round(settings.cloud_routine_timeout_seconds * 1000),
@@ -145,6 +146,30 @@ async def ensure_baseline(db: AsyncSession, *, environment: str | None = None) -
             AgentDeployment.status == "active",
         )
     )
+    if deployment is not None and deployment.model_config_id != model.id:
+        deployed_model = await db.get(ModelConfig, deployment.model_config_id)
+        is_legacy_router = bool(
+            deployed_model
+            and deployed_model.name == "coach-routine"
+            and deployed_model.version == "v1"
+            and deployed_model.provider == "configured-router"
+        )
+        if is_legacy_router:
+            deployment.status = "superseded"
+            await db.flush()
+            deployment = AgentDeployment(
+                agent_type="coach",
+                environment=environment,
+                prompt_version_id=prompt.id,
+                model_config_id=model.id,
+                policy_version_id=policy.id,
+                status="active",
+                revision=deployment.revision + 1,
+                deployed_by="system:model-role-migration",
+                deployed_at=utc_now(),
+            )
+            db.add(deployment)
+            await db.flush()
     if deployment is None:
         deployment = AgentDeployment(
             agent_type="coach",
@@ -384,6 +409,7 @@ async def runtime_overview(db: AsyncSession, user_id: str) -> dict[str, Any]:
             "requires_user_confirmation": True,
             "direct_mutation_allowed": False,
         },
+        "model_roles": MODEL_ROLE_CONTRACTS,
     }
 
 
@@ -512,8 +538,8 @@ async def create_model_config(
     temperature: float,
     max_tokens: int,
 ) -> dict[str, Any]:
-    if provider not in {"configured-router", "local", "smart"}:
-        raise ValueError("provider 只允许 configured-router、local 或 smart")
+    if provider not in {"local", "smart"}:
+        raise ValueError("provider 只允许 local 或 smart")
     row = ModelConfig(
         name=name,
         version=version,
@@ -597,6 +623,8 @@ async def deploy_versions(
         raise LookupError("版本组合不完整")
     if any(row.status != "approved" for row in (prompt, model, policy)):
         raise ValueError("只能发布已批准版本")
+    if model.provider not in {"local", "smart"}:
+        raise ValueError("该模型配置使用已退役路由，仅供历史审计，不能重新发布")
     current = await db.scalar(
         select(AgentDeployment).where(
             AgentDeployment.agent_type == agent_type,

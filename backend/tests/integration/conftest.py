@@ -25,22 +25,23 @@ os.environ.setdefault("SECRET_KEY", "integration-test-secret-32chars!!")
 os.environ.setdefault("SENTRY_DSN", "")
 # SMART_API_KEY / OPENAI_API_KEY 从真实 .env 继承
 
-from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine  # noqa: E402
-from sqlalchemy.pool import NullPool  # noqa: E402
-
-# 父级 conftest 已将 src.database.engine 替换为 SQLite，这里重新 patch 为 PostgreSQL
-# NullPool 避免 asyncpg 连接池与事件循环的并发冲突
-import src.database as _db  # noqa: E402
-
-_PG_ENGINE = create_async_engine(TEST_DB_URL, echo=False, poolclass=NullPool)
-_PGSession = async_sessionmaker(_PG_ENGINE, expire_on_commit=False)
-_db.engine = _PG_ENGINE
-_db.AsyncSessionLocal = _PGSession
-
 from src.api.auth import limiter as auth_limiter  # noqa: E402
 from src.config import settings  # noqa: E402
-from src.database import Base  # noqa: E402
+from src.database import Base, get_db  # noqa: E402
 from src.main import app  # noqa: E402
+from tests.integration.database import (  # noqa: E402
+    IntegrationSessionLocal,
+    integration_engine,
+)
+
+# The project-wide unit-test conftest installs an in-memory SQLite factory on
+# src.database during collection. Integration tests must restore the isolated
+# PostgreSQL factory so production services that open their own sessions test
+# the same database as the integration fixtures.
+import src.database as database  # noqa: E402
+
+database.engine = integration_engine
+database.AsyncSessionLocal = IntegrationSessionLocal
 
 app.state.limiter.enabled = False
 auth_limiter.enabled = False
@@ -72,7 +73,7 @@ async def _close_redis_after_test():
 async def setup_db():
     from sqlalchemy import text
 
-    async with _PG_ENGINE.begin() as conn:
+    async with integration_engine.begin() as conn:
         # pgvector 扩展必须在建表前存在
         await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         # 集成测试库的数据本就会在每次运行时清空。重建 schema 可保证 typed ORM
@@ -103,9 +104,17 @@ def shared():
 
 @pytest.fixture(scope="session")
 async def client(setup_db):
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
-        yield ac
-    await _PG_ENGINE.dispose()
+    async def _override_db():
+        async with IntegrationSessionLocal() as db:
+            yield db
+
+    app.dependency_overrides[get_db] = _override_db
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+            yield ac
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+        await integration_engine.dispose()
 
 
 @pytest.fixture(scope="session")

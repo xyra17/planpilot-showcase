@@ -33,7 +33,9 @@ interface GoalStore {
   currentGoalId: string | null;
   todayTasks: TodayTask[];
   isLoading: boolean;
+  error: string | null;
   fetchGoals: () => Promise<void>;
+  fetchGoal: (id: string) => Promise<Goal>;
   setCurrentGoal: (id: string | null) => void;
   createGoal: (data: Omit<Goal, "id" | "status" | "created_at"> & { pending_kb?: { name: string; description: string } }) => Promise<Goal>;
   updateGoal: (id: string, data: Partial<Omit<Goal, "id" | "created_at">>) => Promise<Goal>;
@@ -46,14 +48,37 @@ export const useGoalStore = create<GoalStore>((set) => ({
   currentGoalId: null,
   todayTasks: [],
   isLoading: false,
+  error: null,
 
   fetchGoals: async () => {
-    set({ isLoading: true });
+    set({ isLoading: true, error: null });
     try {
       const goals = await api.get<Goal[]>("/api/v1/goals");
-      set({ goals });
-    } catch {
-      // keep existing goals on error
+      set({ goals, error: null });
+    } catch (reason) {
+      const message = reason instanceof Error ? reason.message : "目标加载失败，请重试。";
+      set({ goals: [], error: message });
+      throw reason;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  fetchGoal: async (id) => {
+    set({ isLoading: true, error: null });
+    try {
+      const goal = await api.get<Goal>(`/api/v1/goals/${id}`);
+      set((state) => ({
+        goals: state.goals.some((item) => item.id === id)
+          ? state.goals.map((item) => item.id === id ? goal : item)
+          : [goal, ...state.goals],
+        error: null,
+      }));
+      return goal;
+    } catch (reason) {
+      const message = reason instanceof Error ? reason.message : "目标加载失败，请重试。";
+      set({ error: message });
+      throw reason;
     } finally {
       set({ isLoading: false });
     }

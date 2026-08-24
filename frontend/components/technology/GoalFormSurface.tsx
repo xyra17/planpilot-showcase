@@ -23,8 +23,9 @@ import {
   X,
 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 
+import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
 import type { GoalStatus, GoalType } from "@/lib/stores/goalStore";
 
 export type WorkSchedule = "weekday" | "weekend" | "all";
@@ -175,6 +176,7 @@ type GoalFormSurfaceProps = {
   currentLevel: GoalLevel;
   status?: GoalStatus;
   isSubmitting: boolean;
+  authPending?: boolean;
   error?: string | null;
   cancelHref: string;
   presentation?: "page" | "dialog";
@@ -199,6 +201,7 @@ export function GoalFormSurface({
   currentLevel,
   status,
   isSubmitting,
+  authPending = false,
   error,
   cancelHref,
   presentation = "page",
@@ -212,40 +215,112 @@ export function GoalFormSurface({
   onStatusChange,
   onSubmit,
 }: GoalFormSurfaceProps) {
+  const { confirmAction } = useConfirmDialog();
   const selectedType = GOAL_TYPES.find((item) => item.value === type) ?? GOAL_TYPES[2];
   const usesCurrentLevel = type !== "reading" && type !== "habit";
   const isEdit = mode === "edit";
   const isDialog = presentation === "dialog";
   const selectedTypeIndex = Math.max(0, GOAL_TYPES.findIndex((item) => item.value === type));
+  const dialogRef = useRef<HTMLElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+  const initialValueRef = useRef(JSON.stringify({ type, title, deadline, dailyHours, workSchedule, currentLevel, status }));
+  const isDirty = initialValueRef.current !== JSON.stringify({ type, title, deadline, dailyHours, workSchedule, currentLevel, status });
+  const isDirtyRef = useRef(isDirty);
+  const popstateConfirmingRef = useRef(false);
+  const allowNextPopstateRef = useRef(false);
+  isDirtyRef.current = isDirty;
+
+  const confirmDiscard = useCallback(() => confirmAction({
+    kicker: "修改未保存",
+    title: "放弃当前目标设置？",
+    description: "离开后，本次尚未保存的目标名称、日期和学习安排将无法恢复。",
+    cancelLabel: "继续编辑",
+    confirmLabel: "放弃修改",
+    tone: "warning",
+  }), [confirmAction]);
+
+  const requestCancel = useCallback(async () => {
+    if (isDirtyRef.current && !(await confirmDiscard())) return;
+    onCancel?.();
+  }, [confirmDiscard, onCancel]);
 
   useEffect(() => {
     if (!isDialog || !onCancel) return;
+    previousFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onCancel();
+      if (event.key === "Escape") {
+        event.preventDefault();
+        requestCancel();
+        return;
+      }
+      if (event.key !== "Tab" || !dialogRef.current) return;
+      const focusable = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), a[href], input:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      ));
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     };
     window.addEventListener("keydown", handleKeyDown);
+    window.requestAnimationFrame(() => dialogRef.current?.focus({ preventScroll: true }));
     return () => {
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", handleKeyDown);
+      previousFocusRef.current?.focus({ preventScroll: true });
     };
-  }, [isDialog, onCancel]);
+  }, [isDialog, onCancel, requestCancel]);
+
+  useEffect(() => {
+    if (!isDirty) return;
+    const handlePopState = () => {
+      if (allowNextPopstateRef.current) {
+        allowNextPopstateRef.current = false;
+        return;
+      }
+      if (popstateConfirmingRef.current) return;
+
+      // popstate fires after history has moved. Restore the form first, then
+      // use the product dialog to decide whether to repeat the navigation.
+      popstateConfirmingRef.current = true;
+      window.history.forward();
+      void confirmDiscard().then((discard) => {
+        if (discard) {
+          allowNextPopstateRef.current = true;
+          window.history.back();
+        }
+      }).finally(() => {
+        popstateConfirmingRef.current = false;
+      });
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [confirmDiscard, isDirty]);
 
   return (
     <div
       className={`tech-goal-create-page tech-goal-form-page ${isEdit ? "is-editing" : "is-creating"} ${isDialog ? "is-dialog" : ""}`}
-      onMouseDown={isDialog ? onCancel : undefined}
+      onMouseDown={isDialog ? requestCancel : undefined}
     >
       <main
         className="tech-goal-create-main"
+        ref={dialogRef}
+        tabIndex={isDialog ? -1 : undefined}
         role={isDialog ? "dialog" : undefined}
         aria-modal={isDialog || undefined}
         aria-label={isDialog ? (isEdit ? "编辑目标" : "创建新目标") : undefined}
         onMouseDown={isDialog ? (event) => event.stopPropagation() : undefined}
       >
         {isDialog && onCancel && (
-          <button type="button" className="tech-goal-form-dialog-close" aria-label="关闭目标设置" onClick={onCancel}>
+          <button type="button" className="tech-goal-form-dialog-close" aria-label="关闭目标设置" onClick={requestCancel}>
             <X size={17} />
           </button>
         )}
@@ -304,26 +379,17 @@ export function GoalFormSurface({
             </label>
           </section>
 
-          <section className="tech-goal-form-step" aria-labelledby="goal-form-step-two">
-            <header className="tech-goal-form-step-heading">
-              <span aria-hidden="true">2</span>
-              <div><h2 id="goal-form-step-two">如何完成目标</h2><p>设置时间与计划，帮助你持续推进</p></div>
-            </header>
-
-            <div className="tech-goal-create-two-column">
-              <div className="tech-goal-field tech-goal-date-field">
-                <span><CalendarCheck2 size={17} />截止日期</span>
-                <GoalDatePicker value={deadline} onChange={onDeadlineChange} />
-              </div>
-              <div className="tech-goal-field tech-goal-duration-field">
-                <span><TimerReset size={17} />目标投入</span>
-                <div className="tech-goal-duration-stepper" role="group" aria-label="每日投入时长">
-                  <button type="button" aria-label="减少每日投入" onClick={() => onDailyHoursChange(Math.max(.5, dailyHours - .5))} disabled={dailyHours <= .5}><Minus size={17} /></button>
-                  <label><input type="number" min="0.5" max="8" step="0.5" value={dailyHours} onChange={(event) => onDailyHoursChange(Math.min(8, Math.max(.5, Number(event.target.value) || .5)))} aria-label="每日投入小时数" /><span>小时/天</span></label>
-                  <button type="button" aria-label="增加每日投入" onClick={() => onDailyHoursChange(Math.min(8, dailyHours + .5))} disabled={dailyHours >= 8}><Plus size={17} /></button>
+          <section className="tech-goal-form-step" aria-label={isEdit ? "目标状态与计划" : "目标计划"}>
+            {isEdit && status && onStatusChange && (
+              <fieldset className="tech-goal-create-section tech-goal-status-section">
+                <legend><ListChecks size={17} />目标状态</legend>
+                <div className="tech-goal-status-control">
+                  {STATUS_OPTIONS.map((item) => (
+                    <button key={item.value} type="button" className={status === item.value ? "is-selected" : ""} aria-pressed={status === item.value} onClick={() => onStatusChange(item.value)}>{item.label}</button>
+                  ))}
                 </div>
-              </div>
-            </div>
+              </fieldset>
+            )}
 
             <div className={`tech-goal-preference-grid ${usesCurrentLevel ? "" : "is-single"}`}>
               <fieldset className="tech-goal-create-section tech-goal-segment-section">
@@ -347,26 +413,33 @@ export function GoalFormSurface({
               )}
             </div>
 
-            {isEdit && status && onStatusChange && (
-              <fieldset className="tech-goal-create-section tech-goal-status-section">
-                <legend><ListChecks size={17} />目标状态</legend>
-                <div className="tech-goal-status-control">
-                  {STATUS_OPTIONS.map((item) => (
-                    <button key={item.value} type="button" className={status === item.value ? "is-selected" : ""} aria-pressed={status === item.value} onClick={() => onStatusChange(item.value)}>{item.label}</button>
-                  ))}
+            <div className="tech-goal-create-two-column">
+              <div className="tech-goal-field tech-goal-date-field">
+                <span><CalendarCheck2 size={17} />截止日期</span>
+                <GoalDatePicker value={deadline} onChange={onDeadlineChange} />
+              </div>
+              <div className="tech-goal-field tech-goal-duration-field">
+                <span><TimerReset size={17} />目标投入</span>
+                <div className="tech-goal-duration-stepper" role="group" aria-label="每日投入时长">
+                  <button type="button" aria-label="减少每日投入" onClick={() => onDailyHoursChange(Math.max(.5, dailyHours - .5))} disabled={dailyHours <= .5}><Minus size={17} /></button>
+                  <label><input type="number" min="0.5" max="8" step="0.5" value={dailyHours} onChange={(event) => onDailyHoursChange(Math.min(8, Math.max(.5, Number(event.target.value) || .5)))} aria-label="每日投入小时数" /><span>小时/天</span></label>
+                  <button type="button" aria-label="增加每日投入" onClick={() => onDailyHoursChange(Math.min(8, dailyHours + .5))} disabled={dailyHours >= 8}><Plus size={17} /></button>
                 </div>
-              </fieldset>
-            )}
+              </div>
+            </div>
+
           </section>
 
           {error && <p className="tech-goal-form-error" role="alert">{error}</p>}
 
           <footer className="tech-goal-create-actions">
             {onCancel
-              ? <button type="button" onClick={onCancel} className="tech-goal-secondary-action">取消</button>
+              ? <button type="button" onClick={requestCancel} className="tech-goal-secondary-action">取消</button>
               : <Link href={cancelHref} className="tech-goal-secondary-action">取消</Link>}
-            <button type="submit" className="tech-goal-primary-action" disabled={isSubmitting || !title.trim() || !deadline}>
-              {isSubmitting
+            <button type="submit" className="tech-goal-primary-action" disabled={authPending || isSubmitting || !title.trim() || !deadline}>
+              {authPending
+                ? <><Loader2 size={17} className="is-spinning" />正在确认身份…</>
+                : isSubmitting
                 ? <><Loader2 size={17} className="is-spinning" />{isEdit ? "保存中…" : "创建中…"}</>
                 : <><Check size={17} />{isEdit ? "保存修改" : "创建目标"}</>}
             </button>

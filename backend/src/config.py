@@ -1,7 +1,7 @@
 from urllib.parse import urlsplit
 
 from pydantic import model_validator
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _DEFAULT_SECRET_KEY = "change-this-in-production-min-32-chars"
 _PLACEHOLDER_SECRET_KEYS = {
@@ -46,6 +46,9 @@ class Settings(BaseSettings):
     cloud_routine_timeout_seconds: float = 60.0
     cloud_pro_timeout_seconds: float = 300.0
     cloud_model_max_retries: int = 0
+    cloud_routine_max_concurrency: int = 4
+    cloud_pro_max_concurrency: int = 1
+    cloud_model_queue_timeout_seconds: float = 5.0
     model_gateway_max_retries: int = 1
     model_gateway_failure_threshold: int = 3
     model_gateway_circuit_cooldown_seconds: float = 60.0
@@ -58,6 +61,7 @@ class Settings(BaseSettings):
     embedding_dimensions: int = 1024
     embedding_timeout_seconds: float = 30.0
     embedding_max_retries: int = 1
+    embedding_max_concurrency: int = 1
 
     redis_url: str = "redis://localhost:6379/0"
     tavily_api_key: str = ""
@@ -96,6 +100,10 @@ class Settings(BaseSettings):
     data_quality_retention_days: int = 730
     export_audit_retention_days: int = 1095
     expired_session_retention_days: int = 30
+    beta_runtime_gate_ttl_hours: int = 24
+    beta_safety_observation_ttl_hours: int = 6
+    beta_safety_scan_lookback_hours: int = 24
+    beta_review_sample_retention_days: int = 90
 
     @property
     def cors_origin_list(self) -> list[str]:
@@ -107,7 +115,10 @@ class Settings(BaseSettings):
             return self.auth_cookie_secure
         return self.environment.lower() not in {"development", "test"}
 
-    model_config = {"env_file": ".env"}
+    # Ignore deprecated rolling-deployment aliases (for example
+    # PLANPILOT_LOCAL_LLM_URL) so host-side evaluation/re-scoring can import
+    # the same settings module as the containers without extra-field failure.
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     @model_validator(mode="after")
     def enforce_secret_key(self) -> "Settings":
@@ -125,6 +136,12 @@ class Settings(BaseSettings):
             raise ValueError("EMBEDDING_DIMENSIONS 必须为 1024，与数据库 vector(1024) 保持一致")
         if self.local_model_max_concurrency < 1:
             raise ValueError("LOCAL_MODEL_MAX_CONCURRENCY 必须至少为 1")
+        if self.cloud_routine_max_concurrency < 1:
+            raise ValueError("CLOUD_ROUTINE_MAX_CONCURRENCY 必须至少为 1")
+        if self.cloud_pro_max_concurrency < 1:
+            raise ValueError("CLOUD_PRO_MAX_CONCURRENCY 必须至少为 1")
+        if self.embedding_max_concurrency < 1:
+            raise ValueError("EMBEDDING_MAX_CONCURRENCY 必须至少为 1")
         if self.model_gateway_max_retries < 0:
             raise ValueError("MODEL_GATEWAY_MAX_RETRIES 不能为负数")
         if self.model_gateway_failure_threshold < 1:
@@ -134,9 +151,7 @@ class Settings(BaseSettings):
         if self.storage_backend not in {"local", "s3"}:
             raise ValueError("STORAGE_BACKEND 必须是 local 或 s3")
         if self.storage_backend == "s3" and not (
-            self.storage_s3_bucket
-            and self.storage_s3_access_key
-            and self.storage_s3_secret_key
+            self.storage_s3_bucket and self.storage_s3_access_key and self.storage_s3_secret_key
         ):
             raise ValueError("S3 存储必须配置 bucket、access key 和 secret key")
         if self.storage_s3_server_side_encryption not in {"", "AES256", "aws:kms"}:
@@ -162,6 +177,10 @@ class Settings(BaseSettings):
             self.data_quality_retention_days,
             self.export_audit_retention_days,
             self.expired_session_retention_days,
+            self.beta_runtime_gate_ttl_hours,
+            self.beta_safety_observation_ttl_hours,
+            self.beta_safety_scan_lookback_hours,
+            self.beta_review_sample_retention_days,
         )
         if any(value < 1 for value in retention_values):
             raise ValueError("数据留存天数必须至少为 1")
@@ -188,7 +207,9 @@ class Settings(BaseSettings):
                     or parsed.query
                     or parsed.fragment
                 ):
-                    raise ValueError("生产环境 CORS_ORIGINS 只能包含无路径、无用户信息的 HTTPS Origin")
+                    raise ValueError(
+                        "生产环境 CORS_ORIGINS 只能包含无路径、无用户信息的 HTTPS Origin"
+                    )
         return self
 
 

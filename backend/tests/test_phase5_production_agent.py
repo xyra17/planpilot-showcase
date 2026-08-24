@@ -34,6 +34,10 @@ async def test_admin_control_api_and_versioned_evaluation(client, auth, goal_id,
     assert forbidden.status_code == 403
     audit_forbidden = await client.get("/api/v1/agent-control/admin/invocations", headers=auth)
     assert audit_forbidden.status_code == 403
+    product_forbidden = await client.get(
+        "/api/v1/agent-control/admin/product-validation/latest", headers=auth
+    )
+    assert product_forbidden.status_code == 403
 
     goal = await db.get(Goal, goal_id)
     user = await db.get(User, goal.user_id)
@@ -65,9 +69,7 @@ async def test_admin_control_api_and_versioned_evaluation(client, auth, goal_id,
     )
     assert core_reports.status_code == 201, core_reports.text
     assert len(core_reports.json()["reports"]) == 4
-    history = await client.get(
-        "/api/v1/agent-control/learning-experiments/reports", headers=auth
-    )
+    history = await client.get("/api/v1/agent-control/learning-experiments/reports", headers=auth)
     assert history.status_code == 200
     assert len(history.json()) >= 4
 
@@ -84,6 +86,16 @@ async def test_admin_control_api_and_versioned_evaluation(client, auth, goal_id,
     )
     assert decisions.status_code == 200
     assert decisions.json()[0]["decision"] == "hold"
+    product_latest = await client.get(
+        "/api/v1/agent-control/admin/product-validation/latest", headers=auth
+    )
+    assert product_latest.status_code == 200
+    assert product_latest.json()["schema_version"] == "product-validation-v2"
+    product_history = await client.get(
+        "/api/v1/agent-control/admin/product-validation/history?limit=5", headers=auth
+    )
+    assert product_history.status_code == 200
+    assert product_history.json()[0]["snapshot_id"]
 
 
 @pytest.mark.asyncio
@@ -249,6 +261,10 @@ async def test_runtime_overview_only_returns_current_users_invocations(db):
         "requires_user_confirmation": True,
         "direct_mutation_allowed": False,
     }
+    assert overview["model_roles"]["interactive"]["primary_model"] == settings.model_name
+    assert overview["model_roles"]["structured"]["primary_model"] == settings.smart_model_name
+    assert overview["model_roles"]["critical"]["fallback"] is None
+    assert overview["model_roles"]["embedding"]["primary_model"] == settings.embedding_model_name
     count = int(
         await db.scalar(
             select(func.count())

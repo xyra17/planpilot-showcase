@@ -4,7 +4,7 @@ import logging
 from langchain_core.messages import AIMessage, SystemMessage
 
 from src.core.agent.state import AgentState
-from src.core.llm_router import create_structured_routine_llm
+from src.core.llm_router import create_json_llm
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +30,7 @@ _SYSTEM = """你是 PlanPilot 计划生成专家。根据用户提供的目标�
 
 
 async def node(state: AgentState) -> dict:
-    llm = create_structured_routine_llm(
+    llm = create_json_llm(
         max_tokens=2048,
         streaming=True,
     )

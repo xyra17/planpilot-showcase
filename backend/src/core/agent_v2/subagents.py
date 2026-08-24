@@ -26,25 +26,34 @@ from src.core.agent_v2.schemas import (
 
 
 @dataclass(frozen=True)
-class SubAgentProfile:
+class CapabilityProfile:
     role: AgentRole
     label: str
     purpose: str
     output_kind: str
 
 
-SUBAGENTS = {
-    AgentRole.LEARNING_ANALYST: SubAgentProfile(
-        AgentRole.LEARNING_ANALYST, "学习分析 Agent", "分析执行率、逾期和学习债务", "observation"
+CAPABILITY_MODULES = {
+    AgentRole.LEARNING_ANALYST: CapabilityProfile(
+        AgentRole.LEARNING_ANALYST, "学习分析能力", "分析执行率、逾期和学习债务", "observation"
     ),
-    AgentRole.SCHEDULE_OPTIMIZER: SubAgentProfile(
-        AgentRole.SCHEDULE_OPTIMIZER, "日程优化 Agent", "生成容量受限的候选排期", "candidate"
+    AgentRole.SCHEDULE_OPTIMIZER: CapabilityProfile(
+        AgentRole.SCHEDULE_OPTIMIZER,
+        "计划与任务编排能力",
+        "生成容量受限的任务与排期候选方案",
+        "candidate",
     ),
-    AgentRole.KNOWLEDGE_RESEARCHER: SubAgentProfile(
-        AgentRole.KNOWLEDGE_RESEARCHER, "知识检索 Agent", "检索项目知识和受控来源", "evidence"
+    AgentRole.KNOWLEDGE_RESEARCHER: CapabilityProfile(
+        AgentRole.KNOWLEDGE_RESEARCHER,
+        "知识与证据能力",
+        "检索项目知识和受控来源",
+        "evidence",
     ),
-    AgentRole.PLAN_REVIEWER: SubAgentProfile(
-        AgentRole.PLAN_REVIEWER, "计划审查 Agent", "检查冲突、风险和遗漏", "warning"
+    AgentRole.PLAN_REVIEWER: CapabilityProfile(
+        AgentRole.PLAN_REVIEWER,
+        "风险与影响审查能力",
+        "检查容量、截止日期、冲突、删除风险和遗漏",
+        "warning",
     ),
 }
 
@@ -63,7 +72,7 @@ RESULT_MODELS = {
 }
 
 
-async def invoke_subagent(
+async def invoke_capability(
     db: AsyncSession,
     *,
     registry: ToolRegistry,
@@ -77,7 +86,7 @@ async def invoke_subagent(
     if role == AgentRole.MAIN or spec.role != role or tool_name not in request.allowed_tools:
         raise PermissionError("从属能力调用超出授权范围")
     if spec.effect in {Effect.WRITE, Effect.DESTRUCTIVE, Effect.EXTERNAL}:
-        raise PermissionError("从属 Agent 不得调用副作用工具")
+        raise PermissionError("受控能力模块不得调用副作用工具")
     output = await registry.invoke(db, spec, context, request.input_data)
     evidence: list[EvidenceRef] = []
     conclusions: list[SubAgentConclusion] = []
@@ -184,7 +193,7 @@ async def invoke_subagent(
                 evidence_ids=[item.evidence_id for item in evidence],
             )
         ]
-    profile = SUBAGENTS[role]
+    profile = CAPABILITY_MODULES[role]
     result = RESULT_MODELS[role](
         summary=f"{profile.label} 已完成{profile.purpose}",
         evidence=evidence,

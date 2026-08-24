@@ -22,9 +22,14 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.replan_policy import should_suggest_replan
-from src.core.time import local_date_for_timezone
+from src.core.time import local_date_for_timezone, utc_now
 from src.events.publisher import emit
-from src.models import CheckinRecord, Goal, LearningDebt, Task
+from src.models import CheckinRecord, Goal, LearningDebt, Task, TaskMasteryRecord
+from src.services.learning_lifecycle_service import (
+    emit_deviation_detected,
+    emit_recovery_completed_if_applicable,
+    emit_task_started_if_missing,
+)
 
 # ── Constants ──────────────────────────────────────────────────────────────
 
@@ -362,6 +367,10 @@ class CheckinResult(BaseModel):
     debt_added: int = 0
     replan_triggered: bool = False
     tasks: list[TaskCheckin] = Field(default_factory=list)
+    record_id: str | None = None
+    date: str | None = None
+    mode: str | None = None
+    natural_text: str | None = None
 
 
 # ── DB Write Operations (no commit allowed) ────────────────────────────────
@@ -411,17 +420,19 @@ async def _apply_daily_mutations(
 
     副作用：修改 tasks_by_id 中的 Task 对象（mastery_level / status / actual_mins）
 
-    ``actual_mins`` is independent from mastery: a completed task can have
-    no mastery answer, and an explicit ``0`` is a valid recorded investment.
-    Missing values leave an existing record unchanged.
+    执行状态和掌握状态相互独立：完成任务可以不回答掌握度，掌握度高也
+    不会反向伪造任务完成。``actual_mins=0`` 是合法投入记录；缺省值不
+    覆盖已有数据。
     """
     for t in tasks_input:
         task_obj = tasks_by_id[t.task_id]
+        if t.status == "completed":
+            task_obj.status = "completed"
+            task_obj.completed_at = task_obj.completed_at or utc_now()
+        elif t.status == "partial" and task_obj.status not in {"completed", "skipped"}:
+            task_obj.status = "in_progress"
         if t.mastery:
             task_obj.mastery_level = t.mastery
-            if t.mastery in ("L3", "L4"):
-                task_obj.status = "completed"
-            # L2: 基本了解，不改变 status，保持 pending 直到完全掌握
         if t.actual_mins is not None:
             task_obj.actual_mins = t.actual_mins
 
@@ -440,7 +451,8 @@ async def _apply_task_list_mutations_and_create_debts(
     for t in tasks_input:
         task_obj = (await db.execute(select(Task).where(Task.id == t.task_id))).scalar_one_or_none()
         if task_obj:
-            task_obj.status = t.status
+            task_obj.status = "in_progress" if t.status == "partial" else t.status
+            task_obj.completed_at = utc_now() if t.status == "completed" else None
             if t.mastery:
                 task_obj.mastery_level = t.mastery
             if t.actual_mins is not None:
@@ -541,8 +553,7 @@ async def _upsert_checkin_record(
         for duplicate in today_records[1:]:
             await db.delete(duplicate)
     else:
-        db.add(
-            CheckinRecord(
+        record = CheckinRecord(
                 goal_id=goal_id,
                 user_id=user_id,
                 date=today,
@@ -553,7 +564,9 @@ async def _upsert_checkin_record(
                 stats=stats_data,
                 # feedback / replan_triggered: deprecated, not written to new records
             )
-        )
+        db.add(record)
+        await db.flush()
+    return record
 
 
 def _dispatch_deviation_check(user_id: str) -> None:
@@ -620,6 +633,10 @@ async def get_today(
         feedback=record.feedback,  # Phase 2A 后新记录为空（历史记录保留）
         replan_triggered=record.replan_triggered,
         tasks=[TaskCheckin.model_validate(item) for item in s.get("tasks", [])],
+        record_id=record.id,
+        date=record.date,
+        mode=record.mode,
+        natural_text=record.natural_text,
     )
 
 
@@ -649,11 +666,22 @@ async def submit(
     """
     today = local_date_for_timezone(timezone_name).isoformat()
     debt_added = 0
+    tasks_by_id_for_events: dict[str, Task] = {}
+    task_state_before: dict[str, dict[str, Any]] = {}
 
     # ── Mode dispatch ──────────────────────────────────────────────────────
 
     if body.mode == "daily":
         tasks_by_id = await _validate_and_load_daily_tasks(body.tasks, goal.id, db)
+        tasks_by_id_for_events = tasks_by_id
+        task_state_before = {
+            task_id: {
+                "status": task.status,
+                "mastery_level": task.mastery_level,
+                "version": task.version,
+            }
+            for task_id, task in tasks_by_id.items()
+        }
         tasks_input = [TaskCheckinInput.model_validate(t.model_dump()) for t in body.tasks]
         result = _compute_daily_stats(tasks_input, tasks_by_id)
         await _apply_daily_mutations(body.tasks, tasks_by_id)
@@ -667,6 +695,16 @@ async def submit(
             ).scalar_one_or_none()
             if task_obj:
                 tasks_by_id_for_compute[t.task_id] = task_obj
+
+        tasks_by_id_for_events = tasks_by_id_for_compute
+        task_state_before = {
+            task_id: {
+                "status": task.status,
+                "mastery_level": task.mastery_level,
+                "version": task.version,
+            }
+            for task_id, task in tasks_by_id_for_compute.items()
+        }
 
         tasks_input = [TaskCheckinInput.model_validate(t.model_dump()) for t in body.tasks]
         result = _compute_task_list_stats(tasks_input, tasks_by_id_for_compute)
@@ -692,7 +730,7 @@ async def submit(
 
     # ── Upsert record（不 commit）─────────────────────────────────────────
 
-    await _upsert_checkin_record(
+    checkin_record = await _upsert_checkin_record(
         goal.id,
         user_id,
         today,
@@ -730,29 +768,193 @@ async def submit(
         },
     )
 
-    # TaskSkipped events (task_list mode)
-    if body.mode == "task_list":
-        for t in body.tasks:
-            if t.status == "skipped":
-                task_obj = (
-                    await db.execute(select(Task).where(Task.id == t.task_id))
-                ).scalar_one_or_none()
-                if task_obj:
-                    await emit(
-                        db,
-                        user_id=user_id,
-                        goal_id=goal.id,
-                        aggregate_type="task",
-                        aggregate_id=t.task_id,
-                        event_type="TaskSkipped",
-                        payload={
-                            "title": task_obj.title,
-                            "scheduled_date": task_obj.scheduled_date,
-                            "skip_reason": t.note or "",
-                            "debt_created": True,
-                            "estimated_mins": task_obj.estimated_mins,
-                        },
-                    )
+    # 明细任务事件：打卡入口也必须进入与任务页一致的价值指标口径。
+    for item in body.tasks:
+        task_obj = tasks_by_id_for_events.get(item.task_id)
+        before = task_state_before.get(item.task_id)
+        if task_obj is None or before is None:
+            continue
+        event_version = int(before["version"]) + 1
+        if task_obj.status == "in_progress" and before["status"] != "in_progress":
+            started_event = await emit(
+                db,
+                user_id=user_id,
+                goal_id=goal.id,
+                aggregate_type="task",
+                aggregate_id=task_obj.id,
+                event_type="TaskStarted",
+                payload={
+                    "title": task_obj.title,
+                    "from_status": before["status"],
+                    "scheduled_date": task_obj.scheduled_date,
+                    "estimated_mins": task_obj.estimated_mins,
+                    "submission_mode": "checkin_partial",
+                    "aggregate_version": event_version,
+                },
+                idempotency_key=(
+                    f"checkin:{checkin_record.id}:task:{task_obj.id}:"
+                    f"started:v{before['version']}"
+                ),
+            )
+            await emit_recovery_completed_if_applicable(
+                db,
+                user_id=user_id,
+                goal_id=goal.id,
+                task_id=task_obj.id,
+                action_event=started_event,
+            )
+
+        if task_obj.status == "completed" and before["status"] != "completed":
+            await emit_task_started_if_missing(
+                db,
+                user_id=user_id,
+                goal_id=goal.id,
+                task_id=task_obj.id,
+                trigger="checkin_completion_backfill",
+                from_status=str(before["status"]),
+                scheduled_date=task_obj.scheduled_date,
+                estimated_mins=task_obj.estimated_mins,
+                extra_payload={"submission_mode": "checkin"},
+            )
+            completed_event = await emit(
+                db,
+                user_id=user_id,
+                goal_id=goal.id,
+                aggregate_type="task",
+                aggregate_id=task_obj.id,
+                event_type="TaskCompleted",
+                payload={
+                    "title": task_obj.title,
+                    "task_type": task_obj.type,
+                    "stage_label": task_obj.stage_label,
+                    "scheduled_date": task_obj.scheduled_date,
+                    "completed_at": (
+                        task_obj.completed_at.isoformat() if task_obj.completed_at else None
+                    ),
+                    "actual_mins": task_obj.actual_mins,
+                    "estimated_mins": task_obj.estimated_mins,
+                    "mastery_level": task_obj.mastery_level,
+                    "submission_mode": "checkin",
+                    "aggregate_version": event_version,
+                },
+                idempotency_key=(
+                    f"checkin:{checkin_record.id}:task:{task_obj.id}:"
+                    f"completed:v{before['version']}"
+                ),
+            )
+            await emit_recovery_completed_if_applicable(
+                db,
+                user_id=user_id,
+                goal_id=goal.id,
+                task_id=task_obj.id,
+                action_event=completed_event,
+            )
+
+        if item.mastery and item.mastery != before["mastery_level"]:
+            await emit(
+                db,
+                user_id=user_id,
+                goal_id=goal.id,
+                aggregate_type="task",
+                aggregate_id=task_obj.id,
+                event_type="MasteryRecorded",
+                payload={
+                    "task_title": task_obj.title,
+                    "from_level": before["mastery_level"],
+                    "to_level": item.mastery,
+                    "submission_mode": "checkin",
+                    "aggregate_version": event_version,
+                },
+                idempotency_key=(
+                    f"checkin:{checkin_record.id}:task:{task_obj.id}:"
+                    f"mastery:{item.mastery}:v{before['version']}"
+                ),
+            )
+            await emit(
+                db,
+                user_id=user_id,
+                goal_id=goal.id,
+                aggregate_type="mastery_evidence",
+                aggregate_id=task_obj.id,
+                event_type="MasteryEvidenceAdded",
+                payload={
+                    "task_id": task_obj.id,
+                    "evidence_type": "self_assessment",
+                    "quality": "self_reported",
+                    "mastery_level": item.mastery,
+                    "contains_user_content": False,
+                },
+                idempotency_key=(
+                    f"checkin:{checkin_record.id}:task:{task_obj.id}:"
+                    f"evidence:{item.mastery}:v{before['version']}"
+                ),
+            )
+            db.add(
+                TaskMasteryRecord(
+                    task_id=task_obj.id,
+                    goal_id=goal.id,
+                    user_id=user_id,
+                    mastery_level=item.mastery,
+                    source="checkin_submission",
+                )
+            )
+
+        if item.status == "skipped" and before["status"] != "skipped":
+            debt_created = body.mode == "task_list"
+            await emit(
+                db,
+                user_id=user_id,
+                goal_id=goal.id,
+                aggregate_type="task",
+                aggregate_id=task_obj.id,
+                event_type="TaskSkipped",
+                payload={
+                    "title": task_obj.title,
+                    "scheduled_date": task_obj.scheduled_date,
+                    "skip_reason": item.note or "",
+                    "debt_created": debt_created,
+                    "estimated_mins": task_obj.estimated_mins,
+                    "submission_mode": "checkin",
+                },
+                idempotency_key=(
+                    f"checkin:{checkin_record.id}:task:{task_obj.id}:"
+                    f"skipped:v{before['version']}"
+                ),
+            )
+            await emit_deviation_detected(
+                db,
+                user_id=user_id,
+                goal_id=goal.id,
+                aggregate_id=f"{task_obj.id}:{today}",
+                deviation_type="task_skipped",
+                source="user_action",
+                idempotency_key=(
+                    f"checkin-deviation:{checkin_record.id}:task:{task_obj.id}:skipped"
+                ),
+                payload={
+                    "checkin_id": checkin_record.id,
+                    "task_id": task_obj.id,
+                    "local_date": today,
+                    "has_user_reason": bool(item.note),
+                },
+            )
+
+    if replan_triggered:
+        await emit_deviation_detected(
+            db,
+            user_id=user_id,
+            goal_id=goal.id,
+            aggregate_id=f"{goal.id}:{today}",
+            deviation_type="sustained_low_execution",
+            source="system",
+            idempotency_key=f"checkin-deviation:{goal.id}:{today}",
+            payload={
+                "checkin_id": checkin_record.id,
+                "completion_rate": result.completion_rate,
+                "detection_rule": "three_planned_days_below_0.6",
+                "local_date": today,
+            },
+        )
 
     # ── 单次 commit ────────────────────────────────────────────────────────
 
@@ -777,4 +979,8 @@ async def submit(
         debt_added=debt_added,
         replan_triggered=replan_triggered,
         tasks=body.tasks,
+        record_id=checkin_record.id,
+        date=checkin_record.date,
+        mode=checkin_record.mode,
+        natural_text=checkin_record.natural_text,
     )

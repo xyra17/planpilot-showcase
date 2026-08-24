@@ -1,17 +1,10 @@
-from langchain_core.messages import HumanMessage, SystemMessage
+import re
 
 from src.core.agent.state import AgentState
-from src.core.llm_router import create_routine_llm
-
-_SYSTEM = """判断用户消息的意图，只输出以下之一的英文单词，不加任何解释：
-goal_setup - 用户想要设定新目标或制定/修改学习计划（例如："我想学Python"、"帮我整个计划"、"给我排一下课程"、"我打算开始学设计"、"做个英语学习计划"、"帮我建一个目标"）
-checkin - 用户在汇报今日学习进展
-replan_request - 用户请求重新规划/调整学习计划
-verification - 用户想要验收/检验学习掌握情况
-chat - 其他所有对话"""
 
 _CHECKIN_KEYWORDS = [
     "打卡",
+    "打个卡",
     "今天学",
     "今日学",
     "完成了",
@@ -30,6 +23,10 @@ _CHECKIN_KEYWORDS = [
     "汇报",
     "进展",
     "学了",
+    "实际投入",
+    "投入了",
+    "刚完成",
+    "用时",
 ]
 _GOAL_KEYWORDS = [
     "制定计划",
@@ -101,6 +98,18 @@ _VERIFY_KEYWORDS = [
 
 
 def _keyword_intent(text: str) -> str | None:
+    # Hypothetical impact-analysis requests must stay conversational even when
+    # their object contains “完成/未完成”; those words describe task state rather
+    # than a submitted check-in.
+    if any(
+        re.search(pattern, text)
+        for pattern in (
+            r"(?:只|先)(?:分析|说明|说说|告诉).{0,12}(?:别|不要|不)(?:执行|修改|保存|写入)",
+            r"(?:只分析|只说明|只说影响|只看影响|分析影响).{0,12}(?:别执行|不执行)?",
+            r"(?:要是|假如|假设|如果).{0,40}(?:影响多大|会怎样|怎么样|什么影响|后果)",
+        )
+    ):
+        return None
     for kw in _REPLAN_KEYWORDS:
         if kw in text:
             return "replan_request"
@@ -120,24 +129,5 @@ async def node(state: AgentState) -> dict:
     msgs = state.get("messages", [])
     last = msgs[-1].content if msgs else ""
 
-    # 关键词优先
-    intent = _keyword_intent(last)
-    if intent:
-        return {"intent": intent}
-
-    # 关键词无法判断时由本地模型分类，服务不可用则自动回退 Flash。
-    # Flash 等推理模型可能先消耗 reasoning token，过低会得到空正文。
-    llm = create_routine_llm(max_tokens=100)
-    result = await llm.ainvoke([SystemMessage(content=_SYSTEM), HumanMessage(content=last)])
-    raw = result.content.strip().lower()
-    if "replan" in raw:
-        intent = "replan_request"
-    elif "verif" in raw:
-        intent = "verification"
-    elif "goal" in raw:
-        intent = "goal_setup"
-    elif "checkin" in raw:
-        intent = "checkin"
-    else:
-        intent = "chat"
-    return {"intent": intent}
+    # 明确动作使用确定性路由。其余消息直接进入聊天，避免在回答前串行调用一次模型。
+    return {"intent": _keyword_intent(last) or "chat"}

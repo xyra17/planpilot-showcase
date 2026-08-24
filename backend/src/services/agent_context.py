@@ -83,11 +83,18 @@ async def load_learning_context(
                 "goal_id": task.goal_id,
                 "title": task.title,
                 "description": task.description,
+                "plan_id": task.plan_id,
                 "date": task.scheduled_date,
+                "actual_mins": task.actual_mins,
                 "status": task.status,
+                "type": task.type,
+                "kb_refs": list(task.kb_refs or []),
                 "estimated_minutes": task.estimated_mins,
                 "priority": task.priority,
                 "mastery_level": task.mastery_level,
+                "stage_label": task.stage_label,
+                "sequence_in_plan": task.sequence_in_plan,
+                "completed_at": task.completed_at.isoformat() if task.completed_at else None,
                 "version": task.version,
             }
             for task in tasks

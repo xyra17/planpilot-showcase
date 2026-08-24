@@ -23,7 +23,7 @@ RUN_TRANSITIONS = {
         "failed",
         "cancelled",
     },
-    "waiting_approval": {"queued", "rejected", "cancelled"},
+    "waiting_approval": {"queued", "completed", "rejected", "cancelled"},
     "retrying": {"queued", "executing", "failed", "cancelled"},
     "replanning": {"executing", "waiting_approval", "failed", "cancelled"},
     "paused": {"queued", "cancelled"},

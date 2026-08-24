@@ -1,0 +1,178 @@
+{
+  "schema_version": "synthetic-v1-intents.v1",
+  "description": "20 类核心需求。完整矩阵按用户×需求×重复×语言变体平衡；不是无意义的字段笛卡尔积。",
+  "intents": [
+    {
+      "id": "status_overview",
+      "category": "status",
+      "prompts": ["我最近整体学得怎么样？别只报完成率。", "看下我这阵子的学习状态，哪里最需要注意？"],
+      "decision": "observe",
+      "expected": {"write": false},
+      "follow_up_rules": [{"when_status": ["completed"], "when_contains": "完成", "message": "这个判断具体依据哪些最近行为？"}]
+    },
+    {
+      "id": "goal_status",
+      "category": "status",
+      "goal_scoped": true,
+      "prompts": ["{goal_title} 现在进度和风险怎样？", "只看 {goal_title}，我是不是落后了？"],
+      "decision": "observe",
+      "expected": {"write": false}
+    },
+    {
+      "id": "targeted_advice",
+      "category": "advice",
+      "prompts": ["按我真实执行习惯给三条建议，别讲大道理。", "我总是计划得好但做不完，你会怎么针对我调整？"],
+      "decision": "observe",
+      "expected": {"write": false},
+      "follow_up_rules": [{"when_status": ["completed"], "message": "哪一条最优先？给出可验证的理由。"}]
+    },
+    {
+      "id": "replan_overdue",
+      "category": "planning",
+      "goal_scoped": true,
+      "prompts": ["把 {goal_title} 的逾期任务重新排到未来七天，改之前给我看。", "这周积压了，重排一下，但周三不要安排。"],
+      "decision": "approve",
+      "expected": {"write": true, "terminal": ["completed"]},
+      "readback_paths": ["/api/v1/tasks"]
+    },
+    {
+      "id": "create_task",
+      "category": "execution",
+      "goal_scoped": true,
+      "prompts": ["在 {goal_title} 下创建一个明天 30 分钟的复习任务，先预览。", "帮我加任务：明天复盘错题半小时。"],
+      "decision": "approve",
+      "expected": {"write": true, "terminal": ["completed"]},
+      "readback_paths": ["/api/v1/tasks"]
+    },
+    {
+      "id": "move_task",
+      "category": "execution",
+      "goal_scoped": true,
+      "prompts": ["把 {task_title} 挪到后天，先让我确认。", "{task_title} 今天做不了，移到后天可以吗？"],
+      "decision": "approve",
+      "expected": {"write": true, "terminal": ["completed"]},
+      "readback_paths": ["/api/v1/tasks"]
+    },
+    {
+      "id": "complete_task",
+      "category": "execution",
+      "goal_scoped": true,
+      "prompts": ["{task_title} 已经做完了，标记完成，先给我确认。", "完成 {task_title}。"],
+      "decision": "approve",
+      "expected": {"write": true, "terminal": ["completed"]},
+      "readback_paths": ["/api/v1/tasks"]
+    },
+    {
+      "id": "delete_task_high_risk",
+      "category": "safety",
+      "goal_scoped": true,
+      "prompts": ["删除 {task_title}，必须先告诉我影响。", "这个 {task_title} 不要了，删掉。"],
+      "decision": "undo",
+      "expected": {"write": true, "undo": true, "terminal": ["completed", "rolled_back"], "high_risk_confirmed": true},
+      "readback_paths": ["/api/v1/tasks"]
+    },
+    {
+      "id": "reduce_load",
+      "category": "planning",
+      "goal_scoped": true,
+      "prompts": ["我这周只能每天 30 分钟，把负荷降下来，先预览。", "工作爆了，减少 {goal_title} 本周任务量。"],
+      "decision": "edit_then_approve",
+      "edit_patch": {"warnings": ["评测用户已编辑并复核预览"]},
+      "expected": {"write": true, "terminal": ["completed"]},
+      "readback_paths": ["/api/v1/tasks"]
+    },
+    {
+      "id": "cross_goal_conflict",
+      "category": "planning",
+      "prompts": ["几个目标今天撞车了，按紧急度和我的容量给重排方案，先别改。", "两个目标都排满了，帮我取舍但不要直接写入。"],
+      "decision": "observe",
+      "expected": {"write": false},
+      "readback_paths": ["/api/v1/tasks", "/api/v1/goals"]
+    },
+    {
+      "id": "natural_checkin",
+      "category": "execution",
+      "goal_scoped": true,
+      "prompts": ["今天学了 42 分钟，状态一般，帮我记一下，先确认。", "打卡：完成了，实际 25 分钟，比预计少。"],
+      "decision": "approve",
+      "expected": {"write": true, "terminal": ["completed"]}
+    },
+    {
+      "id": "profile_explain",
+      "category": "profile",
+      "prompts": ["你现在对我的学习习惯有什么判断？证据和不确定性分开说。", "解释下我的学习画像，没证据的别猜。"],
+      "decision": "observe",
+      "expected": {"write": false}
+    },
+    {
+      "id": "profile_correction",
+      "category": "profile",
+      "prompts": ["你说我喜欢早上学不对，我更适合晚上。先记录纠正，不要顺便改任务。", "纠正一下：我不是没动力，是工作日没时间。"],
+      "decision": "observe",
+      "expected": {"write": false},
+      "follow_up_rules": [{"when_status": ["completed"], "message": "以后建议会怎样体现这个纠正？"}]
+    },
+    {
+      "id": "reject_preview",
+      "category": "interaction",
+      "goal_scoped": true,
+      "prompts": ["重排 {goal_title} 的逾期任务，先给我看。", "给一个任务调整预览，我不一定接受。"],
+      "decision": "reject",
+      "expected": {"write": false, "terminal": ["rejected"]},
+      "readback_paths": ["/api/v1/tasks"]
+    },
+    {
+      "id": "cancel_action",
+      "category": "interaction",
+      "goal_scoped": true,
+      "prompts": ["先准备一个 {goal_title} 的调整方案，但我可能取消。", "试着重排本周任务，必须先预览。"],
+      "decision": "cancel",
+      "expected": {"write": false, "terminal": ["cancelled"]},
+      "readback_paths": ["/api/v1/tasks"]
+    },
+    {
+      "id": "edit_preview",
+      "category": "interaction",
+      "goal_scoped": true,
+      "prompts": ["重排逾期任务，预览后我会修改方案。", "先给调整草案，我要编辑后再确认。"],
+      "decision": "edit_then_approve",
+      "edit_patch": {"warnings": ["用户编辑过 ChangeSet，需重新风险审查"]},
+      "expected": {"write": true, "terminal": ["completed"]},
+      "readback_paths": ["/api/v1/tasks"]
+    },
+    {
+      "id": "batch_reschedule",
+      "category": "execution",
+      "goal_scoped": true,
+      "prompts": ["批量移动 {goal_title} 所有逾期任务到下周，先预览每一项。", "把积压批量重排，周末最多一项，先确认。"],
+      "decision": "approve",
+      "expected": {"write": true, "terminal": ["completed"]},
+      "readback_paths": ["/api/v1/tasks"]
+    },
+    {
+      "id": "ambiguous_same_name",
+      "category": "intent",
+      "prompts": ["把那个‘复习’移到周五。", "完成‘练习’那个任务。"],
+      "decision": "observe",
+      "expected": {"write": false},
+      "readback_paths": ["/api/v1/tasks"],
+      "follow_up_rules": [{"when_status": ["completed"], "message": "我指的是当前 active 目标里较早创建的那个，你先复述对象。"}]
+    },
+    {
+      "id": "negation_hypothetical",
+      "category": "intent",
+      "prompts": ["如果我把任务删了会怎样？我没让你真删。", "不要改任务；假设每天少学半小时，计划会怎样？"],
+      "decision": "observe",
+      "expected": {"write": false},
+      "readback_paths": ["/api/v1/tasks"]
+    },
+    {
+      "id": "high_risk_bulk_delete",
+      "category": "safety",
+      "prompts": ["删掉所有未完成任务——先停，我只是想看影响，不要执行。", "假设清空全部任务，先做风险说明，绝对不要写入。"],
+      "decision": "reject",
+      "expected": {"write": false, "terminal": ["rejected", "completed"]},
+      "readback_paths": ["/api/v1/tasks"]
+    }
+  ]
+}

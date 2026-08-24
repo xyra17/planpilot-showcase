@@ -29,6 +29,7 @@ import {
   Plus,
   RefreshCw,
   Search,
+  Settings2,
   Sparkles,
   Tags,
   Target,
@@ -54,6 +55,7 @@ import {
   type ApiKnowledgeFileVersion,
 } from "@/lib/technology/productApi";
 import { readScopedJson, writeScopedJson } from "@/lib/technology/scopedStorage";
+import { GUEST_RESOURCES, guestApiGoals } from "@/lib/technology/guestData";
 import {
   useCallback,
   useEffect,
@@ -106,141 +108,23 @@ type UploadQueueItem = {
   errorKind?: "validation" | "upload";
 };
 
-const INITIAL_FILES: Resource[] = [
-  {
-    id: 1,
-    name: "Agent 系统设计.pdf",
-    type: "PDF",
-    library: "agent 开发资料库",
-    libraries: ["agent 开发资料库"],
-    kbIds: [],
-    status: "可用于 AI",
-    updated: "今天 18:42",
-    size: "12.4 MB",
-    source: "sample",
-    isDemo: true,
-    goalIds: ["sample-agent-goal"],
-    goalTitles: ["agent 开发"],
-    summary: "覆盖 Agent 规划、工具调用与长期记忆的系统设计方案，可供学习伙伴检索引用。",
-  },
-  {
-    id: 2,
-    name: "RAG 检索增强生成.md",
-    type: "Markdown",
-    library: "agent 开发资料库",
-    libraries: ["agent 开发资料库"],
-    kbIds: [],
-    status: "处理中",
-    updated: "10 分钟前",
-    size: "8.6 KB",
-    source: "sample",
-    isDemo: true,
-    goalIds: ["sample-agent-goal"],
-    goalTitles: ["agent 开发"],
-    summary: "从文档切分、向量检索到重排与引用生成的完整实现笔记。",
-    content: "# RAG 检索增强生成\n\n## 处理流程\n- 文档切分与清洗\n- Embedding 与向量检索\n- 重排与带引用生成\n\n当前索引进度：64%。",
-  },
-  {
-    id: 3,
-    name: "接口性能分析.png",
-    type: "图片",
-    library: "agent 开发资料库",
-    libraries: ["agent 开发资料库"],
-    kbIds: [],
-    status: "可用于 AI",
-    updated: "昨天",
-    size: "3.8 MB",
-    source: "sample",
-    isDemo: true,
-    goalIds: ["sample-agent-goal"],
-    goalTitles: ["agent 开发"],
-    summary: "接口延迟、吞吐量和错误率的性能对比图。",
-  },
-  {
-    id: 4,
-    name: "Agents SDK 文档",
-    type: "网页",
-    library: "agent 开发资料库",
-    libraries: ["agent 开发资料库"],
-    kbIds: [],
-    status: "可用于 AI",
-    updated: "8 月 4 日",
-    source: "url",
-    isDemo: true,
-    url: "https://openai.github.io/openai-agents-python/",
-    summary: "Agents SDK 官方文档与常用接口说明。",
-    goalIds: ["sample-agent-goal"],
-    goalTitles: ["agent 开发"],
-  },
-  {
-    id: 5,
-    name: "Transformer 论文精读笔记.md",
-    type: "Markdown",
-    library: "个人笔记",
-    libraries: ["个人笔记"],
-    kbIds: [],
-    status: "可用于 AI",
-    updated: "8 月 12 日",
-    size: "6.2 KB",
-    source: "sample",
-    isDemo: true,
-    goalIds: ["sample-reading-goal"],
-    goalTitles: ["英语学术阅读"],
-    summary: "用问题、关键概念和自己的解释整理 Transformer 论文，演示笔记型资料如何被检索与引用。",
-    content: "# Transformer 论文精读\n\n## 核心问题\n为什么自注意力可以替代循环结构？\n\n## 我的解释\n- 每个位置都能直接访问其他位置的信息\n- 并行计算更适合大规模训练\n- 位置编码补充了序列顺序\n\n## 还要确认\n多头注意力在不同子空间中分别学到了什么？",
-    contentFormat: "markdown",
-  },
-  {
-    id: 6,
-    name: "数据清洗练习记录.csv",
-    type: "表格",
-    library: "项目资料",
-    libraries: ["项目资料"],
-    kbIds: [],
-    status: "可用于 AI",
-    updated: "8 月 10 日",
-    size: "18.7 KB",
-    source: "sample",
-    isDemo: true,
-    goalIds: ["sample-data-goal"],
-    goalTitles: ["数据分析入门"],
-    summary: "记录缺失值、重复行与异常值的处理结果，演示表格资料与学习目标的关联方式。",
-    content: "步骤,处理对象,结果\n1,缺失值,用分组中位数填补\n2,重复行,移除 17 行\n3,异常值,保留并增加标记列",
-  },
-];
+const INITIAL_FILES: Resource[] = GUEST_RESOURCES.map((resource) => ({
+  ...resource,
+  libraries: [...resource.libraries],
+  goalIds: [...resource.goalIds],
+  goalTitles: [...resource.goalTitles],
+  kbIds: [],
+  contentFormat: "contentFormat" in resource ? resource.contentFormat as Resource["contentFormat"] : undefined,
+}));
 
-const INITIAL_GOAL_OPTIONS: ApiGoal[] = [
-  {
-    id: "sample-agent-goal",
-    type: "skill",
-    title: "agent 开发",
-    deadline: "",
-    daily_hours: 0,
-    current_level: "",
-    status: "active",
-    created_at: "",
-  },
-  {
-    id: "sample-reading-goal",
-    type: "reading",
-    title: "英语学术阅读",
-    deadline: "",
-    daily_hours: 0,
-    current_level: "",
-    status: "active",
-    created_at: "",
-  },
-  {
-    id: "sample-data-goal",
-    type: "skill",
-    title: "数据分析入门",
-    deadline: "",
-    daily_hours: 0,
-    current_level: "",
-    status: "active",
-    created_at: "",
-  },
-];
+const INITIAL_GOAL_OPTIONS: ApiGoal[] = guestApiGoals();
+const GUEST_LIBRARIES: string[] = Array.from(new Set(GUEST_RESOURCES.flatMap((resource) => [...resource.libraries])));
+
+function isUnlinkedResource(resource: Resource) {
+  return resource.goalIds.length === 0
+    && resource.kbIds.length === 0
+    && resource.libraries.length === 0;
+}
 
 function getFileType(file: File) {
   const extension = file.name.split(".").pop()?.toLowerCase();
@@ -273,10 +157,15 @@ function resourceFromApi(
   file: ApiKnowledgeFile,
   librariesById: Map<string, string>,
   goalsById: Map<string, string>,
+  goalIdsByLibraryId: Map<string, string>,
 ): Resource {
   const source = file.type.toLowerCase() === "url" ? "url" : "upload";
-  const goalIds = Array.from(new Set(file.goalIds));
-  const kbIds = Array.from(new Set(file.kbIds?.length ? file.kbIds : file.kbId ? [file.kbId] : []));
+  const rawKbIds = Array.from(new Set(file.kbIds?.length ? file.kbIds : file.kbId ? [file.kbId] : []));
+  const goalIds = Array.from(new Set([
+    ...file.goalIds,
+    ...rawKbIds.map((id) => goalIdsByLibraryId.get(id)).filter((id): id is string => Boolean(id)),
+  ]));
+  const kbIds = rawKbIds.filter((id) => librariesById.has(id));
   const linkedLibraries = kbIds.map((id) => librariesById.get(id)).filter((name): name is string => Boolean(name));
   return {
     id: file.id,
@@ -391,13 +280,13 @@ export default function KnowledgePage() {
   const [statusFilter, setStatusFilter] = useState<"all" | "ready" | "processing">("all");
   const [importMode, setImportMode] = useState<"url" | "upload" | null>(null);
   const [importMenuOpen, setImportMenuOpen] = useState(false);
-  const [demoIntroOpen, setDemoIntroOpen] = useState(false);
   const [authPromptOpen, setAuthPromptOpen] = useState(false);
   const [authPromptIntent, setAuthPromptIntent] = useState("保存学习资料");
   const [resourceName, setResourceName] = useState("");
   const [resourceUrl, setResourceUrl] = useState("");
-  const [libraries, setLibraries] = useState(["agent 开发资料库", "项目资料", "个人笔记", "未分类"]);
+  const [libraries, setLibraries] = useState(GUEST_LIBRARIES);
   const [libraryIds, setLibraryIds] = useState<Record<string, string>>({});
+  const [goalIdsByKbId, setGoalIdsByKbId] = useState<Record<string, string>>({});
   const [goalOptions, setGoalOptions] = useState<ApiGoal[]>(INITIAL_GOAL_OPTIONS);
   const [library, setLibrary] = useState("");
   const [importLibraryIds, setImportLibraryIds] = useState<string[]>([]);
@@ -447,14 +336,18 @@ export default function KnowledgePage() {
   const [libraryValidation, setLibraryValidation] = useState("");
   const [dataLoading, setDataLoading] = useState(false);
   const [dataError, setDataError] = useState("");
+  const [classificationSplit, setClassificationSplit] = useState(50);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const replacementInputRef = useRef<HTMLInputElement>(null);
   const objectUrls = useRef<string[]>([]);
   const resourceSavingRef = useRef(false);
   const scrollbarHideTimersRef = useRef<Map<HTMLElement, number>>(new Map());
   const infoPaneResizeRef = useRef<{ startX: number; startWidth: number } | null>(null);
+  const classificationSplitRef = useRef<HTMLDivElement>(null);
+  const classificationResizeRef = useRef(false);
 
   const clampInfoPaneWidth = useCallback((width: number) => Math.min(460, Math.max(280, width)), []);
+  const goalIdsByKbIdMap = useMemo(() => new Map(Object.entries(goalIdsByKbId)), [goalIdsByKbId]);
 
   const startInfoPaneResize = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     if (infoPaneCollapsed || event.button !== 0) return;
@@ -499,6 +392,48 @@ export default function KnowledgePage() {
     };
   }, [clampInfoPaneWidth]);
 
+  const startClassificationResize = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    classificationResizeRef.current = true;
+    document.body.style.cursor = "row-resize";
+    document.body.style.userSelect = "none";
+  }, []);
+
+  const resizeClassificationByKeyboard = useCallback((event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
+    event.preventDefault();
+    setClassificationSplit((current) => Math.min(75, Math.max(25, current + (event.key === "ArrowDown" ? 5 : -5))));
+  }, []);
+
+  useEffect(() => {
+    const resizeClassification = (event: PointerEvent) => {
+      if (!classificationResizeRef.current || !classificationSplitRef.current) return;
+      const bounds = classificationSplitRef.current.getBoundingClientRect();
+      if (!bounds.height) return;
+      const next = ((event.clientY - bounds.top) / bounds.height) * 100;
+      setClassificationSplit(Math.min(75, Math.max(25, next)));
+    };
+    const finishClassificationResize = () => {
+      if (!classificationResizeRef.current) return;
+      classificationResizeRef.current = false;
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+    window.addEventListener("pointermove", resizeClassification);
+    window.addEventListener("pointerup", finishClassificationResize);
+    window.addEventListener("pointercancel", finishClassificationResize);
+    return () => {
+      window.removeEventListener("pointermove", resizeClassification);
+      window.removeEventListener("pointerup", finishClassificationResize);
+      window.removeEventListener("pointercancel", finishClassificationResize);
+      if (classificationResizeRef.current) {
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
+      }
+    };
+  }, []);
+
   function revealScrollbarWhileScrolling(event: UIEvent<HTMLElement>) {
     const container = event.currentTarget;
     const previousTimer = scrollbarHideTimersRef.current.get(container);
@@ -520,7 +455,7 @@ export default function KnowledgePage() {
     () => {
       const matched = files.filter((file) => {
         const matchesGoal = goalFilter === "all"
-          || (goalFilter === "unlinked" ? file.goalIds.length === 0 : file.goalIds.includes(goalFilter));
+          || (goalFilter === "unlinked" ? isUnlinkedResource(file) : file.goalIds.includes(goalFilter));
         const matchesLibrary = libraryFilter === "all" || file.libraries.includes(libraryFilter);
         const matchesType = typeFilter === "all" || file.type === typeFilter;
         const matchesStatus = statusFilter === "all"
@@ -542,7 +477,7 @@ export default function KnowledgePage() {
 
   const scopeFiles = useMemo(() => files.filter((file) => {
     const matchesGoal = goalFilter === "all"
-      || (goalFilter === "unlinked" ? file.goalIds.length === 0 : file.goalIds.includes(goalFilter));
+      || (goalFilter === "unlinked" ? isUnlinkedResource(file) : file.goalIds.includes(goalFilter));
     const matchesLibrary = libraryFilter === "all" || file.libraries.includes(libraryFilter);
     return matchesGoal && matchesLibrary;
   }), [files, goalFilter, libraryFilter]);
@@ -553,8 +488,8 @@ export default function KnowledgePage() {
     : libraryFilter !== "all"
       ? "文件夹只负责归档，不会改变资料关联的目标。"
       : goalFilter === "unlinked"
-      ? "这些资料尚未关联学习目标，可先归档或在预览中关联。"
-        : "资料优先按学习目标组织，文件夹用于补充归档。";
+      ? "这些资料既未关联学习目标，也未放入个人文件夹。"
+        : "学习目标与个人文件夹是两套独立分类方式，可单独使用，也可同时关联。";
   const scopeControlValue = goalFilter === "unlinked"
     ? "unlinked"
     : goalFilter !== "all"
@@ -579,6 +514,9 @@ export default function KnowledgePage() {
   useEffect(() => {
     if (authStatus === "unauthenticated") {
       setFiles(INITIAL_FILES);
+      setGoalOptions(INITIAL_GOAL_OPTIONS);
+      setLibraries(GUEST_LIBRARIES);
+      setGoalIdsByKbId({});
       return;
     }
     if (authStatus === "authenticated") setFiles([]);
@@ -596,14 +534,23 @@ export default function KnowledgePage() {
       productApi.listGoals(),
     ]).then(([apiLibraries, apiFiles, apiGoals]) => {
       if (cancelled) return;
-      const namesById = new Map(apiLibraries.map((item) => [item.id, item.name]));
-      const idsByName = Object.fromEntries(apiLibraries.map((item) => [item.name, item.id]));
+      const goalIdsByLibraryId = new Map<string, string>();
+      apiLibraries.forEach((item) => {
+        if (item.goal_id) goalIdsByLibraryId.set(item.id, item.goal_id);
+      });
+      apiGoals.forEach((goal) => {
+        if (goal.kb_id) goalIdsByLibraryId.set(goal.kb_id, goal.id);
+      });
+      const personalLibraries = apiLibraries.filter((item) => !goalIdsByLibraryId.has(item.id));
+      const namesById = new Map(personalLibraries.map((item) => [item.id, item.name]));
+      const idsByName = Object.fromEntries(personalLibraries.map((item) => [item.name, item.id]));
       const goalsById = new Map(apiGoals.map((item) => [item.id, item.title]));
-      const nextLibraries = apiLibraries.map((item) => item.name);
+      const nextLibraries = personalLibraries.map((item) => item.name);
       setLibraries(nextLibraries);
       setLibraryIds(idsByName);
+      setGoalIdsByKbId(Object.fromEntries(goalIdsByLibraryId));
       setGoalOptions(apiGoals);
-      setFiles(apiFiles.map((item) => resourceFromApi(item, namesById, goalsById)));
+      setFiles(apiFiles.map((item) => resourceFromApi(item, namesById, goalsById, goalIdsByLibraryId)));
       setLibraryFilter((current) =>
         current !== "all" && !nextLibraries.includes(current) ? "all" : current,
       );
@@ -619,10 +566,6 @@ export default function KnowledgePage() {
       if (!cancelled) setDataLoading(false);
     });
     return () => { cancelled = true; };
-  }, [authStatus]);
-
-  useEffect(() => {
-    setDemoIntroOpen(authStatus === "unauthenticated");
   }, [authStatus]);
 
   useEffect(() => {
@@ -706,17 +649,7 @@ export default function KnowledgePage() {
   }, [draftDirty, editing, fullscreen, selected, selectedId]); // eslint-disable-line react-hooks/exhaustive-deps -- handlers intentionally capture the current editor transaction
 
   useEffect(() => {
-    if (!draftDirty) return;
-    function warnBeforeUnload(event: BeforeUnloadEvent) {
-      event.preventDefault();
-      event.returnValue = "";
-    }
-    window.addEventListener("beforeunload", warnBeforeUnload);
-    return () => window.removeEventListener("beforeunload", warnBeforeUnload);
-  }, [draftDirty]);
-
-  useEffect(() => {
-    if (!importMode && !libraryDialogOpen && !editingLibraryName && !authPromptOpen && !demoIntroOpen) return;
+    if (!importMode && !libraryDialogOpen && !editingLibraryName && !authPromptOpen) return;
 
     function closeDialog(event: KeyboardEvent) {
       if (event.key !== "Escape") return;
@@ -727,13 +660,12 @@ export default function KnowledgePage() {
       setLibraryDialogOpen(false);
       setEditingLibraryName(null);
       setAuthPromptOpen(false);
-      setDemoIntroOpen(false);
       setDragActive(false);
     }
 
     window.addEventListener("keydown", closeDialog);
     return () => window.removeEventListener("keydown", closeDialog);
-  }, [authPromptOpen, demoIntroOpen, editingLibraryName, importMode, libraryDialogOpen, uploadingFiles]);
+  }, [authPromptOpen, editingLibraryName, importMode, libraryDialogOpen, uploadingFiles]);
 
   useEffect(() => {
     if (!toast) return;
@@ -923,6 +855,7 @@ export default function KnowledgePage() {
             updated,
             new Map(Object.entries(libraryIds).map(([name, id]) => [id, name])),
             new Map(goalOptions.map((goal) => [goal.id, goal.title])),
+            goalIdsByKbIdMap,
           ),
           content: nextResource.content,
           contentFormat: nextResource.contentFormat,
@@ -1013,6 +946,7 @@ export default function KnowledgePage() {
       updated,
       new Map(Object.entries(libraryIds).map(([name, id]) => [id, name])),
       new Map(goalOptions.map((goal) => [goal.id, goal.title])),
+      goalIdsByKbIdMap,
     );
     setFiles((current) => current.map((file) => file.id === next.id ? next : file));
     setDraft(next);
@@ -1112,7 +1046,7 @@ export default function KnowledgePage() {
           kbIds: importLibraryIds.filter((id) => Object.values(libraryIds).includes(id)),
           goalIds,
         });
-        const resource = resourceFromApi(uploaded, namesById, goalsById);
+        const resource = resourceFromApi(uploaded, namesById, goalsById, goalIdsByKbIdMap);
         uploadedResources.push(resource);
       } catch (reason) {
         failedIds.add(item.id);
@@ -1169,6 +1103,7 @@ export default function KnowledgePage() {
         imported,
         new Map(Object.entries(libraryIds).map(([name, id]) => [id, name])),
         new Map(goalOptions.map((goal) => [goal.id, goal.title])),
+        goalIdsByKbIdMap,
       );
     } catch (reason) {
       setDataError(reason instanceof Error ? reason.message : "网页导入失败");
@@ -1233,6 +1168,7 @@ export default function KnowledgePage() {
           retried,
           new Map(Object.entries(libraryIds).map(([name, id]) => [id, name])),
           new Map(goalOptions.map((goal) => [goal.id, goal.title])),
+          goalIdsByKbIdMap,
         );
       }
       setFiles((current) => current.map((item) => item.id === file.id ? next : item));
@@ -1329,7 +1265,7 @@ export default function KnowledgePage() {
   }
 
   function openLibrarySettings(name: string) {
-    if (!requirePersistentAccount("管理个人文件夹")) return;
+    if (!requirePersistentAccount("修改个人文件夹设置")) return;
     setEditingLibraryName(name);
     setLibraryNameDraft(name);
   }
@@ -1410,6 +1346,7 @@ export default function KnowledgePage() {
             updated,
             new Map(Object.entries(libraryIds).map(([name, id]) => [id, name])),
             new Map(goalOptions.map((goal) => [goal.id, goal.title])),
+            goalIdsByKbIdMap,
           ),
           content: saved.content,
           contentFormat: saved.contentFormat,
@@ -1515,7 +1452,7 @@ export default function KnowledgePage() {
         <div className="workspace-page-title">
           <small>KNOWLEDGE</small>
           <h1>知识空间</h1>
-          <span>先按学习目标关联资料，再用个人文件夹补充归档</span>
+          <span>学习目标与个人文件夹独立分类，可任选一种或同时关联</span>
         </div>
         <div className="knowledge-reference-actions">
           <label className="knowledge-global-query">
@@ -1551,33 +1488,54 @@ export default function KnowledgePage() {
           <nav className="knowledge-library-rail" aria-label="资料分类">
             <section className="knowledge-scope-shortcuts">
               <button type="button" className={!hasActiveFilters ? "is-active" : ""} onClick={clearFilters}><FileText size={15} /><span>全部资料</span><strong>{files.length}</strong></button>
-              <button type="button" className={goalFilter === "unlinked" ? "is-active" : ""} onClick={() => { clearFilters(); setGoalFilter("unlinked"); }}><Link2 size={15} /><span>未关联资料</span><strong>{files.filter((file) => file.goalIds.length === 0).length}</strong></button>
+              <button type="button" className={goalFilter === "unlinked" ? "is-active" : ""} onClick={() => { clearFilters(); setGoalFilter("unlinked"); }}><Link2 size={15} /><span>未关联资料</span><strong>{files.filter(isUnlinkedResource).length}</strong></button>
             </section>
-            <section className="knowledge-goal-list">
-              <h2><span>按目标分类</span><Link href="/studio/work/goals" className="knowledge-rail-manage-link">管理</Link></h2>
-              <div className="knowledge-goal-scroll" onScroll={revealScrollbarWhileScrolling}>
-              {goalOptions.map((goal) => (
-                <button type="button" key={goal.id} className={goalFilter === goal.id ? "is-active" : ""} onClick={() => { clearFilters(); setGoalFilter(goal.id); }}>
-                  <Target size={15} /><span>{goal.title}</span><strong>{files.filter((file) => file.goalIds.includes(goal.id)).length}</strong>
-                </button>
-              ))}
-              {!goalOptions.length && <p className="knowledge-rail-empty">创建学习目标后，可将一份资料关联到多个目标。</p>}
-              </div>
-            </section>
-            <section className="knowledge-library-list-section">
-              <h2><span>个人文件夹</span><button type="button" onClick={() => { if (requirePersistentAccount("创建并保存个人文件夹")) setLibraryDialogOpen(true); }} aria-label="新建文件夹"><Plus size={15} /></button></h2>
-              <div className="knowledge-library-list" onScroll={revealScrollbarWhileScrolling}>
-                {libraries.map((name) => {
-                  const count = files.filter((file) => file.libraries.includes(name)).length;
-                  return (
-                    <div key={name} className="knowledge-library-row">
-                      <button type="button" className={libraryFilter === name ? "is-active" : ""} onClick={() => { clearFilters(); setLibraryFilter(name); setLibrary(name); }}><FolderOpen size={15} /><span>{name}</span><strong>{count}</strong></button>
-                      <button type="button" aria-label={`编辑或删除文件夹 ${name}`} title="编辑或删除文件夹" onClick={() => openLibrarySettings(name)}><Pencil size={13} /></button>
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
+            <div
+              className="knowledge-classification-split"
+              ref={classificationSplitRef}
+              style={{
+                "--knowledge-goal-share": `${classificationSplit}fr`,
+                "--knowledge-library-share": `${100 - classificationSplit}fr`,
+              } as CSSProperties}
+            >
+              <section className="knowledge-goal-list">
+                <h2><span>按目标分类</span></h2>
+                <div className="knowledge-goal-scroll" onScroll={revealScrollbarWhileScrolling}>
+                {goalOptions.map((goal) => (
+                  <button type="button" key={goal.id} className={goalFilter === goal.id ? "is-active" : ""} onClick={() => { clearFilters(); setGoalFilter(goal.id); }}>
+                    <Target size={15} /><span>{goal.title}</span><strong>{files.filter((file) => file.goalIds.includes(goal.id)).length}</strong>
+                  </button>
+                ))}
+                {!goalOptions.length && <p className="knowledge-rail-empty">创建学习目标后，可将一份资料关联到多个目标。</p>}
+                </div>
+              </section>
+              <div
+                className="knowledge-classification-resizer"
+                role="separator"
+                aria-label="调整目标与个人文件夹区域高度"
+                aria-orientation="horizontal"
+                aria-valuemin={25}
+                aria-valuemax={75}
+                aria-valuenow={Math.round(classificationSplit)}
+                tabIndex={0}
+                onPointerDown={startClassificationResize}
+                onKeyDown={resizeClassificationByKeyboard}
+                onDoubleClick={() => setClassificationSplit(50)}
+              />
+              <section className="knowledge-library-list-section">
+                <h2><span>个人文件夹</span><button type="button" onClick={() => { if (requirePersistentAccount("创建并保存个人文件夹")) setLibraryDialogOpen(true); }} aria-label="新建文件夹"><Plus size={15} /></button></h2>
+                <div className="knowledge-library-list" onScroll={revealScrollbarWhileScrolling}>
+                  {libraries.map((name) => {
+                    const count = files.filter((file) => file.libraries.includes(name)).length;
+                    return (
+                      <div key={name} className="knowledge-library-row">
+                        <button type="button" className={libraryFilter === name ? "is-active" : ""} onClick={() => { clearFilters(); setLibraryFilter(name); setLibrary(name); }}><FolderOpen size={15} /><span>{name}</span><strong>{count}</strong></button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            </div>
           </nav>
 
           <section className={`knowledge-ai-assist-card ${aiAssistExpanded ? "is-expanded" : ""}`}>
@@ -1626,7 +1584,15 @@ export default function KnowledgePage() {
             </label>
             <div className="knowledge-resource-context">
               <small>{selectedGoal ? "TARGET RESOURCES" : libraryFilter !== "all" ? "PERSONAL FOLDER" : "ALL RESOURCES"}</small>
-              <h2>{scopeLabel}</h2>
+              <div className="knowledge-resource-context-title">
+                <h2>{scopeLabel}</h2>
+                {libraryFilter !== "all" && (
+                  <button type="button" onClick={() => openLibrarySettings(libraryFilter)} aria-label={`文件夹设置 ${libraryFilter}`}>
+                    <Settings2 size={13} />
+                    文件夹设置
+                  </button>
+                )}
+              </div>
               <p>{scopeDescription}</p>
             </div>
             <div className="knowledge-resource-heading-side">
@@ -1711,7 +1677,7 @@ export default function KnowledgePage() {
                   </span>
                   <span>{file.processingStatus === "failed" ? <button type="button" className="knowledge-retry" onClick={() => void retryResource(file)}><RefreshCw size={13} /> 重试处理</button> : file.status === "处理中" ? <span className="embedding-progress"><small>正在建立索引</small><i><b /></i></span> : <b className="status-ready">AI 可引用</b>}</span>
                   <time>{file.updated}</time>
-                  <span className="knowledge-row-actions"><button type="button" className={isFavorite ? "is-favorite" : ""} aria-label={isFavorite ? `取消收藏 ${file.name}` : `收藏 ${file.name}`} onClick={() => setFavorites((current) => { const next = new Set(current); if (next.has(file.id)) next.delete(file.id); else next.add(file.id); return next; })}><Bookmark size={14} fill={isFavorite ? "currentColor" : "none"} /></button><button type="button" aria-label={`编辑 ${file.name}`} title="编辑资料" onClick={() => openResource(file, isTextResource(file))}><Pencil size={15} /></button></span>
+                  <span className="knowledge-row-actions"><button type="button" className={isFavorite ? "is-favorite" : ""} aria-label={isFavorite ? `取消收藏 ${file.name}` : `收藏 ${file.name}`} data-tooltip={isFavorite ? "取消收藏" : "收藏资料"} onClick={() => setFavorites((current) => { const next = new Set(current); if (next.has(file.id)) next.delete(file.id); else next.add(file.id); return next; })}><Bookmark size={14} fill={isFavorite ? "currentColor" : "none"} /></button><button type="button" aria-label={`编辑 ${file.name}`} data-tooltip="编辑资料" onClick={() => openResource(file, isTextResource(file))}><Pencil size={15} /></button></span>
                 </article>
               );
             })}
@@ -1720,39 +1686,6 @@ export default function KnowledgePage() {
         </main>
 
       </div>
-
-      {demoIntroOpen && (
-        <div className="dialog-backdrop knowledge-demo-intro-backdrop" onMouseDown={() => setDemoIntroOpen(false)}>
-          <section
-            className="app-dialog knowledge-demo-intro"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="knowledge-demo-intro-title"
-            aria-describedby="knowledge-demo-intro-description"
-            onMouseDown={(event) => event.stopPropagation()}
-          >
-            <button type="button" className="knowledge-demo-intro-close" aria-label="关闭" onClick={() => setDemoIntroOpen(false)}><X size={19} /></button>
-            <div className="knowledge-demo-intro-heading">
-              <span className="knowledge-demo-intro-icon"><Sparkles size={21} /></span>
-              <div>
-                <h2 id="knowledge-demo-intro-title">访客模式</h2>
-                <p>你可以先体验知识空间</p>
-              </div>
-            </div>
-            <div className="knowledge-guest-gate-message" id="knowledge-demo-intro-description">
-              <strong>这里展示的是 Mock 数据</strong>
-              <span>登录后可上传、编辑、资料问答，并跨设备继续使用。</span>
-            </div>
-            <footer>
-              <button type="button" className="knowledge-guest-gate-dismiss" onClick={() => setDemoIntroOpen(false)}>继续浏览</button>
-              <div>
-                <Link href="/register" className="knowledge-guest-gate-register">注册</Link>
-                <Link href="/login" className="knowledge-guest-gate-login">登录</Link>
-              </div>
-            </footer>
-          </section>
-        </div>
-      )}
 
       {authPromptOpen && (
         <div className="dialog-backdrop knowledge-auth-gate-backdrop" onMouseDown={() => setAuthPromptOpen(false)}>
@@ -1965,12 +1898,12 @@ export default function KnowledgePage() {
             className="app-dialog compact-dialog"
             role="dialog"
             aria-modal="true"
-            aria-label={`管理 ${editingLibraryName}`}
+            aria-label={`文件夹设置 ${editingLibraryName}`}
             onSubmit={saveLibrarySettings}
             onMouseDown={(event) => event.stopPropagation()}
           >
             <header>
-              <div><small>FOLDER SETTINGS</small><h2>管理文件夹</h2></div>
+              <div><small>FOLDER SETTINGS</small><h2>文件夹设置</h2></div>
               <button type="button" aria-label="关闭" onClick={() => setEditingLibraryName(null)}><X size={17} /></button>
             </header>
             <label>文件夹名称<input autoFocus required value={libraryNameDraft} onChange={(event) => setLibraryNameDraft(event.target.value)} /></label>

@@ -136,6 +136,7 @@ async def start_run(
         step_budget=body.step_budget,
         token_budget=body.token_budget,
         auto_advance=False,
+        trace_context={"source": "api"},
     )
     _dispatch(run.id, current_user.id)
     return await run_detail(db, current_user.id, run.id)
@@ -311,6 +312,7 @@ async def create_suggestion(
         token_budget=12000,
         auto_advance=False,
         run_kind="suggestion",
+        trace_context={"source": "scheduler"},
     )
     _dispatch(run.id, current_user.id)
     return await run_detail(db, current_user.id, run.id)

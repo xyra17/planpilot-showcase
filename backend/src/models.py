@@ -261,6 +261,7 @@ class CoachPreference(Base):
         DateTime, server_default=func.now(), onupdate=func.now()
     )
 
+
 class Goal(Base):
     __tablename__ = "goals"
 
@@ -654,6 +655,21 @@ class AgentRun(Base):
         String, ForeignKey("goals.id", ondelete="SET NULL"), nullable=True, index=True
     )
     request_text: Mapped[str] = mapped_column(Text, nullable=False)
+    conversation_turn_id: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
+    insight_id: Mapped[str | None] = mapped_column(
+        String,
+        ForeignKey(
+            "decision_proposals.id",
+            ondelete="SET NULL",
+            use_alter=True,
+            name="fk_agent_runs_insight_id_decision_proposals",
+        ),
+        nullable=True,
+        index=True,
+    )
+    trace_context: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    input_received_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    preview_ready_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     objective: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     plan: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
     plan_history: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
@@ -740,6 +756,9 @@ class AgentApproval(Base):
     change_hash: Mapped[str] = mapped_column(String, nullable=False)
     change_set_version: Mapped[int] = mapped_column(Integer, default=1)
     run_state_version: Mapped[int] = mapped_column(Integer, default=0)
+    review_snapshot: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    reviewed_change_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    review_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     policy_decision: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     decided_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
@@ -765,9 +784,7 @@ class GoalVersion(Base):
     created_by: Mapped[str] = mapped_column(String, default="user")  # user | ai | system
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
-    __table_args__ = (
-        UniqueConstraint("goal_id", "version", name="uq_goal_versions_goal_version"),
-    )
+    __table_args__ = (UniqueConstraint("goal_id", "version", name="uq_goal_versions_goal_version"),)
 
 
 class TaskMasteryRecord(Base):
@@ -816,9 +833,7 @@ class AgentAuditEvent(Base):
 class PasswordResetToken(Base):
     __tablename__ = "password_reset_tokens"
 
-    __table_args__ = (
-        UniqueConstraint("token", name="password_reset_tokens_token_key"),
-    )
+    __table_args__ = (UniqueConstraint("token", name="password_reset_tokens_token_key"),)
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=new_uuid)
     user_id: Mapped[str] = mapped_column(
@@ -833,9 +848,7 @@ class PasswordResetToken(Base):
 class EmailVerificationToken(Base):
     __tablename__ = "email_verification_tokens"
 
-    __table_args__ = (
-        UniqueConstraint("token", name="email_verification_tokens_token_key"),
-    )
+    __table_args__ = (UniqueConstraint("token", name="email_verification_tokens_token_key"),)
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=new_uuid)
     user_id: Mapped[str] = mapped_column(
@@ -993,7 +1006,8 @@ class LearnerPattern(Base):
 
     # ── 置信度 ───────────────────────────────────────────────────────────────
     confidence: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
-    # 公式：confidence_new = confidence_old + contribution × lr × (1 - confidence_old)
+    # 通用 Pattern 公式：confidence_new = confidence_old + contribution × lr × (1 - confidence_old)
+    # delay_pattern 使用 pattern_value.evidence_strength 重算；它表示证据强度，不表示用户动机概率。
     # 衰减：每 14 天未收到 evidence 开始按 decay_rate 衰减
     evidence_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
@@ -1046,9 +1060,7 @@ class LearnerPatternAudit(Base):
     undone_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True)
 
-    __table_args__ = (
-        Index("ix_learner_pattern_audits_user_created", "user_id", "created_at"),
-    )
+    __table_args__ = (Index("ix_learner_pattern_audits_user_created", "user_id", "created_at"),)
 
 
 class LearnerPatternSuppression(Base):
@@ -1071,10 +1083,14 @@ class LearnerPatternSuppression(Base):
     __table_args__ = (
         Index(
             "ix_learner_pattern_suppressions_lookup",
-            "user_id", "pattern_type", "scope", "goal_id",
+            "user_id",
+            "pattern_type",
+            "scope",
+            "goal_id",
             unique=True,
         ),
     )
+
 
 class PatternEvidence(Base):
     """Pattern 支撑证据（Traceability）。
@@ -1162,9 +1178,17 @@ class DecisionProposal(Base):
     summary: Mapped[str] = mapped_column(Text, default="")
     reasoning: Mapped[list[str]] = mapped_column(JSON, default=list)
     proposed_changes: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    action_capability: Mapped[str | None] = mapped_column(String, nullable=True)
+    action_seed: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    converted_run_id: Mapped[str | None] = mapped_column(
+        String, ForeignKey("agent_runs.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     evidence_references: Mapped[list[str]] = mapped_column(JSON, default=list)
     confidence: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     status: Mapped[str] = mapped_column(String, nullable=False, default="pending", index=True)
+    lifecycle_status: Mapped[str] = mapped_column(
+        String, nullable=False, default="insight", server_default="insight", index=True
+    )
     requires_user_confirmation: Mapped[bool] = mapped_column(Boolean, default=True)
     source: Mapped[str] = mapped_column(String, nullable=False, default="ai_agent")
     model_name: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -1185,6 +1209,62 @@ class DecisionProposal(Base):
             name="ck_decision_proposals_confidence",
         ),
         Index("ix_decision_proposals_user_status", "user_id", "status"),
+    )
+
+
+class InsightActionRun(Base):
+    """Append-only Insight→Run history with one active conversion per Insight."""
+
+    __tablename__ = "insight_action_runs"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=new_uuid)
+    insight_id: Mapped[str] = mapped_column(
+        String, ForeignKey("decision_proposals.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    run_id: Mapped[str] = mapped_column(
+        String, ForeignKey("agent_runs.id", ondelete="CASCADE"), nullable=False, unique=True
+    )
+    status: Mapped[str] = mapped_column(String, nullable=False, default="converted", index=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, index=True)
+    attempt_number: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    change_set_id: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
+    approval_id: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
+    history: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now()
+    )
+
+    __table_args__ = (
+        Index(
+            "uq_insight_action_run_active",
+            "insight_id",
+            unique=True,
+            postgresql_where=is_active.is_(True),
+            sqlite_where=is_active.is_(True),
+        ),
+    )
+
+
+class PendingActionIntent(Base):
+    __tablename__ = "pending_action_intents"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=new_uuid)
+    user_id: Mapped[str] = mapped_column(
+        String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    session_id: Mapped[str] = mapped_column(String, nullable=False)
+    conversation_turn_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    missing_slots: Mapped[list[str]] = mapped_column(JSON, default=list)
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now()
+    )
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "session_id", name="uq_pending_action_user_session"),
     )
 
 
@@ -1804,6 +1884,9 @@ class AgentFeedbackEvent(Base):
     proposal_id: Mapped[str | None] = mapped_column(
         String, ForeignKey("decision_proposals.id", ondelete="SET NULL"), nullable=True, index=True
     )
+    run_id: Mapped[str | None] = mapped_column(
+        String, ForeignKey("agent_runs.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     source_event_id: Mapped[str | None] = mapped_column(
         String, ForeignKey("learning_events.id", ondelete="SET NULL"), nullable=True
     )
@@ -2119,5 +2202,105 @@ class CanaryObservation(Base):
             "canary_release_id",
             "observation_type",
             "metric_name",
+        ),
+    )
+
+
+# ── Beta evidence foundation ────────────────────────────────────────────────
+
+
+class AgentBetaControl(Base):
+    """Server-side boundary for Action beta exposure and emergency stops."""
+
+    __tablename__ = "agent_beta_controls"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default="action-beta")
+    beta_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    new_action_runs_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    cohort_mode: Mapped[str] = mapped_column(String(24), default="allowlist", nullable=False)
+    traffic_percent: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    allowlisted_user_ids: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    metric_version: Mapped[str] = mapped_column(
+        String(64), default="action-beta-funnel-v2", nullable=False
+    )
+    measurement_started_at: Mapped[datetime] = mapped_column(
+        DateTime, default=utc_now, nullable=False
+    )
+    paused_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    safety_snapshot: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, nullable=False)
+    updated_by: Mapped[str | None] = mapped_column(
+        String, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now()
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "traffic_percent IN (0, 5, 20, 50)", name="ck_agent_beta_traffic_stage"
+        ),
+        CheckConstraint(
+            "cohort_mode IN ('allowlist', 'percentage')", name="ck_agent_beta_cohort_mode"
+        ),
+    )
+
+
+class AgentBetaControlEvent(Base):
+    """Append-only audit trail for every beta control change."""
+
+    __tablename__ = "agent_beta_control_events"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=new_uuid)
+    control_id: Mapped[str] = mapped_column(
+        String, ForeignKey("agent_beta_controls.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    action: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    actor_id: Mapped[str | None] = mapped_column(
+        String, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    reason: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    before_state: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, nullable=False)
+    after_state: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class AgentBetaReviewSample(Base):
+    """Privacy-safe review item derived only from persisted production facts."""
+
+    __tablename__ = "agent_beta_review_samples"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=new_uuid)
+    source_kind: Mapped[str] = mapped_column(String(32), nullable=False)
+    source_id: Mapped[str] = mapped_column(String, nullable=False)
+    run_id: Mapped[str | None] = mapped_column(
+        String, ForeignKey("agent_runs.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    conversation_turn_id: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
+    pseudonymous_user_key: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    sample_type: Mapped[str] = mapped_column(String(48), nullable=False, index=True)
+    structured_context: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, nullable=False)
+    redacted_summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String(24), default="pending", nullable=False, index=True)
+    reviewer_id: Mapped[str | None] = mapped_column(
+        String, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    reviewer_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    candidate_dataset_id: Mapped[str | None] = mapped_column(
+        String, ForeignKey("evaluation_datasets.id", ondelete="SET NULL"), nullable=True
+    )
+    retention_expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now()
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "source_kind", "source_id", "sample_type", name="uq_agent_beta_review_source_type"
+        ),
+        CheckConstraint(
+            "status IN ('pending', 'reviewed', 'confirmed', 'dismissed')",
+            name="ck_agent_beta_review_status",
         ),
     )

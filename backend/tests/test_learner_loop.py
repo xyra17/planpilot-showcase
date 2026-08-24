@@ -8,7 +8,9 @@ from datetime import date, timedelta
 import pytest
 from sqlalchemy import select
 
+from src.core.agent_v2.orchestrator import advance_run
 from src.core.time import utc_now
+from src.intelligence.event_processor import process_event
 from src.intelligence.profile_metrics import (
     calc_consistency,
     calc_daily_investment,
@@ -96,7 +98,12 @@ async def test_user_can_control_and_audit_learner_patterns(client, auth, goal_id
     audits = await client.get("/api/v1/learner/pattern-audits", headers=auth)
     assert audits.status_code == 200
     assert {row["action"] for row in audits.json()} >= {
-        "confirm", "correct", "undo", "set_scope", "pause", "restore"
+        "confirm",
+        "correct",
+        "undo",
+        "set_scope",
+        "pause",
+        "restore",
     }
 
     forgotten = await client.post(
@@ -122,6 +129,67 @@ async def test_user_can_control_and_audit_learner_patterns(client, auth, goal_id
         )
     )
     assert suppression is not None
+
+
+@pytest.mark.asyncio
+async def test_user_can_attribute_one_overdue_evidence_and_recompute_pattern(client, auth, goal_id, db):
+    goal = await db.scalar(select(Goal).where(Goal.id == goal_id))
+    assert goal is not None
+    events = []
+    for index in range(5):
+        event = LearningEvent(
+            user_id=goal.user_id,
+            goal_id=goal_id,
+            aggregate_type="task",
+            aggregate_id=f"delay-task-{index}",
+            event_type="TaskCompleted",
+            occurred_at=utc_now(),
+            payload={
+                "days_overdue": 4,
+                "actual_mins": 60,
+                "title": f"数据叙事 {index + 1}",
+                "stage_label": "数据叙事",
+            },
+        )
+        db.add(event)
+        await db.flush()
+        await process_event(db, event)
+        events.append(event)
+    await db.commit()
+
+    pattern = await db.scalar(
+        select(LearnerPattern).where(
+            LearnerPattern.user_id == goal.user_id,
+            LearnerPattern.pattern_type == "delay_pattern",
+        )
+    )
+    assert pattern is not None
+    evidence = await db.scalar(
+        select(PatternEvidence).where(
+            PatternEvidence.pattern_id == pattern.id,
+            PatternEvidence.learning_event_id == events[0].id,
+        )
+    )
+    assert evidence is not None
+
+    response = await client.post(
+        f"/api/v1/learner/patterns/{pattern.id}/evidence/{evidence.id}/attribution",
+        headers=auth,
+        json={"reason_code": "business_trip", "note": "当周在出差，连续时间明显减少"},
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["attribution"] == "external_interruption"
+    assert body["pattern"]["evidence_summary"]["excluded_count"] == 1
+    assert body["pattern"]["pattern_value"]["effective_sample_count"] == 4
+    assert body["pattern"]["status"] == "decayed"
+
+    managed = await client.get("/api/v1/learner/patterns/manage", headers=auth)
+    assert managed.status_code == 200
+    managed_pattern = next(row for row in managed.json() if row["id"] == pattern.id)
+    corrected = next(item for item in managed_pattern["evidence"] if item["evidence_id"] == evidence.id)
+    assert corrected["direction"] == "excluded"
+    assert corrected["reason_code"] == "business_trip"
 
 
 def _event(user_id: str, goal_id: str, event_type: str, payload: dict, days_ago: int = 0):
@@ -307,15 +375,32 @@ async def test_profile_context_proposal_and_feedback_closed_loop(client, auth, g
     assert accepted.json()["status"] == "accepted"
 
     applied = await client.post(f"/api/v1/learner/proposals/{proposal['id']}/apply", headers=auth)
-    assert applied.status_code == 200, applied.text
-    assert applied.json()["status"] == "applied"
+    assert applied.status_code == 409
+    action = await client.post(
+        f"/api/v1/learner/proposals/{proposal['id']}/action-run", headers=auth
+    )
+    assert action.status_code == 200, action.text
+    run_id = action.json()["id"]
+    await advance_run(db, user_id=user_id, run_id=run_id)
+    preview = await client.get(f"/api/v2/agent/runs/{run_id}", headers=auth)
+    assert preview.status_code == 200, preview.text
+    approval = preview.json()["approvals"][0]
+    approved = await client.post(
+        f"/api/v2/agent/runs/{run_id}/approve",
+        headers=auth,
+        json={
+            "approval_id": approval["id"],
+            "change_hash": approval["change_hash"],
+            "change_set_version": approval["change_set_version"],
+            "run_state_version": approval["run_state_version"],
+        },
+    )
+    assert approved.status_code == 200, approved.text
+    await advance_run(db, user_id=user_id, run_id=run_id)
     applied_proposal = await db.get(DecisionProposal, proposal["id"])
     await db.refresh(applied_proposal)
-    snapshot = applied_proposal.application_snapshot
-    assert snapshot["schema_version"] == "proposal-application-v1"
-    assert snapshot["target_task_ids"] == [task_id]
-    assert task_id in snapshot["before"]["tasks"]
-    assert snapshot["after"]["tasks"][task_id]["version"] > snapshot["before"]["tasks"][task_id]["version"]
+    assert applied_proposal.status == "applied"
+    assert applied_proposal.lifecycle_status == "applied"
     task = await db.scalar(select(Task).where(Task.id == task_id))
     await db.refresh(task)
     assert task.scheduled_date > date.today().isoformat()

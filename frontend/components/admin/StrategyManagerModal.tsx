@@ -47,7 +47,7 @@ export function StrategyManagerModal({
   const [version, setVersion] = useState("");
   const [changeNote, setChangeNote] = useState("");
   const [template, setTemplate] = useState("");
-  const [provider, setProvider] = useState<"configured-router" | "local" | "smart">("configured-router");
+  const [provider, setProvider] = useState<"local" | "smart">("smart");
   const [modelName, setModelName] = useState("");
   const [temperature, setTemperature] = useState("0.2");
   const [maxTokens, setMaxTokens] = useState("700");
@@ -64,7 +64,7 @@ export function StrategyManagerModal({
     setName(activePrompt?.name ?? "daily_coach_prompt");
     setVersion(nextVersion(activePrompt?.version ?? "coach-v1"));
     setTemplate(activePrompt?.template ?? "");
-    setProvider((activeModel?.provider as typeof provider) ?? "configured-router");
+    setProvider(activeModel?.provider === "local" ? "local" : "smart");
     setModelName(activeModel?.model_name ?? "");
     setTemperature(String(activeModel?.temperature ?? 0.2));
     setMaxTokens(String(activeModel?.max_tokens ?? 700));
@@ -263,7 +263,7 @@ export function StrategyManagerModal({
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="配置名称"><input value={name} onChange={(event) => setName(event.target.value)} /></Field>
                 <Field label="新版本号"><input value={version} onChange={(event) => setVersion(event.target.value)} /></Field>
-                {kind === "model" && <><Field label="服务路由"><select value={provider} onChange={(event) => setProvider(event.target.value as typeof provider)}><option value="configured-router">configured-router</option><option value="local">local</option><option value="smart">smart</option></select></Field><Field label="模型名称"><input value={modelName} onChange={(event) => setModelName(event.target.value)} /></Field><Field label="Temperature"><input type="number" min="0" max="2" step="0.1" value={temperature} onChange={(event) => setTemperature(event.target.value)} /></Field><Field label="最大 Tokens"><input type="number" min="64" max="32000" value={maxTokens} onChange={(event) => setMaxTokens(event.target.value)} /></Field></>}
+                {kind === "model" && <><Field label="服务路由"><select value={provider} onChange={(event) => setProvider(event.target.value as typeof provider)}><option value="smart">云端 DeepSeek（smart）</option><option value="local">本地 Qwen（local）</option></select></Field><Field label="模型名称"><input value={modelName} onChange={(event) => setModelName(event.target.value)} /></Field><Field label="Temperature"><input type="number" min="0" max="2" step="0.1" value={temperature} onChange={(event) => setTemperature(event.target.value)} /></Field><Field label="最大 Tokens"><input type="number" min="64" max="32000" value={maxTokens} onChange={(event) => setMaxTokens(event.target.value)} /></Field></>}
               </div>
               {kind === "prompt" && <Field label="完整提示词模板"><textarea rows={10} value={template} onChange={(event) => setTemplate(event.target.value)} /></Field>}
               {kind === "policy" && <Field label="安全规则（JSON）"><textarea rows={10} className="font-mono" value={rules} onChange={(event) => setRules(event.target.value)} /></Field>}
@@ -282,8 +282,9 @@ export function StrategyManagerModal({
   );
 }
 
-function VersionSelect({ icon: Icon, label, value, onChange, options, model = false }: { icon: typeof FileText; label: string; value: string; onChange: (value: string) => void; options: Array<{ id: string; name: string; version: string; status: string; model_name?: string }>; model?: boolean }) {
-  return <label className="rounded-2xl border border-gray-200 bg-gray-50 p-4"><span className="flex items-center gap-2 text-xs font-semibold text-gray-700"><Icon size={15} className="text-violet-600" />{label}</span><select value={value} onChange={(event) => onChange(event.target.value)} className="mt-3 w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-xs text-gray-800"><option value="">请选择版本</option>{options.filter((item) => item.status === "approved").map((item) => <option key={item.id} value={item.id}>{model ? item.model_name : item.name} · {item.version}</option>)}</select><span className="mt-2 block text-[10px] text-gray-400">仅显示已批准版本</span></label>;
+function VersionSelect({ icon: Icon, label, value, onChange, options, model = false }: { icon: typeof FileText; label: string; value: string; onChange: (value: string) => void; options: Array<{ id: string; name: string; version: string; status: string; model_name?: string; provider?: string }>; model?: boolean }) {
+  const available = options.filter((item) => item.status === "approved" && (!model || item.provider === "local" || item.provider === "smart"));
+  return <label className="rounded-2xl border border-gray-200 bg-gray-50 p-4"><span className="flex items-center gap-2 text-xs font-semibold text-gray-700"><Icon size={15} className="text-violet-600" />{label}</span><select value={available.some((item) => item.id === value) ? value : ""} onChange={(event) => onChange(event.target.value)} className="mt-3 w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-xs text-gray-800"><option value="">请选择版本</option>{available.map((item) => <option key={item.id} value={item.id}>{model ? item.model_name : item.name} · {item.version}</option>)}</select><span className="mt-2 block text-[10px] text-gray-400">{model ? "只显示可执行的已批准路由；退役配置仅留审计" : "仅显示已批准版本"}</span></label>;
 }
 
 function VersionDetail({ title, rows }: { title: string; rows: Array<[string, string | undefined]> }) {

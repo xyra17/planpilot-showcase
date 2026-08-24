@@ -1,0 +1,17 @@
+[
+  {"id":"negation-01","category":"negation","kind":"intent_routing","input":{"message":"先不要新建任务"},"environment":{},"expected":{"mode":"conversation"},"assertions":["no_action_intent"]},
+  {"id":"negation-02","category":"negation","kind":"intent_routing","input":{"message":"别把任务移到明天"},"environment":{},"expected":{"mode":"conversation"},"assertions":["no_action_intent"]},
+  {"id":"question-01","category":"question","kind":"intent_routing","input":{"message":"能不能创建任务？"},"environment":{},"expected":{"mode":"conversation"},"assertions":["no_action_intent"]},
+  {"id":"question-02","category":"question","kind":"intent_routing","input":{"message":"如何重新安排逾期任务？"},"environment":{},"expected":{"mode":"conversation"},"assertions":["no_action_intent"]},
+  {"id":"hypothesis-01","category":"hypothesis","kind":"intent_routing","input":{"message":"假如把任务移到明天会怎样？"},"environment":{},"expected":{"mode":"conversation"},"assertions":["no_action_intent"]},
+  {"id":"multi_intent-01","category":"multi_intent","kind":"intent_routing","input":{"message":"把逾期任务重新安排到下周并给出变更预览"},"environment":{"goal":"primary"},"expected":{"mode":"action","capability":"reschedule_overdue"},"assertions":["complete_action_intent"]},
+  {"id":"typo-01","category":"typo","kind":"intent_routing","input":{"message":"新建任物“复习数组”，安排到明天"},"environment":{"goal":"primary"},"expected":{"mode":"action","capability":"task_mutation"},"assertions":["complete_action_intent"]},
+  {"id":"typo-02","category":"typo","kind":"intent_routing","input":{"message":"把逾期任务重新排其"},"environment":{"goal":"primary"},"expected":{"mode":"action","capability":"reschedule_overdue"},"assertions":["complete_action_intent"]},
+  {"id":"reference-01","category":"reference","kind":"intent_routing","input":{"message":"把它移到明天"},"environment":{},"expected":{"mode":"conversation"},"assertions":["no_action_intent"]},
+  {"id":"same_name-01","category":"same_name","kind":"intent_routing","input":{"message":"完成任务“复习”"},"environment":{"same_name_tasks":2},"expected":{"mode":"clarification","capability":"task_mutation","missing_slots":["task_disambiguation"]},"assertions":["pending_intent_created"]},
+  {"id":"missing-01","category":"missing_parameters","kind":"intent_routing","input":{"message":"新建任务"},"environment":{},"expected":{"mode":"clarification","capability":"task_mutation","missing_slots":["goal","scheduled_date","task_title"]},"assertions":["pending_intent_created"]},
+  {"id":"multi-turn-01","category":"multi_turn_slot_filling","kind":"intent_routing","input":{"messages":["新建任务“章节练习”","明天"]},"environment":{"goal":"primary"},"expected":{"mode":"action","capability":"task_mutation","missing_slots":[]},"assertions":["pending_intent_consumed"]},
+  {"id":"isolation-01","category":"multi_turn_slot_filling","kind":"intent_routing","input":{"messages":["新建任务“隔离测试”","明天"],"continuation_session":"other"},"environment":{"goal":"primary"},"expected":{"mode":"conversation"},"assertions":["session_isolated"]},
+  {"id":"cancel-01","category":"multi_turn_slot_filling","kind":"intent_routing","input":{"messages":["新建任务“取消测试”","取消"]},"environment":{"goal":"primary"},"expected":{"mode":"conversation","speech_act":"cancel"},"assertions":["pending_intent_consumed"]},
+  {"id":"expiry-01","category":"multi_turn_slot_filling","kind":"intent_routing","input":{"messages":["新建任务“过期测试”","明天"]},"environment":{"goal":"primary","expire_pending":true},"expected":{"mode":"conversation"},"assertions":["expired_pending_removed"]}
+]

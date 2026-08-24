@@ -58,15 +58,22 @@ export function GoalCreateDialog({ onClose, onGoalChanged }: { onClose: () => vo
     const localGoal = {
       id,
       name: title.trim(),
+      title: title.trim(),
       type: TYPE_LABELS[type],
+      apiType: type,
       progress: 0,
       deadline: formatGoalDeadline(deadline),
       deadlineDate: deadline,
       daily: `${Math.round(dailyHours * 60)} 分钟`,
-      status: "进行中",
+      daily_hours: dailyHours,
+      current_level: currentLevel,
+      work_schedule: workSchedule,
+      status: "active",
       next: "等待生成学习计划",
       taskSummary: "0 / 0 个任务",
       rhythmSummary: "尚未开始",
+      currentLevel,
+      workSchedule,
     };
     const current = readProductArray<typeof localGoal>(PRODUCT_STORAGE_KEYS.goals, []);
     writeProductArray(PRODUCT_STORAGE_KEYS.goals, [localGoal, ...current], { notifyPilo: true });
@@ -78,6 +85,7 @@ export function GoalCreateDialog({ onClose, onGoalChanged }: { onClose: () => vo
     const trimmedTitle = title.trim();
     if (!trimmedTitle) { setFormError("请先填写目标名称。"); return; }
     if (!deadline) { setFormError("请设置目标截止日期。"); return; }
+    if (authStatus === "loading") { setFormError("正在确认登录状态，请稍后再试。"); return; }
     setFormError("");
     setIsSubmitting(true);
     try {
@@ -92,7 +100,8 @@ export function GoalCreateDialog({ onClose, onGoalChanged }: { onClose: () => vo
             kb_id: null,
             meta: {},
           })).id
-        : createLocalGoal();
+        : authStatus === "unauthenticated" ? createLocalGoal() : null;
+      if (!goalId) throw new Error("正在确认登录状态，请稍后再试。");
       setCreatedGoalId(goalId);
       setShowCreatedDialog(true);
       onGoalChanged?.();
@@ -107,7 +116,7 @@ export function GoalCreateDialog({ onClose, onGoalChanged }: { onClose: () => vo
     if (!createdGoalId) return;
     setPlanError("");
     if (authStatus !== "authenticated") {
-      router.push(`/studio/work/goals/${createdGoalId}`);
+      router.replace(`/studio/work/goals/${createdGoalId}`);
       return;
     }
     setPlanGenerating(true);
@@ -118,7 +127,7 @@ export function GoalCreateDialog({ onClose, onGoalChanged }: { onClose: () => vo
         pacing_mode: pacingMode,
       });
       localStorage.setItem("tasksNeedRefresh", "1");
-      router.push(`/studio/work/goals/${createdGoalId}`);
+      router.replace(`/studio/work/goals/${createdGoalId}`);
     } catch (error) {
       setPlanError(error instanceof Error ? error.message : "学习计划生成失败，请重试。");
     } finally {
@@ -139,6 +148,7 @@ export function GoalCreateDialog({ onClose, onGoalChanged }: { onClose: () => vo
           workSchedule={workSchedule}
           currentLevel={currentLevel}
           isSubmitting={isSubmitting || planGenerating}
+          authPending={authStatus === "loading"}
           error={formError}
           cancelHref="/studio/work/goals"
           onCancel={onClose}
@@ -158,7 +168,7 @@ export function GoalCreateDialog({ onClose, onGoalChanged }: { onClose: () => vo
             <div className="tech-goal-success-icon"><CheckCircle2 size={19} /></div>
             <div><small>GOAL CREATED</small><h2>目标已创建</h2><p>目标已经保存。接下来可以关联参考资料、选择资料使用边界，再生成阶段计划。</p></div>
             <footer>
-              <button type="button" onClick={() => router.push(`/studio/work/goals/${createdGoalId}`)}>稍后规划</button>
+              <button type="button" onClick={() => router.replace(`/studio/work/goals/${createdGoalId}`)}>稍后规划</button>
               <button type="button" onClick={() => { setShowCreatedDialog(false); setShowPlanMode(true); }}>设置资料并生成</button>
             </footer>
           </section>

@@ -5,6 +5,25 @@
 .app-shell .personalization-scope { display: flex; min-height: 44px; align-items: center; gap: 8px; color: var(--workspace-secondary); }
 .app-shell .personalization-scope button { min-width: 190px; min-height: 44px; color: var(--workspace-text); background: var(--workspace-panel); border-color: var(--workspace-border); }
 .app-shell .personalization-content { display: grid; gap: 42px; padding-top: 30px; }
+.app-shell .personalization-feedback-card { position: relative; display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(320px, .95fr); gap: 22px 34px; padding: 4px 0 25px 20px; border-bottom: 1px solid var(--workspace-border); }
+.app-shell .personalization-feedback-card::before { position: absolute; top: 3px; bottom: 25px; left: 0; width: 3px; background: linear-gradient(180deg, var(--workspace-accent), color-mix(in srgb, var(--workspace-accent) 25%, transparent)); border-radius: 99px; content: ""; }
+.app-shell .personalization-feedback-copy > small { display: inline-flex; align-items: center; gap: 6px; color: var(--workspace-accent); font-size: 10px; font-weight: 780; letter-spacing: .035em; }
+.app-shell .personalization-feedback-copy h2 { max-width: 560px; margin: 7px 0 0; color: var(--workspace-text); font-size: clamp(20px, 2vw, 25px); line-height: 1.25; letter-spacing: -.025em; }
+.app-shell .personalization-feedback-copy p { max-width: 620px; margin: 9px 0 0; color: var(--workspace-secondary); font-size: 13px; line-height: 1.7; }
+.app-shell .personalization-feedback-steps { display: grid; margin: 0; padding: 0; border-top: 1px solid var(--workspace-border); border-bottom: 1px solid var(--workspace-border); list-style: none; }
+.app-shell .personalization-feedback-steps > li { display: grid; min-width: 0; grid-template-columns: 24px minmax(0, 1fr); align-items: center; gap: 9px; padding: 9px 0; }
+.app-shell .personalization-feedback-steps > li + li { border-top: 1px solid var(--workspace-border); }
+.app-shell .personalization-feedback-steps > li > svg { color: var(--workspace-accent); }
+.app-shell .personalization-feedback-steps strong,
+.app-shell .personalization-feedback-steps small { display: block; }
+.app-shell .personalization-feedback-steps strong { color: var(--workspace-text); font-size: 12px; line-height: 1.45; }
+.app-shell .personalization-feedback-steps small { margin-top: 2px; color: var(--workspace-tertiary); font-size: 10px; line-height: 1.5; }
+.app-shell .personalization-feedback-actions { display: flex; grid-column: 1 / -1; flex-wrap: wrap; gap: 8px; margin-top: -2px; }
+.app-shell .personalization-feedback-actions :is(button, a) { display: inline-flex; min-height: 44px; align-items: center; justify-content: center; gap: 7px; padding: 0 14px; color: #fff; background: var(--workspace-accent); border: 1px solid var(--workspace-accent); border-radius: 8px; font: inherit; font-size: 12px; font-weight: 740; text-decoration: none; cursor: pointer; }
+.app-shell .personalization-feedback-actions :is(button, a).is-secondary { color: var(--workspace-text); background: transparent; border-color: var(--workspace-border); }
+.app-shell .personalization-feedback-actions :is(button, a):hover { filter: brightness(1.04); }
+.app-shell .personalization-feedback-actions :is(button, a).is-secondary:hover { background: var(--workspace-hover); border-color: var(--workspace-border-strong); filter: none; }
+.app-shell .personalization-feedback-actions :is(button, a):focus-visible { outline: 2px solid color-mix(in srgb, var(--workspace-accent) 58%, transparent); outline-offset: 2px; }
 .app-shell .personalization-group > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; padding-bottom: 14px; }
 .app-shell .personalization-group > header small { color: var(--workspace-accent); font-size: 10px; font-weight: 800; letter-spacing: .12em; }
 .app-shell .personalization-group > header h2 { margin: 5px 0 0; color: var(--workspace-text); font-size: 21px; letter-spacing: -.025em; }
@@ -41,6 +60,15 @@
 .app-shell .personalization-evidence ul { display: grid; gap: 7px; margin: 8px 0 0; padding: 0; list-style: none; }
 .app-shell .personalization-evidence li { display: flex; justify-content: space-between; gap: 12px; color: var(--workspace-text); font-size: 12px; }
 .app-shell .personalization-evidence li small { color: var(--workspace-tertiary); }
+.app-shell .personalization-evidence li.is-excluded { color: var(--workspace-secondary); }
+.app-shell .personalization-evidence-action { display: grid; gap: 8px; flex: 0 0 auto; justify-items: end; }
+.app-shell .personalization-evidence-action > button, .app-shell .personalization-attribution-editor > button { min-height: 32px; padding: 0 9px; color: var(--workspace-accent); background: transparent; border: 1px solid var(--workspace-border); border-radius: 7px; font: inherit; font-size: 11px; font-weight: 720; cursor: pointer; }
+.app-shell .personalization-evidence-action > button:hover, .app-shell .personalization-attribution-editor > button:hover { background: var(--workspace-hover); border-color: var(--workspace-border-strong); }
+.app-shell .personalization-attribution-editor { display: grid; width: min(280px, 100%); gap: 7px; padding: 10px; background: var(--workspace-panel-subtle); border-left: 2px solid var(--workspace-accent); }
+.app-shell .personalization-attribution-editor label { display: grid; gap: 4px; }
+.app-shell .personalization-attribution-editor label span { color: var(--workspace-secondary); font-size: 10px; font-weight: 700; }
+.app-shell .personalization-attribution-editor select, .app-shell .personalization-attribution-editor textarea { width: 100%; min-height: 36px; padding: 7px 8px; color: var(--workspace-text); background: var(--workspace-panel); border: 1px solid var(--workspace-border); border-radius: 6px; font: inherit; font-size: 12px; }
+.app-shell .personalization-attribution-editor textarea { min-height: 58px; resize: vertical; }
 .app-shell .personalization-empty { min-height: 108px; display: grid; place-items: center; padding: 20px; color: var(--workspace-secondary); border-top: 1px solid var(--workspace-border); border-bottom: 1px solid var(--workspace-border); font-size: 13px; }
 .app-shell .personalization-advanced { border-top: 1px solid var(--workspace-border); border-bottom: 1px solid var(--workspace-border); }
 .app-shell .personalization-advanced > summary { display: flex; min-height: 58px; align-items: center; justify-content: space-between; cursor: pointer; list-style: none; }
@@ -58,33 +86,75 @@
 .app-shell :is(.personalization-guest, .personalization-off-state) p { margin: 5px 0 0; color: var(--workspace-secondary); font-size: 13px; line-height: 1.6; }
 .app-shell :is(.personalization-guest, .personalization-off-state) > a { display: inline-flex; min-height: 44px; align-items: center; gap: 7px; padding: 0 13px; color: #fff; background: var(--workspace-accent); border-radius: 8px; text-decoration: none; font-size: 12px; font-weight: 750; }
 
-.app-shell .settings-privacy-card .settings-section-head { grid-template-columns: auto minmax(0, 1fr) auto; }
-.app-shell .privacy-save-state { align-self: center; color: var(--workspace-secondary); font-size: 11px; }
-.app-shell .privacy-save-state.is-error { color: var(--workspace-danger, #b64a5b); }
-.app-shell .privacy-purpose-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 20px; min-height: 78px; padding: 14px 0; border-top: 1px solid var(--workspace-border); }
-.app-shell .privacy-purpose-row strong { color: var(--workspace-text); font-size: 13px; }
-.app-shell .privacy-purpose-row em { margin-left: 8px; padding: 3px 7px; color: var(--workspace-secondary); background: var(--workspace-panel-subtle); border-radius: 999px; font-size: 9px; font-style: normal; }
-.app-shell .privacy-purpose-row p { max-width: 720px; margin: 5px 0 0; color: var(--workspace-secondary); font-size: 12px; line-height: 1.55; }
-.app-shell .privacy-purpose-row .setting-toggle { min-width: 48px; width: 48px; min-height: 44px; height: 44px; }
-.app-shell .personalization-off-choice { display: grid; gap: 14px; padding: 16px; background: var(--workspace-panel-subtle); border-left: 3px solid var(--workspace-accent); }
+.app-shell .settings-task-card > .settings-compact-section-header { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding-bottom: 18px; border-bottom: 1px solid var(--workspace-border); }
+.app-shell .settings-compact-section-icon { display: grid; width: 40px; height: 40px; place-items: center; color: var(--workspace-accent); background: var(--workspace-accent-soft); border-radius: 11px; }
+.app-shell .settings-compact-section-copy { min-width: 0; }
+.app-shell .settings-compact-section-copy h2 { margin: 0; color: var(--workspace-text); font-size: 18px; font-weight: 740; line-height: 1.3; letter-spacing: -.018em; }
+.app-shell .settings-compact-section-copy p { max-width: 660px; margin: 4px 0 0; color: var(--workspace-secondary); font-size: 12px; line-height: 1.5; }
+.app-shell .privacy-save-state { display: inline-flex; min-height: 28px; align-items: center; gap: 6px; justify-self: end; padding: 0 9px; color: var(--workspace-secondary); background: var(--workspace-panel-subtle); border: 1px solid var(--workspace-border); border-radius: 999px; font-size: 10px; font-weight: 700; line-height: 1; white-space: nowrap; }
+.app-shell .privacy-save-state::before { width: 6px; height: 6px; background: var(--workspace-tertiary); border-radius: 50%; content: ""; }
+.app-shell .privacy-save-state:is(.is-saved, .is-idle)::before { background: var(--workspace-accent); }
+.app-shell .privacy-save-state.is-saving::before, .app-shell .privacy-save-state.is-loading::before { background: var(--workspace-accent); animation: privacy-status-pulse 1s ease-in-out infinite; }
+.app-shell .privacy-save-state.is-error { color: var(--workspace-danger, #b64a5b); border-color: color-mix(in srgb, var(--workspace-danger, #b64a5b) 28%, var(--workspace-border)); background: color-mix(in srgb, var(--workspace-danger, #b64a5b) 6%, var(--workspace-panel)); }
+.app-shell .privacy-save-state.is-error::before { background: var(--workspace-danger, #b64a5b); }
+.app-shell .privacy-purpose-list { border-bottom: 1px solid var(--workspace-border); }
+.app-shell .privacy-purpose-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 18px; padding: 13px 0; }
+.app-shell .privacy-purpose-row + .privacy-purpose-row { border-top: 1px solid var(--workspace-border); }
+.app-shell .privacy-purpose-copy { min-width: 0; }
+.app-shell .privacy-purpose-title { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; }
+.app-shell .privacy-purpose-row strong { color: var(--workspace-text); font-size: 13px; font-weight: 720; }
+.app-shell .privacy-purpose-row em { padding: 2px 7px; color: var(--workspace-secondary); background: var(--workspace-panel-subtle); border: 1px solid var(--workspace-border); border-radius: 999px; font-size: 9px; font-style: normal; font-weight: 680; line-height: 1.5; }
+.app-shell .privacy-purpose-row p { max-width: 700px; margin: 4px 0 0; color: var(--workspace-secondary); font-size: 11px; line-height: 1.55; }
+.app-shell .privacy-purpose-control { display: grid; grid-template-columns: 34px 52px; align-items: center; gap: 4px; }
+.app-shell .privacy-purpose-control > span { color: var(--workspace-tertiary); font-size: 10px; font-weight: 650; text-align: right; }
+.app-shell .privacy-purpose-control:has(.privacy-toggle.is-on) > span { color: var(--workspace-accent); }
+.app-shell .settings-privacy-card .privacy-toggle { position: relative; display: block; width: 52px; min-width: 52px; height: 44px; min-height: 44px; padding: 0; background: transparent !important; border: 0 !important; border-radius: 12px; box-shadow: none !important; cursor: pointer; }
+.app-shell .settings-privacy-card .privacy-toggle::before { position: absolute; top: 12px; left: 8px; width: 36px; height: 20px; background: var(--workspace-panel-subtle); border: 1px solid color-mix(in srgb, var(--workspace-secondary) 32%, var(--workspace-border)); border-radius: 999px; content: ""; transition: background-color 160ms ease, border-color 160ms ease; }
+.app-shell .settings-privacy-card .privacy-toggle i { position: absolute; z-index: 1; top: 15px; left: 11px; width: 14px; height: 14px; background: #fff; border-radius: 50%; box-shadow: 0 1px 4px color-mix(in srgb, var(--workspace-text) 28%, transparent); transition: transform 160ms ease; }
+.app-shell .settings-privacy-card .privacy-toggle.is-on::before { background: var(--workspace-accent); border-color: var(--workspace-accent); }
+.app-shell .settings-privacy-card .privacy-toggle.is-on i { transform: translateX(16px); }
+.app-shell .settings-privacy-card .privacy-toggle:hover::before { border-color: color-mix(in srgb, var(--workspace-accent) 60%, var(--workspace-border)); }
+.app-shell .settings-privacy-card .privacy-toggle:focus-visible { outline: 2px solid color-mix(in srgb, var(--workspace-accent) 64%, transparent); outline-offset: 1px; }
+.app-shell .settings-privacy-card .privacy-toggle:disabled { cursor: not-allowed; opacity: .52; }
+.app-shell .personalization-off-choice { display: grid; gap: 14px; margin-top: 12px; padding: 16px; background: var(--workspace-panel-subtle); border-left: 3px solid var(--workspace-accent); border-radius: 0 8px 8px 0; }
 .app-shell .personalization-off-choice p { margin: 5px 0 0; color: var(--workspace-secondary); font-size: 12px; }
 .app-shell .personalization-off-choice > div:last-child { display: flex; flex-wrap: wrap; gap: 8px; }
 .app-shell .personalization-off-choice button, .app-shell .privacy-data-actions button, .app-shell .privacy-inline-error button, .app-shell .privacy-login-note a { display: inline-flex; min-height: 44px; align-items: center; justify-content: center; gap: 6px; padding: 0 12px; color: var(--workspace-text); background: var(--workspace-panel); border: 1px solid var(--workspace-border); border-radius: 8px; font: inherit; font-size: 12px; font-weight: 720; text-decoration: none; cursor: pointer; }
 .app-shell .personalization-off-choice .is-danger, .app-shell .privacy-danger-action button { color: var(--workspace-danger, #b64a5b); border-color: color-mix(in srgb, var(--workspace-danger, #b64a5b) 35%, var(--workspace-border)); }
 .app-shell .personalization-off-choice .is-quiet { color: var(--workspace-secondary); background: transparent; border-color: transparent; }
 .app-shell .privacy-inline-error { display: flex; min-height: 52px; align-items: center; justify-content: space-between; gap: 12px; color: var(--workspace-danger, #b64a5b); border-top: 1px solid var(--workspace-border); font-size: 12px; }
-.app-shell .privacy-data-actions { margin-top: 6px; border-top: 1px solid var(--workspace-border); }
-.app-shell .privacy-data-actions > summary { min-height: 52px; display: flex; align-items: center; color: var(--workspace-text); font-size: 12px; font-weight: 760; cursor: pointer; }
-.app-shell .privacy-data-actions > div { display: grid; gap: 0; }
-.app-shell .privacy-data-actions > div > div { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px 20px; padding: 16px 0; border-top: 1px solid var(--workspace-border); }
-.app-shell .privacy-data-actions strong { font-size: 12px; }
-.app-shell .privacy-data-actions p { grid-column: 1; margin: 4px 0 0; color: var(--workspace-secondary); font-size: 11px; line-height: 1.55; }
-.app-shell .privacy-data-actions button { grid-column: 2; grid-row: 1 / span 2; }
-.app-shell .privacy-login-note { display: flex; min-height: 76px; align-items: center; justify-content: space-between; gap: 14px; border-top: 1px solid var(--workspace-border); }
+.app-shell .privacy-data-actions { border-bottom: 1px solid var(--workspace-border); }
+.app-shell .privacy-data-actions > summary { display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; min-height: 62px; align-items: center; gap: 10px; color: var(--workspace-text); cursor: pointer; list-style: none; }
+.app-shell .privacy-data-actions > summary::-webkit-details-marker { display: none; }
+.app-shell .privacy-data-actions > summary:focus-visible { outline: 2px solid color-mix(in srgb, var(--workspace-accent) 62%, transparent); outline-offset: 2px; border-radius: 7px; }
+.app-shell .privacy-data-icon { display: grid; width: 32px; height: 32px; place-items: center; color: var(--workspace-secondary); background: var(--workspace-panel-subtle); border-radius: 9px; }
+.app-shell .privacy-data-actions > summary > span:nth-child(2) { min-width: 0; }
+.app-shell .privacy-data-actions > summary strong, .app-shell .privacy-data-actions > summary small { display: block; }
+.app-shell .privacy-data-actions > summary strong { font-size: 12px; font-weight: 740; }
+.app-shell .privacy-data-actions > summary small { margin-top: 2px; color: var(--workspace-secondary); font-size: 10px; font-weight: 500; }
+.app-shell .privacy-data-actions > summary > svg { color: var(--workspace-tertiary); transition: transform 160ms ease; }
+.app-shell .privacy-data-actions[open] > summary > svg { transform: rotate(180deg); }
+.app-shell .privacy-data-list { border-top: 1px solid var(--workspace-border); }
+.app-shell .privacy-data-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 16px; padding: 15px 0; }
+.app-shell .privacy-data-row + .privacy-data-row { border-top: 1px solid var(--workspace-border); }
+.app-shell .privacy-data-row > div { min-width: 0; }
+.app-shell .privacy-data-row strong { color: var(--workspace-text); font-size: 12px; font-weight: 720; }
+.app-shell .privacy-data-row p { max-width: 680px; margin: 4px 0 0; color: var(--workspace-secondary); font-size: 10px; line-height: 1.55; }
+.app-shell .privacy-data-row > button { min-width: 144px; }
+.app-shell .privacy-danger-action { border-top-color: color-mix(in srgb, var(--workspace-danger, #b64a5b) 24%, var(--workspace-border)) !important; }
+.app-shell .privacy-danger-action strong { color: var(--workspace-danger, #b64a5b); }
+.app-shell .privacy-login-note { display: flex; min-height: 68px; align-items: center; justify-content: space-between; gap: 14px; }
+
+@keyframes privacy-status-pulse {
+  50% { opacity: .35; transform: scale(.8); }
+}
 
 @media (max-width: 760px) {
   .app-shell .personalization-page { min-height: calc(100dvh - 104px); padding: 14px 14px 100px; }
   .app-shell .personalization-pagebar { grid-template-columns: 1fr; gap: 14px; }
+  .app-shell .personalization-feedback-card { grid-template-columns: 1fr; gap: 18px; padding-left: 16px; }
+  .app-shell .personalization-feedback-actions { display: grid; grid-column: auto; grid-template-columns: 1fr; }
+  .app-shell .personalization-feedback-actions :is(button, a) { width: 100%; }
   .app-shell .personalization-scope, .app-shell .personalization-scope button { width: 100%; }
   .app-shell .personalization-content { gap: 34px; padding-top: 24px; }
   .app-shell .personalization-observation.is-targeted { padding-left: 12px; }
@@ -100,13 +170,20 @@
   .app-shell .personalization-observation-actions .is-danger { margin-left: 0; }
   .app-shell .personalization-evidence, .app-shell .personalization-advanced > div { grid-template-columns: 1fr; }
   .app-shell .personalization-evidence li { align-items: flex-start; flex-direction: column; gap: 2px; }
+  .app-shell .personalization-evidence-action { width: 100%; justify-items: stretch; }
+  .app-shell .personalization-attribution-editor { width: 100%; }
   .app-shell :is(.personalization-guest, .personalization-off-state) { grid-template-columns: auto 1fr; }
   .app-shell :is(.personalization-guest, .personalization-off-state) > a { grid-column: 1 / -1; width: 100%; justify-content: center; }
-  .app-shell .settings-privacy-card .settings-section-head { grid-template-columns: auto minmax(0, 1fr); }
-  .app-shell .privacy-save-state { grid-column: 2; }
-  .app-shell .privacy-purpose-row { gap: 12px; }
-  .app-shell .privacy-data-actions > div > div { grid-template-columns: 1fr; }
-  .app-shell .privacy-data-actions button { grid-column: 1; grid-row: auto; width: 100%; }
+  .app-shell .settings-task-card > .settings-compact-section-header { grid-template-columns: 36px minmax(0, 1fr); align-items: start; gap: 10px; padding-bottom: 15px; }
+  .app-shell .settings-compact-section-icon { width: 36px; height: 36px; border-radius: 10px; }
+  .app-shell .settings-compact-section-copy h2 { font-size: 16px; }
+  .app-shell .privacy-save-state { grid-column: 2; justify-self: start; min-height: 24px; margin-top: 3px; }
+  .app-shell .privacy-purpose-row { gap: 10px; padding: 12px 0; }
+  .app-shell .privacy-purpose-control { grid-template-columns: 52px; }
+  .app-shell .privacy-purpose-control > span { display: none; }
+  .app-shell .privacy-data-actions > summary { grid-template-columns: 32px minmax(0, 1fr) auto; }
+  .app-shell .privacy-data-row { grid-template-columns: 1fr; gap: 10px; }
+  .app-shell .privacy-data-row > button { width: 100%; min-width: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -9,7 +9,7 @@ from sqlalchemy import select
 from src.core.agent_v2.orchestrator import create_run
 from src.core.agent_v2.transitions import claim_run_lease
 from src.core.time import utc_now
-from src.database import AsyncSessionLocal
+from tests.integration.database import IntegrationSessionLocal as AsyncSessionLocal
 from src.models import AgentRun, AgentStep, User
 from src.tasks import agent_runs
 

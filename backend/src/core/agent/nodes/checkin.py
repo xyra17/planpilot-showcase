@@ -3,7 +3,7 @@ from sqlalchemy import select
 
 from src.core.agent.preferences import pilo_preference_context
 from src.core.agent.state import AgentState
-from src.core.llm_router import create_routine_llm
+from src.core.llm_router import create_interactive_llm
 from src.database import AsyncSessionLocal
 from src.models import Goal
 
@@ -47,7 +47,7 @@ async def node(state: AgentState) -> dict:
         except Exception:
             pass
 
-    llm = create_routine_llm(
+    llm = create_interactive_llm(
         max_tokens=256,
         streaming=True,
     )

@@ -1087,8 +1087,100 @@
   gap: 4px;
   overflow-y: auto;
   padding-right: 3px;
-  scrollbar-color: color-mix(in srgb, var(--workspace-accent) 35%, transparent) transparent;
+  scrollbar-color: transparent transparent;
   scrollbar-width: thin;
+}
+
+.app-shell .today-schedule-list::-webkit-scrollbar {
+  width: 5px;
+}
+
+.app-shell .today-schedule-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.app-shell .today-schedule-list::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 999px;
+}
+
+.app-shell .today-schedule-list.is-scrolling {
+  scrollbar-color: color-mix(in srgb, var(--workspace-accent) 42%, transparent) transparent;
+}
+
+.app-shell .today-schedule-list.is-scrolling::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--workspace-accent) 42%, transparent);
+}
+
+.app-shell .today-schedule-footer {
+  display: flex;
+  min-height: 42px;
+  flex: 0 0 42px;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 8px;
+  border-top: 1px solid var(--workspace-border);
+}
+
+.app-shell .today-schedule-footer > div {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px;
+}
+
+.app-shell .today-schedule-footer button {
+  display: inline-flex;
+  min-width: 64px;
+  min-height: 32px;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 11px;
+  color: var(--workspace-secondary);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.app-shell .today-schedule-footer button:hover:not(:disabled),
+.app-shell .today-schedule-footer button:focus-visible {
+  color: var(--workspace-text);
+  background: var(--workspace-panel-subtle);
+  border-color: var(--workspace-border);
+  outline: none;
+}
+
+.app-shell .today-schedule-footer .today-schedule-replan {
+  min-width: 88px;
+  padding-inline: 9px;
+  color: var(--workspace-accent);
+  background: color-mix(in srgb, var(--workspace-accent) 7%, var(--workspace-panel));
+  border-color: color-mix(in srgb, var(--workspace-accent) 22%, var(--workspace-border));
+}
+
+.app-shell .today-schedule-footer .today-schedule-apply {
+  min-width: 72px;
+  color: #fff;
+  background: var(--workspace-accent);
+  border-color: var(--workspace-accent);
+}
+
+.app-shell .today-schedule-footer .today-schedule-apply:hover:not(:disabled),
+.app-shell .today-schedule-footer .today-schedule-apply:focus-visible {
+  color: #fff;
+  background: color-mix(in srgb, var(--workspace-accent) 88%, var(--workspace-text));
+  border-color: var(--workspace-accent);
+}
+
+.app-shell .today-schedule-footer .today-schedule-apply:disabled {
+  cursor: default;
+  opacity: .48;
 }
 
 .app-shell .today-schedule-row {
@@ -1209,10 +1301,12 @@
   flex: 1 1 auto;
   align-items: center;
   justify-content: center;
+  flex-direction: column;
   gap: 10px;
-  margin: 12px 0 4px;
+  margin: 0 0 4px;
   padding: 20px;
   color: var(--workspace-secondary);
+  text-align: center;
   border: 1px dashed var(--workspace-border-strong);
   border-radius: 9px;
 }
@@ -1230,6 +1324,7 @@
 
 .app-shell .today-schedule-empty > div {
   display: flex;
+  align-items: center;
   flex-direction: column;
   gap: 4px;
 }
@@ -1300,6 +1395,7 @@
 .app-shell .today-schedule-planner {
   display: flex;
   width: min(520px, 100%);
+  height: min(320px, 100%);
   max-height: 100%;
   flex-direction: column;
   gap: 14px;
@@ -1407,7 +1503,7 @@
 }
 
 .app-shell .today-schedule-planner-modes > button.is-active {
-  color: var(--workspace-text);
+  color: var(--workspace-accent);
   background: var(--workspace-panel);
   box-shadow: 0 2px 6px color-mix(in srgb, var(--workspace-text) 9%, transparent);
 }
@@ -1461,25 +1557,20 @@
 }
 
 .app-shell .today-schedule-planner-availability {
-  display: flex;
-  width: 100%;
+  display: grid;
+  width: auto;
   min-width: 0;
   align-items: center;
-  gap: 5px;
+  grid-template-columns: auto minmax(0, auto) auto;
+  gap: 8px;
   margin: 0;
-  padding: 8px 0 1px;
+  padding: 0;
   color: var(--workspace-secondary);
   background: transparent;
   border: 0;
-  border-top: 1px solid var(--workspace-border);
   border-radius: 0;
   font-size: 12px;
   white-space: nowrap;
-}
-
-.app-shell .today-schedule-planner-availability svg {
-  flex: 0 0 auto;
-  color: var(--workspace-accent);
 }
 
 .app-shell .today-schedule-planner-availability strong {
@@ -1488,7 +1579,7 @@
   flex: 1 1 auto;
   overflow-x: auto;
   overflow-y: hidden;
-  padding: 2px 0 5px;
+  padding: 2px 0;
   color: var(--workspace-secondary);
   font-size: 12px;
   font-weight: 650;
@@ -1536,14 +1627,16 @@
   min-height: 0;
   flex: 1 1 auto;
   flex-direction: column;
-  gap: 7px;
-  padding-top: 2px;
+  gap: 0;
+  padding: 11px 0 0;
   overflow: hidden;
+  border-top: 1px solid var(--workspace-border);
   animation: schedule-preview-change 180ms ease-out both;
 }
 
 .app-shell .today-schedule-planner-timeline {
   min-height: 0;
+  flex: 1 1 auto;
   overflow-y: auto;
   padding-right: 3px;
   scrollbar-color: transparent transparent;
@@ -1575,9 +1668,13 @@
   display: grid;
   min-height: 40px;
   align-items: center;
-  grid-template-columns: 102px 4px minmax(0, 1fr);
+  grid-template-columns: 84px 4px minmax(0, 1fr);
   gap: 8px;
   border-top: 1px solid color-mix(in srgb, var(--workspace-border) 70%, transparent);
+}
+
+.app-shell .today-schedule-planner-timeline > div:first-child {
+  border-top: 0;
 }
 
 .app-shell .today-schedule-planner-timeline time {
@@ -1618,32 +1715,55 @@
 
 .app-shell .today-schedule-planner-empty {
   display: grid;
-  min-height: 70px;
-  place-items: center;
+  min-height: 28px;
+  align-items: center;
+  grid-template-columns: 16px minmax(0, 1fr);
+  gap: 8px;
   color: var(--workspace-tertiary);
-  border-top: 1px solid var(--workspace-border);
   font-size: 12px;
+  line-height: 1.5;
+  text-align: left;
+  flex: 1 1 auto;
+}
+
+.app-shell .today-schedule-planner-empty svg {
+  color: var(--workspace-accent);
 }
 
 .app-shell .today-schedule-planner-unresolved {
-  display: flex;
+  display: grid;
   align-items: center;
-  gap: 5px;
-  margin: auto 0 0;
-  padding-top: 8px;
+  grid-template-columns: 16px minmax(0, 1fr);
+  gap: 8px;
+  margin: 0;
+  margin-top: 8px;
+  padding: 0 0 5px;
   color: var(--workspace-tertiary);
+  border-bottom: 1px solid var(--workspace-border);
   font-size: 12px;
-  transform: translateY(5px);
+  line-height: 1.5;
+}
+
+.app-shell .today-schedule-planner-unresolved svg {
+  color: var(--workspace-tertiary);
 }
 
 .app-shell .today-schedule-planner > footer {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: 7px;
+  justify-content: space-between;
+  gap: 14px;
   margin-top: 0;
   padding-top: 0;
   border-top: 0;
+}
+
+.app-shell .today-schedule-planner-footer-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px;
 }
 
 .app-shell .today-schedule-planner > footer button {
@@ -5533,6 +5653,24 @@
 }
 
 @media (max-width: 520px) {
+  .app-shell .today-schedule-planner-title {
+    gap: 6px;
+  }
+
+  .app-shell .today-schedule-planner-title > span {
+    width: 32px;
+    height: 32px;
+    flex-basis: 32px;
+  }
+
+  .app-shell .today-schedule-planner-title strong {
+    white-space: nowrap;
+  }
+
+  .app-shell .today-schedule-planner-title small {
+    display: none;
+  }
+
   .app-shell .today-schedule-toolbar {
     align-items: stretch;
     flex-direction: column;
@@ -5565,9 +5703,14 @@
   }
 
   .app-shell .today-schedule-planner-availability {
-    width: 100%;
+    width: auto;
     align-items: center;
-    flex-wrap: nowrap;
+    gap: 4px;
+    font-size: 10px;
+  }
+
+  .app-shell .today-schedule-planner-availability strong {
+    font-size: 10px;
   }
 
   .app-shell .today-schedule-planner-availability a {
@@ -5575,7 +5718,23 @@
   }
 
   .app-shell .today-schedule-planner > footer {
+    gap: 6px;
     flex-wrap: nowrap;
+  }
+
+  .app-shell .today-schedule-planner-footer-actions {
+    gap: 3px;
+  }
+
+  .app-shell .today-schedule-planner > footer button {
+    min-width: 44px;
+    padding-inline: 6px;
+    font-size: 11px;
+  }
+
+  .app-shell .today-schedule-planner > footer button.is-primary {
+    min-width: 56px;
+    padding-inline: 7px;
   }
 
   .app-shell .mode-switch a {

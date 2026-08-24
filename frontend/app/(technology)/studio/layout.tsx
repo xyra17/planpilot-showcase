@@ -2,6 +2,7 @@ import { AuthProvider } from "@/components/technology/AuthProvider";
 import { ProductShell } from "@/components/technology/ProductShell";
 import { ThemeProvider } from "@/components/technology/ThemeProvider";
 import { AppProviders } from "@/components/app/AppProviders";
+import { TasksProvider } from "@/lib/tasks-context";
 import "@/styles/technology/base.css";
 import "@/styles/technology/product-redesign.css";
 import "@/styles/technology/theme-experiences.css";
@@ -24,9 +25,11 @@ export default function TechnologyWorkspaceLayout({
   return (
     <AppProviders>
       <AuthProvider>
-        <ThemeProvider>
-          <ProductShell>{children}</ProductShell>
-        </ThemeProvider>
+        <TasksProvider>
+          <ThemeProvider>
+            <ProductShell>{children}</ProductShell>
+          </ThemeProvider>
+        </TasksProvider>
       </AuthProvider>
     </AppProviders>
   );

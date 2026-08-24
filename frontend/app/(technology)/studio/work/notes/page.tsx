@@ -32,6 +32,7 @@ import {
 import { signalPiloState } from "@/lib/technology/piloState";
 import { signalPiloContext } from "@/lib/technology/piloContext";
 import { readScopedJson, writeScopedJson } from "@/lib/technology/scopedStorage";
+import { GUEST_NOTES, ensureGuestDatasetSeeded, guestApiGoals } from "@/lib/technology/guestData";
 
 const NotionResourceEditor = dynamic(
   () => import("@/components/technology/NotionResourceEditor"),
@@ -70,13 +71,8 @@ type MarkdownSavePicker = (options: {
   }>;
 }) => Promise<MarkdownFileHandle>;
 
-const INITIAL_NOTES: Note[] = [
-  { id: 1, goalId: null, title: "动态规划：状态转移的判断顺序", date: "今天 22:16", goal: "算法基础", content: "先明确状态表示，再从最后一步倒推依赖关系。今天反复出错的原因是把选择与状态混在了一起。" },
-  { id: 2, goalId: null, title: "链表双指针易错点", date: "昨天 21:48", goal: "算法基础", content: "快慢指针题目先确认终止条件，尤其需要区分奇偶长度。" },
-  { id: 3, goalId: null, title: "浏览器事件循环复盘", date: "7 月 30 日", goal: "面试准备", content: "宏任务执行结束后会清空当前微任务队列，再进入渲染机会。" },
-];
-
-const NOTE_GOALS = ["未关联", "算法基础", "面试准备"];
+const INITIAL_NOTES: Note[] = GUEST_NOTES.map((note) => ({ ...note }));
+const GUEST_NOTE_GOALS = guestApiGoals();
 
 function createDraftId() {
   return `draft-${crypto.randomUUID()}`;
@@ -337,11 +333,18 @@ export default function NotesPage() {
     };
   }, [filterPickerOpen]);
 
+  const noteGoalId = useCallback((note: Note) => {
+    if (note.goalId) return note.goalId;
+    if (authStatus === "authenticated") return null;
+    return GUEST_NOTE_GOALS.find((goal) => goal.title === note.goal)?.id ?? null;
+  }, [authStatus]);
+
   const noteMatchesGoal = useCallback((note: Note, filter: string) => {
     if (filter === "all") return true;
-    if (filter === "unlinked") return authStatus === "authenticated" ? !note.goalId : note.goal === "未关联";
-    return authStatus === "authenticated" ? note.goalId === filter : note.goal === filter;
-  }, [authStatus]);
+    const linkedGoalId = noteGoalId(note);
+    if (filter === "unlinked") return !linkedGoalId;
+    return linkedGoalId === filter;
+  }, [noteGoalId]);
 
   const visibleNotes = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -356,7 +359,7 @@ export default function NotesPage() {
   const selectableGoals = useMemo(
     () => authStatus === "authenticated"
       ? [...goalOptions.map((goal) => ({ id: goal.id, title: goal.title })), { id: "", title: "未关联" }]
-      : [...NOTE_GOALS.filter((goal) => goal !== "未关联").map((goal) => ({ id: goal, title: goal })), { id: "", title: "未关联" }],
+      : [...GUEST_NOTE_GOALS.map((goal) => ({ id: goal.id, title: goal.title })), { id: "", title: "未关联" }],
     [authStatus, goalOptions],
   );
 
@@ -377,34 +380,31 @@ export default function NotesPage() {
       const searchable = `${note.title} ${note.goal} ${notePreview(note)}`.toLowerCase();
       if (normalizedQuery && !searchable.includes(normalizedQuery)) return;
       countByGoal.all += 1;
-      const key = authStatus === "authenticated"
-        ? note.goalId || "unlinked"
-        : note.goal === "未关联" ? "unlinked" : note.goal;
+      const key = noteGoalId(note) || "unlinked";
       countByGoal[key] = (countByGoal[key] ?? 0) + 1;
     });
     if (draftIsNew) {
       const searchable = `${draft.title} ${draft.goal} ${notePreview(draft)}`.toLowerCase();
       if (!normalizedQuery || searchable.includes(normalizedQuery)) {
         countByGoal.all += 1;
-        const key = authStatus === "authenticated"
-          ? draft.goalId || "unlinked"
-          : draft.goal === "未关联" ? "unlinked" : draft.goal;
+        const key = noteGoalId(draft) || "unlinked";
         countByGoal[key] = (countByGoal[key] ?? 0) + 1;
       }
     }
     return countByGoal;
-  }, [authStatus, draft, draftIsNew, notes, query, selectedId]);
+  }, [draft, draftIsNew, noteGoalId, notes, query, selectedId]);
 
   const selectedFilterTitle = filterGoals.find((goal) => goal.id === goalFilter)?.title ?? "全部目标";
 
   useEffect(() => {
     if (authStatus === "loading") return;
     if (authStatus === "unauthenticated") {
+      ensureGuestDatasetSeeded();
       const storedNotes = deduplicateNotes(readProductArray<Note>(PRODUCT_STORAGE_KEYS.notes, INITIAL_NOTES));
       const nextNotes = storedNotes.length ? storedNotes : INITIAL_NOTES;
       const params = new URLSearchParams(window.location.search);
       const requestedGoal = params.get("goalId");
-      const validFilter = requestedGoal === "unlinked" || (requestedGoal && NOTE_GOALS.includes(requestedGoal)) ? requestedGoal : "all";
+      const validFilter = requestedGoal === "unlinked" || (requestedGoal && GUEST_NOTE_GOALS.some((goal) => goal.id === requestedGoal)) ? requestedGoal : "all";
       const initialNote = nextNotes.find((note) => noteMatchesGoal(note, validFilter)) ?? nextNotes[0];
       setGoalFilter(validFilter);
       setNotes(nextNotes); setSelectedId(initialNote.id); setDraft(editableNote(initialNote)); setStorageReady(true);
@@ -549,7 +549,8 @@ export default function NotesPage() {
       const goal = goalOptions.find((item) => item.id === goalFilter);
       return { goalId: goal?.id ?? null, goal: goal?.title ?? "未关联" };
     }
-    return { goalId: null, goal: goalFilter };
+    const goal = GUEST_NOTE_GOALS.find((item) => item.id === goalFilter);
+    return { goalId: goal?.id ?? null, goal: goal?.title ?? "未关联" };
   }
 
   function createNote() {

@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Beaker, Blocks, Gauge, Menu, RadioTower, ScrollText, ShieldCheck, X } from "lucide-react";
+import { ArrowLeft, BarChart3, Beaker, Blocks, Gauge, Menu, RadioTower, ScrollText, ShieldCheck, TestTube2, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -14,15 +14,29 @@ const ADMIN_NAV = [
   {
     href: "/admin",
     label: "运营总览",
-    title: "生产运营总览",
-    description: "快速查看 Agent 健康度、当前生产策略与反馈学习状态。",
+    title: "运营决策总览",
+    description: "先看用户有没有获得价值，再看系统和发布是否稳定。",
     icon: Gauge,
   },
   {
+    href: "/admin/product",
+    label: "产品验证",
+    title: "用户价值验证",
+    description: "看用户能否快速开始、遇到中断后回来，并形成长期学习闭环。",
+    icon: BarChart3,
+  },
+  {
+    href: "/admin/beta",
+    label: "行动验证",
+    title: "行动功能验证",
+    description: "查看行动功能的试用范围、安全状态、使用漏斗和真实案例。",
+    icon: TestTube2,
+  },
+  {
     href: "/admin/canary",
-    label: "Canary 发布",
-    title: "Canary 发布管理",
-    description: "在离线门禁保护下逐级放量，并在指标异常时执行受控回滚。",
+    label: "灰度发布",
+    title: "灰度发布管理",
+    description: "在质量门禁保护下逐级放量，出现异常时暂停或回滚。",
     icon: RadioTower,
   },
   {
@@ -94,6 +108,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
               >
                 <Menu size={19} />
               </button>
+              <span className="pp-admin-mobile-current"><CurrentPageIcon size={17} /><strong>{currentPage.label}</strong></span>
             </header>
             <main className="pp-admin-main">
               <header

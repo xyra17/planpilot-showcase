@@ -10,8 +10,15 @@ from pydantic import TypeAdapter
 
 from src.core.agent_v2.registry import ToolRegistry
 from src.core.agent_v2.resolver import validate_plan
-from src.core.agent_v2.schemas import AgentPlan, AgentRole, Effect, OutputRef, PlanStep
-from src.core.llm_router import create_structured_routine_llm, require_json_object
+from src.core.agent_v2.schemas import (
+    ActionIntent,
+    AgentPlan,
+    AgentRole,
+    Effect,
+    OutputRef,
+    PlanStep,
+)
+from src.core.llm_router import create_json_llm, require_json_object
 
 MODEL_PLANNER_TIMEOUT_SECONDS = 15.0
 
@@ -54,7 +61,12 @@ def parse_constraints(request: str) -> dict[str, Any]:
 
 
 def deterministic_plan(
-    registry: ToolRegistry, request: str, goal_id: str | None, *, planner: str = "deterministic"
+    registry: ToolRegistry,
+    request: str,
+    goal_id: str | None,
+    *,
+    planner: str = "deterministic",
+    action_intent: ActionIntent | None = None,
 ) -> AgentPlan:
     constraints = parse_constraints(request)
     candidates = [tool.name for tool in registry.search(request, limit=7)]
@@ -117,12 +129,13 @@ def deterministic_plan(
         "完成任务",
         "标记完成",
     )
-    if not any(term in request for term in mutation_terms):
+    if not action_intent and not any(term in request for term in mutation_terms):
         objective["intent"] = "execution_analysis"
         return AgentPlan(
             planner=planner, objective=objective, candidate_tools=candidates, steps=steps
         )
-    is_crud = any(
+    is_insight = bool(action_intent and action_intent.capability == "insight_action")
+    is_crud = bool(action_intent and action_intent.capability == "task_mutation") or any(
         term in request
         for term in (
             "新增",
@@ -136,24 +149,42 @@ def deterministic_plan(
             "改到",
         )
     )
-    preview_name = "tasks.preview_mutation" if is_crud else "schedule.preview_reschedule"
+    preview_name = (
+        "insights.preview_action"
+        if is_insight
+        else "tasks.preview_mutation"
+        if is_crud
+        else "schedule.preview_reschedule"
+    )
+    preview_input = (
+        {"proposal_id": str(action_intent.constraints["proposal_id"])}
+        if is_insight and action_intent
+        else {
+            "excluded_weekdays": constraints["excluded_weekdays"],
+            "request": request,
+            "goal_id": goal_id,
+            "action_intent": action_intent.model_dump(mode="json") if action_intent else {},
+        }
+    )
+    preview_refs = {"context": OutputRef(step_id="load-context")}
+    if not is_insight:
+        preview_refs["analysis"] = OutputRef(step_id="analyze-execution")
     steps.extend(
         [
             PlanStep(
                 index=2,
                 step_id="preview-changes",
-                title="生成任务变更方案" if is_crud else "生成重新排期方案",
+                title=(
+                    "把学习洞察转换为行动方案"
+                    if is_insight
+                    else "生成任务变更方案"
+                    if is_crud
+                    else "生成重新排期方案"
+                ),
                 agent_role=AgentRole.SCHEDULE_OPTIMIZER,
                 tool_name=preview_name,
-                input={
-                    "excluded_weekdays": constraints["excluded_weekdays"],
-                    "request": request,
-                    "goal_id": goal_id,
-                },
-                input_refs={
-                    "context": OutputRef(step_id="load-context"),
-                    "analysis": OutputRef(step_id="analyze-execution"),
-                },
+                input=preview_input,
+                input_refs=preview_refs,
                 depends_on=["load-context", "analyze-execution"],
                 on_failure="replan",
                 rationale="形成可审查且尚未执行的 ChangeSet",
@@ -164,8 +195,11 @@ def deterministic_plan(
                 title="审查变更方案",
                 agent_role=AgentRole.PLAN_REVIEWER,
                 tool_name="plan.review",
-                input_refs={"change_set": OutputRef(step_id="preview-changes")},
-                depends_on=["preview-changes"],
+                input_refs={
+                    "change_set": OutputRef(step_id="preview-changes"),
+                    "context": OutputRef(step_id="load-context"),
+                },
+                depends_on=["load-context", "preview-changes"],
                 rationale="检查删除、规模和冲突风险",
             ),
             PlanStep(
@@ -188,12 +222,19 @@ def deterministic_plan(
 
 
 async def create_plan(
-    registry: ToolRegistry, request: str, goal_id: str | None, *, step_budget: int, version: int = 1
+    registry: ToolRegistry,
+    request: str,
+    goal_id: str | None,
+    *,
+    step_budget: int,
+    version: int = 1,
+    action_intent: ActionIntent | None = None,
+    deterministic_only: bool = False,
 ) -> tuple[AgentPlan, dict[str, Any]]:
     started = time.monotonic()
     attempted_model: str | None = None
     attempted_tokens = 0
-    fallback = deterministic_plan(registry, request, goal_id)
+    fallback = deterministic_plan(registry, request, goal_id, action_intent=action_intent)
     scored = registry.search_with_scores(request, limit=5)
     candidate_names = {tool.name for _score, tool in scored} | {
         step.tool_name for step in fallback.steps
@@ -202,6 +243,31 @@ async def create_plan(
     for name in candidate_names:
         candidate_scores.setdefault(name, 0)
     catalog = [row for row in registry.public_catalog() if row["name"] in candidate_names]
+    if deterministic_only:
+        fallback.planner = "deterministic"
+        fallback.estimated_tokens = 0
+        validate_plan(fallback, available_tools=registry.names(), step_budget=step_budget)
+        return fallback, {
+            "version": version,
+            "planner": "deterministic",
+            "model": None,
+            "duration_ms": int((time.monotonic() - started) * 1000),
+            "token_usage": 0,
+            "candidates": [
+                {"name": name, "score": candidate_scores[name]}
+                for name in sorted(
+                    candidate_names, key=lambda item: (-candidate_scores[item], item)
+                )
+            ],
+            "selected_tools": [step.tool_name for step in fallback.steps],
+            "step_rationales": {step.step_id: step.rationale for step in fallback.steps},
+            "validation": {
+                "status": "deterministic_accepted",
+                "checks": ["action_intent", "registry", "roles", "dependencies", "write_order"],
+            },
+            "fallback": False,
+            "fallback_reason": None,
+        }
     prompt = {
         "task": "Generate an AgentPlan JSON. Use only catalog tools. Dependencies and input_refs use stable step_id. Subagents cannot use write/destructive/external tools. All writes must follow proposal and review steps.",
         "request": request,
@@ -212,7 +278,7 @@ async def create_plan(
         "schema": AgentPlan.model_json_schema(),
     }
     try:
-        llm = create_structured_routine_llm(temperature=0)
+        llm = create_json_llm(temperature=0)
         response = await asyncio.wait_for(
             llm.ainvoke(
                 [
@@ -257,7 +323,7 @@ async def create_plan(
                 Effect.DESTRUCTIVE,
                 Effect.EXTERNAL,
             }:
-                raise ValueError("从属 Agent 计划包含副作用工具")
+                raise ValueError("受控能力模块计划包含副作用工具")
             supplied = set(step.input) | set(step.input_refs)
             unknown = supplied - set(spec.input_model.model_fields)
             if unknown:

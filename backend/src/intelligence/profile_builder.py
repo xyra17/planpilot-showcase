@@ -25,11 +25,12 @@ class ProfileBuilder:
         user_id: str,
         *,
         window_days: int = DEFAULT_WINDOW_DAYS,
+        as_of: datetime | None = None,
     ) -> dict[str, int]:
         consent = await db.get(UserDataConsent, user_id)
         if consent is not None and not consent.personalization_enabled:
             return {"goal_count": 0, "event_count": 0}
-        now = utc_now()
+        now = as_of or utc_now()
         since = now - timedelta(days=window_days)
 
         patterns = list(
@@ -51,6 +52,7 @@ class ProfileBuilder:
                     .where(
                         LearningEvent.user_id == user_id,
                         LearningEvent.occurred_at >= since,
+                        LearningEvent.occurred_at <= now,
                     )
                     .order_by(LearningEvent.occurred_at.asc())
                 )

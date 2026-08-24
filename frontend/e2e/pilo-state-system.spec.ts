@@ -1,5 +1,19 @@
 import { expect, test, type Page } from "@playwright/test";
 
+const guestPiloStorageKey = (key: string) => `planpilot:storage:v1:guest:pilo:${key}`;
+
+async function writeGuestPiloStorage(page: Page, key: string, value: unknown) {
+  await page.evaluate(({ legacyKey, scopedKey, nextValue }) => {
+    const serialized = typeof nextValue === "string" ? nextValue : JSON.stringify(nextValue);
+    window.localStorage.setItem(legacyKey, serialized);
+    window.localStorage.setItem(scopedKey, serialized);
+  }, { legacyKey: key, scopedKey: guestPiloStorageKey(key), nextValue: value });
+}
+
+async function readGuestPiloStorage<T>(page: Page, key: string): Promise<T> {
+  return page.evaluate((scopedKey) => JSON.parse(window.localStorage.getItem(scopedKey) ?? "{}") as T, guestPiloStorageKey(key));
+}
+
 async function dismissKnowledgeGuestIntro(page: Page) {
   const dialog = page.getByRole("dialog", { name: "访客模式" });
   try {
@@ -16,6 +30,7 @@ test.describe("Pilo v3 state-driven companion workflow", () => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.addInitScript(() => {
+      window.sessionStorage.setItem("planpilot:guest-home-intro-seen:v1", "1");
       window.localStorage.setItem("pp-pilo-random-seed-v2", "42");
       if (!window.localStorage.getItem("pp-pilo-preferences-v2")) window.localStorage.setItem("pp-pilo-preferences-v2", JSON.stringify({
         activity: "docked",
@@ -143,7 +158,7 @@ test.describe("Pilo v3 state-driven companion workflow", () => {
 
     await settings.getByTestId("pilo-debug-checking").click();
     await expect(page.locator(".pilo-companion")).toHaveAttribute("data-pilo-state", "checking");
-    await expect(pet.locator(".pilo-avatar")).toHaveAttribute("data-pilo-atlas-state", "review");
+    await expect(pet.locator(".pilo-avatar")).toHaveAttribute("data-pilo-atlas-state", "idle");
     await settings.getByRole("tab", { name: "概览" }).click();
     const updatedReasonToggle = settings.getByRole("button", { name: /状态说明/ });
     if (await updatedReasonToggle.getAttribute("aria-expanded") === "false") await updatedReasonToggle.click();
@@ -168,7 +183,7 @@ test.describe("Pilo v3 state-driven companion workflow", () => {
     await scenes.getByRole("radio", { name: /适时出现/ }).click();
     await expect(suggestions.getByRole("radio", { name: "安静观察" })).toHaveAttribute("aria-checked", "true");
 
-    await settings.getByRole("button", { name: "展开体验与节奏" }).click();
+    await settings.getByRole("button", { name: "展开体验与节奏" }).press("Enter");
     const explanations = settings.getByRole("switch", { name: /判断依据/ });
     await explanations.click();
     await settings.getByRole("tab", { name: "概览" }).click();
@@ -185,16 +200,12 @@ test.describe("Pilo v3 state-driven companion workflow", () => {
   });
 
   test("uses docked companionship as the durable default without overriding a later manual choice", async ({ page }) => {
-    await page.evaluate(() => {
-      const stored = JSON.parse(window.localStorage.getItem("pp-pilo-preferences-v2") ?? "{}");
-      stored.activity = "active";
-      stored.mode = "coach";
-      delete stored.activityDefaultVersion;
-      window.localStorage.setItem("pp-pilo-preferences-v2", JSON.stringify(stored));
-    });
+    const legacyActivity = await readGuestPiloStorage<Record<string, unknown>>(page, "pp-pilo-preferences-v2");
+    delete legacyActivity.activityDefaultVersion;
+    await writeGuestPiloStorage(page, "pp-pilo-preferences-v2", { ...legacyActivity, activity: "active", mode: "coach" });
     await page.reload();
 
-    let stored = await page.evaluate(() => JSON.parse(window.localStorage.getItem("pp-pilo-preferences-v2") ?? "{}"));
+    let stored = await readGuestPiloStorage<Record<string, unknown>>(page, "pp-pilo-preferences-v2");
     expect(stored).toMatchObject({ activity: "docked", activityDefaultVersion: 1, mode: "custom" });
 
     const pet = page.locator(".pilo-companion__pet");
@@ -206,22 +217,20 @@ test.describe("Pilo v3 state-driven companion workflow", () => {
     await settings.getByRole("button", { name: "关闭 Pilo 设置" }).click();
     await page.reload();
 
-    stored = await page.evaluate(() => JSON.parse(window.localStorage.getItem("pp-pilo-preferences-v2") ?? "{}"));
+    stored = await readGuestPiloStorage<Record<string, unknown>>(page, "pp-pilo-preferences-v2");
     expect(stored).toMatchObject({ activity: "active", activityDefaultVersion: 1, mode: "custom" });
   });
 
   test("finishes a persisted focus session while the settings panel is closed", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "no-preference" });
     const now = await page.evaluate(() => Date.now());
-    await page.evaluate((endsAt) => {
-      window.localStorage.setItem("pp-pilo-focus-session-v1", JSON.stringify({
-        durationMinutes: 15,
-        remainingSeconds: 1,
-        endsAt,
-        status: "running",
-        completionNotified: false,
-      }));
-    }, now + 1_000);
+    await writeGuestPiloStorage(page, "pp-pilo-focus-session-v1", {
+      durationMinutes: 15,
+      remainingSeconds: 1,
+      endsAt: now + 1_000,
+      status: "running",
+      completionNotified: false,
+    });
     await page.reload();
     await page.clock.setFixedTime(new Date(now + 1_500));
     await page.waitForTimeout(1_200);
@@ -295,10 +304,10 @@ test.describe("Pilo v3 state-driven companion workflow", () => {
     await expect(source).toContainText("未关联学习目标 · 本轮保持不限目标");
     await expect(page.getByRole("region", { name: "Pilo 的学习观察" })).toHaveCount(0);
 
-    await page.goto("/studio/coach?surface=notes&objectTitle=%E7%8A%B6%E6%80%81%E8%BD%AC%E7%A7%BB%E5%A4%8D%E7%9B%98&actionLabel=%E6%95%B4%E7%90%86%E5%BD%93%E5%89%8D%E7%AC%94%E8%AE%B0&entryMode=object&goalScope=linked&goalIds=demo-goal-algorithm");
+    await page.goto("/studio/coach?surface=notes&objectTitle=%E7%8A%B6%E6%80%81%E8%BD%AC%E7%A7%BB%E5%A4%8D%E7%9B%98&actionLabel=%E6%95%B4%E7%90%86%E5%BD%93%E5%89%8D%E7%AC%94%E8%AE%B0&entryMode=object&goalScope=linked&goalIds=guest-skill");
     source = page.getByRole("region", { name: "这次对话的页面来源" });
-    await expect(source).toContainText("关联目标：算法进阶 · 已作为本轮聚焦");
-    await expect(page.getByRole("button", { name: /本轮聚焦：算法进阶/ })).toBeVisible();
+    await expect(source).toContainText("关联目标：掌握 Python 数据分析 · 已作为本轮聚焦");
+    await expect(page.getByRole("button", { name: /本轮聚焦：掌握 Python 数据分析/ })).toBeVisible();
     await expect(page.getByRole("region", { name: "Pilo 的学习观察" })).toHaveCount(0);
 
     await page.goto("/studio/coach?surface=review&actionLabel=%E8%A7%A3%E9%87%8A%E4%B8%80%E6%9D%A1%E5%88%A4%E6%96%AD&entryMode=observation&observationTitle=%E4%BD%A0%E5%9C%A8%E6%99%9A%E9%97%B4%E6%9B%B4%E5%AE%B9%E6%98%93%E5%AE%8C%E6%88%90%E9%AB%98%E8%AE%A4%E7%9F%A5%E4%BB%BB%E5%8A%A1&reason=%E8%BF%99%E4%B8%8E%E6%9C%AC%E8%BD%AE%E6%A0%A1%E6%AD%A3%E7%9A%84%E5%AD%A6%E4%B9%A0%E5%88%A4%E6%96%AD%E7%9B%B4%E6%8E%A5%E7%9B%B8%E5%85%B3");
@@ -372,11 +381,9 @@ test.describe("Pilo v3 state-driven companion workflow", () => {
     };
 
     await assertAnchored("above-right");
-    await page.evaluate(() => {
-      const preferences = JSON.parse(window.localStorage.getItem("pp-pilo-preferences-v2") ?? "{}");
-      preferences.home = { x: Math.min(0, -window.innerWidth + 162), y: Math.min(0, -window.innerHeight + 196) };
-      window.localStorage.setItem("pp-pilo-preferences-v2", JSON.stringify(preferences));
-    });
+    const movedPreferences = await readGuestPiloStorage<Record<string, unknown>>(page, "pp-pilo-preferences-v2");
+    const movedHome = await page.evaluate(() => ({ x: Math.min(0, -window.innerWidth + 162), y: Math.min(0, -window.innerHeight + 196) }));
+    await writeGuestPiloStorage(page, "pp-pilo-preferences-v2", { ...movedPreferences, home: movedHome });
     await page.reload();
     await expect(page.locator(".pilo-companion")).toBeVisible();
     await assertAnchored("below-left");
@@ -588,6 +595,9 @@ test.describe("Pilo v3 state-driven companion workflow", () => {
   });
 
   test("uses complete rendered assets and keeps exercise jump out of page navigation", async ({ page }) => {
+    const adaptiveOutfit = await readGuestPiloStorage<Record<string, unknown>>(page, "pp-pilo-preferences-v2");
+    await writeGuestPiloStorage(page, "pp-pilo-preferences-v2", { ...adaptiveOutfit, outfit: "auto", outfits: [], outfitDefaultVersion: 3 });
+    await page.evaluate(() => window.dispatchEvent(new Event("planpilot:pilo-appearance-changed")));
     const pet = page.locator(".pilo-companion__pet");
     await pet.click({ button: "right" });
     const settings = page.getByRole("dialog", { name: "Pilo 设置" });
@@ -596,7 +606,7 @@ test.describe("Pilo v3 state-driven companion workflow", () => {
 
     await settings.getByTestId("pilo-debug-reading").click();
     await expect(page.locator(".pilo-companion")).toHaveAttribute("data-pilo-state", "reading");
-    await expect(pet.locator(".pilo-avatar")).toHaveAttribute("aria-label", /戴着眼镜/);
+    await expect(pet.locator(".pilo-avatar")).toHaveAttribute("data-pilo-accessory", /glasses/);
     await expect(pet.locator(".pilo-avatar")).toHaveAttribute("data-pilo-asset-coverage", "ready");
 
     await page.goto("/studio/work/notes?piloDebug=1&piloSeed=42");
@@ -608,7 +618,7 @@ test.describe("Pilo v3 state-driven companion workflow", () => {
     await reopenedSettings.getByRole("button", { name: /状态时间线/ }).click();
     await reopenedSettings.getByTestId("pilo-debug-stretching").click();
     await expect(page.locator(".pilo-companion")).toHaveAttribute("data-pilo-state", "stretching");
-    await expect(pet.locator(".pilo-avatar")).toHaveAttribute("aria-label", /运动头带/);
+    await expect(pet.locator(".pilo-avatar")).toHaveAttribute("data-pilo-accessory", /headband/);
     await reopenedSettings.getByRole("button", { name: "关闭 Pilo 设置" }).click();
     await expect(reopenedSettings).toBeHidden();
     await expect(pet).toHaveScreenshot("pilo-exercise-reminder.png", {
@@ -713,14 +723,14 @@ test.describe("Pilo v3 state-driven companion workflow", () => {
     await expect(companion).toHaveAttribute("data-pilo-life-action", "tea-break");
     await pet.click({ button: "right" });
     await settings.getByRole("tab", { name: "场景", exact: true }).click();
-    await settings.getByRole("button", { name: "展开装扮选项" }).click();
+    await settings.getByRole("button", { name: "展开装扮选项" }).press("Enter");
     const outfitChoices = settings.getByRole("group", { name: "选择 Pilo 装扮" });
     await expect(outfitChoices.getByRole("button")).toHaveCount(9);
     const outfitCollapse = settings.getByRole("button", { name: "收起装扮选项" });
     await expect(outfitCollapse).toHaveAttribute("aria-expanded", "true");
     await outfitCollapse.click();
     await expect(settings.getByRole("group", { name: "选择 Pilo 装扮" })).toHaveCount(0);
-    await settings.getByRole("button", { name: "展开装扮选项" }).click();
+    await settings.getByRole("button", { name: "展开装扮选项" }).press("Enter");
     await expect(settings.getByRole("group", { name: "选择 Pilo 装扮" }).getByRole("button")).toHaveCount(9);
     for (const label of ["圆框眼镜", "短围巾", "运动头带"]) {
       await expect(outfitChoices.getByRole("button", { name: new RegExp(label) }).locator(".pilo-avatar")).toHaveAttribute("data-pilo-mood", "idle");
@@ -789,12 +799,9 @@ test.describe("Pilo v3 state-driven companion workflow", () => {
   });
 
   test("migrates the former automatic default to the classic outfit", async ({ page }) => {
-    await page.evaluate(() => {
-      const stored = JSON.parse(window.localStorage.getItem("pp-pilo-preferences-v2") ?? "{}");
-      stored.outfit = "auto";
-      delete stored.outfitDefaultVersion;
-      window.localStorage.setItem("pp-pilo-preferences-v2", JSON.stringify(stored));
-    });
+    const legacyOutfit = await readGuestPiloStorage<Record<string, unknown>>(page, "pp-pilo-preferences-v2");
+    delete legacyOutfit.outfitDefaultVersion;
+    await writeGuestPiloStorage(page, "pp-pilo-preferences-v2", { ...legacyOutfit, outfit: "auto" });
     await page.reload();
 
     const pet = page.locator(".pilo-companion__pet");
@@ -805,7 +812,7 @@ test.describe("Pilo v3 state-driven companion workflow", () => {
     await settings.getByRole("button", { name: "展开装扮选项" }).click();
     await expect(settings.getByRole("button", { name: /经典造型/ })).toHaveAttribute("aria-pressed", "true");
 
-    const stored = await page.evaluate(() => JSON.parse(window.localStorage.getItem("pp-pilo-preferences-v2") ?? "{}"));
+    const stored = await readGuestPiloStorage<Record<string, unknown>>(page, "pp-pilo-preferences-v2");
     expect(stored.outfit).toBe("none");
     expect(stored.outfitDefaultVersion).toBe(3);
   });
@@ -1255,9 +1262,13 @@ test.describe("Pilo v3 state-driven companion workflow", () => {
     await assertSceneBounds(667, 375);
   });
 
-  test("previews the seven Scene Pack entries from 场景", async ({ page }) => {
+  test("场景预览移除夜间休息且右键后的主形象不切换浅边静态图", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "no-preference" });
+    const petAvatar = page.locator(".pilo-companion__pet .pilo-avatar");
     await page.locator(".pilo-companion__pet").click({ button: "right" });
+    await expect(petAvatar).toHaveAttribute("data-pilo-mood", "idle");
+    await expect(petAvatar).toHaveAttribute("data-pilo-atlas-state", "idle");
+    await expect(petAvatar.locator(".pilo-avatar__body img")).toHaveCount(0);
     const settings = page.getByRole("dialog", { name: "Pilo 设置" });
     await settings.getByRole("tab", { name: "场景", exact: true }).click();
     const movement = await page.evaluate(() => new Promise<{ panel: number; companion: number }>((resolve) => {
@@ -1283,7 +1294,8 @@ test.describe("Pilo v3 state-driven companion workflow", () => {
     await settings.getByRole("button", { name: "展开场景预览" }).click();
     await expect(settings.getByRole("button", { name: "收起场景预览" })).toBeVisible();
     const previews = settings.locator(".pilo-companion__scene-preview-grid > button");
-    await expect(previews).toHaveCount(7);
+    await expect(previews).toHaveCount(6);
+    await expect(settings.getByText("夜间休息", { exact: true })).toHaveCount(0);
     await previews.filter({ hasText: "晚间回顾" }).click();
     await expect(page.locator(".pilo-companion")).toHaveAttribute("data-pilo-scene", "review");
   });
@@ -1293,9 +1305,133 @@ test.describe("Pilo coach toolbar", () => {
   test.beforeEach(async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.setViewportSize({ width: 1280, height: 800 });
+    await page.addInitScript(() => {
+      const at = (monthOffset: number, dayOffset: number) => {
+        const value = new Date();
+        value.setMonth(value.getMonth() + monthOffset);
+        value.setDate(value.getDate() + dayOffset);
+        value.setHours(19, 30, 0, 0);
+        return value.toISOString();
+      };
+      const conversation = (id: string, title: string, goalTitle: string, updatedAt: string) => ({
+        id,
+        sessionId: id,
+        goalId: null,
+        goalTitle,
+        title,
+        summary: `${title}的会话摘要`,
+        piloFeedback: `Pilo 已整理${title}的下一步`,
+        messages: [{ id: `${id}-u`, role: "user", content: title }, { id: `${id}-a`, role: "assistant", content: `一起处理${title}` }],
+        createdAt: updatedAt,
+        updatedAt,
+        association: "测试会话",
+        isFavorite: false,
+      });
+      const fixtures = [
+        conversation("legacy-algorithm", "调整本周算法计划", "算法进阶", at(0, 0)),
+        conversation("legacy-load", "降低学习负荷", "跨目标节奏", at(0, -10)),
+        conversation("legacy-review", "复盘上月学习节奏", "数据结构巩固", at(-1, -2)),
+      ];
+      fixtures[0].isFavorite = true;
+      fixtures[1].isFavorite = true;
+      window.localStorage.setItem("planpilot:guest-dataset-version", "4");
+      window.localStorage.setItem("planpilot:pilo-demo-archive-version", "4");
+      window.localStorage.setItem("planpilot:pilo-conversations:guest", JSON.stringify(fixtures));
+    });
     await page.goto("/studio/coach");
     await page.waitForLoadState("networkidle");
     await page.waitForTimeout(150);
+  });
+
+  test("keeps the compact desktop toolbar inside the learning partner viewport", async ({ page }) => {
+    await page.setViewportSize({ width: 1000, height: 800 });
+
+    const geometry = await page.evaluate(() => {
+      const workspace = document.querySelector<HTMLElement>(".companion-workspace")!;
+      const commandbar = document.querySelector<HTMLElement>(".companion-commandbar")!;
+      const history = document.querySelector<HTMLElement>(".companion-history-link")!;
+      const panel = document.querySelector<HTMLElement>(".companion-chat-panel")!;
+      const workspaceBounds = workspace.getBoundingClientRect();
+      const commandbarBounds = commandbar.getBoundingClientRect();
+      const historyBounds = history.getBoundingClientRect();
+      const panelBounds = panel.getBoundingClientRect();
+      return {
+        documentFits: document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+        workspaceFits: workspace.scrollWidth <= workspace.clientWidth,
+        commandbarFits: commandbarBounds.right <= workspaceBounds.right,
+        historyFits: historyBounds.right <= commandbarBounds.right,
+        panelFits: panelBounds.right <= workspaceBounds.right,
+      };
+    });
+
+    expect(geometry).toEqual({
+      documentFits: true,
+      workspaceFits: true,
+      commandbarFits: true,
+      historyFits: true,
+      panelFits: true,
+    });
+    await expect(page.locator(".companion-settings-link > span")).toBeHidden();
+    await expect(page.locator(".companion-history-link > span")).toBeHidden();
+    await expect(page.getByRole("button", { name: "打开 Pilo 设置" }).locator("svg")).toBeVisible();
+    await expect(page.getByRole("button", { name: "查看历史会话" }).locator("svg")).toBeVisible();
+  });
+
+  test("matches the round-focus menu to the history drawer language", async ({ page }) => {
+    await page.getByRole("button", { name: /本轮聚焦/ }).click();
+    const menu = page.getByRole("listbox", { name: "选择本轮聚焦目标" });
+    const selected = menu.getByRole("option", { selected: true });
+    await expect(menu).toBeVisible();
+    await expect(menu).toHaveCSS("width", "360px");
+    await expect(menu).toHaveCSS("border-radius", "18px");
+    await expect(selected).toHaveCSS("border-radius", "0px");
+    await expect(selected.locator(".companion-goal-option-mark")).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+
+    await page.getByRole("button", { name: /本轮聚焦/ }).click();
+    await page.getByRole("button", { name: "拉灯切换到深色模式" }).click();
+    await page.getByRole("button", { name: /本轮聚焦/ }).click();
+    await expect(menu).toHaveCSS("background-image", /radial-gradient.*linear-gradient/);
+
+    await page.setViewportSize({ width: 375, height: 812 });
+    const bounds = await menu.boundingBox();
+    expect(bounds?.x ?? -1).toBeGreaterThanOrEqual(0);
+    expect((bounds?.x ?? 0) + (bounds?.width ?? 0)).toBeLessThanOrEqual(375);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)).toBe(false);
+  });
+
+  test("keeps proposal actions and dark action previews readable", async ({ page }) => {
+    await page.evaluate(() => {
+      const host = document.querySelector<HTMLElement>(".companion-feed")!;
+      const fixture = document.createElement("div");
+      fixture.dataset.contrastFixture = "true";
+      fixture.innerHTML = `
+        <article class="companion-proposal">
+          <footer><button type="button" class="is-primary"><span>✓</span>记下这条提醒</button></footer>
+        </article>
+        <section class="companion-action-run" aria-label="暗色行动任务样式检查">
+          <header><div><small>行动任务</small><h3>建议重新安排逾期任务</h3></div><span><i></i>等你确认</span></header>
+          <ul class="companion-action-operations">
+            <li><span>模块与包导入</span><small>待调整</small><p>2026-08-19 → 2026-08-24</p></li>
+          </ul>
+        </section>`;
+      host.append(fixture);
+    });
+
+    const primary = page.locator("[data-contrast-fixture] .companion-proposal button.is-primary");
+    await expect(primary).toHaveCSS("color", "rgb(255, 255, 255)");
+    await expect(primary).toHaveCSS("background-image", /linear-gradient/);
+
+    await page.getByRole("button", { name: "拉灯切换到深色模式" }).click();
+    await expect(page.locator(".companion-workspace")).toHaveClass(/is-dark/);
+    await expect(page.locator(".companion-workspace")).toHaveCSS(
+      "background-image",
+      /rgb\(14, 23, 41\).*rgb\(17, 30, 54\)/,
+    );
+    const action = page.getByRole("region", { name: "暗色行动任务样式检查" });
+    await expect(action.locator("h3")).toHaveCSS("color", "rgb(242, 245, 250)");
+    await expect(action.locator(".companion-action-operations > li > span")).toHaveCSS("color", "rgb(242, 245, 250)");
+    await expect(action.locator(".companion-action-operations > li > p")).toHaveCSS("color", "rgb(189, 199, 215)");
+    await expect(action.locator(".companion-action-operations > li")).toHaveCSS("border-top-color", "rgba(190, 201, 222, 0.2)");
   });
 
   test("keeps long-term observation always on and lets the user choose the round focus", async ({ page }) => {
@@ -1368,8 +1504,9 @@ test.describe("Pilo coach toolbar", () => {
     await composer.press("Enter");
     await expect(page.locator(".companion-message.is-user")).toHaveCount(1);
     await expect(page.locator(".companion-message.is-assistant")).toHaveCount(1);
-    await expect(page.locator(".companion-message.is-user > .companion-message-avatar")).toBeVisible();
-    await expect(page.locator(".companion-message.is-assistant > .companion-message-avatar .pilo-avatar")).toBeVisible();
+    await expect(page.locator(".companion-message.is-user > .companion-message-speaker > .companion-message-avatar")).toBeVisible();
+    await expect(page.locator(".companion-message.is-assistant > .companion-message-speaker > .companion-message-avatar .pilo-avatar")).toBeVisible();
+    await expect(page.locator(".companion-message-speaker > strong")).toHaveCount(0);
     const assistantBubble = page.locator(".companion-message.is-assistant > .companion-message-bubble");
     const userBubble = page.locator(".companion-message.is-user > .companion-message-bubble");
     await expect(assistantBubble).toHaveCSS("border-color", "rgba(117, 103, 248, 0.28)");
@@ -1384,14 +1521,10 @@ test.describe("Pilo coach toolbar", () => {
     expect(assistantBubbleBounds?.x ?? 999).toBeLessThan(userBubbleBounds?.x ?? 0);
     await expect(openingObservation).toHaveClass(/is-collapsed/);
     await expect(openingObservation.getByRole("button", { name: "展开 Pilo 的观察" })).toBeVisible();
-    for (const speaker of await page.locator(".companion-message-author > strong").all()) {
-      await expect(speaker).toHaveCSS("font-size", "13px");
-    }
+    await expect(page.locator(".companion-message-header > .companion-message-author")).toHaveCount(0);
     await expect(page.locator(".companion-message.is-user time")).toHaveCount(1);
     await expect(page.locator(".companion-message.is-assistant time")).toHaveCount(0);
-    await expect(page.locator(".companion-message.is-assistant .companion-message-header")).toContainText("查看依据");
-    const assistantEvidenceBounds = await page.locator(".companion-message.is-assistant .companion-message-header > button").boundingBox();
-    expect((assistantEvidenceBounds?.x ?? 0) + (assistantEvidenceBounds?.width ?? 0)).toBeGreaterThan((assistantBubbleBounds?.x ?? 0) + (assistantBubbleBounds?.width ?? 0) - 44);
+    await expect(page.locator(".companion-message.is-assistant .companion-message-header")).toHaveCount(0);
     await expect(page.locator(".companion-message footer")).toHaveCount(0);
     await expect(page.locator(".companion-input-note")).toHaveCount(1);
     await expect.poll(async () => feed.evaluate((element) => {
@@ -1415,7 +1548,7 @@ test.describe("Pilo coach toolbar", () => {
     await expect(evidencePanel.getByRole("heading", { name: "依据来源" })).toBeVisible();
     await expect(evidencePanel).toContainText(/\d+ 条近期记录/);
     const patternsToggle = evidencePanel.getByRole("button", { name: /与你有关的学习习惯/ });
-    const memoryToggle = evidencePanel.getByRole("button", { name: /相关长期记忆/ });
+    const memoryToggle = evidencePanel.getByRole("button", { name: /本轮参考的长期记录/ });
     const resourcesToggle = evidencePanel.getByRole("button", { name: /本轮可用资料/ });
     await expect(patternsToggle).toHaveAttribute("aria-expanded", "true");
     await expect(memoryToggle).toHaveAttribute("aria-expanded", "false");
@@ -1466,10 +1599,11 @@ test.describe("Pilo coach toolbar", () => {
     const todayButton = weekPicker.getByRole("button", { name: /今天/ });
     await expect(todayButton).toHaveAttribute("aria-current", "date");
     await expect(todayButton).not.toHaveCSS("background-image", "none");
-    const recordedWeekday = weekPicker.getByRole("button", { name: /1 次会话/ }).first();
+    const recordedWeekday = weekPicker.getByRole("button", { name: /\d+ 次会话/ }).first();
     await recordedWeekday.click();
     await expect(recordedWeekday).toHaveAttribute("aria-pressed", "true");
-    await expect(historyPanel.locator(".companion-history-period.is-week .companion-thread-item")).toHaveCount(1);
+    const selectedDayCount = Number((await recordedWeekday.getAttribute("aria-label"))?.match(/(\d+) 次会话/)?.[1] ?? 0);
+    await expect(historyPanel.locator(".companion-history-period.is-week .companion-thread-item")).toHaveCount(selectedDayCount);
     await recordedWeekday.click();
     await expect(recordedWeekday).toHaveAttribute("aria-pressed", "false");
     const archiveToggle = historyPanel.getByRole("button", { name: "展开更早的历史会话" });
@@ -1516,7 +1650,7 @@ test.describe("Pilo coach toolbar", () => {
     await expect(historyPanel.locator(".companion-history-date-field__label").first()).toHaveCSS("text-align", "left");
     const todayRail = await todayButton.evaluate((button) => getComputedStyle(button, "::before").width);
     expect(todayRail).toBe("1.5px");
-    expect(await historyPanel.locator(".companion-thread-feedback").count()).toBeGreaterThanOrEqual(4);
+    expect(await historyPanel.locator(".companion-thread-feedback").count()).toBeGreaterThanOrEqual(3);
     const piloFace = historyPanel.locator(".companion-thread-pilo-face").first();
     await expect(piloFace).toBeVisible();
     await expect(piloFace).toHaveCSS("overflow", "hidden");
@@ -1553,20 +1687,20 @@ test.describe("Pilo coach toolbar", () => {
     await expect(menu).toBeVisible();
     await expect(menu).toContainText("长期观察始终参与");
     await expect(menu.getByRole("option", { name: /不限目标/ })).toHaveAttribute("aria-selected", "true");
-    await expect(menu.getByRole("option", { name: /算法进阶/ })).toBeVisible();
-    await expect(menu.getByRole("option", { name: /数据结构巩固/ })).toBeVisible();
+    await expect(menu.getByRole("option", { name: /掌握 Python 数据分析/ })).toBeVisible();
+    await expect(menu.getByRole("option", { name: /研究生英语二 80 分冲刺/ })).toBeVisible();
     await expect(menu).toContainText("不会修改长期画像或自动调整计划");
-    await menu.getByRole("option", { name: /算法进阶/ }).click();
-    await expect(trigger).toContainText("算法进阶");
+    await menu.getByRole("option", { name: /掌握 Python 数据分析/ }).click();
+    await expect(trigger).toContainText("掌握 Python 数据分析");
     await trigger.press("ArrowDown");
-    await expect(menu.getByRole("option", { name: /算法进阶/ })).toHaveAttribute("aria-selected", "true");
+    await expect(menu.getByRole("option", { name: /掌握 Python 数据分析/ })).toHaveAttribute("aria-selected", "true");
     await menu.getByRole("option", { name: /不限目标/ }).click();
     await expect(trigger).toContainText("不限目标");
     await trigger.press("ArrowDown");
     const goalContext = page.locator(".companion-goal-menu-context");
     await expect(goalContext.locator("strong")).toHaveCSS("font-size", "14px");
     await expect(goalContext.locator("small")).toHaveCSS("font-size", "12px");
-    await expect(goalContext.locator("svg")).toHaveCSS("width", "20px");
+    await expect(goalContext.locator("svg")).toHaveCSS("width", "18px");
     await page.keyboard.press("Escape");
     await expect(trigger).toHaveAttribute("aria-expanded", "false");
 
@@ -1601,7 +1735,7 @@ test.describe("Pilo coach toolbar", () => {
     const goalContext = page.locator(".companion-goal-menu-context");
     await expect(goalContext.locator("strong")).toHaveCSS("font-size", "14px");
     await expect(goalContext.locator("small")).toHaveCSS("font-size", "12px");
-    await expect(goalContext.locator("svg")).toHaveCSS("width", "20px");
+    await expect(goalContext.locator("svg")).toHaveCSS("width", "18px");
     await page.keyboard.press("Escape");
 
     await page.getByRole("button", { name: "查看历史会话" }).click();

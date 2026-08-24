@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  AlertTriangle,
   Check,
   ChevronDown,
   ChevronRight,
@@ -17,22 +18,23 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type UIEvent } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/technology/AuthProvider";
-import { GoalCreateDialog } from "@/components/goal/GoalCreateDialog";
-import { GoalEditDialog } from "@/components/goal/GoalEditDialog";
 import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { DataSyncNotice } from "@/components/ui/DataSyncNotice";
 import { productApi, type ApiGoal, type ApiTask, type GoalProgress } from "@/lib/technology/productApi";
 import {
   PRODUCT_STORAGE_KEYS,
   readProductArray,
   writeProductArray,
 } from "@/lib/technology/productData";
-import { signalPiloState } from "@/lib/technology/piloState";
 import { signalPiloContext } from "@/lib/technology/piloContext";
+import { ensureGuestDatasetSeeded, guestStoredGoals } from "@/lib/technology/guestData";
 
-type GoalStatus = "进行中" | "有风险" | "已暂停";
-type GoalFilter = "全部" | "进行中" | "有风险" | "已完成" | "已归档";
+type GoalBaseStatus = ApiGoal["status"];
+type GoalFilter = "全部" | "进行中" | "有风险" | "已完成" | "已暂停" | "已归档" | "尚未规划";
+type ProgressState = "ready" | "loading" | "error";
 
 type Goal = {
   id: string | number;
@@ -42,7 +44,11 @@ type Goal = {
   deadline: string;
   deadlineDate?: string;
   daily: string;
-  status: GoalStatus;
+  status: GoalBaseStatus;
+  isRisk: boolean;
+  progressState: ProgressState;
+  completedTasks: number | null;
+  totalTasks: number | null;
   next: string;
   taskSummary: string;
   rhythmSummary: string;
@@ -51,10 +57,15 @@ type Goal = {
 };
 
 type GoalMilestone = {
+  goalId: string;
+  taskId?: string;
   title: string;
+  goalName: string;
+  detail: string;
   meta: string;
   tone: "attention" | "active" | "ready" | "done" | "neutral";
   priority: number;
+  isCurrent: boolean;
 };
 
 type MilestoneScope = "all" | string;
@@ -86,52 +97,7 @@ function formatTaskDate(value: string) {
   return new Intl.DateTimeFormat("zh-CN", { month: "long", day: "numeric" }).format(parsed);
 }
 
-const INITIAL_GOALS: Goal[] = [
-  {
-    id: 1,
-    name: "算法基础体系化",
-    type: "技能提升",
-    progress: 64,
-    deadline: "9 月 30 日",
-    deadlineDate: "2026-09-30",
-    daily: "60 分钟",
-    status: "进行中",
-    next: "动态规划 · 第 3 阶段",
-    taskSummary: "16 / 25 个任务",
-    rhythmSummary: "连续学习 12 天",
-    debtCount: 0,
-    scheduleDeltaDays: 1,
-  },
-  {
-    id: 2,
-    name: "前端面试准备",
-    type: "求职备考",
-    progress: 38,
-    deadline: "10 月 18 日",
-    deadlineDate: "2026-10-18",
-    daily: "45 分钟",
-    status: "有风险",
-    next: "浏览器原理 · 待复习",
-    taskSummary: "8 / 21 个任务",
-    rhythmSummary: "4 项知识待复习",
-    debtCount: 4,
-    scheduleDeltaDays: -2,
-  },
-  {
-    id: 3,
-    name: "英文技术阅读",
-    type: "习惯养成",
-    progress: 72,
-    deadline: "长期",
-    daily: "20 分钟",
-    status: "已暂停",
-    next: "恢复后从短文开始",
-    taskSummary: "18 / 30 个任务",
-    rhythmSummary: "暂停中",
-    debtCount: 0,
-    scheduleDeltaDays: null,
-  },
-];
+const INITIAL_GOALS: Goal[] = guestStoredGoals();
 
 function goalRemainingDays(goal: Goal) {
   if (goal.deadline === "长期" || !goal.deadlineDate) return "持续进行";
@@ -143,7 +109,7 @@ function goalRemainingDays(goal: Goal) {
 }
 
 function goalRemainingLabel(goal: Goal) {
-  if (goal.progress >= 100) return "已完成";
+  if (goal.status === "completed") return "已完成";
   const days = goalRemainingDays(goal);
   if (days === "持续进行") return days;
   if (days < 0) return `已逾期 ${Math.abs(days)} 天`;
@@ -151,10 +117,45 @@ function goalRemainingLabel(goal: Goal) {
   return `剩余 ${days} 天`;
 }
 
-function goalMilestones(goal: Goal, tasks: SearchableTask[], detailed: boolean): GoalMilestone[] {
-  const taskMatch = (goal.taskSummary ?? "").match(/(\d+)\s*\/\s*(\d+)/);
-  const completedTasks = Number(taskMatch?.[1] ?? 0);
-  const totalTasks = Number(taskMatch?.[2] ?? 0);
+function goalStatusLabel(goal: Goal) {
+  if (goal.status === "completed") return "已完成";
+  if (goal.status === "paused") return "已暂停";
+  if (goal.status === "abandoned") return "已归档";
+  return goal.isRisk ? "有风险" : "进行中";
+}
+
+function legacyStatus(value: unknown, progress: number): GoalBaseStatus {
+  if (value === "paused" || value === "已暂停") return "paused";
+  if (value === "abandoned" || value === "已归档" || value === "已放弃") return "abandoned";
+  if (value === "completed" || value === "已完成" || progress >= 100) return "completed";
+  return "active";
+}
+
+function normalizeLocalGoal(goal: Goal): Goal {
+  const match = String(goal.taskSummary ?? "").match(/(\d+)\s*\/\s*(\d+)/);
+  const progress = Number.isFinite(Number(goal.progress)) ? Number(goal.progress) : 0;
+  const status = legacyStatus(goal.status, progress);
+  const remainingDays = goal.deadlineDate
+    ? Math.ceil((new Date(`${goal.deadlineDate}T00:00:00`).getTime() - new Date(`${todayIsoDate()}T00:00:00`).getTime()) / 86_400_000)
+    : null;
+  const isRisk = status === "active" && (
+    Boolean(goal.isRisk)
+    || String(goal.status) === "有风险"
+    || Number(goal.debtCount ?? 0) > 0
+    || Number(goal.scheduleDeltaDays ?? 0) < 0
+    || (remainingDays != null && remainingDays < 0)
+  );
+  return {
+    ...goal,
+    status,
+    isRisk,
+    progressState: goal.progressState ?? "ready",
+    completedTasks: goal.completedTasks ?? (match ? Number(match[1]) : null),
+    totalTasks: goal.totalTasks ?? (match ? Number(match[2]) : null),
+  };
+}
+
+function goalMilestones(goal: Goal, tasks: SearchableTask[]): GoalMilestone[] {
   const remainingDays = goalRemainingDays(goal);
   const goalTasks = tasks
     .filter((task) => !task.done && (task.goalId === String(goal.id) || task.goalTitle === goal.name))
@@ -165,8 +166,7 @@ function goalMilestones(goal: Goal, tasks: SearchableTask[], detailed: boolean):
       return first.date.localeCompare(second.date);
     });
   const nextAction = goalTasks[0]?.title || goal.next || "继续执行当前计划";
-  const dailyRhythm = goal.daily || "30 分钟";
-  const debtCount = goal.debtCount ?? Number(goal.rhythmSummary?.match(/(\d+)\s*项知识待复习/)?.[1] ?? 0);
+  const debtCount = goal.debtCount ?? 0;
   const behindDays = typeof goal.scheduleDeltaDays === "number" && goal.scheduleDeltaDays < 0
     ? Math.abs(goal.scheduleDeltaDays)
     : 0;
@@ -174,65 +174,51 @@ function goalMilestones(goal: Goal, tasks: SearchableTask[], detailed: boolean):
   const needsPriority = isOverdue || behindDays >= 3 || debtCount >= 3;
   const items: GoalMilestone[] = [];
 
-  if (goal.status === "有风险") {
-    const riskTitle = isOverdue
-      ? `${goal.name}已超过截止日期 ${Math.abs(Number(remainingDays))} 天`
+  if (goal.isRisk) {
+    const riskDetail = isOverdue
+      ? `已超过截止日期 ${Math.abs(Number(remainingDays))} 天`
       : behindDays > 0
-        ? `${goal.name}当前节奏落后计划 ${behindDays} 天`
+        ? `当前节奏落后计划 ${behindDays} 天`
         : debtCount > 0
-          ? `${goal.name}有 ${debtCount} 项待复习知识需要安排`
-          : `${goal.name}的推进节奏需要重新确认`;
+          ? `有 ${debtCount} 项待复习知识需要安排`
+          : "推进节奏需要重新确认";
     items.push({
-      title: riskTitle,
+      goalId: String(goal.id),
+      title: `${goal.name}${riskDetail}`,
+      goalName: goal.name,
+      detail: riskDetail,
       meta: needsPriority ? "优先处理" : "需要关注",
       tone: "attention",
       priority: 0,
+      isCurrent: false,
     });
   }
 
-  if (typeof remainingDays === "number" && remainingDays >= 0 && remainingDays <= 7) {
+  if (typeof remainingDays === "number" && remainingDays >= 0 && remainingDays <= 7 && (behindDays > 0 || debtCount > 0)) {
+    const deadlineDetail = remainingDays === 0 ? "今天到期" : `距离截止还有 ${remainingDays} 天`;
     items.push({
-      title: remainingDays === 0 ? `${goal.name}今天到期` : `${goal.name}距离截止还有 ${remainingDays} 天`,
+      goalId: String(goal.id),
+      title: `${goal.name}${deadlineDetail}`,
+      goalName: goal.name,
+      detail: deadlineDetail,
       meta: "临近截止",
       tone: "attention",
       priority: 1,
+      isCurrent: false,
     });
   }
 
   items.push({
+    goalId: String(goal.id),
+    taskId: goalTasks[0]?.id,
     title: `${goal.name}下一步：${nextAction}`,
-    meta: goalTasks[0] ? "下一项任务" : "继续推进",
+    goalName: goal.name,
+    detail: `下一步：${nextAction}`,
+    meta: goalTasks[0]?.date === todayIsoDate() ? "今日任务" : goalTasks[0] ? "下一项任务" : "持续推进",
     tone: "active",
     priority: 2,
+    isCurrent: goalTasks[0]?.date === todayIsoDate(),
   });
-
-  if (totalTasks > 0) {
-    items.push({
-      title: completedTasks > 0
-        ? `${goal.name}已完成 ${completedTasks} / ${totalTasks} 个任务`
-        : `${goal.name}还没有完成任务`,
-      meta: completedTasks > 0 ? `完成 ${goal.progress}%` : "可以开始",
-      tone: completedTasks > 0 ? "active" : "ready",
-      priority: 3,
-    });
-  }
-
-  if (detailed) {
-    if (typeof remainingDays === "number" && remainingDays > 7) {
-      items.push({
-        title: `${goal.name}距离截止还有 ${remainingDays} 天`,
-        meta: "时间充足",
-        tone: "neutral",
-        priority: 4,
-      });
-    }
-    items.push({
-      title: `${goal.name}每天计划投入 ${dailyRhythm}`,
-      meta: "学习节奏",
-      tone: "ready",
-      priority: 5,
-    });
-  }
 
   return items;
 }
@@ -242,7 +228,7 @@ export default function GoalsPage() {
   const searchParams = useSearchParams();
   const { status: authStatus } = useAuth();
   const { confirmAction } = useConfirmDialog();
-  const [goals, setGoals] = useState(INITIAL_GOALS);
+  const [goals, setGoals] = useState<Goal[]>([]);
   const [storageReady, setStorageReady] = useState(false);
   const [filter, setFilter] = useState<GoalFilter>("全部");
   const [searchTerm, setSearchTerm] = useState("");
@@ -254,11 +240,11 @@ export default function GoalsPage() {
   const [filterMenuOpen, setFilterMenuOpen] = useState(false);
   const [milestoneScope, setMilestoneScope] = useState<MilestoneScope>("all");
   const [milestoneMenuOpen, setMilestoneMenuOpen] = useState(false);
-  const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null);
-  const [goalDialog, setGoalDialog] = useState<{ mode: "create" } | { mode: "edit"; goalId: string } | null>(null);
   const [goalMutationVersion, setGoalMutationVersion] = useState(0);
+  const [progressRetryVersion, setProgressRetryVersion] = useState(0);
   const [dataLoading, setDataLoading] = useState(false);
   const [dataError, setDataError] = useState("");
+  const [progressError, setProgressError] = useState("");
   const headingToolsRef = useRef<HTMLDivElement | null>(null);
   const goalsListRef = useRef<HTMLDivElement | null>(null);
   const milestoneSwitcherRef = useRef<HTMLDivElement | null>(null);
@@ -311,10 +297,12 @@ export default function GoalsPage() {
       return goals.filter((goal) => {
         const matchesFilter =
           filter === "全部"
-            || (filter === "进行中" && goal.status !== "已暂停")
-            || (filter === "有风险" && goal.status === "有风险")
-            || (filter === "已完成" && goal.progress >= 100)
-            || (filter === "已归档" && goal.status === "已暂停");
+            || (filter === "进行中" && goal.status === "active")
+            || (filter === "有风险" && goal.isRisk)
+            || (filter === "已完成" && goal.status === "completed")
+            || (filter === "已暂停" && goal.status === "paused")
+            || (filter === "已归档" && goal.status === "abandoned")
+            || (filter === "尚未规划" && goal.status !== "abandoned" && goal.progressState === "ready" && goal.totalTasks === 0);
         const matchesQuery = !query
           || `${goal.name}${goal.type}${goal.next}`.toLocaleLowerCase("zh-CN").includes(query)
           || matchedGoalIds.has(String(goal.id));
@@ -324,42 +312,42 @@ export default function GoalsPage() {
     [filter, goals, submittedSearch, taskSearchResults],
   );
 
-  const completionAverage = goals.length
-    ? Math.round(goals.reduce((total, goal) => total + goal.progress, 0) / goals.length)
-    : 0;
-  const riskCount = goals.filter((goal) => goal.status === "有风险").length;
-  const completedCount = goals.filter((goal) => goal.progress >= 100).length;
-  const reviewDueCount = goals.reduce((total, goal) => {
-    const match = goal.rhythmSummary?.match(/(\d+)\s*项知识待复习/);
-    return total + Number(match?.[1] ?? 0);
-  }, 0);
-  const donutGradient = `conic-gradient(from -90deg, var(--goal-ring-progress) 0 ${completionAverage}%, var(--goal-ring-track) ${completionAverage}% 100%)`;
-
+  const includedProgressGoals = goals.filter((goal) => goal.status !== "abandoned" && goal.progressState === "ready" && Number(goal.totalTasks) > 0);
+  const completedTaskTotal = includedProgressGoals.reduce((total, goal) => total + Number(goal.completedTasks ?? 0), 0);
+  const taskTotal = includedProgressGoals.reduce((total, goal) => total + Number(goal.totalTasks ?? 0), 0);
+  const completionAverage = taskTotal > 0 ? Math.round((completedTaskTotal / taskTotal) * 100) : 0;
+  const riskCount = goals.filter((goal) => goal.isRisk).length;
+  const completedCount = goals.filter((goal) => goal.status === "completed").length;
+  const unplannedCount = goals.filter((goal) => goal.status !== "abandoned" && goal.progressState === "ready" && goal.totalTasks === 0).length;
+  const reviewDueCount = goals.reduce((total, goal) => total + Number(goal.debtCount ?? 0), 0);
   useEffect(() => {
+    const piloGoals = goals.filter((goal) => goal.status === "active" || goal.status === "completed");
     signalPiloContext({
       kind: "scope",
       surface: "goals",
-      itemCount: goals.length,
+      goalIds: piloGoals.filter((goal) => goal.status === "active").map((goal) => String(goal.id)),
+      itemCount: piloGoals.length,
       completedCount,
       reviewDueCount,
     });
-  }, [completedCount, goals.length, reviewDueCount]);
+  }, [completedCount, goals, reviewDueCount]);
   const activeMilestoneGoals = useMemo(
-    () => goals.filter((goal) => goal.status !== "已暂停" && goal.progress < 100),
+    () => goals.filter((goal) => goal.status === "active"),
     [goals],
   );
   const selectedMilestoneGoal = milestoneScope === "all"
     ? null
     : activeMilestoneGoals.find((goal) => String(goal.id) === milestoneScope) ?? null;
-  const milestoneItems = useMemo(
+  const allMilestoneItems = useMemo(
     () => (milestoneScope === "all"
       ? activeMilestoneGoals
       : activeMilestoneGoals.filter((goal) => String(goal.id) === milestoneScope))
-      .flatMap((goal) => goalMilestones(goal, searchableTasks, milestoneScope !== "all"))
-      .sort((first, second) => first.priority - second.priority)
-      .slice(0, 10),
+      .flatMap((goal) => goalMilestones(goal, searchableTasks))
+      .sort((first, second) => first.priority - second.priority),
     [activeMilestoneGoals, milestoneScope, searchableTasks],
   );
+  const milestoneItems = allMilestoneItems.slice(0, 10);
+  const hiddenMilestoneCount = Math.max(0, allMilestoneItems.length - milestoneItems.length);
 
   useEffect(() => {
     if (milestoneScope !== "all" && !activeMilestoneGoals.some((goal) => String(goal.id) === milestoneScope)) {
@@ -389,8 +377,7 @@ export default function GoalsPage() {
 
   useEffect(() => {
     if (searchParams.get("create") !== "1") return;
-    setGoalDialog({ mode: "create" });
-    router.replace("/studio/work/goals", { scroll: false });
+    router.replace("/studio/work/goals/new", { scroll: false });
   }, [router, searchParams]);
 
   function goalFromApi(goal: ApiGoal, progress?: GoalProgress): Goal {
@@ -400,46 +387,78 @@ export default function GoalsPage() {
       : progress?.total_tasks
       ? Math.round((progress.completed_tasks / progress.total_tasks) * 100)
       : Math.round((progress?.avg_completion_rate ?? 0) * 100);
-    const isRisk = (progress?.debt_count ?? 0) > 0 || (progress?.days_ahead_or_behind ?? 0) < 0;
-    const status: GoalStatus = goal.status === "paused" || goal.status === "abandoned" ? "已暂停" : isRisk ? "有风险" : "进行中";
+    const deadlineDays = Math.ceil((new Date(`${goal.deadline}T00:00:00`).getTime() - new Date(`${todayIsoDate()}T00:00:00`).getTime()) / 86_400_000);
+    const isRisk = goal.status === "active" && (
+      (progress?.debt_count ?? 0) > 0
+      || (progress?.days_ahead_or_behind ?? 0) < 0
+      || deadlineDays < 0
+    );
     const deadline = new Intl.DateTimeFormat("zh-CN", { month: "long", day: "numeric" }).format(new Date(`${goal.deadline}T00:00:00`));
     return {
       id: goal.id,
       name: goal.title,
       type: typeLabel[goal.type],
-      progress: Math.min(100, progressValue),
+      progress: progress ? Math.min(100, progressValue) : 0,
       deadline,
       deadlineDate: goal.deadline,
       daily: `${Math.round(goal.daily_hours * 60)} 分钟`,
-      status,
+      status: goal.status,
+      isRisk,
+      progressState: progress ? "ready" : "error",
+      completedTasks: progress?.completed_tasks ?? null,
+      totalTasks: progress?.total_tasks ?? null,
       next: progress?.debt_count ? `${progress.debt_count} 项学习债务需要处理` : `${goal.current_level === "beginner" ? "初学" : goal.current_level === "intermediate" ? "进阶" : "高阶"}阶段 · 继续执行当前计划`,
-      taskSummary: progress?.total_tasks ? `${progress.completed_tasks} / ${progress.total_tasks} 个任务` : "0 / 0 个任务",
-      rhythmSummary: progress?.debt_count ? `${progress.debt_count} 项知识待复习` : `连续学习 ${progress?.streak_days ?? 0} 天`,
-      debtCount: progress?.debt_count ?? 0,
-      scheduleDeltaDays: progress?.days_ahead_or_behind ?? null,
+      taskSummary: progress ? `${progress.completed_tasks} / ${progress.total_tasks} 个任务` : "进度暂不可同步",
+      rhythmSummary: progress?.debt_count ? `${progress.debt_count} 项知识待复习` : progress ? `连续学习 ${progress.streak_days} 天` : "进度暂不可同步",
+      debtCount: progress?.debt_count,
+      scheduleDeltaDays: progress?.days_ahead_or_behind,
     };
   }
 
-  function closeGoalDialog() {
-    setSelectedGoal(null);
-  }
-
   useEffect(() => {
-    if (authStatus === "loading") return;
+    if (authStatus === "loading") {
+      setGoals([]);
+      setDataLoading(true);
+      setDataError("");
+      setProgressError("");
+      return;
+    }
     if (authStatus === "unauthenticated") {
-      setGoals(readProductArray(PRODUCT_STORAGE_KEYS.goals, INITIAL_GOALS));
+      ensureGuestDatasetSeeded();
+      setGoals(readProductArray<Goal>(PRODUCT_STORAGE_KEYS.goals, INITIAL_GOALS).map(normalizeLocalGoal));
       setStorageReady(true);
+      setDataLoading(false);
+      setDataError("");
+      setProgressError("");
       return;
     }
     let active = true;
-    setDataLoading(true); setDataError("");
+    setGoals([]);
+    setDataLoading(true);
+    setDataError("");
+    setProgressError("");
     void productApi.listGoals().then(async (items) => {
-      const progressRows = await Promise.all(items.map((item) => productApi.getGoalProgress(item.id).catch(() => undefined)));
-      if (active) setGoals(items.map((item, index) => goalFromApi(item, progressRows[index])));
-    }).catch((reason) => { if (active) setDataError(reason instanceof Error ? reason.message : "目标加载失败"); })
+      let progressRows: GoalProgress[] = [];
+      try {
+        progressRows = await productApi.getGoalsProgress();
+      } catch (reason) {
+        if (active) setProgressError(reason instanceof Error ? reason.message : "目标进度暂不可同步");
+      }
+      if (!active) return;
+      const progressByGoal = new Map(progressRows.map((row) => [row.goal_id, row]));
+      const mappedGoals = items.map((item) => goalFromApi(item, progressByGoal.get(item.id)));
+      if (progressRows.length > 0 && mappedGoals.some((goal) => goal.progressState === "error")) {
+        setProgressError("部分目标进度暂不可同步");
+      }
+      setGoals(mappedGoals);
+    }).catch((reason) => {
+      if (!active) return;
+      setGoals([]);
+      setDataError(reason instanceof Error ? reason.message : "目标加载失败");
+    })
       .finally(() => { if (active) setDataLoading(false); });
     return () => { active = false; };
-  }, [authStatus, goalMutationVersion]);
+  }, [authStatus, goalMutationVersion, progressRetryVersion]);
 
   useEffect(() => {
     if (authStatus === "loading") return;
@@ -496,18 +515,6 @@ export default function GoalsPage() {
     writeProductArray(PRODUCT_STORAGE_KEYS.goals, goals);
   }, [authStatus, goals, storageReady]);
 
-  useEffect(() => {
-    if (!selectedGoal) return;
-
-    function closeDialog(event: KeyboardEvent) {
-      if (event.key !== "Escape") return;
-      closeGoalDialog();
-    }
-
-    window.addEventListener("keydown", closeDialog);
-    return () => window.removeEventListener("keydown", closeDialog);
-  }, [selectedGoal]);
-
   function submitTaskSearch() {
     const query = searchTerm.trim();
     setSubmittedSearch(query);
@@ -521,24 +528,6 @@ export default function GoalsPage() {
       return;
     }
     router.push(`/studio/work/goals/${task.goalId}?taskId=${encodeURIComponent(task.id)}`);
-  }
-
-  async function toggleGoalPause(goal: Goal) {
-    signalPiloState("checking", { source: "goals:status" });
-    const nextStatus: GoalStatus = goal.status === "已暂停" ? "进行中" : "已暂停";
-    if (authStatus === "authenticated" && typeof goal.id === "string") {
-      try { await productApi.updateGoal(goal.id, { status: nextStatus === "已暂停" ? "paused" : "active" }); }
-      catch (reason) { signalPiloState("failure", { source: "goals:status", duration: 4_200 }); setDataError(reason instanceof Error ? reason.message : "目标状态更新失败"); return; }
-    }
-    setGoals((current) => current.map((item) => item.id === goal.id ? { ...item, status: nextStatus } : item));
-    setSelectedGoal((current) => current?.id === goal.id ? { ...current, status: nextStatus } : current);
-    signalPiloState("success", {
-      source: "goals:status",
-      reason: nextStatus === "进行中" ? "这个目标重新开始生长" : "目标状态已经更新",
-      duration: nextStatus === "进行中" ? 6_400 : 3_200,
-      accessory: nextStatus === "进行中" ? "wristwarmers" : undefined,
-      lifeAction: nextStatus === "进行中" ? "nurture-growth" : undefined,
-    });
   }
 
   async function removeGoal(goal: Goal) {
@@ -555,7 +544,6 @@ export default function GoalsPage() {
       catch (reason) { setDataError(reason instanceof Error ? reason.message : "目标删除失败"); return; }
     }
     setGoals((current) => current.filter((item) => item.id !== goal.id));
-    closeGoalDialog();
   }
 
   return (
@@ -622,9 +610,9 @@ export default function GoalsPage() {
               <SlidersHorizontal size={17} />
             </button>
             {filterMenuOpen && (
-              <div className="goals-filter-menu" role="menu">
-                <button type="button" role="menuitem" onClick={() => { setFilter("有风险"); setFilterMenuOpen(false); }}>只看有风险</button>
-                <button type="button" role="menuitem" onClick={() => { setFilter("全部"); setFilterMenuOpen(false); }}>清除筛选</button>
+              <div className="goals-filter-menu" role="menu" aria-label="高级目标筛选">
+                <button className={filter === "有风险" ? "is-selected" : ""} type="button" role="menuitem" onClick={() => { setFilter("有风险"); setFilterMenuOpen(false); }}><Target size={15} aria-hidden="true" /><span>只看有风险</span>{filter === "有风险" && <Check size={14} aria-hidden="true" />}</button>
+                <button type="button" role="menuitem" onClick={() => { setFilter("全部"); setFilterMenuOpen(false); }}><X size={15} aria-hidden="true" /><span>清除筛选</span></button>
               </div>
             )}
             {searchResultsOpen && (
@@ -643,7 +631,7 @@ export default function GoalsPage() {
                 <div className="goals-task-search-list">
                   {taskSearchResults.map((task) => {
                     const associatedGoal = goals.find((goal) => String(goal.id) === task.goalId);
-                    const isArchived = associatedGoal?.status === "已暂停";
+                    const isArchived = associatedGoal?.status === "abandoned";
                     const isHistorical = Boolean(task.date && task.date < todayIsoDate());
                     const statusLabel = isArchived ? "已归档" : task.done ? "已完成" : isHistorical ? "历史任务" : "待完成";
                     return (
@@ -664,19 +652,38 @@ export default function GoalsPage() {
         </div>
       </header>
 
-      {(dataLoading || dataError) && <div className={`product-data-state ${dataError ? "is-error" : ""}`} role={dataError ? "alert" : "status"}>{dataLoading ? "正在同步目标…" : dataError}<button type="button" onClick={() => window.location.reload()}>刷新</button></div>}
-
-      <div className="goals-redesign-grid">
+      {(dataLoading || dataError || progressError) && (
+        <DataSyncNotice
+          loading={dataLoading && !dataError}
+          title={dataError ? "目标同步失败" : progressError ? "目标进度同步失败" : "正在同步目标"}
+          message={dataError || progressError || undefined}
+          retryLabel="重新加载"
+          onRetry={dataError
+            ? () => setGoalMutationVersion((version) => version + 1)
+            : progressError
+              ? () => setProgressRetryVersion((version) => version + 1)
+              : undefined}
+        />
+      )}
+      {!dataLoading && dataError && (
+        <div className="product-empty-state" role="status">
+          <Target size={22} aria-hidden="true" />
+          <strong>目标列表暂未显示</strong>
+          <p>你的目标数据没有被清空。连接恢复后，点击右上角“重新加载”即可继续。</p>
+        </div>
+      )}
+      {!dataLoading && !dataError && <div className="goals-redesign-grid">
         <section className="goals-list-panel" aria-labelledby="my-goals-heading">
           <header className="goals-panel-heading">
             <h2 id="my-goals-heading" className="sr-only">我的目标</h2>
             <div className="goals-panel-heading-actions">
               <div className="filter-tabs" role="tablist" aria-label="目标状态筛选">
-                {(["全部", "进行中", "已完成", "已归档"] as const).map((item) => (
+                {(["全部", "进行中", "已完成", "已暂停", "已归档"] as const).map((item) => (
                   <button
                     type="button"
                     role="tab"
                     aria-selected={filter === item}
+                    data-filter={item}
                     key={item}
                     className={filter === item ? "is-active" : ""}
                     onClick={() => setFilter(item)}
@@ -688,7 +695,7 @@ export default function GoalsPage() {
               <button
                 type="button"
                 className="primary-action goals-panel-create"
-                onClick={() => setGoalDialog({ mode: "create" })}
+                onClick={() => router.push("/studio/work/goals/new")}
               >
                 <Plus size={15} /> 新建目标
               </button>
@@ -698,45 +705,43 @@ export default function GoalsPage() {
             {visibleGoals.map((goal, index) => {
               const GoalTypeIcon = index === 0 ? Rocket : index === 1 ? LibraryBig : Sprout;
               const taskSummary = goal.taskSummary || (index === 0 ? "16 / 25 个任务" : index === 1 ? "8 / 21 个任务" : "18 / 30 个任务");
-              const statusLabel = goal.status === "已暂停" ? "已归档" : goal.status;
+              const statusLabel = goalStatusLabel(goal);
               const nextAction = goal.next || "继续执行当前计划";
               return (
                 <article
-                  className={`goal-list-row tech-goal-card is-${goal.status}`}
+                  className={`goal-list-row tech-goal-card is-${statusLabel}`}
                   key={goal.id}
                   style={{ "--goal-list-delay": `${Math.min(index, 6) * 45}ms` } as CSSProperties}
-                  role="link"
-                  tabIndex={0}
-                  aria-label={`查看目标 ${goal.name}`}
-                  onClick={() => router.push(`/studio/work/goals/${goal.id}`)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") router.push(`/studio/work/goals/${goal.id}`);
-                  }}
                 >
+                  <Link
+                    href={`/studio/work/goals/${goal.id}`}
+                    aria-label={`查看目标 ${goal.name}`}
+                    style={{ position: "absolute", inset: 0, zIndex: 1, borderRadius: "inherit" }}
+                  />
                   <span className={`goal-list-icon goal-list-icon-${index % 3}`}><GoalTypeIcon size={18} /></span>
                   <div className="goal-list-main">
                     <div className="goal-list-title-line">
                       <strong>{goal.name}</strong>
-                      <small className={`goal-list-status status-${goal.status}`}>{statusLabel}</small>
+                      <small className={`goal-list-status status-${statusLabel}`}>{statusLabel}</small>
                     </div>
                     <p className="goal-list-next"><span>下一步：</span>{nextAction}</p>
                     <div className="goal-list-detail-line">
-                      <i><span style={{ width: `${goal.progress}%` }} /></i>
+                      <i><span style={{ width: goal.progressState === "ready" ? `${goal.progress}%` : "0%" }} /></i>
                       <small>{taskSummary} · {goalRemainingLabel(goal)}</small>
                     </div>
                   </div>
                   <div className="goal-list-progress">
-                    <strong>{goal.progress}%</strong>
+                    <strong>{goal.progressState === "ready" ? `${goal.progress}%` : "--"}</strong>
                   </div>
-                  <details className="goal-list-menu" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
+                  <details className="goal-list-menu" style={{ zIndex: 2 }}>
                     <summary
                       aria-label={`管理目标 ${goal.name}`}
                     >
                       <MoreHorizontal size={17} />
                     </summary>
                     <div role="menu">
-                      <button type="button" role="menuitem" aria-label={`编辑目标 ${goal.name}`} onClick={() => setGoalDialog({ mode: "edit", goalId: String(goal.id) })}><Pencil size={13} />编辑</button>
-                      <button type="button" role="menuitem" aria-label={`删除目标 ${goal.name}`} onClick={() => void removeGoal(goal)}><Trash2 size={13} />删除</button>
+                      <button type="button" role="menuitem" aria-label={`编辑目标 ${goal.name}`} onClick={() => router.push(`/studio/work/goals/${goal.id}/edit`)}><Pencil size={15} /><span>编辑</span></button>
+                      <button type="button" role="menuitem" aria-label={`删除目标 ${goal.name}`} onClick={() => void removeGoal(goal)}><Trash2 size={15} /><span>删除</span></button>
                     </div>
                   </details>
                 </article>
@@ -748,23 +753,41 @@ export default function GoalsPage() {
         <aside className="goals-side-stack">
           <section className="goal-insight-panel" aria-labelledby="goal-overview-heading">
             <header className="goals-panel-heading">
-              <h2 id="goal-overview-heading">总体进度</h2>
+              <div className="goal-overview-heading-copy">
+                <h2 id="goal-overview-heading">总体进度</h2>
+                <small>{progressError ? "目标已加载，任务进度暂不可同步" : "根据未归档目标的已有任务计算"}</small>
+              </div>
             </header>
-            <div className="goal-donut-layout">
-              <div className="goal-donut" style={{ background: donutGradient }} aria-label={`总体进度 ${completionAverage}%`}>
-                <div><strong>{completionAverage}%</strong><span>平均进度</span></div>
+            <div className={`goal-donut-layout ${progressError ? "is-unavailable" : ""}`}>
+              <div
+                className={`goal-donut ${progressError ? "is-unavailable" : ""}`}
+                style={{ "--goal-progress-value": `${completionAverage}%` } as CSSProperties}
+                aria-label={progressError ? "总体进度暂不可同步" : `未归档目标任务进度 ${completionAverage}%`}
+              >
+                <div><strong>{progressError ? "—" : `${completionAverage}%`}</strong><span>{progressError ? "进度暂不可用" : "任务进度"}</span></div>
               </div>
-              <div className="goal-legend">
-                <span><i className="is-planned" />平均进度<strong>{completionAverage}%</strong></span>
-                <span><i className="is-risk" />有风险目标<strong>{riskCount} 个</strong></span>
-                <span><i className="is-done" />已完成目标<strong>{completedCount} 个</strong></span>
-              </div>
+              {progressError ? (
+                <div className="goal-overview-unavailable-copy" role="status">
+                  <span aria-hidden="true"><AlertTriangle size={16} /></span>
+                  <div>
+                    <strong>进度数据暂未显示</strong>
+                    <small>目标本身仍然存在，重新加载后会自动更新任务进度。</small>
+                  </div>
+                </div>
+              ) : (
+                <div className="goal-legend">
+                  <span data-tone="progress" title="未归档且已有任务的目标" role="button" tabIndex={0} onClick={() => setFilter("全部")} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") setFilter("全部"); }}><i className="is-planned" />任务完成<strong>{`${completedTaskTotal}/${taskTotal}`}</strong></span>
+                  <span data-tone="risk" role="button" tabIndex={0} onClick={() => setFilter("有风险")} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") setFilter("有风险"); }}><i className="is-risk" />有风险目标<strong>{riskCount} 个</strong></span>
+                  <span data-tone="done" role="button" tabIndex={0} onClick={() => setFilter("已完成")} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") setFilter("已完成"); }}><i className="is-done" />已完成目标<strong>{completedCount} 个</strong></span>
+                  {unplannedCount > 0 && <span data-tone="unplanned" role="button" tabIndex={0} onClick={() => setFilter("尚未规划")} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") setFilter("尚未规划"); }}><i className="is-unplanned" />尚未规划<strong>{unplannedCount} 个</strong></span>}
+                </div>
+              )}
             </div>
           </section>
 
           <section className="goal-insight-panel goal-milestones-panel" id="goal-milestones" aria-labelledby="goal-milestones-heading">
             <header className="goals-panel-heading">
-              <h2 id="goal-milestones-heading">目标状态摘要</h2>
+              <h2 id="goal-milestones-heading">目标状态</h2>
               {activeMilestoneGoals.length >= 2 && (
                 <div className="goal-milestone-switcher" ref={milestoneSwitcherRef}>
                   <button
@@ -791,6 +814,7 @@ export default function GoalsPage() {
                         className={milestoneScope === "all" ? "is-selected" : ""}
                         onClick={() => { setMilestoneScope("all"); setMilestoneMenuOpen(false); }}
                       >
+                        <Target size={15} aria-hidden="true" />
                         <span><strong>全部进行中目标</strong><small>按优先级聚合</small></span>
                         {milestoneScope === "all" && <Check size={13} aria-hidden="true" />}
                       </button>
@@ -803,7 +827,8 @@ export default function GoalsPage() {
                           key={goal.id}
                           onClick={() => { setMilestoneScope(String(goal.id)); setMilestoneMenuOpen(false); }}
                         >
-                          <span><strong>{goal.name}</strong><small>{goal.status} · {goalRemainingLabel(goal)}</small></span>
+                          <Sprout size={15} aria-hidden="true" />
+                          <span><strong>{goal.name}</strong><small>{goalStatusLabel(goal)} · {goalRemainingLabel(goal)}</small></span>
                           {milestoneScope === String(goal.id) && <Check size={13} aria-hidden="true" />}
                         </button>
                       ))}
@@ -814,74 +839,30 @@ export default function GoalsPage() {
             </header>
             <div className="goal-milestones-list" onScroll={revealMilestoneScrollbar}>
               {milestoneItems.map((milestone, index) => (
-                <div className={`goal-milestone tone-${milestone.tone}`} key={`${milestone.title}-${index}`}>
-                  <span className={`goal-milestone-dot ${index === 0 ? "is-current" : ""}`} />
+                <Link
+                  className={`goal-milestone tone-${milestone.tone}`}
+                  key={`${milestone.title}-${index}`}
+                  href={`/studio/work/goals/${milestone.goalId}${milestone.taskId ? `?taskId=${encodeURIComponent(milestone.taskId)}` : ""}`}
+                  style={{ color: "inherit", textDecoration: "none", "--goal-milestone-delay": `${Math.min(index, 6) * 45}ms` } as CSSProperties}
+                >
+                  <span className={`goal-milestone-dot ${milestone.isCurrent ? "is-current" : ""}`} />
                   <div>
-                    <span className="goal-milestone-title">{milestone.title}</span>
+                    <span className="goal-milestone-title">
+                      <strong>{milestone.goalName}</strong>
+                      <span>{milestone.detail}</span>
+                    </span>
                     <small className={`goal-milestone-status ${milestone.meta === "优先处理" ? "is-priority" : milestone.meta === "临近截止" ? "is-deadline" : ""}`}>{milestone.meta}</small>
                   </div>
-                </div>
+                </Link>
               ))}
+              {hiddenMilestoneCount > 0 && <p className="goal-milestone-empty">还有 {hiddenMilestoneCount} 项</p>}
               {milestoneItems.length === 0 && <p className="goal-milestone-empty">暂无需要推进的目标；恢复已暂停目标或创建新目标后，这里会汇总下一步。</p>}
             </div>
           </section>
         </aside>
 
-      </div>
-      {!dataLoading && visibleGoals.length === 0 && <div className="product-empty-state"><Target size={22} /><strong>还没有符合条件的目标</strong><p>创建第一个目标后，计划、任务和知识空间会围绕它组织。</p><button type="button" onClick={() => setGoalDialog({ mode: "create" })}><Plus size={15} />新建目标</button></div>}
-
-      {selectedGoal && (
-        <div className="dialog-backdrop" onMouseDown={closeGoalDialog}>
-          <section
-            className="app-dialog compact-dialog goal-detail-dialog"
-            role="dialog"
-            aria-modal="true"
-            aria-label={`${selectedGoal.name}详情`}
-            onMouseDown={(event) => event.stopPropagation()}
-          >
-            <header>
-              <div><small>GOAL DETAIL</small><h2>{selectedGoal.name}</h2></div>
-              <button
-                type="button"
-                aria-label="关闭目标详情"
-                onClick={closeGoalDialog}
-              >
-                <X size={17} />
-              </button>
-            </header>
-            <div className="goal-detail-grid">
-              <div><span>目标类型</span><strong>{selectedGoal.type}</strong></div>
-              <div><span>当前状态</span><strong>{selectedGoal.status}</strong></div>
-              <div><span>截止日期</span><strong>{selectedGoal.deadline}</strong></div>
-              <div><span>每日投入</span><strong>{selectedGoal.daily}</strong></div>
-            </div>
-            <div className="goal-detail-next">
-              <span>下一步</span>
-              <strong>{selectedGoal.next}</strong>
-            </div>
-            <footer>
-              <button type="button" className="danger-quiet" onClick={() => void removeGoal(selectedGoal)}>删除目标</button>
-              <button type="button" onClick={() => void toggleGoalPause(selectedGoal)}>{selectedGoal.status === "已暂停" ? "恢复目标" : "暂停目标"}</button>
-              <button type="button" onClick={closeGoalDialog}>关闭</button>
-            </footer>
-          </section>
-        </div>
-      )}
-
-      {goalDialog?.mode === "create" && (
-        <GoalCreateDialog
-          onClose={() => setGoalDialog(null)}
-          onGoalChanged={() => setGoalMutationVersion((version) => version + 1)}
-        />
-      )}
-
-      {goalDialog?.mode === "edit" && (
-        <GoalEditDialog
-          goalId={goalDialog.goalId}
-          onClose={() => setGoalDialog(null)}
-          onGoalChanged={() => setGoalMutationVersion((version) => version + 1)}
-        />
-      )}
+      </div>}
+      {!dataLoading && !dataError && visibleGoals.length === 0 && <div className="product-empty-state"><Target size={22} /><strong>还没有符合条件的目标</strong><p>创建第一个目标后，计划、任务和知识空间会围绕它组织。</p><button type="button" onClick={() => router.push("/studio/work/goals/new")}><Plus size={15} />新建目标</button></div>}
 
     </div>
   );

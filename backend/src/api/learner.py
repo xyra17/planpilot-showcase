@@ -38,6 +38,17 @@ class PatternActionBody(BaseModel):
     goal_id: str | None = None
 
 
+class DelayAttributionBody(BaseModel):
+    reason_code: Literal[
+        "business_trip",
+        "illness_or_care",
+        "temporary_capacity",
+        "other_external",
+        "unexplained",
+    ]
+    note: str | None = None
+
+
 async def _require_personalization(db: AsyncSession, user_id: str) -> None:
     if not await privacy_service.personalization_allowed(db, user_id):
         raise HTTPException(403, "个性化学习已关闭；可在隐私设置中重新启用")
@@ -184,6 +195,30 @@ async def apply_pattern_action(
         raise HTTPException(400, str(exc)) from exc
 
 
+@router.post("/patterns/{pattern_id}/evidence/{evidence_id}/attribution")
+async def record_delay_attribution(
+    pattern_id: str,
+    evidence_id: str,
+    body: DelayAttributionBody,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    await _require_personalization(db, current_user.id)
+    try:
+        return await pattern_control_service.record_delay_attribution(
+            db,
+            user_id=current_user.id,
+            pattern_id=pattern_id,
+            evidence_id=evidence_id,
+            reason_code=body.reason_code,
+            note=body.note,
+        )
+    except pattern_control_service.PatternControlNotFound as exc:
+        raise HTTPException(404, str(exc)) from exc
+    except pattern_control_service.PatternControlError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
 @router.get("/pattern-audits")
 async def list_pattern_audits(
     pattern_id: str | None = Query(default=None),
@@ -294,8 +329,23 @@ async def apply_proposal(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
+    raise HTTPException(
+        409,
+        "学习洞察不能直接修改数据，请先生成行动方案并在变更预览中确认",
+    )
+
+
+@router.post("/proposals/{proposal_id}/action-run")
+async def create_proposal_action_run(
+    proposal_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    await _require_personalization(db, current_user.id)
     try:
-        return await proposal_service.apply_proposal(current_user.id, proposal_id, db)
+        return await proposal_service.convert_insight_to_action_run(
+            current_user.id, proposal_id, db
+        )
     except proposal_service.ProposalNotFound as exc:
         raise HTTPException(404, str(exc)) from exc
     except proposal_service.ProposalConflict as exc:

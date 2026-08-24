@@ -27,6 +27,13 @@ class Risk(StrEnum):
 
 
 class AgentRole(StrEnum):
+    """Persisted execution roles.
+
+    Legacy enum values are retained for stored Run compatibility. Except for
+    MAIN (the orchestrator), these represent controlled capability modules,
+    not autonomous model agents.
+    """
+
     MAIN = "main"
     LEARNING_ANALYST = "learning_analyst"
     SCHEDULE_OPTIMIZER = "schedule_optimizer"
@@ -76,6 +83,39 @@ class PolicyOutcome(StrEnum):
     DENY = "deny"
 
 
+class ActionEntityRef(BaseModel):
+    entity: Literal["goal", "task"]
+    entity_id: str
+    label: str
+
+
+class ActionIntent(BaseModel):
+    capability: Literal["reschedule_overdue", "task_mutation", "insight_action", "complex_action"]
+    goal_id: str | None = None
+    entity_refs: list[ActionEntityRef] = Field(default_factory=list)
+    constraints: dict[str, JSONValue] = Field(default_factory=dict)
+    requested_effect: Literal["create", "update", "complete", "delete", "reschedule"]
+    resolution_quality: Literal["exact", "inferred", "ambiguous", "incomplete"] = "inferred"
+    confidence: float | None = Field(default=None, ge=0, le=1, deprecated=True)
+    missing_slots: list[str] = Field(default_factory=list)
+    source: Literal["pilo", "insight", "api", "scheduler"] = "pilo"
+
+    @property
+    def complete(self) -> bool:
+        return not self.missing_slots
+
+
+class NeedFrame(BaseModel):
+    speech_act: Literal["ask", "explain", "command", "confirm", "cancel", "inform"]
+    core_need: str
+    mode: Literal["conversation", "action", "clarification"]
+    context_scope: list[
+        Literal["conversation", "goal", "tasks", "checkins", "knowledge", "learning_profile"]
+    ] = Field(default_factory=list)
+    evidence_scope: list[str] = Field(default_factory=list)
+    action_intent: ActionIntent | None = None
+
+
 class ToolContext(BaseModel):
     user_id: str
     run_id: str
@@ -112,6 +152,7 @@ class ChangeSet(BaseModel):
     summary: str
     operations: list[ChangeOperation] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
+    source: dict[str, JSONValue] = Field(default_factory=dict)
 
 
 class PlanStep(BaseModel):
@@ -156,6 +197,7 @@ class PolicyDecision(BaseModel):
     risk: Risk
     reasons: list[str] = Field(default_factory=list)
     obligations: list[str] = Field(default_factory=list)
+    review_finding_codes: list[str] = Field(default_factory=list)
     policy_version: str = "v2.2"
     evaluated_at: datetime = Field(default_factory=utc_now)
 
@@ -225,16 +267,42 @@ class RescheduleInput(StrictToolInput):
     excluded_weekdays: list[int] = Field(default_factory=list)
     request: str = ""
     goal_id: str | None = None
+    action_intent: dict[str, JSONValue] = Field(default_factory=dict)
 
 
 class ReviewInput(StrictToolInput):
     change_set: dict[str, JSONValue]
+    context: dict[str, JSONValue] = Field(default_factory=dict)
+
+
+class InsightPreviewInput(StrictToolInput):
+    proposal_id: str
+    context: dict[str, JSONValue] = Field(default_factory=dict)
+
+
+class ReviewEntityRef(BaseModel):
+    entity: str
+    entity_id: str
+    label: str | None = None
+
+
+class ReviewFinding(BaseModel):
+    code: str
+    severity: Literal["low", "medium", "high", "critical"]
+    blocking: bool = False
+    entity_refs: list[ReviewEntityRef] = Field(default_factory=list)
+    message: str
+    recommended_policy: Literal[
+        "allow", "require_approval", "require_high_risk_confirmation", "deny"
+    ]
 
 
 class ReviewOutput(PermissiveToolModel):
     approved_for_preview: bool
+    findings: list[ReviewFinding] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
     operation_count: int = 0
+    highest_severity: Literal["none", "low", "medium", "high", "critical"] = "none"
 
 
 class ApplyChangesInput(StrictToolInput):

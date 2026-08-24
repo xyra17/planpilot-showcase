@@ -17,6 +17,24 @@ test("侧栏与知识空间使用统一的四字命名", async ({ page }) => {
   await expect(page.getByRole("navigation", { name: "知识空间视图" })).toHaveCount(0);
 });
 
+test("访客笔记目标筛选显示实际关联篇数", async ({ page }) => {
+  await page.goto("/studio/work/notes");
+
+  await page.getByRole("button", { name: "筛选笔记目标", exact: true }).click();
+  const goalOptions = page.getByRole("listbox", { name: "可筛选目标", exact: true });
+  await expect(goalOptions.getByRole("option", { name: "全部目标 5 篇", exact: true })).toBeVisible();
+  await expect(goalOptions.getByRole("option", { name: "研究生英语二 80 分冲刺 1 篇", exact: true })).toBeVisible();
+  await expect(goalOptions.getByRole("option", { name: "通过 PMP 项目管理认证 1 篇", exact: true })).toBeVisible();
+  await expect(goalOptions.getByRole("option", { name: "掌握 Python 数据分析 1 篇", exact: true })).toBeVisible();
+  await expect(goalOptions.getByRole("option", { name: "读完《设计心理学》并输出卡片 1 篇", exact: true })).toBeVisible();
+  await expect(goalOptions.getByRole("option", { name: "日语 N2 听读提升 1 篇", exact: true })).toBeVisible();
+  await expect(goalOptions.getByRole("option", { name: "连续 30 天晨间写作 0 篇", exact: true })).toBeVisible();
+
+  await goalOptions.getByRole("option", { name: "掌握 Python 数据分析 1 篇", exact: true }).click();
+  await expect(page.locator(".notes-list-row")).toHaveCount(1);
+  await expect(page.locator(".notes-list-row").first()).toContainText("Pandas 分组聚合");
+});
+
 test("删除笔记使用项目确认弹窗且取消后保留笔记", async ({ page }) => {
   await page.goto("/studio/work/notes");
 

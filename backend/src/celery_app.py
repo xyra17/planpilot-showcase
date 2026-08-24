@@ -31,6 +31,7 @@ celery_app = Celery(
         "src.tasks.phase5_tasks",
         "src.tasks.phase6_tasks",
         "src.tasks.privacy_tasks",
+        "src.tasks.beta_readiness_tasks",
     ],
 )
 
@@ -124,5 +125,20 @@ celery_app.conf.beat_schedule = {
         "task": "src.tasks.phase6_tasks.normalize_canary_observations",
         "schedule": crontab(minute="3-59/5"),
         "options": {"expires": 240},
+    },
+    "scan-beta-hard-safety": {
+        "task": "src.tasks.beta_readiness_tasks.scan_hard_safety",
+        "schedule": crontab(minute="1-59/5"),
+        "options": {"expires": 240},
+    },
+    "normalize-beta-review-samples": {
+        "task": "src.tasks.beta_readiness_tasks.normalize_review_samples",
+        "schedule": crontab(minute="2-59/5"),
+        "options": {"expires": 240},
+    },
+    "cleanup-beta-review-samples": {
+        "task": "src.tasks.beta_readiness_tasks.cleanup_review_samples",
+        "schedule": crontab(hour=3, minute=35),
+        "options": {"expires": 3600},
     },
 }

@@ -29,6 +29,17 @@ from src.services import (
 )
 
 
+async def _valid_imported_runtime_gate(_db):
+    return {
+        "id": "isolated-proof",
+        "status": "valid",
+        "valid": True,
+        "blockers": [],
+        "dataset_hash": "isolated-runtime-dataset",
+        "critical_safety_pass_rate": 1.0,
+    }
+
+
 @pytest.mark.asyncio
 async def test_model_gateway_retries_timeout_then_uses_fallback():
     await reset_gateway_state()
@@ -54,7 +65,13 @@ async def test_model_gateway_retries_timeout_then_uses_fallback():
 
 
 @pytest.mark.asyncio
-async def test_production_gate_has_104_cases_and_is_auditable(client, auth, goal_id, db):
+async def test_production_gate_has_104_cases_and_is_auditable(
+    client, auth, goal_id, db, monkeypatch
+):
+    monkeypatch.setattr(
+        "src.services.beta_evidence_service.runtime_gate_status",
+        _valid_imported_runtime_gate,
+    )
     goal = await db.get(Goal, goal_id)
     user = await db.get(User, goal.user_id)
     user.is_admin = True
@@ -90,7 +107,13 @@ async def test_production_gate_has_104_cases_and_is_auditable(client, auth, goal
 
 
 @pytest.mark.asyncio
-async def test_canary_is_offline_gated_internal_first_and_advances(client, auth, goal_id, db):
+async def test_canary_is_offline_gated_internal_first_and_advances(
+    client, auth, goal_id, db, monkeypatch
+):
+    monkeypatch.setattr(
+        "src.services.beta_evidence_service.runtime_gate_status",
+        _valid_imported_runtime_gate,
+    )
     goal = await db.get(Goal, goal_id)
     admin = await db.get(User, goal.user_id)
     admin.is_admin = True

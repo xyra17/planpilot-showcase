@@ -16,7 +16,7 @@ import uuid
 from datetime import timedelta
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.time import utc_now
@@ -370,10 +370,14 @@ class TestProcessEventIntegration:
         assert "preferred_session_length" in pattern_types
         assert "delay_pattern" in pattern_types
 
-        # 验证每个 Pattern 的初始状态
+        # 验证每个 Pattern 的初始状态；delay_pattern 的首条按时记录是反向证据，
+        # 因此其证据强度不会因为一条记录就被抬高。
         for p in patterns:
             assert p.evidence_count == 1
-            assert p.confidence > CONFIDENCE_INIT  # 已收到首条 evidence
+            if p.pattern_type == "delay_pattern":
+                assert p.confidence < CONFIDENCE_INIT
+            else:
+                assert p.confidence > CONFIDENCE_INIT  # 已收到首条 evidence
             assert p.status == "candidate"
             assert p.last_confirmed_at is not None
 
@@ -388,6 +392,69 @@ class TestProcessEventIntegration:
             .all()
         )
         assert len(evidences) == 3
+
+    async def test_delay_pattern_uses_bidirectional_evidence_and_external_attribution(self, db: AsyncSession):
+        """延期/按时记录双向计数；外部中断只排除模式统计，不删除延期事实。"""
+        user = _make_user()
+        db.add(user)
+        await db.flush()
+
+        events = []
+        for index in range(5):
+            event = _make_event(
+                user.id,
+                payload={
+                    "actual_mins": 30,
+                    "days_overdue": 4,
+                    "title": f"数据叙事练习 {index + 1}",
+                    "stage_label": "数据叙事",
+                },
+            )
+            db.add(event)
+            await db.flush()
+            await process_event(db, event)
+            events.append(event)
+        await db.commit()
+
+        pattern = await db.scalar(
+            select(LearnerPattern).where(
+                LearnerPattern.user_id == user.id,
+                LearnerPattern.pattern_type == "delay_pattern",
+            )
+        )
+        assert pattern is not None
+        assert pattern.status == "active"
+        assert pattern.pattern_value["supporting_count"] == 5
+        assert pattern.pattern_value["effective_sample_count"] == 5
+
+        original = await db.scalar(
+            select(PatternEvidence).where(
+                PatternEvidence.pattern_id == pattern.id,
+                PatternEvidence.learning_event_id == events[0].id,
+            )
+        )
+        assert original is not None
+        correction = _make_event(
+            user.id,
+            event_type="DelayAttributionRecorded",
+            aggregate_id=events[0].aggregate_id,
+            payload={
+                "target_event_id": events[0].id,
+                "target_evidence_id": original.id,
+                "attribution": "external_interruption",
+                "reason_code": "business_trip",
+            },
+        )
+        db.add(correction)
+        await db.flush()
+        await process_event(db, correction)
+        await db.commit()
+        await db.refresh(pattern)
+
+        assert pattern.pattern_value["sample_count"] == 5
+        assert pattern.pattern_value["effective_sample_count"] == 4
+        assert pattern.pattern_value["excluded_count"] == 1
+        assert pattern.status == "decayed"
 
     async def test_event_without_actual_mins_skips_h2(self, db: AsyncSession):
         """payload actual_mins=0 时，H-2 condition 不满足，只触发 H-1 + Pl-1（共2条）"""
@@ -514,23 +581,34 @@ class TestProcessEventIntegration:
 
 
 # ── Batch Processing ──────────────────────────────────────────────────────────
-# Batch 测试共享同一个 SQLite DB 和游标（consumer_name='pattern_analyzer'）。
-# 为了隔离每个测试，事件的 created_at 使用递增的"未来"时间偏移，
-# 确保无论前序测试把游标推到哪，本次测试的事件都在游标之后。
-# 各测试时间窗口（以 utc_now 为基准）：
-#   test1 → +1h 段，test2 → +2h 段，test3 → +3h 段，test4 → +4h 段
+# Batch 测试显式隔离事件流和 consumer cursor，避免共享 SQLite 的执行顺序
+# 影响结果。测试不再依赖任意未来年份或逐步增大的时间窗口。
 
 
 @pytest.mark.asyncio
 class TestBatchProcessing:
     """集成测试：run_batch() 批处理和游标推进"""
 
+    @pytest.fixture(autouse=True)
+    async def _isolate_event_stream(self, db: AsyncSession):
+        await db.execute(
+            delete(IntelligenceCursor).where(IntelligenceCursor.consumer_name == CONSUMER_NAME)
+        )
+        await db.execute(delete(LearningEvent))
+        await db.commit()
+        yield
+        await db.execute(
+            delete(IntelligenceCursor).where(IntelligenceCursor.consumer_name == CONSUMER_NAME)
+        )
+        await db.execute(delete(LearningEvent))
+        await db.commit()
+
     async def test_run_batch_processes_events_and_advances_cursor(self, db: AsyncSession):
         """run_batch() 处理新事件并推进游标"""
         user = _make_user()
         db.add(user)
 
-        base = utc_now() + timedelta(hours=1)
+        base = utc_now()
         event_ids = []
         for i in range(3):
             event = _make_event(
@@ -559,7 +637,7 @@ class TestBatchProcessing:
         user = _make_user()
         db.add(user)
 
-        base = utc_now() + timedelta(hours=2)
+        base = utc_now()
         for i in range(2):
             event = _make_event(
                 user.id,
@@ -582,7 +660,7 @@ class TestBatchProcessing:
         user = _make_user()
         db.add(user)
 
-        base = utc_now() + timedelta(hours=3)
+        base = utc_now()
         for i in range(5):
             event = _make_event(
                 user.id,

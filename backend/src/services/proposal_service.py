@@ -8,17 +8,19 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 from sqlalchemy import or_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.agents.coach_agent import CoachAgent
+from src.core.agent_v2.schemas import ChangeOperation, ChangeSet
 from src.core.time import utc_now
 from src.events.publisher import emit
 from src.intelligence.decision_context import DecisionContextBuilder
 from src.intelligence.pattern_feedback import apply_pattern_signal
 from src.models import (
+    CheckinRecord,
     DecisionProposal,
     Goal,
-    GoalVersion,
     LearnerPattern,
     LearningConcept,
     ProposalFeedback,
@@ -34,6 +36,8 @@ ALLOWED_PROPOSAL_TYPES = {
     "TASK_SPLIT",
     "DIFFICULTY_ADJUST",
     "REVIEW_INSERTION",
+    "GOAL_PLAN_CREATE",
+    "CHECKIN_RECORD",
 }
 
 
@@ -82,6 +86,7 @@ async def list_proposals(
     status: str | None = None,
 ) -> list[dict[str, Any]]:
     stmt = select(DecisionProposal).where(DecisionProposal.user_id == user_id)
+    stmt = stmt.where(DecisionProposal.proposal_type.notin_({"GOAL_PLAN_CREATE", "CHECKIN_RECORD"}))
     if goal_id:
         stmt = stmt.where(DecisionProposal.goal_id == goal_id)
     if status:
@@ -122,6 +127,7 @@ async def generate_proposal(
     db: AsyncSession,
     *,
     goal_id: str | None,
+    source: str = "ai_agent",
 ) -> list[dict[str, Any]]:
     runtime = await agent_control_service.resolve_runtime(
         db,
@@ -165,7 +171,9 @@ async def generate_proposal(
     overdue = goal_context.get("overdue_tasks", [])
     profile = full_context.get("profile") or {}
     pattern_by_type = {row["pattern_type"]: row for row in patterns}
-    policy_type = CoachAgent.recommend_action(full_context) if use_personalization else "learning_nudge"
+    policy_type = (
+        CoachAgent.recommend_action(full_context) if use_personalization else "learning_nudge"
+    )
 
     if not use_personalization:
         body = ProposalCreate(
@@ -319,7 +327,7 @@ async def generate_proposal(
         user_id,
         body,
         db,
-        source="ai_agent",
+        source=source,
         model_name=agent_result.model_name or runtime.model.model_name,
         agent_trace=agent_trace,
     )
@@ -445,146 +453,339 @@ async def adjust_proposal(
 
 
 async def apply_proposal(user_id: str, proposal_id: str, db: AsyncSession) -> dict[str, Any]:
-    proposal = await _get_owned_proposal(user_id, proposal_id, db)
-    if proposal.status == "applied":
-        return proposal_to_dict(proposal)
-    _require_status(proposal, "accepted")
-    _require_not_expired(proposal)
-    before_snapshot = await _proposal_target_snapshot(proposal, db)
-
-    if proposal.proposal_type == "reschedule_overdue_tasks":
-        await _apply_task_reschedules(user_id, proposal, db)
-    elif proposal.proposal_type == "reduce_daily_load":
-        await _apply_daily_load(user_id, proposal, db)
-    elif proposal.proposal_type != "learning_nudge":
-        if proposal.proposal_type == "PLAN_ADJUSTMENT":
-            await _apply_plan_adjustment(user_id, proposal, db)
-        elif proposal.proposal_type == "TASK_SPLIT":
-            await _apply_task_split(user_id, proposal, db)
-        elif proposal.proposal_type == "DIFFICULTY_ADJUST":
-            await _apply_difficulty_adjust(user_id, proposal, db)
-        elif proposal.proposal_type == "REVIEW_INSERTION":
-            await _apply_review_insertion(user_id, proposal, db)
-        else:
-            raise ProposalValidation("unsupported proposal type")
-
-    now = utc_now()
-    created_task_ids = [row.id for row in db.new if isinstance(row, Task)]
-    await db.flush()
-    after_snapshot = await _proposal_target_snapshot(
-        proposal, db, additional_task_ids=created_task_ids
+    del user_id, proposal_id, db
+    raise ProposalConflict(
+        "direct Proposal apply was removed; convert the insight to an Action Run"
     )
-    before_goal = before_snapshot.get("goal")
-    after_goal = after_snapshot.get("goal")
-    if before_goal and after_goal and before_goal["version"] != after_goal["version"]:
-        goal = await db.get(Goal, after_goal["id"])
-        assert goal is not None
-        db.add(
-            GoalVersion(
-                goal_id=goal.id,
-                version=goal.version,
-                title_snapshot=goal.title,
-                objective_snapshot=goal.description,
-                constraints_snapshot={
-                    "deadline": goal.deadline,
-                    "daily_hours": goal.daily_hours,
-                    "work_schedule": goal.work_schedule,
-                    "status": goal.status,
-                },
-                change_reason=f"proposal:{proposal.id}",
-                created_by="ai",
+
+
+async def build_insight_change_set(user_id: str, proposal_id: str, db: AsyncSession) -> ChangeSet:
+    """Convert one validated learning insight into an executable ChangeSet."""
+    proposal = await _get_owned_proposal(user_id, proposal_id, db)
+    if proposal.status not in {"pending", "accepted"}:
+        raise ProposalConflict("only pending or accepted insights can generate an action plan")
+    _require_not_expired(proposal)
+    changes = proposal.proposed_changes or {}
+    operations: list[ChangeOperation] = []
+
+    if proposal.proposal_type == "CHECKIN_RECORD":
+        goal_id = str(changes.get("goal_id") or proposal.goal_id or "")
+        goal = await db.scalar(select(Goal).where(Goal.id == goal_id, Goal.user_id == user_id))
+        if goal is None:
+            raise ProposalValidation("check-in goal does not exist")
+        checkin_date = str(changes.get("date") or "")
+        try:
+            date.fromisoformat(checkin_date)
+            rate = float(changes["completion_rate"])
+        except (TypeError, ValueError, KeyError) as exc:
+            raise ProposalValidation("check-in draft is invalid") from exc
+        if not 0 <= rate <= 1:
+            raise ProposalValidation("check-in completion rate is outside the allowed range")
+        existing = await db.scalar(
+            select(CheckinRecord).where(
+                CheckinRecord.user_id == user_id,
+                CheckinRecord.goal_id == goal_id,
+                CheckinRecord.date == checkin_date,
             )
         )
-    proposal.status = "applied"
-    proposal.applied_at = now
-    proposal.updated_at = now
-    proposal.application_snapshot = {
-        "schema_version": "proposal-application-v1",
-        "applied_at": now.isoformat(),
-        "before": before_snapshot,
-        "after": after_snapshot,
-        "target_task_ids": sorted(after_snapshot["tasks"]),
-    }
-    await emit(
-        db,
-        user_id=user_id,
-        goal_id=proposal.goal_id,
-        aggregate_type="proposal",
-        aggregate_id=proposal.id,
-        event_type="ProposalApplied",
-        source="ai_agent",
-        correlation_id=proposal.id,
-        idempotency_key=f"proposal:{proposal.id}:applied",
-        payload={
-            "proposal_type": proposal.proposal_type,
-            "target_task_ids": proposal.application_snapshot["target_task_ids"],
-            "target_versions": {
-                task_id: row["version"] for task_id, row in after_snapshot["tasks"].items()
-            },
-        },
+        checkin_id = existing.id if existing else str(uuid.uuid4())
+        before = (
+            {
+                "id": existing.id,
+                "goal_id": existing.goal_id,
+                "date": existing.date,
+                "mode": existing.mode,
+                "natural_text": existing.natural_text,
+                "completion_rate": existing.completion_rate,
+            }
+            if existing
+            else None
+        )
+        after = {
+            "id": checkin_id,
+            "goal_id": goal_id,
+            "date": checkin_date,
+            "mode": "natural",
+            "natural_text": str(changes.get("natural_text") or ""),
+            "completion_rate": rate,
+        }
+        operations.append(
+            ChangeOperation(
+                entity="checkin",
+                entity_id=checkin_id,
+                field="__upsert__",
+                before=before,
+                after=after,
+                label=f"{goal.title} · {checkin_date}",
+                reason="自然语言完成度是推断结果，需确认后记录",
+            )
+        )
+
+    if proposal.proposal_type == "GOAL_PLAN_CREATE":
+        goal_snapshot = dict(changes.get("goal") or {})
+        goal_id = str(goal_snapshot.get("id") or "")
+        if not goal_id or not str(goal_snapshot.get("title") or "").strip():
+            raise ProposalValidation("goal plan draft is incomplete")
+        operations.append(
+            ChangeOperation(
+                entity="goal",
+                entity_id=goal_id,
+                field="__create__",
+                before=None,
+                after=goal_snapshot,
+                label=str(goal_snapshot["title"]),
+                reason="按用户确认的计划草案创建目标",
+            )
+        )
+        for raw in changes.get("tasks", []):
+            snapshot = dict(raw)
+            task_id = str(snapshot.get("id") or uuid.uuid4())
+            snapshot.update({"id": task_id, "goal_id": goal_id})
+            operations.append(
+                ChangeOperation(
+                    entity="task",
+                    entity_id=task_id,
+                    field="__create__",
+                    before=None,
+                    after=snapshot,
+                    label=str(snapshot.get("title") or "学习任务"),
+                    reason="按用户确认的计划草案创建任务",
+                )
+            )
+
+    if proposal.proposal_type in {"reschedule_overdue_tasks", "PLAN_ADJUSTMENT"} and changes.get(
+        "task_updates"
+    ):
+        updates, tasks = await _validate_task_reschedules(user_id, changes, db)
+        for update in updates:
+            task = tasks[update["task_id"]]
+            operations.append(
+                ChangeOperation(
+                    entity="task",
+                    entity_id=task.id,
+                    field="scheduled_date",
+                    before=task.scheduled_date,
+                    after=update["scheduled_date"],
+                    label=task.title,
+                    reason=f"来自学习洞察“{proposal.title}”",
+                    precondition={"version": task.version},
+                )
+            )
+
+    if (
+        proposal.proposal_type in {"reduce_daily_load", "PLAN_ADJUSTMENT"}
+        and "daily_hours" in changes
+    ):
+        goal, daily_hours = await _validate_daily_load(user_id, proposal.goal_id, changes, db)
+        operations.append(
+            ChangeOperation(
+                entity="goal",
+                entity_id=goal.id,
+                field="daily_hours",
+                before=goal.daily_hours,
+                after=daily_hours,
+                label=goal.title,
+                reason=f"来自学习洞察“{proposal.title}”",
+                precondition={"version": goal.version},
+            )
+        )
+
+    if proposal.proposal_type == "TASK_SPLIT":
+        await _validate_adaptive_changes(user_id, proposal, changes, db)
+        original = await db.get(Task, str(changes["original_task_id"]))
+        assert original is not None
+        operations.append(
+            ChangeOperation(
+                entity="task",
+                entity_id=original.id,
+                field="status",
+                before=original.status,
+                after="skipped",
+                label=original.title,
+                reason="拆分后停用原任务",
+                precondition={"version": original.version},
+            )
+        )
+        for row in changes["new_tasks"]:
+            task_id = str(uuid.uuid4())
+            snapshot = {
+                "id": task_id,
+                "goal_id": original.goal_id,
+                "title": str(row["title"]).strip(),
+                "description": None,
+                "estimated_mins": int(row["estimated_mins"]),
+                "status": "pending",
+                "priority": original.priority,
+                "scheduled_date": str(row["scheduled_date"]),
+                "mastery_level": "unknown",
+                "type": original.type,
+                "kb_refs": list(original.kb_refs or []),
+                "version": 1,
+            }
+            operations.append(
+                ChangeOperation(
+                    entity="task",
+                    entity_id=task_id,
+                    field="__create__",
+                    before=None,
+                    after=snapshot,
+                    label=snapshot["title"],
+                    reason="按洞察方案拆分任务",
+                )
+            )
+
+    if proposal.proposal_type == "DIFFICULTY_ADJUST":
+        await _validate_adaptive_changes(user_id, proposal, changes, db)
+        task = await db.get(Task, str(changes["task_id"]))
+        assert task is not None
+        for field, after in (
+            ("estimated_mins", int(changes["estimated_mins"])),
+            ("priority", str(changes["priority"])),
+        ):
+            operations.append(
+                ChangeOperation(
+                    entity="task",
+                    entity_id=task.id,
+                    field=field,
+                    before=getattr(task, field),
+                    after=after,
+                    label=task.title,
+                    reason=f"来自学习洞察“{proposal.title}”",
+                    precondition={"version": task.version},
+                )
+            )
+
+    if proposal.proposal_type == "REVIEW_INSERTION":
+        await _validate_adaptive_changes(user_id, proposal, changes, db)
+        task_id = str(uuid.uuid4())
+        snapshot = {
+            "id": task_id,
+            "goal_id": str(changes.get("goal_id") or proposal.goal_id),
+            "title": str(changes["title"]).strip(),
+            "description": None,
+            "estimated_mins": int(changes["estimated_mins"]),
+            "status": "pending",
+            "priority": "high",
+            "scheduled_date": str(changes["scheduled_date"]),
+            "mastery_level": "unknown",
+            "type": "review",
+            "kb_refs": [str(changes["concept_id"])],
+            "version": 1,
+        }
+        operations.append(
+            ChangeOperation(
+                entity="task",
+                entity_id=task_id,
+                field="__create__",
+                before=None,
+                after=snapshot,
+                label=snapshot["title"],
+                reason="按洞察方案插入复习任务",
+            )
+        )
+
+    if not operations:
+        raise ProposalValidation("这条学习洞察不包含需要修改的数据")
+    return ChangeSet(
+        summary=f"根据“{proposal.title}”生成 {len(operations)} 项变更",
+        operations=operations,
+        source={"kind": "learning_insight", "proposal_id": proposal.id},
     )
-    await db.commit()
-    return proposal_to_dict(proposal)
 
 
-def _proposal_task_ids(proposal: DecisionProposal) -> set[str]:
-    changes = proposal.proposed_changes or {}
-    task_ids = {
-        str(row["task_id"])
-        for row in changes.get("task_updates", [])
-        if isinstance(row, dict) and row.get("task_id")
-    }
-    for key in ("task_id", "original_task_id"):
-        if changes.get(key):
-            task_ids.add(str(changes[key]))
-    return task_ids
-
-
-async def _proposal_target_snapshot(
-    proposal: DecisionProposal,
+async def convert_insight_to_action_run(
+    user_id: str,
+    proposal_id: str,
     db: AsyncSession,
     *,
-    additional_task_ids: list[str] | None = None,
+    conversation_turn_id: str | None = None,
+    need_frame: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    task_ids = _proposal_task_ids(proposal) | set(additional_task_ids or [])
-    if task_ids:
-        tasks = list((await db.execute(select(Task).where(Task.id.in_(task_ids)))).scalars())
-    elif proposal.goal_id:
-        tasks = list(
-            (
-                await db.execute(
-                    select(Task).where(
-                        Task.goal_id == proposal.goal_id,
-                        Task.status.in_({"pending", "in_progress"}),
-                    )
-                )
-            ).scalars()
-        )
-    else:
-        tasks = []
-    goal = await db.get(Goal, proposal.goal_id) if proposal.goal_id else None
-    return {
-        "goal": (
-            {
-                "id": goal.id,
-                "version": goal.version,
-                "daily_hours": goal.daily_hours,
-                "status": goal.status,
-            }
-            if goal
-            else None
-        ),
-        "tasks": {
-            task.id: {
-                "version": task.version,
-                "status": task.status,
-                "scheduled_date": task.scheduled_date,
-                "estimated_mins": task.estimated_mins,
-                "completed_at": task.completed_at.isoformat() if task.completed_at else None,
-            }
-            for task in tasks
-        },
+    from src.core.agent_v2.orchestrator import create_run, run_detail
+    from src.core.agent_v2.schemas import ActionIntent
+    from src.models import InsightActionRun
+    from src.services.insight_action_lifecycle import (
+        active_link,
+        next_attempt_number,
+        sync_run_lifecycle,
+    )
+    from src.tasks.agent_runs import dispatch_agent_run
+
+    proposal = await _get_owned_proposal(user_id, proposal_id, db, lock=True)
+    existing = await active_link(db, proposal.id, lock=True)
+    if existing:
+        return await run_detail(db, user_id, existing.run_id)
+    if proposal.status == "applied" or proposal.lifecycle_status == "applied":
+        raise ProposalConflict("applied insight cannot generate another action run")
+    await build_insight_change_set(user_id, proposal_id, db)
+
+    proposal.action_capability = "insight_action"
+    proposal.action_seed = {
+        "proposal_id": proposal.id,
+        "proposal_type": proposal.proposal_type,
     }
+    conversation_turn_id = conversation_turn_id or str(uuid.uuid4())
+    intent = ActionIntent(
+        capability="insight_action",
+        goal_id=proposal.goal_id,
+        constraints={"proposal_id": proposal.id},
+        requested_effect="update",
+        resolution_quality="exact",
+        source="insight",
+    )
+    run = await create_run(
+        db,
+        user_id=user_id,
+        request=f"根据学习洞察生成调整方案：{proposal.title}",
+        goal_id=proposal.goal_id,
+        step_budget=10,
+        token_budget=20000,
+        auto_advance=False,
+        run_kind="user",
+        action_intent=intent,
+        deterministic_plan_only=True,
+        conversation_turn_id=conversation_turn_id,
+        insight_id=proposal.id,
+        trace_context={
+            "conversation_turn_id": conversation_turn_id,
+            "source": "learning_insight",
+            "insight_id": proposal.id,
+            "need_frame": need_frame
+            or {
+                "speech_act": "command",
+                "core_need": "将学习洞察转换为行动方案",
+                "mode": "action",
+                "context_scope": ["goal", "tasks", "learning_profile"],
+                "evidence_scope": list(proposal.evidence_references or []),
+            },
+            "action_intent": intent.model_dump(mode="json"),
+        },
+        commit=False,
+    )
+    run_id = str(run.id)
+    link = InsightActionRun(
+        insight_id=proposal.id,
+        run_id=run_id,
+        status="converted",
+        is_active=True,
+        attempt_number=await next_attempt_number(db, proposal.id),
+        history=[],
+    )
+    db.add(link)
+    try:
+        await db.flush()
+        proposal.converted_run_id = run_id
+        proposal.lifecycle_status = "converted"
+        await sync_run_lifecycle(db, run=run, lifecycle="converted")
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        winner = await active_link(db, proposal_id)
+        if winner is None:
+            raise
+        return await run_detail(db, user_id, winner.run_id)
+    dispatch_agent_run(run_id, user_id)
+    return await run_detail(db, user_id, run_id)
 
 
 async def _create_no_commit(
@@ -620,6 +821,9 @@ async def _create_no_commit(
     if len(patterns) != len(set(body.evidence_references)):
         raise ProposalValidation("every evidence reference must be an active owned pattern")
 
+    from src.services.beta_evidence_service import assignment
+
+    beta = await assignment(db, user_id)
     proposal = DecisionProposal(
         user_id=user_id,
         goal_id=body.goal_id,
@@ -634,7 +838,7 @@ async def _create_no_commit(
         requires_user_confirmation=True,
         source=source,
         model_name=model_name,
-        agent_trace=agent_trace or {},
+        agent_trace={**(agent_trace or {}), "beta": beta},
         expires_at=body.expires_at,
     )
     db.add(proposal)
@@ -656,15 +860,20 @@ async def _create_no_commit(
     return proposal
 
 
-async def _get_owned_proposal(user_id: str, proposal_id: str, db: AsyncSession) -> DecisionProposal:
-    proposal = (
-        await db.execute(
-            select(DecisionProposal).where(
-                DecisionProposal.id == proposal_id,
-                DecisionProposal.user_id == user_id,
-            )
-        )
-    ).scalar_one_or_none()
+async def _get_owned_proposal(
+    user_id: str,
+    proposal_id: str,
+    db: AsyncSession,
+    *,
+    lock: bool = False,
+) -> DecisionProposal:
+    stmt = select(DecisionProposal).where(
+        DecisionProposal.id == proposal_id,
+        DecisionProposal.user_id == user_id,
+    )
+    if lock:
+        stmt = stmt.with_for_update()
+    proposal = (await db.execute(stmt)).scalar_one_or_none()
     if proposal is None:
         raise ProposalNotFound("proposal does not exist")
     return proposal
@@ -680,34 +889,6 @@ def _require_status(proposal: DecisionProposal, required: str) -> None:
 def _require_not_expired(proposal: DecisionProposal) -> None:
     if proposal.expires_at and proposal.expires_at <= utc_now():
         raise ProposalConflict("proposal has expired")
-
-
-async def _apply_task_reschedules(
-    user_id: str, proposal: DecisionProposal, db: AsyncSession
-) -> None:
-    updates, tasks = await _validate_task_reschedules(user_id, proposal.proposed_changes or {}, db)
-
-    for update in updates:
-        task = tasks[update["task_id"]]
-        parsed = date.fromisoformat(update["scheduled_date"])
-        old_date = task.scheduled_date
-        task.scheduled_date = parsed.isoformat()
-        await emit(
-            db,
-            user_id=user_id,
-            goal_id=task.goal_id,
-            aggregate_type="task",
-            aggregate_id=task.id,
-            event_type="TaskRescheduled",
-            source="ai_agent",
-            payload={
-                "title": task.title,
-                "from_date": old_date,
-                "to_date": parsed.isoformat(),
-                "trigger": "proposal_apply",
-                "proposal_id": proposal.id,
-            },
-        )
 
 
 async def _validate_task_reschedules(
@@ -742,28 +923,6 @@ async def _validate_task_reschedules(
         if parsed < date.today():
             raise ProposalValidation("scheduled_date cannot be in the past")
     return updates, tasks
-
-
-async def _apply_daily_load(user_id: str, proposal: DecisionProposal, db: AsyncSession) -> None:
-    changes = proposal.proposed_changes or {}
-    goal, daily_hours = await _validate_daily_load(user_id, proposal.goal_id, changes, db)
-    old_hours = goal.daily_hours
-    goal.daily_hours = daily_hours
-    await emit(
-        db,
-        user_id=user_id,
-        goal_id=goal.id,
-        aggregate_type="goal",
-        aggregate_id=goal.id,
-        event_type="GoalUpdated",
-        source="ai_agent",
-        payload={
-            "changed_fields": ["daily_hours"],
-            "old_daily_hours": old_hours,
-            "daily_hours": daily_hours,
-            "proposal_id": proposal.id,
-        },
-    )
 
 
 async def _validate_daily_load(
@@ -878,131 +1037,6 @@ async def _validate_adaptive_changes(
             raise ProposalValidation("review title is required")
 
 
-async def _apply_plan_adjustment(
-    user_id: str, proposal: DecisionProposal, db: AsyncSession
-) -> None:
-    changes = proposal.proposed_changes or {}
-    await _validate_adaptive_changes(user_id, proposal, changes, db)
-    if changes.get("task_updates"):
-        await _apply_task_reschedules(user_id, proposal, db)
-    if "daily_hours" in changes:
-        await _apply_daily_load(user_id, proposal, db)
-
-
-async def _apply_task_split(user_id: str, proposal: DecisionProposal, db: AsyncSession) -> None:
-    changes = proposal.proposed_changes or {}
-    await _validate_adaptive_changes(user_id, proposal, changes, db)
-    original = await db.scalar(select(Task).where(Task.id == changes["original_task_id"]))
-    assert original is not None
-    original.status = "skipped"
-    await emit(
-        db,
-        user_id=user_id,
-        goal_id=original.goal_id,
-        aggregate_type="task",
-        aggregate_id=original.id,
-        event_type="TaskSkipped",
-        source="ai_agent",
-        payload={
-            "title": original.title,
-            "skip_reason": "adaptive_task_split",
-            "debt_created": False,
-            "proposal_id": proposal.id,
-        },
-    )
-    for row in changes["new_tasks"]:
-        task = Task(
-            id=str(uuid.uuid4()),
-            goal_id=original.goal_id,
-            title=str(row["title"]).strip(),
-            estimated_mins=int(row["estimated_mins"]),
-            scheduled_date=str(row["scheduled_date"]),
-            priority=original.priority,
-            type=original.type,
-            status="pending",
-        )
-        db.add(task)
-        await emit(
-            db,
-            user_id=user_id,
-            goal_id=original.goal_id,
-            aggregate_type="task",
-            aggregate_id=task.id,
-            event_type="TaskCreated",
-            source="ai_agent",
-            payload={
-                "title": task.title,
-                "scheduled_date": task.scheduled_date,
-                "estimated_mins": task.estimated_mins,
-                "proposal_id": proposal.id,
-            },
-        )
-
-
-async def _apply_difficulty_adjust(
-    user_id: str, proposal: DecisionProposal, db: AsyncSession
-) -> None:
-    changes = proposal.proposed_changes or {}
-    await _validate_adaptive_changes(user_id, proposal, changes, db)
-    task = await db.scalar(select(Task).where(Task.id == changes["task_id"]))
-    assert task is not None
-    old_minutes, old_priority = task.estimated_mins, task.priority
-    task.estimated_mins = int(changes["estimated_mins"])
-    task.priority = str(changes["priority"])
-    await emit(
-        db,
-        user_id=user_id,
-        goal_id=task.goal_id,
-        aggregate_type="task",
-        aggregate_id=task.id,
-        event_type="TaskDifficultyAdjusted",
-        source="ai_agent",
-        payload={
-            "old_estimated_mins": old_minutes,
-            "estimated_mins": task.estimated_mins,
-            "old_priority": old_priority,
-            "priority": task.priority,
-            "proposal_id": proposal.id,
-        },
-    )
-
-
-async def _apply_review_insertion(
-    user_id: str, proposal: DecisionProposal, db: AsyncSession
-) -> None:
-    changes = proposal.proposed_changes or {}
-    await _validate_adaptive_changes(user_id, proposal, changes, db)
-    task = Task(
-        id=str(uuid.uuid4()),
-        goal_id=str(changes.get("goal_id") or proposal.goal_id),
-        title=str(changes["title"]).strip(),
-        estimated_mins=int(changes["estimated_mins"]),
-        scheduled_date=str(changes["scheduled_date"]),
-        priority="high",
-        type="review",
-        status="pending",
-        kb_refs=[str(changes["concept_id"])],
-    )
-    db.add(task)
-    await emit(
-        db,
-        user_id=user_id,
-        goal_id=task.goal_id,
-        aggregate_type="task",
-        aggregate_id=task.id,
-        event_type="TaskCreated",
-        source="ai_agent",
-        payload={
-            "title": task.title,
-            "scheduled_date": task.scheduled_date,
-            "estimated_mins": task.estimated_mins,
-            "type": "review",
-            "concept_id": changes["concept_id"],
-            "proposal_id": proposal.id,
-        },
-    )
-
-
 def proposal_to_dict(proposal: DecisionProposal, *, has_feedback: bool = False) -> dict[str, Any]:
     # Learner-facing responses expose only a small, human-readable generation
     # summary.  Prompt/model/policy IDs and experiment internals belong to the
@@ -1021,9 +1055,13 @@ def proposal_to_dict(proposal: DecisionProposal, *, has_feedback: bool = False) 
         "summary": proposal.summary,
         "reasoning": proposal.reasoning or [],
         "proposed_changes": proposal.proposed_changes or {},
+        "action_capability": proposal.action_capability,
+        "action_seed": proposal.action_seed or {},
+        "converted_run_id": proposal.converted_run_id,
         "evidence_references": proposal.evidence_references or [],
         "confidence": proposal.confidence,
         "status": proposal.status,
+        "lifecycle_status": proposal.lifecycle_status,
         "requires_user_confirmation": proposal.requires_user_confirmation,
         "source": proposal.source,
         # Keep model routing details in the admin audit, not the learner response.

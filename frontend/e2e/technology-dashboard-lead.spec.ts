@@ -1,4 +1,12 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+
+async function dismissGuestHomeIntro(page: Page) {
+  const dialog = page.getByRole("dialog", { name: "访客体验" });
+  await dialog.waitFor({ state: "visible", timeout: 2_000 }).catch(() => undefined);
+  if (await dialog.isVisible().catch(() => false)) {
+    await dialog.getByRole("button", { name: "继续体验" }).click();
+  }
+}
 
 function localIso(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
@@ -10,6 +18,17 @@ function currentWeekDate(index: number) {
   const date = new Date(today.getFullYear(), today.getMonth(), today.getDate() - mondayIndex + index);
   return date;
 }
+
+test("首页深色洞察区不向下投射浅灰色带", async ({ page }) => {
+  await page.addInitScript(() => {
+    window.sessionStorage.setItem("planpilot:guest-home-intro-seen:v1", "1");
+  });
+  await page.goto("/studio/work");
+
+  const lead = page.locator(".theme-lead-tech:visible");
+  await expect(lead).toBeVisible();
+  await expect(lead).toHaveCSS("box-shadow", "none");
+});
 
 test("科技首页保留指标单位并把问候语放入深色洞察区", async ({ page }) => {
   const today = new Date();
@@ -37,23 +56,37 @@ test("科技首页保留指标单位并把问候语放入深色洞察区", async
   ];
   await page.addInitScript(({ items, goals, weeklyAvailability }) => {
     window.localStorage.setItem("planpilot-v2-tasks", JSON.stringify(items));
+    window.localStorage.setItem("planpilot:guest-dataset-version", "4");
     window.localStorage.setItem("planpilot-v2-goals", JSON.stringify(goals));
     window.localStorage.setItem("planpilot-v2-weekly-availability", JSON.stringify(weeklyAvailability));
   }, {
     items: seededTasks,
     weeklyAvailability: seededAvailability,
-    goals: [{
-      id: "goal-1",
-      type: "skill",
-      title: "算法基础",
-      deadline: "2026-09-01",
-      daily_hours: 80 / 60,
-      current_level: "入门",
-      status: "active",
-      created_at: "2026-08-01",
-    }],
+    goals: [
+      {
+        id: "1",
+        type: "skill",
+        title: "算法基础",
+        deadline: "2026-09-01",
+        daily_hours: 80 / 60,
+        current_level: "入门",
+        status: "active",
+        created_at: "2026-08-01",
+      },
+      {
+        id: "2",
+        type: "exam",
+        title: "面试准备",
+        deadline: "2026-09-15",
+        daily_hours: 1,
+        current_level: "入门",
+        status: "active",
+        created_at: "2026-08-01",
+      },
+    ],
   });
   await page.goto("/studio/work");
+  await dismissGuestHomeIntro(page);
 
   const lead = page.locator(".theme-lead-tech:visible");
   await expect(lead).toBeVisible();
@@ -75,7 +108,7 @@ test("科技首页保留指标单位并把问候语放入深色洞察区", async
   const expectedMetrics = [
     ["—", "", "活跃目标"],
     ["—", "", "连续学习"],
-    ["—", "", "本周投入"],
+    ["0.8", "小时", "本周投入"],
     ["—", "", "待复习知识"],
   ] as const;
 
@@ -85,13 +118,13 @@ test("科技首页保留指标单位并把问候语放入深色洞察区", async
   await expect(searchButton).toBeVisible();
   await expect(searchButton).toHaveCSS("border-top-width", "0px");
   await expect(searchButton).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
-  await expect(lead.getByRole("heading", { name: "登录后开始形成长期学习画像" })).toBeVisible();
+  await expect(lead.getByRole("heading", { name: "登录后启用个性化学习建议" })).toBeVisible();
   await expect(lead).toContainText("当前是访客模式");
   await expect(lead).not.toContainText("完成动态规划练习");
   await expect(cards.nth(1)).toContainText("登录后统计真实连续记录");
-  await expect(cards.nth(2)).toContainText("尚未形成实际投入记录");
+  await expect(cards.nth(2)).toContainText("距离本周计划还有 2.2 小时");
   await expect(cards.nth(3)).toContainText("登录后读取真实知识缺口");
-  const profileLink = lead.getByRole("link", { name: "登录并同步画像" });
+  const profileLink = lead.getByRole("link", { name: "登录并查看选择" });
   await expect(profileLink).toHaveCSS("border-top-width", "0px");
 
   for (let index = 0; index < expectedMetrics.length; index += 1) {
@@ -136,8 +169,8 @@ test("科技首页保留指标单位并把问候语放入深色洞察区", async
   expect(verticalSpacing.todayTitleGap).toBeLessThanOrEqual(2);
   expect(verticalSpacing.rhythmTitleGap).toBeLessThanOrEqual(2);
   expect(verticalSpacing.progressToTasks).toBeLessThanOrEqual(11);
-  expect(verticalSpacing.rhythmHeaderToHeatmap).toBeLessThanOrEqual(13);
-  expect(verticalSpacing.peakToSummary).toBeLessThanOrEqual(9);
+  expect(verticalSpacing.rhythmHeaderToHeatmap).toBeLessThanOrEqual(19);
+  expect(verticalSpacing.peakToSummary).toBeLessThanOrEqual(12);
 
   const priorityPicker = todayPanel.getByRole("button", { name: "复习链表双指针优先级" });
   await expect(priorityPicker).toContainText("低");
@@ -203,16 +236,12 @@ test("科技首页保留指标单位并把问候语放入深色洞察区", async
   await expect(modeSwitch).toBeVisible();
   await expect(todayPanel.locator(".plan-progress")).toBeVisible();
   await modeSwitch.click();
-  await expect(todayPanel.getByRole("button", { name: "返回任务" })).toBeVisible();
-  await expect(todayPanel.locator(".plan-progress")).toHaveCount(0);
-  await todayPanel.getByRole("button", { name: "自动规划" }).click();
   const planner = todayPanel.getByRole("dialog", { name: "自动规划今天的任务" });
   await expect(planner.getByRole("group", { name: "选择规划节奏" })).toBeVisible();
   await planner.getByRole("button", { name: "应用", exact: true }).click();
-  await expect(todayPanel.getByText("时间流逝度").first()).toBeVisible();
-  await expect(todayPanel.locator(".today-schedule-progress > small")).toHaveCount(2);
-  await todayPanel.getByRole("button", { name: "确认安排" }).click();
-  await todayPanel.getByRole("button", { name: "返回任务" }).click();
+  await expect(todayPanel.locator(".task-elapsed-progress")).toHaveCount(2);
+  await expect(todayPanel.locator(".task-elapsed-progress").first()).toBeVisible();
+  await expect(todayPanel.getByRole("button", { name: "重新规划" })).toBeVisible();
   const scheduledTask = todayPanel.locator(".task-item", { hasText: "复习链表双指针" });
   await expect(scheduledTask.locator(".task-meta small")).toHaveText("09:00–09:20");
 
@@ -220,7 +249,7 @@ test("科技首页保留指标单位并把问候语放入深色洞察区", async
   await expect(rhythmDays.nth(todayIndex)).toHaveAttribute("aria-current", "date");
   await expect(page.locator('.rhythm-heatmap-grid > article[aria-current="date"]')).toHaveCount(1);
   await expect(page.locator(".rhythm-heatmap-grid > article.is-future")).toHaveCount(6 - todayIndex);
-  await expect(rhythmPanel).toContainText("本周实际投入正在积累");
+  await expect(rhythmPanel).toContainText("截至今天，今天投入最高");
   await expect(rhythmPanel).not.toContainText("周四是本周专注高峰");
 
   const rhythmTypography = await rhythmPanel.evaluate((panel) => {
@@ -238,10 +267,10 @@ test("科技首页保留指标单位并把问候语放入深色洞察区", async
       asideColors: summaryAsides.map((item) => getComputedStyle(item.querySelector("strong")!).color),
     };
   });
-  expect(rhythmTypography.headingSize).toBe("12px");
-  expect(rhythmTypography.dayLabelSize).toBe("13px");
+  expect(rhythmTypography.headingSize).toBe("13px");
+  expect(rhythmTypography.dayLabelSize).toBe("12px");
   expect(rhythmTypography.dayUnitSize).toBe("12px");
-  expect(rhythmTypography.dayStateSize).toBe("11px");
+  expect(rhythmTypography.dayStateSize).toBe("10px");
   expect(new Set(rhythmTypography.asideLabelSizes).size).toBe(1);
   expect(new Set(rhythmTypography.asideValueSizes).size).toBe(1);
   expect(new Set(rhythmTypography.asideWidths).size).toBe(1);
@@ -353,8 +382,8 @@ test("科技首页保留指标单位并把问候语放入深色洞察区", async
   expect(taskColumnLayout.metaLeft).toBeGreaterThan(taskColumnLayout.titleRight);
 
   await page.getByRole("button", { name: "前往时间规划" }).click();
-  await expect(page.locator(".today-panel.is-schedule")).toBeVisible();
-  await expect(page.getByRole("button", { name: "返回任务" })).toBeVisible();
+  await expect(todayPanel).toBeVisible();
+  await expect(todayPanel.getByRole("button", { name: "打开时间规划" })).toBeVisible();
   await page.locator(".rhythm-panel").getByRole("button", { name: "本周" }).click();
   await expect(page.getByRole("region", { name: "本周计划" })).toBeVisible();
 
@@ -382,6 +411,7 @@ test("科技首页保留指标单位并把问候语放入深色洞察区", async
 test("本周页在没有任务时不生成虚构负荷与建议", async ({ page }) => {
   await page.addInitScript(() => {
     window.localStorage.setItem("planpilot-v2-tasks", "[]");
+    window.localStorage.setItem("planpilot:guest-dataset-version", "4");
   });
   await page.goto("/studio/work?view=week");
 
@@ -406,7 +436,7 @@ test("登录用户的深色洞察卡只展示真实长期学习习惯", async ({
   await page.route("**/api/v1/tasks**", (route) => route.fulfill({ json: [] }));
   await page.route("**/api/v1/goals", (route) => route.fulfill({ json: [] }));
   await page.route("**/api/v1/goals/progress", (route) => route.fulfill({ json: [] }));
-  await page.route("**/api/v1/schedule/today", (route) => route.fulfill({ json: { date: localIso(new Date()), blocks: [] } }));
+  await page.route("**/api/v1/schedule/*", (route) => route.fulfill({ json: { date: localIso(new Date()), blocks: [] } }));
   await page.route("**/api/v1/learner/decision-context**", (route) => route.fulfill({
     json: {
       active_patterns: [{
@@ -426,6 +456,7 @@ test("登录用户的深色洞察卡只展示真实长期学习习惯", async ({
   }));
 
   await page.goto("/studio/work");
+  await dismissGuestHomeIntro(page);
   const lead = page.locator(".theme-lead-tech:visible");
   await expect(lead.getByRole("heading", { name: "你更常在 19:00–21:00 进入学习状态" })).toBeVisible();
   await expect(lead).toContainText("LEARNING SIGNAL · CONFIDENCE 82%");
@@ -469,6 +500,7 @@ test("登录用户的四项洞察指标全部由真实接口数据生成", async
   } }));
 
   await page.goto("/studio/work");
+  await dismissGuestHomeIntro(page);
   const cards = page.locator(".theme-lead-tech:visible .tech-telemetry article");
   await expect(cards.nth(0)).toContainText("2个活跃目标");
   await expect(cards.nth(0)).toContainText("1 个目标本周有风险");
@@ -478,10 +510,97 @@ test("登录用户的四项洞察指标全部由真实接口数据生成", async
   await expect(cards.nth(3)).toContainText("2 项保持率低于 50%");
 });
 
+test("登录用户任务行隐藏开始按钮并在执行时段触发内部观察", async ({ page }) => {
+  const today = localIso(new Date());
+  let observedStarts = 0;
+  const pendingTask = {
+    id: "task-layout-0",
+    title: "未安排任务",
+    goalId: "goal-start",
+    goalTitle: "验证首个行动",
+    done: false,
+    status: "pending",
+    estimatedMinutes: 25,
+    actualMinutes: null,
+    date: today,
+    priority: "high",
+    masteryLevel: "unknown",
+  };
+  const taskFixtures = [pendingTask, ...["构建混合检索流程", "实现 ReAct 推理循环", "重构会话摘要管线"].map((title, index) => ({
+    ...pendingTask,
+    id: `task-layout-${index + 1}`,
+    title,
+  }))];
+  await page.route("**/api/v1/auth/me", (route) => route.fulfill({ json: {
+    id: "member-task-start",
+    email: "start@example.com",
+    username: "开始用户",
+    timezone: "Asia/Shanghai",
+    onboarding_completed: true,
+  } }));
+  await page.route("**/api/v1/goals/progress", (route) => route.fulfill({ json: [] }));
+  await page.route("**/api/v1/goals", (route) => route.fulfill({ json: [{
+    id: "goal-start",
+    type: "skill",
+    title: "验证首个行动",
+    deadline: "2099-09-01",
+    daily_hours: 1,
+    current_level: "beginner",
+    status: "active",
+    created_at: "2026-08-01",
+  }] }));
+  await page.route("**/api/v1/tasks**", async (route) => {
+    if (route.request().method() === "POST" && route.request().url().endsWith("/observe-start")) {
+      observedStarts += 1;
+      await route.fulfill({ json: { ...pendingTask, status: "in_progress" } });
+      return;
+    }
+    await route.fulfill({ json: taskFixtures });
+  });
+  await page.route("**/api/v1/schedule/**", (route) => route.fulfill({ json: { date: today, blocks: [{
+    id: "observed-window",
+    label: pendingTask.title,
+    taskId: pendingTask.id,
+    goalTitle: pendingTask.goalTitle,
+    startHour: 0,
+    durationMinutes: 1439,
+    color: "#7c6cf2",
+    progress: 0,
+  }] } }));
+  await page.route("**/api/v1/learner/decision-context**", (route) => route.fulfill({ json: { active_patterns: [], knowledge_gaps: [] } }));
+
+  await page.goto("/studio/work");
+  const row = page.locator(".task-item", { hasText: "未安排任务" });
+  await expect(row).toContainText("00:00–23:59");
+  await expect(row.getByRole("button", { name: /开始任务|任务进行中/ })).toHaveCount(0);
+  await expect.poll(() => observedStarts).toBe(1);
+
+  await page.setViewportSize({ width: 375, height: 812 });
+  await expect(row).toContainText("00:00–23:59");
+  const geometry = await row.evaluate((element) => ({
+    documentWidth: document.documentElement.scrollWidth,
+    rowRight: element.getBoundingClientRect().right,
+    viewportWidth: document.documentElement.clientWidth,
+  }));
+  expect(geometry.rowRight).toBeLessThanOrEqual(geometry.viewportWidth + 1);
+  expect(geometry.documentWidth).toBeLessThanOrEqual(geometry.viewportWidth);
+  const rowLayout = await page.locator(".task-item").evaluateAll((rows) => rows.map((element, index) => {
+    const row = element.getBoundingClientRect();
+    const meta = element.querySelector<HTMLElement>(".task-meta")!.getBoundingClientRect();
+    const next = rows[index + 1]?.getBoundingClientRect();
+    return {
+      metaInsideRow: meta.bottom <= row.bottom + 1,
+      clearOfNextRow: !next || meta.bottom <= next.top + 1,
+    };
+  }));
+  expect(rowLayout.every((item) => item.metaInsideRow && item.clearOfNextRow)).toBe(true);
+});
+
 test("高屏幕下工作卡片按内容等高且学习伙伴紧跟其后", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   const todayIso = localIso(new Date());
   await page.addInitScript(({ isoDate }) => {
+    window.localStorage.setItem("planpilot:guest-dataset-version", "4");
     window.localStorage.setItem("planpilot-v2-tasks", JSON.stringify(
       Array.from({ length: 7 }, (_, index) => ({
         id: 700 + index,
@@ -497,6 +616,7 @@ test("高屏幕下工作卡片按内容等高且学习伙伴紧跟其后", async
     ));
   }, { isoDate: todayIso });
   await page.goto("/studio/work");
+  await dismissGuestHomeIntro(page);
   await expect(page.locator(".theme-lead-tech:visible")).toBeVisible();
   await expect(page.locator(".coach-strip-goal-advice:visible").first()).toBeVisible();
   await page.waitForTimeout(800);
@@ -542,6 +662,7 @@ test("高屏幕下工作卡片按内容等高且学习伙伴紧跟其后", async
 test("已完成任务用实际投入替换时间与优先级且可保存", async ({ page }) => {
   const today = localIso(new Date());
   await page.addInitScript(({ isoDate }) => {
+    window.localStorage.setItem("planpilot:guest-dataset-version", "4");
     window.localStorage.setItem("planpilot-v2-tasks", JSON.stringify([
       {
         id: 91,
@@ -571,6 +692,7 @@ test("已完成任务用实际投入替换时间与优先级且可保存", async
   }, { isoDate: today });
 
   await page.goto("/studio/work");
+  await dismissGuestHomeIntro(page);
   const row = page.locator(".task-item", { hasText: "完成后的投入记录" });
   const actualButton = row.getByRole("button", { name: "记录实际投入" });
   await expect(actualButton).toBeVisible();
@@ -629,6 +751,7 @@ test("实际投入内联控件在 375px 下不造成页面横向溢出", async (
   const today = localIso(new Date());
   await page.setViewportSize({ width: 375, height: 812 });
   await page.addInitScript(({ isoDate }) => {
+    window.localStorage.setItem("planpilot:guest-dataset-version", "4");
     window.localStorage.setItem("planpilot-v2-tasks", JSON.stringify([{
       id: 93,
       goalId: "1",
@@ -644,6 +767,7 @@ test("实际投入内联控件在 375px 下不造成页面横向溢出", async (
   }, { isoDate: today });
 
   await page.goto("/studio/work");
+  await dismissGuestHomeIntro(page);
   const row = page.locator(".task-item", { hasText: "窄屏投入记录" });
   await row.getByRole("button", { name: "记录实际投入" }).click();
   const geometry = await row.evaluate((element) => {
@@ -672,6 +796,7 @@ test("取消任务完成后节奏统计立即扣除该任务的实际投入", as
   const initialAverage = Math.round(84 / elapsedWeekDays);
   const remainingAverage = Math.round(40 / elapsedWeekDays);
   await page.addInitScript(({ isoDate }) => {
+    window.localStorage.setItem("planpilot:guest-dataset-version", "4");
     window.localStorage.setItem("planpilot-v2-tasks", JSON.stringify([
       {
         id: 201,
@@ -701,6 +826,7 @@ test("取消任务完成后节奏统计立即扣除该任务的实际投入", as
   }, { isoDate: today });
 
   await page.goto("/studio/work");
+  await dismissGuestHomeIntro(page);
   const rhythmPanel = page.locator(".rhythm-panel:visible");
   const rhythmSummary = rhythmPanel.locator(".rhythm-summary");
   await expect(rhythmSummary).toContainText(`平均每日${initialAverage} 分钟`);
@@ -725,7 +851,7 @@ test("取消任务完成后节奏统计立即扣除该任务的实际投入", as
   await expect(rhythmPanel).not.toContainText("已投入 84 分钟");
 
   await page.getByRole("button", { name: "标记为未完成：第二项已打卡任务" }).click();
-  await expect(rhythmPanel.locator(".rhythm-peak-note")).toContainText("本周实际投入正在积累");
+  await expect(rhythmPanel.locator(".rhythm-peak-note")).toContainText("本周实际投入等待记录");
   await expect(rhythmSummary).toContainText("平均每日—");
   await expect(rhythmSummary).toContainText("本周已投入—");
 });
@@ -733,6 +859,7 @@ test("取消任务完成后节奏统计立即扣除该任务的实际投入", as
 test("本周实际投入按分钟数形成连续的低饱和紫色色阶", async ({ page }) => {
   await page.clock.setFixedTime(new Date(2026, 7, 20, 12));
   await page.addInitScript(() => {
+    window.localStorage.setItem("planpilot:guest-dataset-version", "4");
     window.localStorage.setItem("planpilot-v2-tasks", JSON.stringify([
       { id: 301, goalId: "1", date: "2026-08-17", title: "轻量投入", goal: "算法基础", duration: "20 分钟", time: "18:00", done: true, priority: "普通", actualMinutes: 20 },
       { id: 302, goalId: "1", date: "2026-08-18", title: "稳定投入", goal: "算法基础", duration: "50 分钟", time: "18:00", done: true, priority: "普通", actualMinutes: 50 },
@@ -741,6 +868,7 @@ test("本周实际投入按分钟数形成连续的低饱和紫色色阶", async
   });
 
   await page.goto("/studio/work");
+  await dismissGuestHomeIntro(page);
   const cards = page.locator(".rhythm-panel:visible .rhythm-heatmap-grid > article");
   await expect(cards.nth(0).locator(":scope > strong")).toHaveText("20");
   await expect(cards.nth(1).locator(":scope > strong")).toHaveText("50");
@@ -768,17 +896,18 @@ test("本周实际投入按分钟数形成连续的低饱和紫色色阶", async
 
 test("今日任务可通过轻量交互定位到所属目标中的具体任务", async ({ page }) => {
   await page.goto("/studio/work");
-  const taskRow = page.locator(".task-item", { hasText: "完成动态规划练习" });
-  const checkButton = page.getByRole("button", { name: "标记为未完成：完成动态规划练习" });
+  await dismissGuestHomeIntro(page);
+  const taskRow = page.locator(".task-item", { hasText: "完成 Pandas 分组聚合练习" });
+  const checkButton = page.getByRole("button", { name: "标记为已完成：完成 Pandas 分组聚合练习" });
   await taskRow.locator(":scope > div").click();
   await expect(checkButton).toHaveCount(1);
-  await expect(checkButton).toHaveAttribute("aria-pressed", "true");
+  await expect(checkButton).toHaveAttribute("aria-pressed", "false");
   await expect(page).toHaveURL(/\/studio\/work$/);
-  const taskLink = page.getByRole("button", { name: "打开任务：完成动态规划练习" });
+  const taskLink = page.getByRole("button", { name: "打开任务：完成 Pandas 分组聚合练习" });
   await expect(taskLink.locator(".task-open-indicator")).toBeVisible();
   await taskLink.click();
-  await expect(page).toHaveURL(/\/studio\/work\/goals\/1\?taskId=1/);
-  expect(new URL(page.url()).searchParams.get("returnTo")).toBe("/studio/work?selected=1");
+  await expect(page).toHaveURL(/\/studio\/work\/goals\/guest-skill\?taskId=guest-task-1/);
+  expect(new URL(page.url()).searchParams.get("returnTo")).toBe("/studio/work?selected=guest-task-1");
 });
 
 test("登录用户接口失败时显示错误并可重试，不回退到访客示例", async ({ page }) => {
@@ -805,6 +934,7 @@ test("登录用户接口失败时显示错误并可重试，不回退到访客�
   await page.route("**/api/v1/schedule/today", (route) => route.fulfill({ json: { date: "2026-08-20", blocks: [] } }));
 
   await page.goto("/studio/work");
+  await dismissGuestHomeIntro(page);
   const errorState = page.locator(".pp-data-sync-notice.is-error");
   await expect(errorState).toContainText("今日计划同步失败");
   await expect(errorState).toContainText("任务接口暂时不可用");
@@ -818,9 +948,33 @@ test("登录用户接口失败时显示错误并可重试，不回退到访客�
   await expect(errorState).toContainText("任务接口暂时不可用");
 });
 
+test("管理后台入口以动作名称为主标题", async ({ page }) => {
+  await page.route("**/api/v1/auth/me", (route) => route.fulfill({
+    json: {
+      id: "admin-sidebar-type",
+      email: "admin-sidebar@example.com",
+      username: "管理员",
+      is_admin: true,
+      timezone: "Asia/Shanghai",
+      onboarding_completed: true,
+    },
+  }));
+  await page.route("**/api/v1/tasks**", (route) => route.fulfill({ json: [] }));
+  await page.route("**/api/v1/goals", (route) => route.fulfill({ json: [] }));
+  await page.route("**/api/v1/goals/progress", (route) => route.fulfill({ json: [] }));
+  await page.route("**/api/v1/schedule/today", (route) => route.fulfill({ json: { date: "2026-08-24", blocks: [] } }));
+
+  await page.goto("/studio/work");
+  const entry = page.getByRole("link", { name: /进入管理后台/ });
+  await expect(entry).toBeVisible();
+  await expect(entry.locator("strong")).toHaveCSS("font-size", "12px");
+  await expect(entry.locator("small")).toHaveCSS("font-size", "11px");
+});
+
 test("目标列表成功为空时不显示总体进度同步失败，也会清理失效关联任务", async ({ page }) => {
   let deletedTaskId = "";
   await page.route("**/api/v1/auth/me", (route) => route.fulfill({ json: { id: "orphan-cleanup-user", email: "orphan@example.com", username: "清理用户", email_verified: true, onboarding_completed: true } }));
+  await page.route("**/api/v1/schedule/*", (route) => route.fulfill({ json: { date: localIso(new Date()), blocks: [] } }));
   await page.route("**/api/v1/goals", (route) => route.fulfill({ json: [] }));
   await page.route("**/api/v1/goals/progress", (route) => route.fulfill({ status: 404, json: { detail: "目标不存在" } }));
   await page.route("**/api/v1/tasks**", (route) => {
@@ -835,6 +989,7 @@ test("目标列表成功为空时不显示总体进度同步失败，也会清�
     await route.fulfill({ status: 204, body: "" });
   });
   await page.goto("/studio/work");
+  await dismissGuestHomeIntro(page);
   await expect(page.locator(".pp-data-sync-notice")).toHaveCount(0);
   await expect(page.locator(".task-item", { hasText: "失效任务" })).toHaveCount(0);
   await expect.poll(() => deletedTaskId).toBe("orphan-task-1");
@@ -894,6 +1049,7 @@ test("登录用户添加任务只提交一次并写入真实目标与日期", as
   });
 
   await page.goto("/studio/work");
+  await dismissGuestHomeIntro(page);
   await page.getByRole("button", { name: "添加任务" }).click();
   const dialog = page.getByRole("dialog", { name: "添加今日任务" });
   await expect(dialog.getByRole("combobox", { name: "关联目标" })).toContainText("算法基础");

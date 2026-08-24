@@ -42,7 +42,7 @@ async def test_coach_agent_accepts_valid_structured_narrative():
     llm = MagicMock(ainvoke=AsyncMock(return_value=response))
     with (
         patch.object(settings, "coach_agent_enabled", True),
-        patch("src.agents.coach_agent.create_structured_routine_llm", return_value=llm),
+        patch("src.agents.coach_agent.create_json_llm", return_value=llm),
     ):
         result = await CoachAgent.generate(
             _context(),
@@ -72,7 +72,7 @@ async def test_coach_agent_falls_back_on_unsafe_action_type():
     llm = MagicMock(ainvoke=AsyncMock(return_value=response))
     with (
         patch.object(settings, "coach_agent_enabled", True),
-        patch("src.agents.coach_agent.create_structured_routine_llm", return_value=llm),
+        patch("src.agents.coach_agent.create_json_llm", return_value=llm),
     ):
         result = await CoachAgent.generate(
             _context(),

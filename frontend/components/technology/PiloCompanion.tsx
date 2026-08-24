@@ -281,7 +281,6 @@ const PILO_SCENE_OPTIONS: ReadonlyArray<{ id: PiloSceneId; label: string; descri
   { id: "dinner", label: "晚餐时间", description: "Pilo 在暖灯下认真吃晚餐", asset: "/pilo/scenes/v4/dinner-01.webp" },
   { id: "movement", label: "活动一下", description: "Pilo 在阳光房里舒展身体", asset: "/pilo/scenes/v4/movement-01.webp" },
   { id: "review", label: "晚间回顾", description: "Pilo 在暮色里写下今日观察", asset: "/pilo/scenes/v4/review-01.webp" },
-  { id: "night", label: "夜间休息", description: "Pilo 放下手，安静结束今天", asset: "/pilo/scenes/v4/night-01.webp" },
 ];
 
 const USER_PREVIEW_LIFE_ACTION_IDS: readonly PiloLifeActionId[] = [
@@ -2578,7 +2577,7 @@ export function PiloCompanion() {
           aria-label={open ? "收起 Pilo 学习伙伴" : "打开 Pilo 学习伙伴；可拖动，右键或长按查看更多"}
         >
           <PiloAvatar
-            mood={avatarMood}
+            mood={contextMenu ? "idle" : avatarMood}
             accessory={activeAccessory}
             accessories={isDragging ? [] : manualOutfits}
             size={104}
@@ -2924,7 +2923,7 @@ export function PiloCompanion() {
 
                   <section className={`pilo-companion__appearance-intro pilo-companion__scene-preview-heading ${expandedSections.scenePreviews ? "is-expanded" : "is-collapsed"}`}>
                     <Sparkles size={17} />
-                    <span><strong>场景预览</strong><small>手动查看清晨、专注、用餐与夜间场景；不会计入自动出现。</small></span>
+                    <span><strong>场景预览</strong><small>手动查看清晨、专注、用餐、活动与回顾场景；不会计入自动出现。</small></span>
                     <button
                       type="button"
                       className="pilo-companion__collapse-toggle"

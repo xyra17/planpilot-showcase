@@ -9,11 +9,12 @@ from pathlib import Path
 import pytest
 from sqlalchemy import select
 
+from src.core.agent_v2.orchestrator import advance_run
 from src.core.time import utc_now
 from src.intelligence.cognitive_model import knowledge_retention, retention_curve
 from src.intelligence.evaluation import evaluate_benchmark, persist_report
 from src.intelligence.memory_system import MemoryBuilder
-from src.models import Goal, LearningEvent, Task, TaskMasteryRecord
+from src.models import AgentRun, Goal, LearningEvent, Task, TaskMasteryRecord
 
 
 def test_forgetting_curve_is_monotonic_and_bounded():
@@ -173,9 +174,34 @@ async def test_adaptive_task_split_still_requires_review_and_apply(client, auth,
     original = await db.scalar(select(Task).where(Task.id == task_id))
     assert original.status == "pending"
 
-    await client.post(f"/api/v1/learner/proposals/{proposal['id']}/accept", headers=auth)
+    action = await client.post(
+        f"/api/v1/learner/proposals/{proposal['id']}/action-run", headers=auth
+    )
+    assert action.status_code == 200, action.text
+    assert action.json()["status"] == "queued"
+    assert action.json()["plan"][-1]["tool_name"] == "tasks.apply_changes"
     applied = await client.post(f"/api/v1/learner/proposals/{proposal['id']}/apply", headers=auth)
-    assert applied.status_code == 200, applied.text
+    assert applied.status_code == 409
+    await db.refresh(original)
+    assert original.status == "pending"
+    run = await db.get(AgentRun, action.json()["id"])
+    assert run is not None
+    await advance_run(db, user_id=run.user_id, run_id=run.id)
+    preview = (await client.get(f"/api/v2/agent/runs/{run.id}", headers=auth)).json()
+    assert preview["status"] == "waiting_approval"
+    approval = preview["approvals"][0]
+    approved = await client.post(
+        f"/api/v2/agent/runs/{run.id}/approve",
+        headers=auth,
+        json={
+            "approval_id": approval["id"],
+            "change_hash": approval["change_hash"],
+            "change_set_version": approval["change_set_version"],
+            "run_state_version": approval["run_state_version"],
+        },
+    )
+    assert approved.status_code == 200, approved.text
+    await advance_run(db, user_id=run.user_id, run_id=run.id)
     await db.refresh(original)
     assert original.status == "skipped"
     split_tasks = list(

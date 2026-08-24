@@ -1,6 +1,9 @@
 "use client";
 
-import { AlertCircle, LoaderCircle, RefreshCw } from "lucide-react";
+import { AlertCircle, LoaderCircle, LogIn, RefreshCw } from "lucide-react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
+import { navigateToLogin, noticeRequiresLogin } from "@/lib/technology/noticeActions";
 
 type DataSyncNoticeProps = {
   title: string;
@@ -8,6 +11,7 @@ type DataSyncNoticeProps = {
   loading?: boolean;
   retryLabel?: string;
   onRetry?: () => void;
+  loginHref?: string;
 };
 
 export function DataSyncNotice({
@@ -16,10 +20,19 @@ export function DataSyncNotice({
   loading = false,
   retryLabel = "重试",
   onRetry,
+  loginHref,
 }: DataSyncNoticeProps) {
   const Icon = loading ? LoaderCircle : AlertCircle;
+  const requiresLogin = !loading && noticeRequiresLogin(message);
+  const ActionIcon = requiresLogin ? LogIn : RefreshCw;
+  const actionLabel = requiresLogin ? "去登录" : retryLabel;
+  const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
 
-  return (
+  useEffect(() => {
+    setPortalTarget(document.body);
+  }, []);
+
+  const notice = (
     <aside
       className={`pp-data-sync-notice ${loading ? "is-loading" : "is-error"}`}
       role={loading ? "status" : "alert"}
@@ -32,12 +45,14 @@ export function DataSyncNotice({
         <strong>{title}</strong>
         {message && <small>{message}</small>}
       </span>
-      {!loading && onRetry && (
-        <button type="button" onClick={onRetry}>
-          <RefreshCw size={14} aria-hidden="true" />
-          {retryLabel}
+      {!loading && (requiresLogin || onRetry) && (
+        <button type="button" onClick={requiresLogin ? () => navigateToLogin(loginHref) : onRetry}>
+          <ActionIcon size={14} aria-hidden="true" />
+          {actionLabel}
         </button>
       )}
     </aside>
   );
+
+  return portalTarget ? createPortal(notice, portalTarget) : null;
 }
