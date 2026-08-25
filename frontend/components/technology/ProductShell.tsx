@@ -99,6 +99,8 @@ export function ProductShell({
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const searchRequestRef = useRef(0);
   const notificationRequestRef = useRef(0);
+  const scrollbarTimersRef = useRef<Map<HTMLElement, number>>(new Map());
+  const pageScrollbarTimerRef = useRef<number | null>(null);
   const searchReturnFocus = useRef<HTMLElement | null>(null);
   const inSettings = pathname.startsWith("/studio/settings");
   const searchItems = searchIndex.filter((item) =>
@@ -300,9 +302,48 @@ export function ProductShell({
     return () => window.removeEventListener("keydown", handleKeyboard);
   }, [refreshSearchItems, searchOpen]);
 
+  const revealActiveScrollbar = useCallback((element: HTMLElement) => {
+    const currentTimer = scrollbarTimersRef.current.get(element);
+    if (currentTimer) window.clearTimeout(currentTimer);
+    element.classList.add("is-scrolling");
+    const nextTimer = window.setTimeout(() => {
+      element.classList.remove("is-scrolling");
+      scrollbarTimersRef.current.delete(element);
+    }, 720);
+    scrollbarTimersRef.current.set(element, nextTimer);
+  }, []);
+
+  useEffect(() => {
+    const scrollbarTimers = scrollbarTimersRef.current;
+
+    function revealPageScrollbar() {
+      document.documentElement.classList.add("is-scrolling");
+      if (pageScrollbarTimerRef.current) window.clearTimeout(pageScrollbarTimerRef.current);
+      pageScrollbarTimerRef.current = window.setTimeout(() => {
+        document.documentElement.classList.remove("is-scrolling");
+        pageScrollbarTimerRef.current = null;
+      }, 720);
+    }
+
+    window.addEventListener("scroll", revealPageScrollbar, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", revealPageScrollbar);
+      if (pageScrollbarTimerRef.current) window.clearTimeout(pageScrollbarTimerRef.current);
+      document.documentElement.classList.remove("is-scrolling");
+      scrollbarTimers.forEach((timer, element) => {
+        window.clearTimeout(timer);
+        element.classList.remove("is-scrolling");
+      });
+      scrollbarTimers.clear();
+    };
+  }, []);
+
   return (
     <div
       className={`app-shell shell-theme-${theme}`}
+      onScrollCapture={(event) => {
+        if (event.target instanceof HTMLElement) revealActiveScrollbar(event.target);
+      }}
       onPointerMove={(event) => {
         if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
         event.currentTarget.style.setProperty("--page-glow-x", `${event.clientX}px`);

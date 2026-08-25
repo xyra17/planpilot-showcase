@@ -509,6 +509,12 @@ test("新建笔记不会挤窄列表导航或截断选中色块", async ({ page 
   await page.goto("/studio/work/notes");
   await expect(page.locator(".notes-list-row").first()).toBeVisible();
 
+  const notesList = page.locator(".notes-list-scroll:visible").last();
+  await expect(notesList).toHaveCSS("scrollbar-color", "rgba(0, 0, 0, 0) rgba(0, 0, 0, 0)");
+  await notesList.evaluate((element) => element.dispatchEvent(new Event("scroll", { bubbles: true })));
+  await expect(notesList).toHaveClass(/is-scrolling/);
+  await expect(notesList).not.toHaveClass(/is-scrolling/, { timeout: 1_500 });
+
   const measureListRail = () => page.locator(".notes-list-scroll:visible").last().evaluate((scroll) => {
     const row = scroll.querySelector<HTMLElement>(".notes-list-row");
     const scrollBounds = scroll.getBoundingClientRect();

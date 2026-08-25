@@ -1,0 +1,143 @@
+/* Scrollbars stay discoverable while moving, then recede so dense workspaces
+ * keep their content edge visually quiet. ProductShell supplies is-scrolling
+ * to every active internal scroller and to the document scroller. */
+
+html {
+  scrollbar-color: transparent transparent;
+  scrollbar-width: thin;
+}
+
+html::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+html::-webkit-scrollbar-track,
+html::-webkit-scrollbar-thumb {
+  background: transparent;
+}
+
+html.is-scrolling {
+  scrollbar-color: color-mix(in srgb, var(--workspace-accent, #6f5cf4) 48%, transparent) transparent;
+}
+
+html.is-scrolling::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--workspace-accent, #6f5cf4) 48%, transparent);
+  border-radius: 999px;
+}
+
+[data-theme] .app-shell :is(
+  .goals-list,
+  .goal-milestones-list,
+  .notes-list-scroll,
+  .notes-notion-canvas,
+  .task-list,
+  .today-schedule-list,
+  .today-schedule-planner-timeline,
+  .week-focus-task-list,
+  .plan-mode-reference-list,
+  .tech-goal-create-main,
+  .knowledge-goal-scroll,
+  .knowledge-library-list,
+  .knowledge-resource-table,
+  .knowledge-library-rail,
+  .companion-feed,
+  .companion-history-scroll,
+  .companion-sidepanel__scroll,
+  .companion-goal-menu,
+  .pilo-companion__context,
+  .pilo-companion__panel
+) {
+  scrollbar-color: transparent transparent;
+  scrollbar-width: thin;
+}
+
+[data-theme] .app-shell :is(
+  .goals-list,
+  .goal-milestones-list,
+  .notes-list-scroll,
+  .notes-notion-canvas,
+  .task-list,
+  .today-schedule-list,
+  .today-schedule-planner-timeline,
+  .week-focus-task-list,
+  .plan-mode-reference-list,
+  .tech-goal-create-main,
+  .knowledge-goal-scroll,
+  .knowledge-library-list,
+  .knowledge-resource-table,
+  .knowledge-library-rail,
+  .companion-feed,
+  .companion-history-scroll,
+  .companion-sidepanel__scroll,
+  .companion-goal-menu,
+  .pilo-companion__context,
+  .pilo-companion__panel
+)::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+[data-theme] .app-shell :is(
+  .goals-list,
+  .goal-milestones-list,
+  .notes-list-scroll,
+  .notes-notion-canvas,
+  .task-list,
+  .today-schedule-list,
+  .today-schedule-planner-timeline,
+  .week-focus-task-list,
+  .plan-mode-reference-list,
+  .tech-goal-create-main,
+  .knowledge-goal-scroll,
+  .knowledge-library-list,
+  .knowledge-resource-table,
+  .knowledge-library-rail,
+  .companion-feed,
+  .companion-history-scroll,
+  .companion-sidepanel__scroll,
+  .companion-goal-menu,
+  .pilo-companion__context,
+  .pilo-companion__panel
+)::-webkit-scrollbar-track,
+[data-theme] .app-shell :is(
+  .goals-list,
+  .goal-milestones-list,
+  .notes-list-scroll,
+  .notes-notion-canvas,
+  .task-list,
+  .today-schedule-list,
+  .today-schedule-planner-timeline,
+  .week-focus-task-list,
+  .plan-mode-reference-list,
+  .tech-goal-create-main,
+  .knowledge-goal-scroll,
+  .knowledge-library-list,
+  .knowledge-resource-table,
+  .knowledge-library-rail,
+  .companion-feed,
+  .companion-history-scroll,
+  .companion-sidepanel__scroll,
+  .companion-goal-menu,
+  .pilo-companion__context,
+  .pilo-companion__panel
+)::-webkit-scrollbar-thumb {
+  background: transparent;
+}
+
+[data-theme] .app-shell .is-scrolling {
+  scrollbar-color: color-mix(in srgb, var(--workspace-accent) 44%, transparent) transparent;
+}
+
+[data-theme] .app-shell .is-scrolling::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--workspace-accent) 44%, transparent);
+  border: 0;
+  border-radius: 999px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  [data-theme] .app-shell .is-scrolling::-webkit-scrollbar-thumb,
+  html.is-scrolling::-webkit-scrollbar-thumb {
+    transition: background-color 140ms ease;
+  }
+}

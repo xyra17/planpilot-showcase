@@ -260,7 +260,9 @@ test("目标页普通二级菜单点击外部关闭并说明入口用途", async
 
 test("目标动态滚动条右移并仅在滚动时显示", async ({ page }) => {
   await page.goto("/studio/work/goals");
+  const goalsList = page.locator(".goals-list:visible");
   const milestoneList = page.locator(".goal-milestones-list:visible");
+  await expect(goalsList).toHaveCSS("scrollbar-color", "rgba(0, 0, 0, 0) rgba(0, 0, 0, 0)");
   await expect(milestoneList).toBeVisible();
   await expect(milestoneList).toHaveCSS("overflow-y", "auto");
   await expect(milestoneList).toHaveCSS("scrollbar-color", "rgba(0, 0, 0, 0) rgba(0, 0, 0, 0)");
@@ -275,6 +277,15 @@ test("目标动态滚动条右移并仅在滚动时显示", async ({ page }) => 
   await milestoneList.evaluate((element) => element.dispatchEvent(new Event("scroll", { bubbles: true })));
   await expect(milestoneList).toHaveClass(/is-scrolling/);
   await expect(milestoneList).not.toHaveClass(/is-scrolling/, { timeout: 1_500 });
+
+  await goalsList.evaluate((element) => element.dispatchEvent(new Event("scroll", { bubbles: true })));
+  await expect(goalsList).toHaveClass(/is-scrolling/);
+  await expect(goalsList).not.toHaveClass(/is-scrolling/, { timeout: 1_500 });
+
+  await expect(page.locator("html")).toHaveCSS("scrollbar-color", "rgba(0, 0, 0, 0) rgba(0, 0, 0, 0)");
+  await page.evaluate(() => window.dispatchEvent(new Event("scroll")));
+  await expect(page.locator("html")).toHaveClass(/is-scrolling/);
+  await expect(page.locator("html")).not.toHaveClass(/is-scrolling/, { timeout: 1_500 });
 });
 
 test("新建目标页使用统一分步表单并完成创建", async ({ page }) => {
