@@ -1932,6 +1932,10 @@
     inset 0 1px 0 color-mix(in srgb, white 72%, transparent);
 }
 
+.knowledge-reference-page .knowledge-demo-intro:focus {
+  outline: none;
+}
+
 .knowledge-demo-intro-close,
 .knowledge-auth-gate-close {
   position: absolute;
@@ -2010,9 +2014,9 @@
 
 .knowledge-guest-gate-message {
   display: grid;
-  gap: 4px;
+  gap: 6px;
   margin-top: 20px;
-  padding: 14px 16px;
+  padding: 16px 17px;
   color: var(--knowledge-muted);
   border: 1px solid color-mix(in srgb, var(--knowledge-accent) 18%, var(--knowledge-line));
   border-radius: 15px;
@@ -2025,12 +2029,15 @@
   color: var(--knowledge-accent);
   font-size: 14px;
   font-weight: 780;
+  line-height: 1.45;
 }
 
 .knowledge-guest-gate-copy {
   display: grid;
-  gap: 1px;
-  padding-left: 8px;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  line-height: 1.62;
 }
 
 .knowledge-guest-gate-copy > span {
@@ -2042,14 +2049,14 @@
   align-items: center;
   justify-content: space-between;
   gap: 14px;
-  margin-top: 22px;
+  margin-top: 20px;
   padding-top: 0;
   border-top: 0;
 }
 
 .knowledge-reference-page .knowledge-guest-gate-dismiss {
   min-height: 44px;
-  padding: 0 8px;
+  padding: 0 12px;
   color: var(--knowledge-muted);
   border: 0;
   border-radius: 10px;
@@ -2180,6 +2187,10 @@
 .knowledge-reference-page .app-dialog>footer button {
   min-height: 40px;
   font-size: 13px;
+}
+
+.knowledge-reference-page .knowledge-demo-intro > footer .knowledge-guest-gate-dismiss {
+  min-height: 44px;
 }
 
 .knowledge-reference-page .file-dropzone strong {

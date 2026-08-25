@@ -5,10 +5,10 @@ import Link from "next/link";
 import { useEffect, useRef } from "react";
 
 export function GuestModeDialog({ onClose }: { onClose: () => void }) {
-  const continueRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
-    continueRef.current?.focus();
+    dialogRef.current?.focus();
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
     };
@@ -19,11 +19,13 @@ export function GuestModeDialog({ onClose }: { onClose: () => void }) {
   return (
     <div className="dialog-backdrop knowledge-demo-intro-backdrop knowledge-reference-page" onMouseDown={onClose}>
       <section
+        ref={dialogRef}
         className="app-dialog knowledge-demo-intro"
         role="dialog"
         aria-modal="true"
         aria-labelledby="guest-mode-title"
         aria-describedby="guest-mode-description"
+        tabIndex={-1}
         onMouseDown={(event) => event.stopPropagation()}
       >
         <button type="button" className="knowledge-demo-intro-close" aria-label="关闭" onClick={onClose}><X size={19} /></button>
@@ -37,12 +39,12 @@ export function GuestModeDialog({ onClose }: { onClose: () => void }) {
         <div className="knowledge-guest-gate-message" id="guest-mode-description">
           <strong>页面展示的是一组体验数据</strong>
           <span className="knowledge-guest-gate-copy">
-            <span>目标、任务、笔记、资料与 Pilo 对话互相关联</span>
+            <span>目标、任务、笔记、资料与 Pilo 对话互相关联；</span>
             <span>登录后将使用你自己的真实数据。</span>
           </span>
         </div>
         <footer>
-          <button ref={continueRef} type="button" className="knowledge-guest-gate-dismiss" onClick={onClose}>继续体验</button>
+          <button type="button" className="knowledge-guest-gate-dismiss" onClick={onClose}>继续体验</button>
           <div>
             <Link href="/register" className="knowledge-guest-gate-register">注册</Link>
             <Link href="/login" className="knowledge-guest-gate-login">登录</Link>

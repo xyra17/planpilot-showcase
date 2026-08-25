@@ -21,12 +21,13 @@ test("访客说明只在首页展示并提供登录注册入口", async ({ page 
   const guestCopy = intro.locator(".knowledge-guest-gate-copy");
   const guestCopyLines = guestCopy.locator(":scope > span");
   await expect(guestCopyLines).toHaveText([
-    "目标、任务、笔记、资料与 Pilo 对话互相关联",
+    "目标、任务、笔记、资料与 Pilo 对话互相关联；",
     "登录后将使用你自己的真实数据。",
   ]);
   const guestCopyBox = await guestCopyLines.first().boundingBox();
   const guestCopyTitleBox = await intro.locator(".knowledge-guest-gate-message strong").boundingBox();
-  expect((guestCopyBox?.x ?? 0) - (guestCopyTitleBox?.x ?? 0)).toBeGreaterThanOrEqual(7);
+  expect(Math.abs((guestCopyBox?.x ?? 0) - (guestCopyTitleBox?.x ?? 0))).toBeLessThanOrEqual(1);
+  await expect(intro).toBeFocused();
   await expect(intro.getByRole("link", { name: "注册", exact: true })).toHaveAttribute("href", "/register");
   await expect(intro.getByRole("link", { name: "登录", exact: true })).toHaveAttribute("href", "/login");
 
