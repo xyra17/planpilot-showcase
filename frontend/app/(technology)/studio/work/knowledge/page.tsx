@@ -1207,26 +1207,6 @@ export default function KnowledgePage() {
     setToast(`已创建文件夹“${name}”`);
   }
 
-  async function retryResource(file: Resource) {
-    if (!requirePersistentAccount("重新处理学习资料")) return;
-    try {
-      let next: Resource = { ...file, status: "处理中", processingStatus: "queued", processingError: null };
-      if (authStatus === "authenticated" && typeof file.id === "string") {
-        const retried = await productApi.retryKnowledgeFile(file.id);
-        next = resourceFromApi(
-          retried,
-          new Map(Object.entries(libraryIds).map(([name, id]) => [id, name])),
-          new Map(goalOptions.map((goal) => [goal.id, goal.title])),
-          goalIdsByKbIdMap,
-        );
-      }
-      setFiles((current) => current.map((item) => item.id === file.id ? next : item));
-      setToast(`已重新提交“${file.name}”`);
-    } catch (reason) {
-      setDataError(reason instanceof Error ? reason.message : "重试失败");
-    }
-  }
-
   async function deleteCurrentLibrary(name: string) {
     const id = libraryIds[name];
     try {
