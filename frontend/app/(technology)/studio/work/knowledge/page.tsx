@@ -337,6 +337,7 @@ export default function KnowledgePage() {
   const [dataLoading, setDataLoading] = useState(false);
   const [dataError, setDataError] = useState("");
   const [classificationSplit, setClassificationSplit] = useState(50);
+  const [railWidth, setRailWidth] = useState(228);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const replacementInputRef = useRef<HTMLInputElement>(null);
   const objectUrls = useRef<string[]>([]);
@@ -345,6 +346,7 @@ export default function KnowledgePage() {
   const infoPaneResizeRef = useRef<{ startX: number; startWidth: number } | null>(null);
   const classificationSplitRef = useRef<HTMLDivElement>(null);
   const classificationResizeRef = useRef(false);
+  const railResizeRef = useRef<{ startX: number; startWidth: number } | null>(null);
 
   const clampInfoPaneWidth = useCallback((width: number) => Math.min(460, Math.max(280, width)), []);
   const goalIdsByKbIdMap = useMemo(() => new Map(Object.entries(goalIdsByKbId)), [goalIdsByKbId]);
@@ -406,6 +408,20 @@ export default function KnowledgePage() {
     setClassificationSplit((current) => Math.min(75, Math.max(25, current + (event.key === "ArrowDown" ? 5 : -5))));
   }, []);
 
+  const startRailResize = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    railResizeRef.current = { startX: event.clientX, startWidth: railWidth };
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  }, [railWidth]);
+
+  const resizeRailByKeyboard = useCallback((event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+    event.preventDefault();
+    setRailWidth((current) => Math.min(360, Math.max(200, current + (event.key === "ArrowRight" ? 20 : -20))));
+  }, []);
+
   useEffect(() => {
     const resizeClassification = (event: PointerEvent) => {
       if (!classificationResizeRef.current || !classificationSplitRef.current) return;
@@ -431,6 +447,28 @@ export default function KnowledgePage() {
         document.body.style.cursor = "";
         document.body.style.userSelect = "";
       }
+    };
+  }, []);
+
+  useEffect(() => {
+    const moveRail = (event: PointerEvent) => {
+      const resize = railResizeRef.current;
+      if (!resize) return;
+      setRailWidth(Math.min(360, Math.max(200, resize.startWidth + event.clientX - resize.startX)));
+    };
+    const finishRailResize = () => {
+      if (!railResizeRef.current) return;
+      railResizeRef.current = null;
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+    window.addEventListener("pointermove", moveRail);
+    window.addEventListener("pointerup", finishRailResize);
+    window.addEventListener("pointercancel", finishRailResize);
+    return () => {
+      window.removeEventListener("pointermove", moveRail);
+      window.removeEventListener("pointerup", finishRailResize);
+      window.removeEventListener("pointercancel", finishRailResize);
     };
   }, []);
 
@@ -1483,7 +1521,7 @@ export default function KnowledgePage() {
         />
       )}
 
-      <div className="knowledge-reference-grid">
+      <div className="knowledge-reference-grid" style={{ "--knowledge-rail-width": `${railWidth}px` } as React.CSSProperties}>
         <aside className="knowledge-rail-column">
           <nav className="knowledge-library-rail" aria-label="资料分类" onScroll={revealScrollbarWhileScrolling}>
             <section className="knowledge-scope-shortcuts">
@@ -1570,6 +1608,19 @@ export default function KnowledgePage() {
             </div>
           </section>
         </aside>
+
+        <div
+          className="knowledge-rail-resizer"
+          onPointerDown={startRailResize}
+          onKeyDown={resizeRailByKeyboard}
+          role="separator"
+          aria-label="调整资料分类栏宽度"
+          aria-orientation="vertical"
+          aria-valuemin={200}
+          aria-valuemax={360}
+          aria-valuenow={railWidth}
+          tabIndex={0}
+        />
 
         <main className="knowledge-resource-panel">
           <header className="knowledge-resource-heading knowledge-resource-filter-row">

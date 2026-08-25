@@ -260,6 +260,7 @@ export default function NotesPage() {
   const [fullscreen, setFullscreen] = useState(false);
   const [fullscreenToolbarHost, setFullscreenToolbarHost] = useState<HTMLDivElement | null>(null);
   const [indexCollapsed, setIndexCollapsed] = useState(false);
+  const [indexWidth, setIndexWidth] = useState(228);
   const [goalFilter, setGoalFilter] = useState("all");
   const [filterPickerOpen, setFilterPickerOpen] = useState(false);
   const [goalOptions, setGoalOptions] = useState<ApiGoal[]>([]);
@@ -275,6 +276,9 @@ export default function NotesPage() {
   const draftIsNewRef = useRef(draftIsNew);
   const filterPickerRef = useRef<HTMLDivElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
+  const indexDraggingRef = useRef(false);
+  const indexDragStartRef = useRef(0);
+  const indexDragWidthRef = useRef(228);
 
   function revealScrollbarWhileScrolling(event: UIEvent<HTMLElement>) {
     const container = event.currentTarget;
@@ -287,6 +291,31 @@ export default function NotesPage() {
     }, 720);
     scrollbarHideTimersRef.current.set(container, nextTimer);
   }
+
+  const startIndexResize = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
+    if (indexCollapsed) return;
+    indexDraggingRef.current = true;
+    indexDragStartRef.current = event.clientX;
+    indexDragWidthRef.current = indexWidth;
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  }, [indexCollapsed, indexWidth]);
+
+  useEffect(() => {
+    const onMove = (event: MouseEvent) => {
+      if (!indexDraggingRef.current) return;
+      setIndexWidth(Math.min(380, Math.max(220, indexDragWidthRef.current + event.clientX - indexDragStartRef.current)));
+    };
+    const onUp = () => {
+      if (!indexDraggingRef.current) return;
+      indexDraggingRef.current = false;
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => { window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); };
+  }, []);
 
   useEffect(() => {
     draftRef.current = draft;
@@ -772,7 +801,7 @@ export default function NotesPage() {
         />
       )}
 
-      <section className={`notes-workspace ${indexCollapsed ? "is-index-collapsed" : ""}`}>
+      <section className={`notes-workspace ${indexCollapsed ? "is-index-collapsed" : ""}`} style={{ "--notes-index-width": `${indexWidth}px` } as React.CSSProperties}>
         <aside className="notes-list" aria-label="笔记列表">
           <button
             type="button"
@@ -890,6 +919,18 @@ export default function NotesPage() {
             )}
           </div>
         </aside>
+
+        <div
+          className="notes-column-resizer"
+          onMouseDown={startIndexResize}
+          role="separator"
+          aria-label="调整笔记列表宽度"
+          aria-orientation="vertical"
+          aria-valuemin={220}
+          aria-valuemax={380}
+          aria-valuenow={indexWidth}
+          tabIndex={0}
+        />
 
         <article className={`note-editor ${fullscreen ? "is-fullscreen" : ""}`}>
           {fullscreen && (

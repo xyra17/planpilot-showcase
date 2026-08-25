@@ -4146,8 +4146,8 @@
    The grid itself is deliberately unboxed: the index and editor are the two
    equal-height surfaces, using Knowledge Space's measured desktop geometry. */
 .app-shell .tech-notes-migrated .notes-workspace {
-  grid-template-columns: minmax(220px, 228px) minmax(0, 1fr) !important;
-  gap: 12px;
+  grid-template-columns: minmax(220px, var(--notes-index-width, 228px)) 4px minmax(0, 1fr) !important;
+  gap: 7px;
   overflow: visible;
   background: transparent !important;
   border: 0 !important;
@@ -4156,7 +4156,39 @@
 }
 
 .app-shell .tech-notes-migrated .notes-workspace.is-index-collapsed {
-  grid-template-columns: 44px minmax(0, 1fr) !important;
+  grid-template-columns: 44px 0 minmax(0, 1fr) !important;
+}
+
+.app-shell .tech-notes-migrated .notes-column-resizer {
+  position: relative;
+  width: 4px;
+  min-width: 4px;
+  cursor: col-resize;
+  outline: none;
+}
+
+.app-shell .tech-notes-migrated .notes-column-resizer::after {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 2px;
+  height: 56px;
+  content: "";
+  background: color-mix(in srgb, var(--workspace-accent) 20%, var(--workspace-border));
+  border-radius: 999px;
+  opacity: .78;
+  transform: translate(-50%, -50%);
+  transition: height 160ms ease, background 160ms ease;
+}
+
+.app-shell .tech-notes-migrated .notes-column-resizer:hover::after,
+.app-shell .tech-notes-migrated .notes-column-resizer:focus-visible::after {
+  height: 72px;
+  background: var(--workspace-accent);
+}
+
+.app-shell .tech-notes-migrated .notes-workspace.is-index-collapsed .notes-column-resizer {
+  visibility: hidden;
 }
 
 .app-shell .tech-notes-migrated .notes-workspace > .notes-list,
@@ -4832,6 +4864,10 @@
   .app-shell .tech-notes-migrated .notes-workspace.is-index-collapsed {
     grid-template-columns: 1fr !important;
     gap: 12px;
+  }
+
+  .app-shell .tech-notes-migrated .notes-column-resizer {
+    display: none;
   }
 }
 
