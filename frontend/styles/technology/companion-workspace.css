@@ -8552,6 +8552,14 @@
   background-repeat: no-repeat;
   background-size: contain;
 }
+.pilo-companion__life-action-preview > img {
+  display: block;
+  width: 54px;
+  height: 62px;
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-drag: none;
+}
 
 .pilo-companion__life-action-grid > button > span:last-child {
   min-width: 0;

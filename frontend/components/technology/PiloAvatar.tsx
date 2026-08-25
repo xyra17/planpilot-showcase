@@ -65,6 +65,8 @@ const LIFE_ACTION_PHASE_FRAME_OVERRIDES: Partial<Record<PiloLifeActionId, Record
   },
 };
 const ATLAS_LIFE_ACTION_PHASE_FRAMES: Partial<Record<PiloLifeActionId, Record<PiloActionPhase, readonly number[]>>> = {
+  // Sitting/resting uses the calm idle row as a gentle breathing loop.
+  rest: { entering: [0, 1], holding: [2, 3, 4, 5], leaving: [5, 1, 0] },
   read: { entering: [0, 1], holding: [2, 3, 4, 5], leaving: [5, 1, 0] },
   work: { entering: [0, 1], holding: [2, 3, 4, 5], leaving: [5, 1, 0] },
   wait: { entering: [0, 1], holding: [2, 3, 4, 5], leaving: [5, 1, 0] },
@@ -79,6 +81,7 @@ const ATLAS_LIFE_ACTION_PHASE_FRAMES: Partial<Record<PiloLifeActionId, Record<Pi
   walk: { entering: [0, 1], holding: [0, 1, 2, 3, 4, 5, 6, 7], leaving: [7, 6, 1, 0] },
 };
 const ATLAS_LIFE_ACTION_DURATIONS: Partial<Record<PiloLifeActionId, readonly number[]>> = {
+  rest: [300, 300, 620, 760, 760, 920, 300, 300],
   read: [300, 300, 620, 760, 760, 920, 300, 300],
   work: [180, 180, 220, 240, 240, 240, 220, 220],
   wait: [260, 260, 420, 520, 520, 640, 260, 260],

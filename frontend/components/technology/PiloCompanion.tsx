@@ -73,6 +73,7 @@ import {
   PILO_STATE_EVENT,
   signalPiloState,
   type PiloAccessory,
+  type PiloLifeActionId,
   type PiloStateDetail,
   type PiloSystemState,
 } from "@/lib/technology/piloState";
@@ -306,6 +307,26 @@ const PILO_SUPPLEMENTAL_LIFE_ACTION_IDS = new Set([
   "nap",
   "sign-off",
 ]);
+
+function SupplementalLifeActionPreview({ actionId }: { actionId: PiloLifeActionId }) {
+  const [frame, setFrame] = useState(0);
+
+  useEffect(() => {
+    setFrame(0);
+    const timer = window.setInterval(() => {
+      setFrame((current) => (current + 1) % 8);
+    }, 180);
+    return () => window.clearInterval(timer);
+  }, [actionId]);
+
+  return (
+    <img
+      src={`/pilo/life/${actionId}/${String(frame).padStart(2, "0")}.png`}
+      alt=""
+      draggable={false}
+    />
+  );
+}
 
 const MODE_OPTIONS: ReadonlyArray<{
   id: Exclude<PiloCompanionMode, "custom">;
@@ -2962,7 +2983,7 @@ export function PiloCompanion() {
                                   instant
                                 />
                               ) : (
-                                <span style={{ backgroundImage: `url(/pilo/life/${action.id}/04.png)` }} />
+                                <SupplementalLifeActionPreview actionId={action.id} />
                               )}
                             </span>
                             <span><strong>{action.label}</strong><small>{action.trigger}</small></span>
