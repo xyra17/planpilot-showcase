@@ -64,6 +64,7 @@ import {
   useState,
   type CSSProperties,
   type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
   type UIEvent,
 } from "react";
@@ -337,7 +338,7 @@ export default function KnowledgePage() {
   const [dataLoading, setDataLoading] = useState(false);
   const [dataError, setDataError] = useState("");
   const [classificationSplit, setClassificationSplit] = useState(50);
-  const [railWidth, setRailWidth] = useState(228);
+  const [railWidth, setRailWidth] = useState(208);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const replacementInputRef = useRef<HTMLInputElement>(null);
   const objectUrls = useRef<string[]>([]);
@@ -419,7 +420,7 @@ export default function KnowledgePage() {
   const resizeRailByKeyboard = useCallback((event: ReactKeyboardEvent<HTMLDivElement>) => {
     if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
     event.preventDefault();
-    setRailWidth((current) => Math.min(360, Math.max(200, current + (event.key === "ArrowRight" ? 20 : -20))));
+    setRailWidth((current) => Math.min(340, Math.max(180, current + (event.key === "ArrowRight" ? 20 : -20))));
   }, []);
 
   useEffect(() => {
@@ -454,7 +455,7 @@ export default function KnowledgePage() {
     const moveRail = (event: PointerEvent) => {
       const resize = railResizeRef.current;
       if (!resize) return;
-      setRailWidth(Math.min(360, Math.max(200, resize.startWidth + event.clientX - resize.startX)));
+      setRailWidth(Math.min(340, Math.max(180, resize.startWidth + event.clientX - resize.startX)));
     };
     const finishRailResize = () => {
       if (!railResizeRef.current) return;
@@ -482,6 +483,12 @@ export default function KnowledgePage() {
       scrollbarHideTimersRef.current.delete(container);
     }, 720);
     scrollbarHideTimersRef.current.set(container, nextTimer);
+  }
+
+  function updateNavTooltip(event: ReactMouseEvent<HTMLButtonElement>, label: string, count: number) {
+    const labelElement = event.currentTarget.querySelector<HTMLElement>(".knowledge-nav-label");
+    const labelIsTruncated = Boolean(labelElement && labelElement.scrollWidth > labelElement.clientWidth + 1);
+    event.currentTarget.title = labelIsTruncated ? `${label} · ${count} 项资料` : `${count} 项资料`;
   }
 
   const selected = files.find((file) => file.id === selectedId) ?? null;
@@ -1525,8 +1532,8 @@ export default function KnowledgePage() {
         <aside className="knowledge-rail-column">
           <nav className="knowledge-library-rail" aria-label="资料分类" onScroll={revealScrollbarWhileScrolling}>
             <section className="knowledge-scope-shortcuts">
-              <button type="button" className={!hasActiveFilters ? "is-active" : ""} onClick={clearFilters}><FileText size={15} /><span>全部资料</span><strong>{files.length}</strong></button>
-              <button type="button" className={goalFilter === "unlinked" ? "is-active" : ""} onClick={() => { clearFilters(); setGoalFilter("unlinked"); }}><Link2 size={15} /><span>未关联资料</span><strong>{files.filter(isUnlinkedResource).length}</strong></button>
+              <button type="button" className={!hasActiveFilters ? "is-active" : ""} aria-label={`全部资料，${files.length} 项资料`} onMouseEnter={(event) => updateNavTooltip(event, "全部资料", files.length)} onClick={clearFilters}><FileText size={15} /><span className="knowledge-nav-label">全部资料</span></button>
+              <button type="button" className={goalFilter === "unlinked" ? "is-active" : ""} aria-label={`未关联资料，${files.filter(isUnlinkedResource).length} 项资料`} onMouseEnter={(event) => updateNavTooltip(event, "未关联资料", files.filter(isUnlinkedResource).length)} onClick={() => { clearFilters(); setGoalFilter("unlinked"); }}><Link2 size={15} /><span className="knowledge-nav-label">未关联资料</span></button>
             </section>
             <div
               className="knowledge-classification-split"
@@ -1540,8 +1547,8 @@ export default function KnowledgePage() {
                 <h2><span>按目标分类</span></h2>
                 <div className="knowledge-goal-scroll" onScroll={revealScrollbarWhileScrolling}>
                 {goalOptions.map((goal) => (
-                  <button type="button" key={goal.id} className={goalFilter === goal.id ? "is-active" : ""} onClick={() => { clearFilters(); setGoalFilter(goal.id); }}>
-                    <Target size={15} /><span>{goal.title}</span><strong>{files.filter((file) => file.goalIds.includes(goal.id)).length}</strong>
+                  <button type="button" key={goal.id} className={goalFilter === goal.id ? "is-active" : ""} aria-label={`${goal.title}，${files.filter((file) => file.goalIds.includes(goal.id)).length} 项资料`} onMouseEnter={(event) => updateNavTooltip(event, goal.title, files.filter((file) => file.goalIds.includes(goal.id)).length)} onClick={() => { clearFilters(); setGoalFilter(goal.id); }}>
+                    <Target size={15} /><span className="knowledge-nav-label">{goal.title}</span>
                   </button>
                 ))}
                 {!goalOptions.length && <p className="knowledge-rail-empty">创建学习目标后，可将一份资料关联到多个目标。</p>}
@@ -1567,7 +1574,7 @@ export default function KnowledgePage() {
                     const count = files.filter((file) => file.libraries.includes(name)).length;
                     return (
                       <div key={name} className="knowledge-library-row">
-                        <button type="button" className={libraryFilter === name ? "is-active" : ""} onClick={() => { clearFilters(); setLibraryFilter(name); setLibrary(name); }}><FolderOpen size={15} /><span>{name}</span><strong>{count}</strong></button>
+                        <button type="button" className={libraryFilter === name ? "is-active" : ""} aria-label={`${name}，${count} 项资料`} onMouseEnter={(event) => updateNavTooltip(event, name, count)} onClick={() => { clearFilters(); setLibraryFilter(name); setLibrary(name); }}><FolderOpen size={15} /><span className="knowledge-nav-label">{name}</span></button>
                       </div>
                     );
                   })}
@@ -1616,7 +1623,7 @@ export default function KnowledgePage() {
           role="separator"
           aria-label="调整资料分类栏宽度"
           aria-orientation="vertical"
-          aria-valuemin={200}
+          aria-valuemin={180}
           aria-valuemax={360}
           aria-valuenow={railWidth}
           tabIndex={0}

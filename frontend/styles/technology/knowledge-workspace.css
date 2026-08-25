@@ -6179,7 +6179,7 @@
   }
 
   .knowledge-reference-page .knowledge-reference-grid {
-    grid-template-columns: minmax(200px, var(--knowledge-rail-width, 228px)) 4px minmax(0, 1fr);
+    grid-template-columns: minmax(180px, var(--knowledge-rail-width, 208px)) 4px minmax(0, 1fr);
     gap: 7px;
   }
 
