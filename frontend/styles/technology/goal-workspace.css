@@ -977,6 +977,19 @@
   scrollbar-width: thin;
 }
 
+.app-shell .tech-goals-page .goals-list.is-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.app-shell .tech-goals-page .goals-list.is-empty .product-empty-state {
+  width: 100%;
+  min-height: 260px;
+}
+
 .app-shell .tech-goals-page .goals-list::-webkit-scrollbar {
   width: 6px;
 }

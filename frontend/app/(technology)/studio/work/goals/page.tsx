@@ -701,7 +701,7 @@ export default function GoalsPage() {
               </button>
             </div>
           </header>
-          <div className="goals-list" ref={goalsListRef}>
+          <div className={`goals-list ${visibleGoals.length === 0 ? "is-empty" : ""}`} ref={goalsListRef}>
             {visibleGoals.map((goal, index) => {
               const GoalTypeIcon = index === 0 ? Rocket : index === 1 ? LibraryBig : Sprout;
               const taskSummary = goal.taskSummary || (index === 0 ? "16 / 25 个任务" : index === 1 ? "8 / 21 个任务" : "18 / 30 个任务");
@@ -747,6 +747,14 @@ export default function GoalsPage() {
                 </article>
               );
             })}
+            {visibleGoals.length === 0 && (
+              <div className="product-empty-state" role="status">
+                <Target size={22} aria-hidden="true" />
+                <strong>还没有符合条件的目标</strong>
+                <p>创建第一个目标后，计划、任务和知识空间会围绕它组织。</p>
+                <button type="button" onClick={() => router.push("/studio/work/goals/new")}><Plus size={15} />新建目标</button>
+              </div>
+            )}
           </div>
         </section>
 
@@ -862,8 +870,6 @@ export default function GoalsPage() {
         </aside>
 
       </div>}
-      {!dataLoading && !dataError && visibleGoals.length === 0 && <div className="product-empty-state"><Target size={22} /><strong>还没有符合条件的目标</strong><p>创建第一个目标后，计划、任务和知识空间会围绕它组织。</p><button type="button" onClick={() => router.push("/studio/work/goals/new")}><Plus size={15} />新建目标</button></div>}
-
     </div>
   );
 }
