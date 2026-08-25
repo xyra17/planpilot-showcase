@@ -26,6 +26,7 @@ import src.api.goals as goals
 import src.api.intelligence as intelligence
 import src.api.knowledge as knowledge
 import src.api.learner as learner
+import src.api.model_settings as model_settings
 import src.api.notifications as notifications
 import src.api.plans as plans
 import src.api.privacy as privacy
@@ -62,19 +63,22 @@ async def lifespan(app: FastAPI):
     await get_agent()
 
     # 本地模型热身：若配置了本地推理端点，提前触发模型加载以消除首次请求的冷启动延迟
-    if settings.local_model_enabled and settings.openai_base_url:
+    from src.services.runtime_model_config import get_runtime_model_config
+
+    runtime_models = get_runtime_model_config()
+    if runtime_models.local_enabled and runtime_models.local_base_url:
         from openai import AsyncOpenAI
 
         from src.core.agent.nodes.chat import _SYSTEM_BASE
 
         try:
             local_client = AsyncOpenAI(
-                api_key=settings.openai_api_key or "local",
-                base_url=settings.openai_base_url,
+                api_key=runtime_models.local_api_key or "local",
+                base_url=runtime_models.local_base_url,
             )
             await asyncio.wait_for(
                 local_client.chat.completions.create(
-                    model=settings.model_name,
+                    model=runtime_models.local_model_name,
                     messages=[
                         {"role": "system", "content": _SYSTEM_BASE},
                         {"role": "user", "content": "回复好"},
@@ -84,7 +88,7 @@ async def lifespan(app: FastAPI):
                 ),
                 timeout=15.0,
             )
-            logger.info("本地模型热身完成 (base_url=%s)", settings.openai_base_url)
+            logger.info("本地模型热身完成 (base_url=%s)", runtime_models.local_base_url)
         except Exception as e:
             logger.warning("本地模型热身失败，将在首次请求时加载: %s", e)
 
@@ -185,6 +189,7 @@ for domain_router in (
     intelligence.router,
     learner.router,
     notifications.router,
+    model_settings.router,
     schedule.router,
 ):
     for route in domain_router.routes:
@@ -223,13 +228,16 @@ async def readiness() -> dict[str, str]:
 
 @app.get("/health/ai")
 async def ai_health() -> dict:
+    from src.services.runtime_model_config import get_runtime_model_config
+
+    runtime_models = get_runtime_model_config()
     local_reachable = False
     local_error: str | None = None
     local_models: list[str] = []
-    if settings.local_model_enabled and settings.openai_base_url:
+    if runtime_models.local_enabled and runtime_models.local_base_url:
         try:
             async with httpx.AsyncClient(timeout=2.0) as client:
-                response = await client.get(f"{settings.openai_base_url.rstrip('/')}/models")
+                response = await client.get(f"{runtime_models.local_base_url.rstrip('/')}/models")
                 response.raise_for_status()
                 payload = response.json()
                 local_models = [
@@ -244,10 +252,10 @@ async def ai_health() -> dict:
     embedding_reachable = False
     embedding_error: str | None = None
     embedding_models: list[str] = []
-    if settings.embedding_base_url:
+    if runtime_models.embedding_enabled and runtime_models.embedding_base_url:
         try:
             async with httpx.AsyncClient(timeout=2.0) as client:
-                response = await client.get(f"{settings.embedding_base_url.rstrip('/')}/models")
+                response = await client.get(f"{runtime_models.embedding_base_url.rstrip('/')}/models")
                 response.raise_for_status()
                 payload = response.json()
                 embedding_models = [
@@ -263,16 +271,16 @@ async def ai_health() -> dict:
         **get_llm_runtime_status(),
         "local_reachable": local_reachable,
         "local_error_type": local_error,
-        "local_configured_model": settings.model_name,
+        "local_configured_model": runtime_models.local_model_name,
         "local_advertised_models": local_models,
-        "local_model_id_exact_match": settings.model_name in local_models,
-        "embedding_configured": bool(settings.embedding_base_url),
+        "local_model_id_exact_match": runtime_models.local_model_name in local_models,
+        "embedding_configured": bool(runtime_models.embedding_enabled and runtime_models.embedding_base_url),
         "embedding_reachable": embedding_reachable,
         "embedding_error_type": embedding_error,
-        "embedding_configured_model": settings.embedding_model_name,
+        "embedding_configured_model": runtime_models.embedding_model_name,
         "embedding_advertised_models": embedding_models,
-        "flash_configured": bool(settings.smart_api_key and settings.smart_model_name),
-        "pro_configured": bool(settings.smart_api_key and settings.smart_pro_model_name),
-        "cloud_routine_configured": bool(settings.smart_api_key and settings.smart_model_name),
-        "cloud_pro_configured": bool(settings.smart_api_key and settings.smart_pro_model_name),
+        "flash_configured": bool(runtime_models.cloud_enabled and runtime_models.cloud_api_key and runtime_models.cloud_model_name),
+        "pro_configured": bool(runtime_models.cloud_enabled and runtime_models.cloud_api_key and runtime_models.cloud_pro_model_name),
+        "cloud_routine_configured": bool(runtime_models.cloud_enabled and runtime_models.cloud_api_key and runtime_models.cloud_model_name),
+        "cloud_pro_configured": bool(runtime_models.cloud_enabled and runtime_models.cloud_api_key and runtime_models.cloud_pro_model_name),
     }

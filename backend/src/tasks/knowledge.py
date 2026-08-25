@@ -228,6 +228,7 @@ async def _process(item_id: str) -> None:
 
     from src.config import settings
     from src.models import KnowledgeChunk, KnowledgeItem
+    from src.services.runtime_model_config import get_runtime_model_config
     from src.services.object_storage import (
         ObjectStorageError,
         extension_for_reference,
@@ -284,12 +285,13 @@ async def _process(item_id: str) -> None:
             await db.execute(delete(KnowledgeChunk).where(KnowledgeChunk.item_id == item.id))
             await db.commit()
 
+            runtime_models = get_runtime_model_config()
             clients = []
-            if settings.embedding_base_url:
+            if runtime_models.embedding_enabled and runtime_models.embedding_base_url:
                 clients.append(
                     AsyncOpenAI(
-                        api_key=settings.embedding_api_key or "local",
-                        base_url=settings.embedding_base_url,
+                        api_key=runtime_models.embedding_api_key or "local",
+                        base_url=runtime_models.embedding_base_url,
                         timeout=settings.embedding_timeout_seconds,
                         max_retries=settings.embedding_max_retries,
                     )
@@ -301,8 +303,8 @@ async def _process(item_id: str) -> None:
                 clients,
                 item.title,
                 chunks,
-                model=settings.embedding_model_name,
-                dimensions=settings.embedding_dimensions,
+                model=runtime_models.embedding_model_name,
+                dimensions=runtime_models.embedding_dimensions,
             )
             for index, ((chunk, start_char, end_char), embedding) in enumerate(
                 zip(chunks, embeddings, strict=True)

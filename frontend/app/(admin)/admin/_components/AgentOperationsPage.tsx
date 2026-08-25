@@ -104,8 +104,8 @@ const MODEL_ROLE_LABEL = {
 
 const ROUTE_LABEL: Record<string, string> = {
   local: "本地 Qwen",
-  flash: "DeepSeek Flash",
-  pro: "DeepSeek Pro",
+  flash: "云端日常模型",
+  pro: "云端高质量模型",
   "embedding-local": "本地向量检索",
   "keyword-search": "关键词包含匹配",
 };

@@ -177,6 +177,6 @@ async def test_quality_failure_retries_with_local_model():
 
 def test_model_roles_are_explicit_and_non_overlapping():
     assert MODEL_ROLE_CONTRACTS["interactive"]["primary"] == "local"
-    assert MODEL_ROLE_CONTRACTS["structured"]["primary"] == "flash"
-    assert MODEL_ROLE_CONTRACTS["critical"]["primary"] == "pro"
+    assert MODEL_ROLE_CONTRACTS["structured"]["primary"] == "cloud"
+    assert MODEL_ROLE_CONTRACTS["critical"]["primary"] == "cloud-pro"
     assert MODEL_ROLE_CONTRACTS["embedding"]["primary"] == "embedding-local"

@@ -217,6 +217,36 @@ export interface GatewayCircuit {
   retry_after: number | null;
 }
 
+export interface RuntimeModelSettings {
+  local_enabled: boolean;
+  local_base_url: string;
+  local_model_name: string;
+  local_api_key_configured: boolean;
+  cloud_enabled: boolean;
+  cloud_provider: "deepseek" | "zhipu" | "doubao" | "custom";
+  cloud_base_url: string;
+  cloud_model_name: string;
+  cloud_pro_model_name: string;
+  cloud_api_key_configured: boolean;
+  embedding_enabled: boolean;
+  embedding_base_url: string;
+  embedding_model_name: string;
+  embedding_dimensions: number;
+  embedding_api_key_configured: boolean;
+  coach_agent_enabled: boolean;
+  updated_at: string | null;
+  updated_by: string | null;
+}
+
+export interface ModelProbeResult {
+  target: "local" | "cloud" | "embedding";
+  configured: boolean;
+  reachable: boolean;
+  model_match: boolean;
+  advertised_models: string[];
+  detail: string;
+}
+
 export interface CalibrationOverview {
   prediction_type: string;
   algorithm_version: string;
@@ -413,6 +443,12 @@ export const agentControlApi = {
     api.get<AgentTrace>(`/api/v1/agent-control/traces/${traceId}`),
   getGatewayCircuits: () =>
     api.get<GatewayCircuit[]>("/api/v1/agent-control/gateway/circuits"),
+  getRuntimeModelSettings: () =>
+    api.get<RuntimeModelSettings>("/api/v1/admin/model-settings"),
+  updateRuntimeModelSettings: (body: Record<string, unknown>) =>
+    api.put<RuntimeModelSettings>("/api/v1/admin/model-settings", body),
+  probeRuntimeModels: () =>
+    api.post<ModelProbeResult[]>("/api/v1/admin/model-settings/probe", {}),
   getEvaluations: () =>
     api.get<EvaluationRun[]>("/api/v1/agent-control/evaluations"),
   getExperiments: () =>

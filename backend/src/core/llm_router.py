@@ -1,9 +1,4 @@
-"""PlanPilot generation-model roles and bounded routing.
-
-Interactive text uses local Qwen with Flash as availability fallback.
-Structured JSON uses Flash with local Qwen as availability fallback.
-Critical judgments use Pro without silent degradation.
-"""
+"""PlanPilot generation-model roles and bounded, provider-neutral routing."""
 
 import asyncio
 import json
@@ -21,6 +16,7 @@ from langchain_openai import ChatOpenAI
 
 from src.config import settings
 from src.core.model_gateway import gateway_status
+from src.services.runtime_model_config import RuntimeModelConfig, get_runtime_model_config
 
 logger = logging.getLogger(__name__)
 
@@ -129,7 +125,7 @@ MODEL_ROLE_CONTRACTS = {
         "purpose": "普通聊天、打卡回应、短解释和笔记辅助",
         "primary": "local",
         "primary_model": settings.model_name,
-        "fallback": "flash",
+        "fallback": "cloud",
         "fallback_model": settings.smart_model_name,
         "fallback_policy": "本地模型不可用、报错或队列超时后回退；不因主观回答质量自动切换",
         "result": "简短中文自然语言，可流式返回",
@@ -137,7 +133,7 @@ MODEL_ROLE_CONTRACTS = {
     },
     "structured": {
         "purpose": "宏观计划、每日任务、验收出题、Agent 规划和建议 JSON",
-        "primary": "flash",
+        "primary": "cloud",
         "primary_model": settings.smart_model_name,
         "fallback": "local",
         "fallback_model": settings.model_name,
@@ -147,7 +143,7 @@ MODEL_ROLE_CONTRACTS = {
     },
     "critical": {
         "purpose": "学习答案评分和需要高质量终审的复杂决策",
-        "primary": "pro",
+        "primary": "cloud-pro",
         "primary_model": settings.smart_pro_model_name,
         "fallback": None,
         "fallback_model": None,
@@ -217,11 +213,12 @@ class _RouteMetricsCallback(BaseCallbackHandler):
         self._finish(run_id, "failure")
 
 
-def _local_llm(**kwargs: Any) -> ChatOpenAI:
+def _local_llm(runtime: RuntimeModelConfig | None = None, **kwargs: Any) -> ChatOpenAI:
+    runtime = runtime or get_runtime_model_config()
     return ChatOpenAI(
-        model=settings.model_name,
-        api_key=settings.openai_api_key or "local",
-        base_url=settings.openai_base_url or None,
+        model=runtime.local_model_name,
+        api_key=runtime.local_api_key or "local",
+        base_url=runtime.local_base_url or None,
         timeout=settings.local_model_timeout_seconds,
         max_retries=0,
         extra_body={"chat_template_kwargs": {"enable_thinking": False}},
@@ -230,11 +227,12 @@ def _local_llm(**kwargs: Any) -> ChatOpenAI:
     )
 
 
-def _flash_llm(**kwargs: Any) -> ChatOpenAI:
+def _flash_llm(runtime: RuntimeModelConfig | None = None, **kwargs: Any) -> ChatOpenAI:
+    runtime = runtime or get_runtime_model_config()
     return ChatOpenAI(
-        model=settings.smart_model_name,
-        api_key=settings.smart_api_key,
-        base_url=settings.smart_base_url or None,
+        model=runtime.cloud_model_name,
+        api_key=runtime.cloud_api_key,
+        base_url=runtime.cloud_base_url or None,
         timeout=settings.cloud_routine_timeout_seconds,
         max_retries=settings.cloud_model_max_retries,
         callbacks=[_RouteMetricsCallback("flash")],
@@ -305,21 +303,22 @@ def _limit_pro_concurrency(runnable: Any) -> Any:
 def create_interactive_llm(*, tools: Sequence[Any] | None = None, **kwargs: Any) -> Any:
     """Local Qwen first for user-facing conversation; Flash is availability fallback."""
     candidates: list[Any] = []
+    runtime = get_runtime_model_config()
     local_added = (
-        settings.local_model_enabled and settings.openai_base_url and local_circuit.allow_request()
+        runtime.local_enabled and runtime.local_base_url and local_circuit.allow_request()
     )
     if local_added:
-        local = _local_llm(**kwargs)
+        local = _local_llm(runtime, **kwargs)
         if tools:
             local = local.bind_tools(tools)
         candidates.append(_limit_local_concurrency(local))
-    if settings.smart_api_key and settings.smart_model_name:
-        flash = _flash_llm(**kwargs)
+    if runtime.cloud_enabled and runtime.cloud_api_key and runtime.cloud_model_name:
+        flash = _flash_llm(runtime, **kwargs)
         if tools:
             flash = flash.bind_tools(tools)
         candidates.append(_limit_flash_concurrency(flash))
     if not candidates:
-        raise RuntimeError("没有可用的日常模型：请配置本地模型或 DeepSeek Flash")
+        raise RuntimeError("没有可用的日常模型：请配置本地模型或云端模型")
 
     primary, *fallbacks = candidates
     return primary.with_fallbacks(fallbacks) if fallbacks else primary
@@ -333,21 +332,22 @@ def create_routine_llm(*, tools: Sequence[Any] | None = None, **kwargs: Any) -> 
 def create_structured_llm(*, tools: Sequence[Any] | None = None, **kwargs: Any) -> Any:
     """Flash first for contract-bound JSON; local Qwen is availability fallback."""
     candidates: list[Any] = []
-    if settings.smart_api_key and settings.smart_model_name:
-        flash = _flash_llm(**kwargs)
+    runtime = get_runtime_model_config()
+    if runtime.cloud_enabled and runtime.cloud_api_key and runtime.cloud_model_name:
+        flash = _flash_llm(runtime, **kwargs)
         if tools:
             flash = flash.bind_tools(tools)
         candidates.append(_limit_flash_concurrency(flash))
     local_added = (
-        settings.local_model_enabled and settings.openai_base_url and local_circuit.allow_request()
+        runtime.local_enabled and runtime.local_base_url and local_circuit.allow_request()
     )
     if local_added:
-        local = _local_llm(**kwargs)
+        local = _local_llm(runtime, **kwargs)
         if tools:
             local = local.bind_tools(tools)
         candidates.append(_limit_local_concurrency(local))
     if not candidates:
-        raise RuntimeError("没有可用的结构化生成模型：请配置 DeepSeek Flash 或本地模型")
+        raise RuntimeError("没有可用的结构化生成模型：请配置云端模型或本地模型")
     primary, *fallbacks = candidates
     return primary.with_fallbacks(fallbacks) if fallbacks else primary
 
@@ -364,14 +364,15 @@ def create_structured_routine_llm(
     model_kwargs["response_format"] = {"type": "json_object"}
     if provider in {None, "configured-router", "structured"}:
         return create_structured_llm(model_kwargs=model_kwargs, **kwargs)
+    runtime = get_runtime_model_config()
     timeout = timeout_ms / 1000 if timeout_ms else None
     if provider == "local":
-        if not settings.openai_base_url:
+        if not runtime.local_base_url:
             raise RuntimeError("本地模型 Provider 未配置")
         model = ChatOpenAI(
-            model=model_name or settings.model_name,
-            api_key=settings.openai_api_key or "local",
-            base_url=settings.openai_base_url,
+            model=model_name or runtime.local_model_name,
+            api_key=runtime.local_api_key or "local",
+            base_url=runtime.local_base_url,
             timeout=timeout or settings.local_model_timeout_seconds,
             max_retries=0,
             extra_body={"chat_template_kwargs": {"enable_thinking": False}},
@@ -381,13 +382,13 @@ def create_structured_routine_llm(
         )
         return _limit_local_concurrency(model)
     if provider == "smart":
-        if not settings.smart_api_key:
+        if not runtime.cloud_enabled or not runtime.cloud_api_key:
             raise RuntimeError("云端模型 Provider 未配置")
         return _limit_flash_concurrency(
             ChatOpenAI(
-                model=model_name or settings.smart_model_name,
-                api_key=settings.smart_api_key,
-                base_url=settings.smart_base_url or None,
+                model=model_name or runtime.cloud_model_name,
+                api_key=runtime.cloud_api_key,
+                base_url=runtime.cloud_base_url or None,
                 timeout=timeout or settings.cloud_routine_timeout_seconds,
                 max_retries=settings.cloud_model_max_retries,
                 callbacks=[_RouteMetricsCallback("flash")],
@@ -432,13 +433,14 @@ async def ainvoke_structured_checked(
 ) -> Any:
     """Invoke the structured role and retry a quality failure on the other provider."""
     routed = create_structured_llm(tools=tools, **kwargs)
+    runtime = get_runtime_model_config()
     response = await routed.ainvoke(messages)
     try:
         validator(response.content)
         return response
     except Exception:
         used_model = str((response.response_metadata or {}).get("model_name", ""))
-        used_local = bool(settings.openai_base_url) and used_model != settings.smart_model_name
+        used_local = bool(runtime.local_base_url) and used_model != runtime.cloud_model_name
         route = "local" if used_local else "flash"
         model_metrics.record_quality_failure(route)
         logger.warning(
@@ -447,16 +449,16 @@ async def ainvoke_structured_checked(
             used_model or "unknown",
         )
         if used_local:
-            if not settings.smart_api_key or not settings.smart_model_name:
+            if not runtime.cloud_enabled or not runtime.cloud_api_key or not runtime.cloud_model_name:
                 raise
-            retry = _flash_llm(**kwargs)
+            retry = _flash_llm(runtime, **kwargs)
             if tools:
                 retry = retry.bind_tools(tools)
             retry = _limit_flash_concurrency(retry)
         else:
-            if not settings.local_model_enabled or not settings.openai_base_url:
+            if not runtime.local_enabled or not runtime.local_base_url:
                 raise
-            retry = _local_llm(**kwargs)
+            retry = _local_llm(runtime, **kwargs)
             if tools:
                 retry = retry.bind_tools(tools)
             retry = _limit_local_concurrency(retry)
@@ -483,13 +485,14 @@ async def ainvoke_routine_checked(
 
 def create_pro_llm(**kwargs: Any) -> Any:
     """Create the critical role; it intentionally has no lower-quality fallback."""
-    if not settings.smart_api_key or not settings.smart_pro_model_name:
-        raise RuntimeError("DeepSeek Pro 未配置")
+    runtime = get_runtime_model_config()
+    if not runtime.cloud_enabled or not runtime.cloud_api_key or not runtime.cloud_pro_model_name:
+        raise RuntimeError("高质量云端模型未配置")
     return _limit_pro_concurrency(
         ChatOpenAI(
-            model=settings.smart_pro_model_name,
-            api_key=settings.smart_api_key,
-            base_url=settings.smart_base_url or None,
+            model=runtime.cloud_pro_model_name,
+            api_key=runtime.cloud_api_key,
+            base_url=runtime.cloud_base_url or None,
             timeout=settings.cloud_pro_timeout_seconds,
             max_retries=settings.cloud_model_max_retries,
             callbacks=[_RouteMetricsCallback("pro")],
@@ -504,12 +507,14 @@ def create_critical_llm(**kwargs: Any) -> Any:
 
 
 def get_llm_runtime_status() -> dict[str, Any]:
+    runtime = get_runtime_model_config()
     return {
-        "local_enabled": settings.local_model_enabled,
-        "local_base_url_configured": bool(settings.openai_base_url),
-        "local_model": settings.model_name,
-        "cloud_routine_model": settings.smart_model_name,
-        "cloud_pro_model": settings.smart_pro_model_name,
+        "local_enabled": runtime.local_enabled,
+        "local_base_url_configured": bool(runtime.local_base_url),
+        "local_model": runtime.local_model_name,
+        "cloud_provider": runtime.cloud_provider,
+        "cloud_routine_model": runtime.cloud_model_name,
+        "cloud_pro_model": runtime.cloud_pro_model_name,
         "circuit": local_circuit.snapshot(),
         "metrics": model_metrics.snapshot(),
         "gateway_circuits": gateway_status(),

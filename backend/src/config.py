@@ -62,6 +62,7 @@ class Settings(BaseSettings):
     embedding_timeout_seconds: float = 30.0
     embedding_max_retries: int = 1
     embedding_max_concurrency: int = 1
+    runtime_model_config_path: str = "uploads/system/model-runtime.json"
 
     redis_url: str = "redis://localhost:6379/0"
     tavily_api_key: str = ""

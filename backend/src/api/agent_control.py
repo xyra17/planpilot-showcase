@@ -14,6 +14,7 @@ from src.core.model_gateway import distributed_gateway_status
 from src.database import get_db
 from src.deps import get_current_admin, get_current_user
 from src.models import User
+from src.services.runtime_model_config import get_runtime_model_config
 from src.services import (
     agent_control_service,
     beta_evidence_service,
@@ -218,12 +219,13 @@ async def gateway_circuits(
     # Only report routes that the current runtime can actually call. Historical
     # model registrations (including the retired configured-router alias) remain
     # auditable in version history but are not live gateway routes.
+    runtime = get_runtime_model_config()
     routes = sorted(
         route
         for route in {
-            f"local:{settings.model_name}" if settings.model_name else "",
-            f"smart:{settings.smart_model_name}" if settings.smart_model_name else "",
-            f"pro:{settings.smart_pro_model_name}" if settings.smart_pro_model_name else "",
+            f"local:{runtime.local_model_name}" if runtime.local_enabled and runtime.local_model_name else "",
+            f"smart:{runtime.cloud_model_name}" if runtime.cloud_enabled and runtime.cloud_model_name else "",
+            f"pro:{runtime.cloud_pro_model_name}" if runtime.cloud_enabled and runtime.cloud_pro_model_name else "",
         }
         if route
     )

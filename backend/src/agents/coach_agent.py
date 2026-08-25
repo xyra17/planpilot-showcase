@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 from src.config import settings
 from src.core.llm_router import create_json_llm
 from src.core.model_gateway import ModelGateway, ModelGatewayError
+from src.services.runtime_model_config import get_runtime_model_config
 
 logger = logging.getLogger(__name__)
 PROMPT_VERSION = "coach-v2"
@@ -84,7 +85,7 @@ class CoachAgent:
     ) -> CoachAgentResult:
         trace_id = uuid.uuid4().hex
         started = time.monotonic()
-        if not settings.coach_agent_enabled:
+        if not get_runtime_model_config().coach_agent_enabled:
             return cls._fallback(
                 trace_id,
                 started,
@@ -126,11 +127,12 @@ class CoachAgent:
             ).encode("utf-8")
         ).hexdigest()
         try:
+            runtime_models = get_runtime_model_config()
             fallback_provider = (
                 "local"
-                if model_provider == "smart" and settings.local_model_enabled
+                if model_provider == "smart" and runtime_models.local_enabled
                 else "smart"
-                if model_provider == "local" and settings.smart_api_key
+                if model_provider == "local" and runtime_models.cloud_enabled and runtime_models.cloud_api_key
                 else None
             )
             llm = create_json_llm(
