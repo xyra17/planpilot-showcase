@@ -40,6 +40,7 @@ class ModelSettingsUpdate(BaseModel):
     local_base_url: str = Field(max_length=500)
     local_model_name: str = Field(max_length=500)
     local_api_key: str = Field(default="", max_length=1000)
+    local_max_concurrency: int = Field(default=1, ge=1, le=32)
     clear_local_api_key: bool = False
     cloud_enabled: bool = False
     cloud_provider: Literal["deepseek", "zhipu", "doubao", "custom"] = "deepseek"
@@ -47,6 +48,8 @@ class ModelSettingsUpdate(BaseModel):
     cloud_model_name: str = Field(default="", max_length=300)
     cloud_pro_model_name: str = Field(default="", max_length=300)
     cloud_api_key: str = Field(default="", max_length=1000)
+    cloud_routine_max_concurrency: int = Field(default=4, ge=1, le=32)
+    cloud_pro_max_concurrency: int = Field(default=1, ge=1, le=32)
     clear_cloud_api_key: bool = False
     embedding_enabled: bool = True
     embedding_base_url: str = Field(max_length=500)
@@ -54,6 +57,7 @@ class ModelSettingsUpdate(BaseModel):
     embedding_api_key: str = Field(default="", max_length=1000)
     clear_embedding_api_key: bool = False
     embedding_dimensions: int = 1024
+    embedding_max_concurrency: int = Field(default=1, ge=1, le=32)
     coach_agent_enabled: bool = True
 
     @model_validator(mode="after")

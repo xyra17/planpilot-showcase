@@ -104,10 +104,13 @@ const MODEL_ROLE_LABEL = {
 
 const ROUTE_LABEL: Record<string, string> = {
   local: "本地 Qwen",
+  cloud: "云端日常模型",
+  "cloud-pro": "云端高质量模型",
   flash: "云端日常模型",
   pro: "云端高质量模型",
   "embedding-local": "本地向量检索",
   "keyword-search": "关键词包含匹配",
+  unavailable: "未启用",
 };
 
 function StatCard({
@@ -1134,36 +1137,39 @@ export default function AgentOperationsPage() {
 
       {view === "overview" && overview?.model_roles && (
         <section className="pp-admin-panel pp-admin-panel-indigo mt-5 rounded-3xl border border-gray-100 bg-white p-5 shadow-[var(--shadow-xs)]" data-testid="runtime-model-roles">
-          <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-end">
+          <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
             <div>
-              <h2 className="text-base font-semibold text-gray-900">实际模型路由</h2>
-              <p className="mt-1 text-xs leading-5 text-gray-500">以当前实际运行配置为准；学习建议的发布修订只影响任务模型，不代表所有模型都会一起变化。</p>
+              <h2 className="text-lg font-semibold tracking-[-0.01em] text-gray-900">实际模型路由</h2>
+              <p className="mt-1.5 max-w-4xl text-sm leading-6 text-gray-500">模型名和并发上限来自当前运行配置。切换供应商或模型并保存后，新请求与这里的显示会同步更新。</p>
             </div>
-            <span className="text-[11px] font-medium text-gray-400">3 个生成角色 + 1 个向量角色</span>
+            <span className="text-xs font-medium text-gray-500">3 个生成角色 · 1 个向量角色</span>
           </div>
-          <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <div className="mt-5 grid items-start gap-4 lg:grid-cols-2">
             {(Object.keys(MODEL_ROLE_LABEL) as Array<keyof typeof MODEL_ROLE_LABEL>).map((roleKey) => {
               const meta = MODEL_ROLE_LABEL[roleKey];
               const role = overview.model_roles[roleKey];
               const primaryName = role.primary_model || "未配置模型";
               const fallbackName = role.fallback
                 ? `${ROUTE_LABEL[role.fallback] ?? role.fallback}${role.fallback_model ? ` · ${role.fallback_model}` : ""}`
-                : "无静默降级";
+                : roleKey === "critical" ? "无静默降级" : "未配置回退";
+              const concurrencyLabel = role.max_concurrency > 0
+                ? `并发上限 ${role.max_concurrency}`
+                : role.primary === "keyword-search" ? "无需模型并发" : "未启用";
               return (
-                <article key={roleKey} className={cn("rounded-2xl border p-4", meta.tone)}>
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="text-[11px] font-semibold uppercase tracking-[.12em]">{meta.name}</div>
-                      <div className="mt-1 text-sm font-semibold text-gray-900">{meta.description}</div>
+                <article key={roleKey} className={cn("rounded-2xl border px-5 py-4", meta.tone)} data-testid={`model-role-${roleKey}`}>
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <h3 className="text-lg font-bold leading-6 tracking-[-0.015em] text-gray-950">{meta.name}</h3>
+                      <p className="mt-1 text-sm leading-5 text-gray-600">{meta.description}</p>
                     </div>
-                    <span className="rounded-full bg-white/80 px-2 py-1 text-[10px] font-semibold text-gray-500">并发 {role.max_concurrency}</span>
+                    <span title="PlanPilot 对该角色同时放行的请求上限，可在模型运行配置中调整" className="shrink-0 rounded-full border border-current/10 bg-white/85 px-3 py-1.5 text-xs font-semibold text-gray-600">{concurrencyLabel}</span>
                   </div>
-                  <p className="mt-3 min-h-10 text-[11px] leading-5 text-gray-500">{role.purpose}</p>
-                  <dl className="mt-3 space-y-2 border-t border-current/10 pt-3 text-[10px]">
-                    <div><dt className="text-gray-400">主路由</dt><dd className="mt-0.5 break-words font-semibold text-gray-700">{ROUTE_LABEL[role.primary] ?? role.primary} · {primaryName}</dd></div>
-                    <div><dt className="text-gray-400">回退</dt><dd className="mt-0.5 break-words font-medium text-gray-600">{fallbackName}</dd></div>
+                  <p className="mt-3 text-sm leading-6 text-gray-600">{role.purpose}</p>
+                  <dl className="mt-4 grid gap-3 border-t border-current/10 pt-4 text-sm sm:grid-cols-2">
+                    <div className="min-w-0"><dt className="text-xs font-medium text-gray-500">主路由</dt><dd className="mt-1 break-all font-semibold leading-5 text-gray-800">{ROUTE_LABEL[role.primary] ?? role.primary} · {primaryName}</dd></div>
+                    <div className="min-w-0"><dt className="text-xs font-medium text-gray-500">失败回退</dt><dd className="mt-1 break-all font-medium leading-5 text-gray-700">{fallbackName}</dd></div>
                   </dl>
-                  <p className="mt-3 border-t border-current/10 pt-3 text-[10px] leading-4 text-gray-500">{role.fallback_policy}</p>
+                  <p className="mt-4 border-t border-current/10 pt-3 text-xs leading-5 text-gray-600"><span className="font-semibold text-gray-700">路由规则：</span>{role.fallback_policy}</p>
                 </article>
               );
             })}

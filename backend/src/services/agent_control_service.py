@@ -13,7 +13,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config import settings
-from src.core.llm_router import MODEL_ROLE_CONTRACTS
+from src.core.llm_router import get_model_role_contracts
 from src.core.time import utc_now
 from src.models import (
     AgentDeployment,
@@ -409,7 +409,7 @@ async def runtime_overview(db: AsyncSession, user_id: str) -> dict[str, Any]:
             "requires_user_confirmation": True,
             "direct_mutation_allowed": False,
         },
-        "model_roles": MODEL_ROLE_CONTRACTS,
+        "model_roles": get_model_role_contracts(),
     }
 
 

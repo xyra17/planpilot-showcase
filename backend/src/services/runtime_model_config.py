@@ -27,17 +27,21 @@ class RuntimeModelConfig:
     local_base_url: str
     local_model_name: str
     local_api_key: str
+    local_max_concurrency: int
     cloud_enabled: bool
     cloud_provider: str
     cloud_base_url: str
     cloud_model_name: str
     cloud_pro_model_name: str
     cloud_api_key: str
+    cloud_routine_max_concurrency: int
+    cloud_pro_max_concurrency: int
     embedding_enabled: bool
     embedding_base_url: str
     embedding_model_name: str
     embedding_api_key: str
     embedding_dimensions: int
+    embedding_max_concurrency: int
     coach_agent_enabled: bool
     updated_at: str | None = None
     updated_by: str | None = None
@@ -49,17 +53,21 @@ def _fallback() -> RuntimeModelConfig:
         local_base_url=settings.openai_base_url,
         local_model_name=settings.model_name,
         local_api_key=settings.openai_api_key or "local",
+        local_max_concurrency=settings.local_model_max_concurrency,
         cloud_enabled=bool(settings.smart_api_key and settings.smart_model_name),
         cloud_provider="custom",
         cloud_base_url=settings.smart_base_url,
         cloud_model_name=settings.smart_model_name,
         cloud_pro_model_name=settings.smart_pro_model_name,
         cloud_api_key=settings.smart_api_key,
+        cloud_routine_max_concurrency=settings.cloud_routine_max_concurrency,
+        cloud_pro_max_concurrency=settings.cloud_pro_max_concurrency,
         embedding_enabled=bool(settings.embedding_base_url),
         embedding_base_url=settings.embedding_base_url,
         embedding_model_name=settings.embedding_model_name,
         embedding_api_key=settings.embedding_api_key or "local",
         embedding_dimensions=settings.embedding_dimensions,
+        embedding_max_concurrency=settings.embedding_max_concurrency,
         coach_agent_enabled=settings.coach_agent_enabled,
     )
 
@@ -104,17 +112,21 @@ def _from_document(document: dict[str, Any]) -> RuntimeModelConfig:
         local_base_url=str(local.get("base_url", fallback.local_base_url)).strip(),
         local_model_name=str(local.get("model_name", fallback.local_model_name)).strip(),
         local_api_key=_decrypt(str(local.get("api_key", ""))) or "local",
+        local_max_concurrency=int(local.get("max_concurrency", fallback.local_max_concurrency)),
         cloud_enabled=bool(cloud.get("enabled", False)),
         cloud_provider=str(cloud.get("provider", "custom")).strip() or "custom",
         cloud_base_url=str(cloud.get("base_url", "")).strip(),
         cloud_model_name=str(cloud.get("model_name", "")).strip(),
         cloud_pro_model_name=str(cloud.get("pro_model_name", "")).strip(),
         cloud_api_key=_decrypt(str(cloud.get("api_key", ""))),
+        cloud_routine_max_concurrency=int(cloud.get("routine_max_concurrency", fallback.cloud_routine_max_concurrency)),
+        cloud_pro_max_concurrency=int(cloud.get("pro_max_concurrency", fallback.cloud_pro_max_concurrency)),
         embedding_enabled=bool(embedding.get("enabled", fallback.embedding_enabled)),
         embedding_base_url=str(embedding.get("base_url", fallback.embedding_base_url)).strip(),
         embedding_model_name=str(embedding.get("model_name", fallback.embedding_model_name)).strip(),
         embedding_api_key=_decrypt(str(embedding.get("api_key", ""))) or "local",
         embedding_dimensions=int(embedding.get("dimensions", 1024)),
+        embedding_max_concurrency=int(embedding.get("max_concurrency", fallback.embedding_max_concurrency)),
         coach_agent_enabled=bool(document.get("coach_agent_enabled", fallback.coach_agent_enabled)),
         updated_at=document.get("updated_at"),
         updated_by=document.get("updated_by"),
@@ -171,6 +183,7 @@ def save_runtime_model_config(payload: dict[str, Any], *, actor: str) -> dict[st
             "enabled": bool(payload["local_enabled"]),
             "base_url": str(payload["local_base_url"]).strip(),
             "model_name": str(payload["local_model_name"]).strip(),
+            "max_concurrency": int(payload["local_max_concurrency"]),
             "api_key": secret("local", "local_api_key", "clear_local_api_key", current.local_api_key),
         },
         "cloud": {
@@ -179,6 +192,8 @@ def save_runtime_model_config(payload: dict[str, Any], *, actor: str) -> dict[st
             "base_url": str(payload["cloud_base_url"]).strip(),
             "model_name": str(payload["cloud_model_name"]).strip(),
             "pro_model_name": str(payload["cloud_pro_model_name"]).strip(),
+            "routine_max_concurrency": int(payload["cloud_routine_max_concurrency"]),
+            "pro_max_concurrency": int(payload["cloud_pro_max_concurrency"]),
             "api_key": secret("cloud", "cloud_api_key", "clear_cloud_api_key", current.cloud_api_key),
         },
         "embedding": {
@@ -186,6 +201,7 @@ def save_runtime_model_config(payload: dict[str, Any], *, actor: str) -> dict[st
             "base_url": str(payload["embedding_base_url"]).strip(),
             "model_name": str(payload["embedding_model_name"]).strip(),
             "dimensions": int(payload["embedding_dimensions"]),
+            "max_concurrency": int(payload["embedding_max_concurrency"]),
             "api_key": secret("embedding", "embedding_api_key", "clear_embedding_api_key", current.embedding_api_key),
         },
         "updated_at": datetime.now(timezone.utc).isoformat(),

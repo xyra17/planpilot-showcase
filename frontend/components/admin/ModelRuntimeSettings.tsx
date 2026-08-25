@@ -25,15 +25,19 @@ function toForm(settings: RuntimeModelSettings): FormState {
     local_enabled: settings.local_enabled,
     local_base_url: settings.local_base_url,
     local_model_name: settings.local_model_name,
+    local_max_concurrency: settings.local_max_concurrency,
     cloud_enabled: settings.cloud_enabled,
     cloud_provider: settings.cloud_provider,
     cloud_base_url: settings.cloud_base_url,
     cloud_model_name: settings.cloud_model_name,
     cloud_pro_model_name: settings.cloud_pro_model_name,
+    cloud_routine_max_concurrency: settings.cloud_routine_max_concurrency,
+    cloud_pro_max_concurrency: settings.cloud_pro_max_concurrency,
     embedding_enabled: settings.embedding_enabled,
     embedding_base_url: settings.embedding_base_url,
     embedding_model_name: settings.embedding_model_name,
     embedding_dimensions: settings.embedding_dimensions,
+    embedding_max_concurrency: settings.embedding_max_concurrency,
     coach_agent_enabled: settings.coach_agent_enabled,
     local_api_key: "",
     cloud_api_key: "",
@@ -55,6 +59,23 @@ function Field({ label, value, onChange, placeholder, type = "text", hint }: { l
       <span>{label}</span>
       <input type={type} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} className="h-10 rounded-xl border border-gray-200 bg-white px-3 text-sm text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100" />
       {hint && <span className="font-normal leading-5 text-gray-400">{hint}</span>}
+    </label>
+  );
+}
+
+function ConcurrencyField({ label, value, onChange }: { label: string; value: number; onChange: (value: number) => void }) {
+  return (
+    <label className="grid gap-1.5 text-xs font-medium text-gray-700">
+      <span>{label}</span>
+      <input
+        aria-label={label}
+        type="number"
+        min={1}
+        max={32}
+        value={value}
+        onChange={(event) => onChange(Math.max(1, Math.min(32, Number(event.target.value) || 1)))}
+        className="h-10 rounded-xl border border-gray-200 bg-white px-3 text-sm font-semibold text-gray-900 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100"
+      />
     </label>
   );
 }
@@ -118,21 +139,25 @@ export function ModelRuntimeSettings() {
         <span className="shrink-0 rounded-full bg-cyan-50 px-2.5 py-1 text-xs font-semibold text-cyan-700">管理员可写 · 全局生效</span>
       </div>
 
-      <div className="mt-5 grid gap-4">
+      <div className="mt-4 rounded-2xl border border-cyan-100 bg-cyan-50/60 px-4 py-3 text-xs leading-5 text-cyan-900">
+        <strong>并发上限是 PlanPilot 同时放行的请求数，不是模型厂商标称性能。</strong> 本地模型通常受显存和推理队列限制；云端模型受账号限流、成本和任务风险影响。修改后，新请求会立即使用新的限制。
+      </div>
+
+      <div className="mt-4 grid gap-4">
         <div className="rounded-2xl border border-gray-200 p-4">
           <div className="flex items-center justify-between gap-4"><div className="flex items-center gap-2"><Cpu size={17} className="text-violet-600" /><div><h3 className="text-sm font-semibold text-gray-900">本机 Qwen</h3><p className="text-xs text-gray-500">日常对话优先使用，失败时可回退到云端模型。</p></div></div><Toggle checked={form.local_enabled} onChange={(value) => update("local_enabled", value)} label="启用本机 Qwen" /></div>
-          <div className="mt-4 grid gap-3 lg:grid-cols-2"><Field label="OpenAI-compatible Base URL" value={form.local_base_url} onChange={(value) => update("local_base_url", value)} /><Field label="模型名" value={form.local_model_name} onChange={(value) => update("local_model_name", value)} /></div>
+          <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_1fr_10rem]"><Field label="OpenAI-compatible Base URL" value={form.local_base_url} onChange={(value) => update("local_base_url", value)} /><Field label="模型名" value={form.local_model_name} onChange={(value) => update("local_model_name", value)} /><ConcurrencyField label="对话并发上限" value={form.local_max_concurrency} onChange={(value) => update("local_max_concurrency", value)} /></div>
         </div>
 
         <div className="rounded-2xl border border-gray-200 p-4">
           <div className="flex items-center justify-between gap-4"><div className="flex items-center gap-2"><Cloud size={17} className="text-cyan-600" /><div><h3 className="text-sm font-semibold text-gray-900">云端生成模型</h3><p className="text-xs text-gray-500">结构化规划和高质量判断使用；可自由填写兼容 OpenAI 的供应商。</p></div></div><Toggle checked={form.cloud_enabled} onChange={(value) => update("cloud_enabled", value)} label="启用云端模型" /></div>
           <div className="mt-4 flex flex-wrap gap-2" role="group" aria-label="云端模型供应商">{PROVIDERS.map((provider) => <button key={provider.id} type="button" onClick={() => chooseProvider(provider.id)} className={cn("rounded-full border px-3 py-1.5 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300", form.cloud_provider === provider.id ? "border-cyan-600 bg-cyan-600 text-white" : "border-gray-200 bg-white text-gray-600 hover:border-cyan-300 hover:text-cyan-700")}>{provider.label}</button>)}</div>
-          <div className="mt-4 grid gap-3 lg:grid-cols-2"><Field label="Base URL" value={form.cloud_base_url} onChange={(value) => update("cloud_base_url", value)} placeholder="https://…" /><Field label="API Key" type="password" value={form.cloud_api_key} onChange={(value) => update("cloud_api_key", value)} placeholder={saved.cloud_api_key_configured ? "已保存；留空保持不变" : "输入 API Key"} hint="密钥只写入后端加密文件，不会回显。" /><Field label="日常/结构化模型名" value={form.cloud_model_name} onChange={(value) => update("cloud_model_name", value)} /><Field label="高质量模型名" value={form.cloud_pro_model_name} onChange={(value) => update("cloud_pro_model_name", value)} /></div>
+          <div className="mt-4 grid gap-3 lg:grid-cols-2"><Field label="Base URL" value={form.cloud_base_url} onChange={(value) => update("cloud_base_url", value)} placeholder="https://…" /><Field label="API Key" type="password" value={form.cloud_api_key} onChange={(value) => update("cloud_api_key", value)} placeholder={saved.cloud_api_key_configured ? "已保存；留空保持不变" : "输入 API Key"} hint="密钥只写入后端加密文件，不会回显。" /><Field label="日常/结构化模型名" value={form.cloud_model_name} onChange={(value) => update("cloud_model_name", value)} /><Field label="高质量模型名" value={form.cloud_pro_model_name} onChange={(value) => update("cloud_pro_model_name", value)} /><ConcurrencyField label="任务模型并发上限" value={form.cloud_routine_max_concurrency} onChange={(value) => update("cloud_routine_max_concurrency", value)} /><ConcurrencyField label="安全判断并发上限" value={form.cloud_pro_max_concurrency} onChange={(value) => update("cloud_pro_max_concurrency", value)} /></div>
         </div>
 
         <div className="rounded-2xl border border-gray-200 p-4">
           <div className="flex items-center justify-between gap-4"><div className="flex items-center gap-2"><Database size={17} className="text-emerald-600" /><div><h3 className="text-sm font-semibold text-gray-900">知识库 Embedding</h3><p className="text-xs text-gray-500">独立于生成模型，维度固定为 1024。</p></div></div><Toggle checked={form.embedding_enabled} onChange={(value) => update("embedding_enabled", value)} label="启用知识库 Embedding" /></div>
-          <div className="mt-4 grid gap-3 lg:grid-cols-2"><Field label="Embedding Base URL" value={form.embedding_base_url} onChange={(value) => update("embedding_base_url", value)} /><Field label="Embedding 模型名" value={form.embedding_model_name} onChange={(value) => update("embedding_model_name", value)} /><Field label="API Key（本地服务可留空）" type="password" value={form.embedding_api_key} onChange={(value) => update("embedding_api_key", value)} placeholder={saved.embedding_api_key_configured ? "已保存；留空保持不变" : "local"} /></div>
+          <div className="mt-4 grid gap-3 lg:grid-cols-2"><Field label="Embedding Base URL" value={form.embedding_base_url} onChange={(value) => update("embedding_base_url", value)} /><Field label="Embedding 模型名" value={form.embedding_model_name} onChange={(value) => update("embedding_model_name", value)} /><Field label="API Key（本地服务可留空）" type="password" value={form.embedding_api_key} onChange={(value) => update("embedding_api_key", value)} placeholder={saved.embedding_api_key_configured ? "已保存；留空保持不变" : "local"} /><ConcurrencyField label="知识检索并发上限" value={form.embedding_max_concurrency} onChange={(value) => update("embedding_max_concurrency", value)} /></div>
         </div>
       </div>
 

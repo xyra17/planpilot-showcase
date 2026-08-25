@@ -26,6 +26,7 @@ from src.services import (
     feedback_learning_service,
     monitoring_service,
 )
+from src.services.runtime_model_config import get_runtime_model_config
 
 
 @pytest.mark.asyncio
@@ -257,14 +258,15 @@ async def test_runtime_overview_only_returns_current_users_invocations(db):
     db.add(user)
     await db.commit()
     overview = await agent_control_service.runtime_overview(db, user.id)
+    runtime_models = get_runtime_model_config()
     assert overview["safety"] == {
         "requires_user_confirmation": True,
         "direct_mutation_allowed": False,
     }
-    assert overview["model_roles"]["interactive"]["primary_model"] == settings.model_name
-    assert overview["model_roles"]["structured"]["primary_model"] == settings.smart_model_name
+    assert overview["model_roles"]["interactive"]["primary_model"] == runtime_models.local_model_name
+    assert overview["model_roles"]["structured"]["primary_model"] == runtime_models.cloud_model_name
     assert overview["model_roles"]["critical"]["fallback"] is None
-    assert overview["model_roles"]["embedding"]["primary_model"] == settings.embedding_model_name
+    assert overview["model_roles"]["embedding"]["primary_model"] == runtime_models.embedding_model_name
     count = int(
         await db.scalar(
             select(func.count())

@@ -32,17 +32,21 @@ async def test_admin_can_save_encrypted_hot_runtime_model_config(client, auth, d
             "local_base_url": "http://host.docker.internal:8080/v1",
             "local_model_name": "qwen-local",
             "local_api_key": "local",
+            "local_max_concurrency": 2,
             "cloud_enabled": True,
             "cloud_provider": "zhipu",
             "cloud_base_url": "https://open.bigmodel.cn/api/paas/v4",
             "cloud_model_name": "glm-5",
             "cloud_pro_model_name": "glm-5",
             "cloud_api_key": "super-secret-cloud-key",
+            "cloud_routine_max_concurrency": 6,
+            "cloud_pro_max_concurrency": 2,
             "embedding_enabled": True,
             "embedding_base_url": "http://host.docker.internal:1234/v1",
             "embedding_model_name": "qwen-embedding",
             "embedding_api_key": "local",
             "embedding_dimensions": 1024,
+            "embedding_max_concurrency": 3,
             "coach_agent_enabled": True,
         },
     )
@@ -50,6 +54,8 @@ async def test_admin_can_save_encrypted_hot_runtime_model_config(client, auth, d
     payload = response.json()
     assert payload["cloud_provider"] == "zhipu"
     assert payload["cloud_api_key_configured"] is True
+    assert payload["cloud_routine_max_concurrency"] == 6
+    assert payload["cloud_pro_max_concurrency"] == 2
     assert "cloud_api_key" not in payload
 
     raw = target.read_text(encoding="utf-8")
@@ -59,3 +65,5 @@ async def test_admin_can_save_encrypted_hot_runtime_model_config(client, auth, d
     runtime = runtime_model_config.get_runtime_model_config()
     assert runtime.cloud_api_key == "super-secret-cloud-key"
     assert runtime.cloud_model_name == "glm-5"
+    assert runtime.local_max_concurrency == 2
+    assert runtime.embedding_max_concurrency == 3

@@ -13,7 +13,15 @@ class EmbeddingUnavailableError(RuntimeError):
     """Embedding 未配置、不可用或返回内容不符合契约。"""
 
 
-_embedding_semaphore = asyncio.Semaphore(settings.embedding_max_concurrency)
+_embedding_semaphores: dict[int, asyncio.Semaphore] = {}
+
+
+def _embedding_semaphore(limit: int) -> asyncio.Semaphore:
+    semaphore = _embedding_semaphores.get(limit)
+    if semaphore is None:
+        semaphore = asyncio.Semaphore(limit)
+        _embedding_semaphores[limit] = semaphore
+    return semaphore
 
 
 @lru_cache(maxsize=8)
@@ -44,7 +52,7 @@ async def embed_text(text: str) -> list[float]:
     if client is None:
         raise EmbeddingUnavailableError("未配置独立 Embedding 服务")
 
-    async with _embedding_semaphore:
+    async with _embedding_semaphore(runtime.embedding_max_concurrency):
         response = await client.embeddings.create(
             model=runtime.embedding_model_name,
             input=text,

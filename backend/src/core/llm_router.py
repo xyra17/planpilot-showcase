@@ -116,53 +116,100 @@ class ModelMetrics:
 
 local_circuit = LocalModelCircuitBreaker()
 model_metrics = ModelMetrics()
-_local_semaphore = asyncio.Semaphore(settings.local_model_max_concurrency)
-_flash_semaphore = asyncio.Semaphore(settings.cloud_routine_max_concurrency)
-_pro_semaphore = asyncio.Semaphore(settings.cloud_pro_max_concurrency)
+_route_semaphores: dict[tuple[str, int], asyncio.Semaphore] = {}
 
-MODEL_ROLE_CONTRACTS = {
-    "interactive": {
-        "purpose": "普通聊天、打卡回应、短解释和笔记辅助",
-        "primary": "local",
-        "primary_model": settings.model_name,
-        "fallback": "cloud",
-        "fallback_model": settings.smart_model_name,
-        "fallback_policy": "本地模型不可用、报错或队列超时后回退；不因主观回答质量自动切换",
-        "result": "简短中文自然语言，可流式返回",
-        "max_concurrency": settings.local_model_max_concurrency,
-    },
-    "structured": {
-        "purpose": "宏观计划、每日任务、验收出题、Agent 规划和建议 JSON",
-        "primary": "cloud",
-        "primary_model": settings.smart_model_name,
-        "fallback": "local",
-        "fallback_model": settings.model_name,
-        "fallback_policy": "主模型不可用时回退；使用契约校验入口时，JSON 或业务契约失败也会换路重试一次",
-        "result": "经过 JSON 或业务契约校验的结构化结果",
-        "max_concurrency": settings.cloud_routine_max_concurrency,
-    },
-    "critical": {
-        "purpose": "学习答案评分和需要高质量终审的复杂决策",
-        "primary": "cloud-pro",
-        "primary_model": settings.smart_pro_model_name,
-        "fallback": None,
-        "fallback_model": None,
-        "fallback_policy": "不静默降级；调用失败时向上游返回明确错误",
-        "result": "高质量判断；失败时显式报错，不静默降低模型等级",
-        "max_concurrency": settings.cloud_pro_max_concurrency,
-    },
-    "embedding": {
-        "purpose": "知识库向量化和语义检索",
-        "primary": "embedding-local",
-        "primary_model": settings.embedding_model_name,
-        "fallback": "keyword-search",
-        "fallback_model": None,
-        "fallback_policy": "Embedding 不可用或向量无有效结果时使用数据库原文包含匹配",
-        "result": f"{settings.embedding_dimensions} 维向量；不可用时退化为关键词检索",
-        "max_concurrency": settings.embedding_max_concurrency,
-    },
-}
 
+def _route_semaphore(route: str, limit: int) -> asyncio.Semaphore:
+    """Return the limiter for new calls at the current runtime limit."""
+    key = (route, limit)
+    semaphore = _route_semaphores.get(key)
+    if semaphore is None:
+        semaphore = asyncio.Semaphore(limit)
+        _route_semaphores[key] = semaphore
+    return semaphore
+
+
+def get_model_role_contracts(runtime: RuntimeModelConfig | None = None) -> dict[str, dict[str, Any]]:
+    """Build the admin-facing routing map from the hot runtime configuration."""
+    runtime = runtime or get_runtime_model_config()
+    local_available = bool(runtime.local_enabled and runtime.local_base_url and runtime.local_model_name)
+    cloud_available = bool(
+        runtime.cloud_enabled
+        and runtime.cloud_base_url
+        and runtime.cloud_api_key
+        and runtime.cloud_model_name
+    )
+    pro_available = bool(cloud_available and runtime.cloud_pro_model_name)
+    embedding_available = bool(
+        runtime.embedding_enabled and runtime.embedding_base_url and runtime.embedding_model_name
+    )
+
+    interactive_primary = "local" if local_available else "cloud" if cloud_available else "unavailable"
+    interactive_model = (
+        runtime.local_model_name if local_available else runtime.cloud_model_name if cloud_available else ""
+    )
+    interactive_fallback = "cloud" if local_available and cloud_available else None
+    interactive_fallback_model = runtime.cloud_model_name if interactive_fallback else None
+    interactive_limit = (
+        runtime.local_max_concurrency
+        if local_available
+        else runtime.cloud_routine_max_concurrency if cloud_available else 0
+    )
+
+    structured_primary = "cloud" if cloud_available else "local" if local_available else "unavailable"
+    structured_model = (
+        runtime.cloud_model_name if cloud_available else runtime.local_model_name if local_available else ""
+    )
+    structured_fallback = "local" if cloud_available and local_available else None
+    structured_fallback_model = runtime.local_model_name if structured_fallback else None
+    structured_limit = (
+        runtime.cloud_routine_max_concurrency
+        if cloud_available
+        else runtime.local_max_concurrency if local_available else 0
+    )
+
+    return {
+        "interactive": {
+            "purpose": "普通聊天、打卡回应、短解释和笔记辅助",
+            "primary": interactive_primary,
+            "primary_model": interactive_model,
+            "fallback": interactive_fallback,
+            "fallback_model": interactive_fallback_model,
+            "fallback_policy": "本地模型不可用、报错或队列超时后回退；不因主观回答质量自动切换",
+            "result": "简短中文自然语言，可流式返回",
+            "max_concurrency": interactive_limit,
+        },
+        "structured": {
+            "purpose": "宏观计划、每日任务、验收出题、Agent 规划和建议 JSON",
+            "primary": structured_primary,
+            "primary_model": structured_model,
+            "fallback": structured_fallback,
+            "fallback_model": structured_fallback_model,
+            "fallback_policy": "主模型不可用时回退；使用契约校验入口时，JSON 或业务契约失败也会换路重试一次",
+            "result": "经过 JSON 或业务契约校验的结构化结果",
+            "max_concurrency": structured_limit,
+        },
+        "critical": {
+            "purpose": "学习答案评分和需要高质量终审的复杂决策",
+            "primary": "cloud-pro" if pro_available else "unavailable",
+            "primary_model": runtime.cloud_pro_model_name if pro_available else "",
+            "fallback": None,
+            "fallback_model": None,
+            "fallback_policy": "不静默降级；调用失败时向上游返回明确错误",
+            "result": "高质量判断；失败时显式报错，不静默降低模型等级",
+            "max_concurrency": runtime.cloud_pro_max_concurrency if pro_available else 0,
+        },
+        "embedding": {
+            "purpose": "知识库向量化和语义检索",
+            "primary": "embedding-local" if embedding_available else "keyword-search",
+            "primary_model": runtime.embedding_model_name if embedding_available else "",
+            "fallback": "keyword-search" if embedding_available else None,
+            "fallback_model": None,
+            "fallback_policy": "Embedding 不可用或向量无有效结果时使用数据库原文包含匹配",
+            "result": f"{runtime.embedding_dimensions} 维向量；不可用时退化为关键词检索",
+            "max_concurrency": runtime.embedding_max_concurrency if embedding_available else 0,
+        },
+    }
 
 class _RouteMetricsCallback(BaseCallbackHandler):
     def __init__(self, route: str) -> None:
@@ -273,28 +320,37 @@ def _limit_concurrency(
     return RunnableLambda(invoke_sync, afunc=invoke_async)
 
 
-def _limit_local_concurrency(runnable: Any) -> Any:
+def _limit_local_concurrency(runnable: Any, limit: int | None = None) -> Any:
     return _limit_concurrency(
         runnable,
-        semaphore=_local_semaphore,
+        semaphore=_route_semaphore(
+            "local",
+            limit if limit is not None else get_runtime_model_config().local_max_concurrency,
+        ),
         queue_timeout_seconds=settings.local_model_queue_timeout_seconds,
         route="local",
     )
 
 
-def _limit_flash_concurrency(runnable: Any) -> Any:
+def _limit_flash_concurrency(runnable: Any, limit: int | None = None) -> Any:
     return _limit_concurrency(
         runnable,
-        semaphore=_flash_semaphore,
+        semaphore=_route_semaphore(
+            "flash",
+            limit if limit is not None else get_runtime_model_config().cloud_routine_max_concurrency,
+        ),
         queue_timeout_seconds=settings.cloud_model_queue_timeout_seconds,
         route="flash",
     )
 
 
-def _limit_pro_concurrency(runnable: Any) -> Any:
+def _limit_pro_concurrency(runnable: Any, limit: int | None = None) -> Any:
     return _limit_concurrency(
         runnable,
-        semaphore=_pro_semaphore,
+        semaphore=_route_semaphore(
+            "pro",
+            limit if limit is not None else get_runtime_model_config().cloud_pro_max_concurrency,
+        ),
         queue_timeout_seconds=settings.cloud_model_queue_timeout_seconds,
         route="pro",
     )
@@ -311,12 +367,12 @@ def create_interactive_llm(*, tools: Sequence[Any] | None = None, **kwargs: Any)
         local = _local_llm(runtime, **kwargs)
         if tools:
             local = local.bind_tools(tools)
-        candidates.append(_limit_local_concurrency(local))
+        candidates.append(_limit_local_concurrency(local, runtime.local_max_concurrency))
     if runtime.cloud_enabled and runtime.cloud_api_key and runtime.cloud_model_name:
         flash = _flash_llm(runtime, **kwargs)
         if tools:
             flash = flash.bind_tools(tools)
-        candidates.append(_limit_flash_concurrency(flash))
+        candidates.append(_limit_flash_concurrency(flash, runtime.cloud_routine_max_concurrency))
     if not candidates:
         raise RuntimeError("没有可用的日常模型：请配置本地模型或云端模型")
 
@@ -337,7 +393,7 @@ def create_structured_llm(*, tools: Sequence[Any] | None = None, **kwargs: Any) 
         flash = _flash_llm(runtime, **kwargs)
         if tools:
             flash = flash.bind_tools(tools)
-        candidates.append(_limit_flash_concurrency(flash))
+        candidates.append(_limit_flash_concurrency(flash, runtime.cloud_routine_max_concurrency))
     local_added = (
         runtime.local_enabled and runtime.local_base_url and local_circuit.allow_request()
     )
@@ -345,7 +401,7 @@ def create_structured_llm(*, tools: Sequence[Any] | None = None, **kwargs: Any) 
         local = _local_llm(runtime, **kwargs)
         if tools:
             local = local.bind_tools(tools)
-        candidates.append(_limit_local_concurrency(local))
+        candidates.append(_limit_local_concurrency(local, runtime.local_max_concurrency))
     if not candidates:
         raise RuntimeError("没有可用的结构化生成模型：请配置云端模型或本地模型")
     primary, *fallbacks = candidates
@@ -380,7 +436,7 @@ def create_structured_routine_llm(
             model_kwargs=model_kwargs,
             **kwargs,
         )
-        return _limit_local_concurrency(model)
+        return _limit_local_concurrency(model, runtime.local_max_concurrency)
     if provider == "smart":
         if not runtime.cloud_enabled or not runtime.cloud_api_key:
             raise RuntimeError("云端模型 Provider 未配置")
@@ -394,7 +450,8 @@ def create_structured_routine_llm(
                 callbacks=[_RouteMetricsCallback("flash")],
                 model_kwargs=model_kwargs,
                 **kwargs,
-            )
+            ),
+            runtime.cloud_routine_max_concurrency,
         )
     raise ValueError(f"不支持的模型 Provider: {provider}")
 
@@ -454,14 +511,14 @@ async def ainvoke_structured_checked(
             retry = _flash_llm(runtime, **kwargs)
             if tools:
                 retry = retry.bind_tools(tools)
-            retry = _limit_flash_concurrency(retry)
+            retry = _limit_flash_concurrency(retry, runtime.cloud_routine_max_concurrency)
         else:
             if not runtime.local_enabled or not runtime.local_base_url:
                 raise
             retry = _local_llm(runtime, **kwargs)
             if tools:
                 retry = retry.bind_tools(tools)
-            retry = _limit_local_concurrency(retry)
+            retry = _limit_local_concurrency(retry, runtime.local_max_concurrency)
     response = await retry.ainvoke(messages)
     validator(response.content)
     return response
@@ -497,7 +554,8 @@ def create_pro_llm(**kwargs: Any) -> Any:
             max_retries=settings.cloud_model_max_retries,
             callbacks=[_RouteMetricsCallback("pro")],
             **kwargs,
-        )
+        ),
+        runtime.cloud_pro_max_concurrency,
     )
 
 
@@ -518,5 +576,5 @@ def get_llm_runtime_status() -> dict[str, Any]:
         "circuit": local_circuit.snapshot(),
         "metrics": model_metrics.snapshot(),
         "gateway_circuits": gateway_status(),
-        "roles": MODEL_ROLE_CONTRACTS,
+        "roles": get_model_role_contracts(runtime),
     }

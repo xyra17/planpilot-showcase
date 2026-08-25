@@ -1,14 +1,15 @@
+from dataclasses import replace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from src.core.llm_router import (
-    MODEL_ROLE_CONTRACTS,
     ainvoke_structured_checked,
     create_critical_llm,
     create_interactive_llm,
     create_json_llm,
     create_structured_routine_llm,
+    get_model_role_contracts,
     local_circuit,
     model_metrics,
 )
@@ -176,7 +177,71 @@ async def test_quality_failure_retries_with_local_model():
 
 
 def test_model_roles_are_explicit_and_non_overlapping():
-    assert MODEL_ROLE_CONTRACTS["interactive"]["primary"] == "local"
-    assert MODEL_ROLE_CONTRACTS["structured"]["primary"] == "cloud"
-    assert MODEL_ROLE_CONTRACTS["critical"]["primary"] == "cloud-pro"
-    assert MODEL_ROLE_CONTRACTS["embedding"]["primary"] == "embedding-local"
+    from src.services.runtime_model_config import get_runtime_model_config
+
+    runtime = replace(
+        get_runtime_model_config(),
+        local_enabled=True,
+        local_base_url="http://localhost:8080/v1",
+        cloud_enabled=True,
+        cloud_base_url="https://models.example.com/v1",
+        cloud_api_key="test",
+        embedding_enabled=True,
+        embedding_base_url="http://localhost:1234/v1",
+    )
+    roles = get_model_role_contracts(runtime)
+    assert roles["interactive"]["primary"] == "local"
+    assert roles["structured"]["primary"] == "cloud"
+    assert roles["critical"]["primary"] == "cloud-pro"
+    assert roles["embedding"]["primary"] == "embedding-local"
+
+
+def test_model_role_overview_tracks_hot_models_and_concurrency():
+    from src.services.runtime_model_config import get_runtime_model_config
+
+    runtime = replace(
+        get_runtime_model_config(),
+        local_model_name="local-next",
+        cloud_model_name="glm-5.3",
+        cloud_pro_model_name="glm-5.3-pro",
+        embedding_model_name="embedding-next",
+        local_enabled=True,
+        local_base_url="http://localhost:8080/v1",
+        cloud_enabled=True,
+        cloud_base_url="https://models.example.com/v1",
+        cloud_api_key="test",
+        embedding_enabled=True,
+        embedding_base_url="http://localhost:1234/v1",
+        local_max_concurrency=2,
+        cloud_routine_max_concurrency=7,
+        cloud_pro_max_concurrency=3,
+        embedding_max_concurrency=4,
+    )
+    roles = get_model_role_contracts(runtime)
+
+    assert roles["interactive"]["primary_model"] == "local-next"
+    assert roles["structured"]["primary_model"] == "glm-5.3"
+    assert roles["critical"]["primary_model"] == "glm-5.3-pro"
+    assert roles["embedding"]["primary_model"] == "embedding-next"
+    assert [roles[key]["max_concurrency"] for key in roles] == [2, 7, 3, 4]
+
+
+def test_model_role_overview_shows_the_actual_local_fallback_when_cloud_is_off():
+    from src.services.runtime_model_config import get_runtime_model_config
+
+    runtime = replace(
+        get_runtime_model_config(),
+        local_enabled=True,
+        local_base_url="http://localhost:8080/v1",
+        local_model_name="local-only",
+        local_max_concurrency=2,
+        cloud_enabled=False,
+        cloud_api_key="",
+    )
+    roles = get_model_role_contracts(runtime)
+
+    assert roles["structured"]["primary"] == "local"
+    assert roles["structured"]["primary_model"] == "local-only"
+    assert roles["structured"]["max_concurrency"] == 2
+    assert roles["critical"]["primary"] == "unavailable"
+    assert roles["critical"]["max_concurrency"] == 0
