@@ -722,11 +722,16 @@ test.describe("Pilo v3 state-driven companion workflow", () => {
     await expect(lifeActionTabs.getByRole("tab", { name: "基础动作" })).toHaveAttribute("aria-selected", "true");
     const lifeActions = settings.getByRole("tabpanel", { name: "基础动作" });
     await expect(lifeActions.getByRole("button")).toHaveCount(8);
-    await expect(lifeActions.getByRole("button", { name: "预览敲电脑动作" })).toBeVisible();
+    for (const label of ["坐下休息", "慢慢走动", "捧星等待", "安慰自己", "回应完成", "短暂打盹", "松一口气", "收工告别"]) {
+      await expect(lifeActions.getByRole("button", { name: `预览${label}动作` })).toBeVisible();
+    }
     await lifeActionTabs.getByRole("tab", { name: "道具动作" }).click();
     await expect(lifeActionTabs.getByRole("tab", { name: "道具动作" })).toHaveAttribute("aria-selected", "true");
     const propLifeActions = settings.getByRole("tabpanel", { name: "道具动作" });
     await expect(propLifeActions.getByRole("button")).toHaveCount(8);
+    for (const label of ["安静阅读", "敲电脑", "伸展活动", "茶歇", "记录灵感", "查看计时器", "整理桌面", "照顾小芽"]) {
+      await expect(propLifeActions.getByRole("button", { name: `预览${label}动作` })).toBeVisible();
+    }
     await propLifeActions.getByRole("button", { name: "预览茶歇动作" }).click();
     await expect(settings).toHaveCount(0);
     await expect(companion).toHaveAttribute("data-pilo-life-action", "tea-break");

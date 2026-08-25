@@ -284,8 +284,28 @@ const PILO_SCENE_OPTIONS: ReadonlyArray<{ id: PiloSceneId; label: string; descri
   { id: "review", label: "晚间回顾", description: "Pilo 在暮色里写下今日观察", asset: "/pilo/scenes/v4/review-01.webp" },
 ];
 
-const PILO_BASIC_LIFE_ACTION_OPTIONS = PILO_LIFE_ACTIONS.filter((action) => action.readiness === "loop-ready");
-const PILO_PROP_LIFE_ACTION_OPTIONS = PILO_LIFE_ACTIONS.filter((action) => action.readiness === "complete");
+const PILO_BASIC_LIFE_ACTION_IDS = new Set([
+  "rest",
+  "walk",
+  "wait",
+  "comfort",
+  "finish",
+  "nap",
+  "relief",
+  "sign-off",
+]);
+const PILO_BASIC_LIFE_ACTION_OPTIONS = PILO_LIFE_ACTIONS.filter((action) => PILO_BASIC_LIFE_ACTION_IDS.has(action.id));
+const PILO_PROP_LIFE_ACTION_OPTIONS = PILO_LIFE_ACTIONS.filter((action) => !PILO_BASIC_LIFE_ACTION_IDS.has(action.id));
+const PILO_SUPPLEMENTAL_LIFE_ACTION_IDS = new Set([
+  "tea-break",
+  "capture-idea",
+  "check-timer",
+  "tidy-desk",
+  "nurture-growth",
+  "relief",
+  "nap",
+  "sign-off",
+]);
 
 const MODE_OPTIONS: ReadonlyArray<{
   id: Exclude<PiloCompanionMode, "custom">;
@@ -2932,7 +2952,7 @@ export function PiloCompanion() {
                         {(lifeActionTab === "basic" ? PILO_BASIC_LIFE_ACTION_OPTIONS : PILO_PROP_LIFE_ACTION_OPTIONS).map((action) => (
                           <button type="button" aria-label={`预览${action.label}动作`} onClick={() => previewLifeAction(action)} key={action.id}>
                             <span className="pilo-companion__life-action-preview" aria-hidden="true">
-                              {lifeActionTab === "basic" ? (
+                              {lifeActionTab === "basic" || !PILO_SUPPLEMENTAL_LIFE_ACTION_IDS.has(action.id) ? (
                                 <PiloAvatar
                                   size={58}
                                   mood={moodForSystemState(action.state)}
