@@ -3295,6 +3295,13 @@
   background: transparent;
 }
 
+.knowledge-reference-page .knowledge-goal-scroll > button strong {
+  align-self: center;
+  justify-self: end;
+  margin-right: 3px;
+  text-align: right;
+}
+
 .knowledge-reference-page :is(
   .knowledge-scope-shortcuts > button.is-active strong,
   .knowledge-library-list > button.is-active strong,
