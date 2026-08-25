@@ -9,6 +9,16 @@
     "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
 }
 
+/* Desktop shell: use the available main area instead of centering a narrow
+ * 1380px canvas, so cards sit closer to the navigation and right frame. */
+@media (min-width: 981px) {
+  .app-shell .page-content {
+    width: 100% !important;
+    max-width: none !important;
+    padding-inline: 22px !important;
+  }
+}
+
 /* Material changes should not switch Chinese UI text to unavailable display
  * fonts. Texture, borders and motion retain the theme identity; core UI type
  * stays stable and legible across operating systems. */
