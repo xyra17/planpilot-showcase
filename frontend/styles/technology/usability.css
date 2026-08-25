@@ -10326,7 +10326,6 @@ html[data-theme][data-theme][data-theme] .app-shell .settings-detail-grid > .set
 }
 
 .app-shell .today-schedule-progress i b {
-  background: linear-gradient(90deg, #715cff 0%, #43b9dd 100%);
   box-shadow: 0 0 8px color-mix(in srgb, var(--workspace-accent) 18%, transparent);
 }
 

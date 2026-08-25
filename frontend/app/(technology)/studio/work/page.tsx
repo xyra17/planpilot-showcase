@@ -1835,7 +1835,7 @@ export default function WorkPage() {
                                 title={scheduledProgress.elapsed >= 100 ? "该学习时段已经结束" : scheduledProgress.elapsed > 0 ? `当前时段已进行 ${scheduledProgress.elapsed}%` : "该学习时段尚未开始"}
                               >
                                 <span className="task-elapsed-bar">
-                                  <i><b style={{ width: `${scheduledProgress.elapsed}%`, backgroundColor: scheduledProgress.color }} /></i>
+                                  <i><b style={{ width: `${scheduledProgress.elapsed}%` }} /></i>
                                 </span>
                                 <span className="task-elapsed-copy" aria-hidden="true">时间流逝度 · {scheduledProgress.elapsed}%</span>
                               </span>
@@ -1910,7 +1910,7 @@ export default function WorkPage() {
                           >
                             <small>时间流逝度</small>
                             <span>
-                              <i><b style={{ width: `${elapsed}%` }} /></i>
+                              <i><b style={{ width: `${elapsed}%`, backgroundColor: block.color }} /></i>
                               <em>{elapsed}%</em>
                             </span>
                           </span>

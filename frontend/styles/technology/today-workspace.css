@@ -438,14 +438,16 @@
   width: 72px;
   height: 5px;
   overflow: hidden;
-  background: var(--workspace-border);
+  background: rgba(103, 83, 235, .11);
   border-radius: 99px;
 }
 
 .app-shell .dashboard-page .task-elapsed-progress i b {
   display: block;
   height: 100%;
+  background: linear-gradient(90deg, #715cff, #43b9dd);
   border-radius: inherit;
+  box-shadow: 0 0 8px rgba(95, 91, 236, .28);
 }
 
 .app-shell .dashboard-page .task-actual-editor {
