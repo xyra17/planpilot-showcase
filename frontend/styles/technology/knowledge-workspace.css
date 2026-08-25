@@ -6138,8 +6138,36 @@
    group; this intentionally comes last so earlier density rules cannot drift. */
 .knowledge-reference-page .knowledge-resource-table-head,
 .knowledge-reference-page .knowledge-resource-table article {
-  grid-template-columns: 26px minmax(240px, 1.35fr) minmax(156px, .9fr) 92px 78px 68px;
+  grid-template-columns: 24px minmax(190px, 1.7fr) minmax(110px, .9fr) 86px 52px 52px;
   column-gap: 6px;
+}
+
+.knowledge-reference-page .knowledge-resource-table-head > span {
+  justify-self: center;
+  text-align: center;
+}
+
+.knowledge-reference-page .knowledge-resource-table-head > span:first-child {
+  display: grid;
+  place-items: center;
+}
+
+.knowledge-reference-page .knowledge-resource-name-head {
+  position: relative;
+  width: 100%;
+  text-align: center;
+}
+
+.knowledge-reference-page .knowledge-resource-name-head > span:first-child {
+  display: block;
+  text-align: center;
+}
+
+.knowledge-reference-page .knowledge-batch-cell {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
 }
 
 .knowledge-reference-page .knowledge-resource-table-head > span:nth-child(n+2):nth-child(-n+5) {
@@ -6210,6 +6238,46 @@
 .knowledge-reference-page .knowledge-row-actions button:focus-visible::after {
   opacity: 1;
   transform: translate(-50%, 0);
+}
+
+.knowledge-reference-page .knowledge-row-action-cell {
+  display: grid;
+  place-items: center;
+}
+
+.knowledge-reference-page .knowledge-row-action-cell button {
+  display: grid;
+  width: 27px;
+  height: 27px;
+  position: relative;
+  place-items: center;
+  color: #8993a6;
+  border-radius: 5px;
+}
+
+.knowledge-reference-page .knowledge-row-action-cell button:hover,
+.knowledge-reference-page .knowledge-row-action-cell button:focus-visible {
+  color: var(--knowledge-accent);
+  background: var(--knowledge-accent-soft);
+}
+
+.knowledge-reference-page .knowledge-row-action-cell button.is-favorite {
+  color: var(--knowledge-accent);
+}
+
+.knowledge-reference-page .knowledge-resource-table article .knowledge-resource-goals em {
+  min-height: 0;
+  padding: 0;
+  color: #5669ad;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font-weight: 600;
+}
+
+.knowledge-reference-page .knowledge-resource-table article .knowledge-resource-goals em.is-unlinked {
+  color: #8792aa;
+  background: transparent;
 }
 
 @media (min-width: 961px) {

@@ -1683,10 +1683,9 @@ export default function KnowledgePage() {
           <div className="knowledge-resource-table" role="table" aria-label="知识空间资料" onScroll={revealScrollbarWhileScrolling}>
             <div className="knowledge-resource-table-head" role="row">
               <span><input type="checkbox" aria-label="选择全部资料" checked={Boolean(visibleFiles.length) && selectedRows.size === visibleFiles.length} onChange={(event) => setSelectedRows(event.target.checked ? new Set(visibleFiles.map((file) => file.id)) : new Set())} /></span>
-              <span>资料</span><span>关联目标</span><span>更新</span>
-              <span className="knowledge-batch-cell" aria-label="资料操作">
+              <span className="knowledge-resource-name-head"><span>资料名称</span>
                 {selectedRows.size > 0 && (
-                  <>
+                  <span className="knowledge-batch-cell" aria-label="资料操作">
                     <button type="button" className="knowledge-batch-trigger" aria-expanded={batchMenuOpen} onClick={() => setBatchMenuOpen((current) => !current)}>
                       批量操作 <ChevronDown size={13} />
                     </button>
@@ -1698,9 +1697,9 @@ export default function KnowledgePage() {
                         <button type="button" role="menuitem" className="is-danger" onClick={() => { setBatchMenuOpen(false); void confirmDeleteSelectedResources(); }}><Trash2 size={14} />批量删除</button>
                       </div>
                     )}
-                  </>
+                  </span>
                 )}
-              </span>
+              </span><span>关联目标</span><span>更新时间</span><span>收藏</span><span>编辑</span>
             </div>
             {visibleFiles.map((file) => {
               const isSelected = selectedRows.has(file.id);
@@ -1708,19 +1707,18 @@ export default function KnowledgePage() {
               return (
                 <article key={file.id} role="row" className={isSelected ? "is-selected" : ""}>
                   <span><input type="checkbox" aria-label={`选择 ${file.name}`} checked={isSelected} onChange={() => setSelectedRows((current) => { const next = new Set(current); if (next.has(file.id)) next.delete(file.id); else next.add(file.id); return next; })} /></span>
-                  <div className="knowledge-resource-identity-cell">
-                    <button type="button" className="knowledge-resource-identity" onClick={() => openResource(file)}>
-                      <span className={`knowledge-file-glyph is-${file.type.toLowerCase()}`}><ResourceGlyph type={file.type} /></span>
-                      <span className="knowledge-resource-copy"><strong>{file.name}</strong><small>{file.type} · {file.libraries.length ? file.libraries.join("、") : "未归档"}{file.size ? ` · ${file.size}` : ""}</small></span>
-                    </button>
-                    <span className="knowledge-row-actions"><button type="button" className={isFavorite ? "is-favorite" : ""} aria-label={isFavorite ? `取消收藏 ${file.name}` : `收藏 ${file.name}`} data-tooltip={isFavorite ? "取消收藏" : "收藏资料"} onClick={() => setFavorites((current) => { const next = new Set(current); if (next.has(file.id)) next.delete(file.id); else next.add(file.id); return next; })}><Bookmark size={14} fill={isFavorite ? "currentColor" : "none"} /></button><button type="button" aria-label={`编辑 ${file.name}`} data-tooltip="编辑资料" onClick={() => openResource(file, isTextResource(file))}><Pencil size={15} /></button></span>
-                  </div>
+                  <button type="button" className="knowledge-resource-identity" onClick={() => openResource(file)}>
+                    <span className={`knowledge-file-glyph is-${file.type.toLowerCase()}`}><ResourceGlyph type={file.type} /></span>
+                    <span className="knowledge-resource-copy"><strong>{file.name}</strong><small>{file.type} · {file.libraries.length ? file.libraries.join("、") : "未归档"}{file.size ? ` · ${file.size}` : ""}</small></span>
+                  </button>
                   <span className="knowledge-resource-goals">
                     {file.goalTitles.length
                       ? file.goalTitles.map((goalTitle) => <em key={goalTitle}>{goalTitle}</em>)
                       : <em className="is-unlinked">未关联</em>}
                   </span>
                   <time>{file.updated}</time>
+                  <span className="knowledge-row-action-cell"><button type="button" className={isFavorite ? "is-favorite" : ""} aria-label={isFavorite ? `取消收藏 ${file.name}` : `收藏 ${file.name}`} data-tooltip={isFavorite ? "取消收藏" : "收藏资料"} onClick={() => setFavorites((current) => { const next = new Set(current); if (next.has(file.id)) next.delete(file.id); else next.add(file.id); return next; })}><Bookmark size={14} fill={isFavorite ? "currentColor" : "none"} /></button></span>
+                  <span className="knowledge-row-action-cell"><button type="button" aria-label={`编辑 ${file.name}`} data-tooltip="编辑资料" onClick={() => openResource(file, isTextResource(file))}><Pencil size={15} /></button></span>
                 </article>
               );
             })}
