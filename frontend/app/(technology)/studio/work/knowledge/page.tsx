@@ -511,11 +511,15 @@ export default function KnowledgePage() {
         const matchesFavorite = !favoritesOnly || favorites.has(file.id);
         return matchesGoal && matchesLibrary && matchesType && matchesStatus && matchesQuery && matchesFavorite;
       });
+      const ordered = [...matched].sort((a, b) => Number(isUnlinkedResource(a)) - Number(isUnlinkedResource(b)));
       if (sortMode === "recent") {
         const position = new Map(recentResourceIds.map((id, index) => [id, index]));
-        return [...matched].sort((a, b) => (position.get(a.id) ?? 9999) - (position.get(b.id) ?? 9999));
+        return ordered.sort((a, b) => {
+          const unlinkedOrder = Number(isUnlinkedResource(a)) - Number(isUnlinkedResource(b));
+          return unlinkedOrder || (position.get(a.id) ?? 9999) - (position.get(b.id) ?? 9999);
+        });
       }
-      return matched;
+      return ordered;
     },
     [favorites, favoritesOnly, files, goalFilter, libraryFilter, query, recentResourceIds, sortMode, statusFilter, typeFilter],
   );
@@ -1699,7 +1703,7 @@ export default function KnowledgePage() {
           <div className="knowledge-resource-table" role="table" aria-label="知识空间资料" onScroll={revealScrollbarWhileScrolling}>
             <div className="knowledge-resource-table-head" role="row">
               <span><input type="checkbox" aria-label="选择全部资料" checked={Boolean(visibleFiles.length) && selectedRows.size === visibleFiles.length} onChange={(event) => setSelectedRows(event.target.checked ? new Set(visibleFiles.map((file) => file.id)) : new Set())} /></span>
-              <span>资料</span><span>关联目标</span><span>索引状态</span><span>更新</span>
+              <span>资料</span><span>关联目标</span><span>更新</span>
               <span className="knowledge-batch-cell" aria-label="资料操作">
                 {selectedRows.size > 0 && (
                   <>
@@ -1724,18 +1728,19 @@ export default function KnowledgePage() {
               return (
                 <article key={file.id} role="row" className={isSelected ? "is-selected" : ""}>
                   <span><input type="checkbox" aria-label={`选择 ${file.name}`} checked={isSelected} onChange={() => setSelectedRows((current) => { const next = new Set(current); if (next.has(file.id)) next.delete(file.id); else next.add(file.id); return next; })} /></span>
-                  <button type="button" className="knowledge-resource-identity" onClick={() => openResource(file)}>
-                    <span className={`knowledge-file-glyph is-${file.type.toLowerCase()}`}><ResourceGlyph type={file.type} /></span>
-                    <span><strong>{file.name}</strong><small>{file.type} · {file.libraries.length ? file.libraries.join("、") : "未归档"}{file.size ? ` · ${file.size}` : ""}</small></span>
-                  </button>
+                  <div className="knowledge-resource-identity-cell">
+                    <button type="button" className="knowledge-resource-identity" onClick={() => openResource(file)}>
+                      <span className={`knowledge-file-glyph is-${file.type.toLowerCase()}`}><ResourceGlyph type={file.type} /></span>
+                      <span className="knowledge-resource-copy"><strong>{file.name}</strong><small>{file.type} · {file.libraries.length ? file.libraries.join("、") : "未归档"}{file.size ? ` · ${file.size}` : ""}</small></span>
+                    </button>
+                    <span className="knowledge-row-actions"><button type="button" className={isFavorite ? "is-favorite" : ""} aria-label={isFavorite ? `取消收藏 ${file.name}` : `收藏 ${file.name}`} data-tooltip={isFavorite ? "取消收藏" : "收藏资料"} onClick={() => setFavorites((current) => { const next = new Set(current); if (next.has(file.id)) next.delete(file.id); else next.add(file.id); return next; })}><Bookmark size={14} fill={isFavorite ? "currentColor" : "none"} /></button><button type="button" aria-label={`编辑 ${file.name}`} data-tooltip="编辑资料" onClick={() => openResource(file, isTextResource(file))}><Pencil size={15} /></button></span>
+                  </div>
                   <span className="knowledge-resource-goals">
                     {file.goalTitles.length
                       ? file.goalTitles.map((goalTitle) => <em key={goalTitle}>{goalTitle}</em>)
                       : <em className="is-unlinked">未关联</em>}
                   </span>
-                  <span>{file.processingStatus === "failed" ? <button type="button" className="knowledge-retry" onClick={() => void retryResource(file)}><RefreshCw size={13} /> 重试处理</button> : file.status === "处理中" ? <span className="embedding-progress"><small>正在建立索引</small><i><b /></i></span> : <b className="status-ready">AI 可引用</b>}</span>
                   <time>{file.updated}</time>
-                  <span className="knowledge-row-actions"><button type="button" className={isFavorite ? "is-favorite" : ""} aria-label={isFavorite ? `取消收藏 ${file.name}` : `收藏 ${file.name}`} data-tooltip={isFavorite ? "取消收藏" : "收藏资料"} onClick={() => setFavorites((current) => { const next = new Set(current); if (next.has(file.id)) next.delete(file.id); else next.add(file.id); return next; })}><Bookmark size={14} fill={isFavorite ? "currentColor" : "none"} /></button><button type="button" aria-label={`编辑 ${file.name}`} data-tooltip="编辑资料" onClick={() => openResource(file, isTextResource(file))}><Pencil size={15} /></button></span>
                 </article>
               );
             })}

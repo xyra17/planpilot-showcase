@@ -3265,6 +3265,39 @@
   line-height: 1;
 }
 
+/* Compact resource rows: title, metadata and actions share one aligned cell. */
+.knowledge-reference-page .knowledge-resource-table-head,
+.knowledge-reference-page .knowledge-resource-table article {
+  grid-template-columns: 24px minmax(180px, 1.7fr) minmax(110px, .9fr) 78px 54px;
+}
+
+.knowledge-reference-page .knowledge-resource-identity-cell {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+}
+
+.knowledge-reference-page .knowledge-resource-identity-cell .knowledge-resource-identity {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.knowledge-reference-page .knowledge-resource-copy {
+  min-width: 0;
+}
+
+.knowledge-reference-page .knowledge-resource-copy strong,
+.knowledge-reference-page .knowledge-resource-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.knowledge-reference-page .knowledge-row-actions {
+  flex: 0 0 auto;
+}
+
 /* Keep counts informative but visually subordinate to the navigation labels. */
 .knowledge-reference-page :is(
   .knowledge-scope-shortcuts > button strong,
