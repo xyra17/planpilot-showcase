@@ -1910,7 +1910,7 @@ export default function WorkPage() {
                           >
                             <small>时间流逝度</small>
                             <span>
-                              <i><b style={{ width: `${elapsed}%`, backgroundColor: block.color }} /></i>
+                              <i><b style={{ width: `${elapsed}%` }} /></i>
                               <em>{elapsed}%</em>
                             </span>
                           </span>
