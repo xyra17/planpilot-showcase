@@ -346,6 +346,15 @@
 
 .app-shell .dashboard-page .task-checkbox {
   transform: none;
+  border: 2px solid transparent;
+  box-sizing: border-box;
+}
+
+.app-shell .dashboard-page .task-checkbox:hover,
+.app-shell .dashboard-page .task-checkbox:focus,
+.app-shell .dashboard-page .task-checkbox:focus-visible {
+  border-color: color-mix(in srgb, var(--workspace-accent) 42%, transparent);
+  outline: none;
 }
 
 .app-shell .dashboard-page .task-open-button {

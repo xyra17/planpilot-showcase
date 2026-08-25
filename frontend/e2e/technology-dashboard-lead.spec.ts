@@ -185,13 +185,18 @@ test("科技首页保留指标单位并把问候语放入深色洞察区", async
     const list = control.closest(".task-list")!.getBoundingClientRect();
     const rect = control.getBoundingClientRect();
     const style = getComputedStyle(control);
-    const outlineExtent = Number.parseFloat(style.outlineWidth) + Number.parseFloat(style.outlineOffset);
     return {
-      visibleLeftInset: rect.left - outlineExtent - list.left,
+      visibleLeftInset: rect.left - list.left,
+      borderLeftWidth: style.borderLeftWidth,
+      borderLeftColor: style.borderLeftColor,
+      outlineStyle: style.outlineStyle,
       transform: style.transform,
     };
   });
   expect(completionControlGeometry.visibleLeftInset).toBeGreaterThanOrEqual(3);
+  expect(completionControlGeometry.borderLeftWidth).toBe("2px");
+  expect(completionControlGeometry.borderLeftColor).not.toBe("rgba(0, 0, 0, 0)");
+  expect(completionControlGeometry.outlineStyle).toBe("none");
   expect(completionControlGeometry.transform).toBe("none");
   const priorityColors = await Promise.all([
     todayPanel.getByRole("button", { name: "整理今日错题优先级" }),
