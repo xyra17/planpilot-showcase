@@ -28,6 +28,8 @@ html.is-scrolling::-webkit-scrollbar-thumb {
 
 [data-theme] .app-shell :is(
   .goals-list,
+  .goal-task-scroll,
+  .goal-detail-scroll,
   .goal-milestones-list,
   .notes-list-scroll,
   .notes-notion-canvas,
@@ -54,6 +56,8 @@ html.is-scrolling::-webkit-scrollbar-thumb {
 
 [data-theme] .app-shell :is(
   .goals-list,
+  .goal-task-scroll,
+  .goal-detail-scroll,
   .goal-milestones-list,
   .notes-list-scroll,
   .notes-notion-canvas,
@@ -80,6 +84,8 @@ html.is-scrolling::-webkit-scrollbar-thumb {
 
 [data-theme] .app-shell :is(
   .goals-list,
+  .goal-task-scroll,
+  .goal-detail-scroll,
   .goal-milestones-list,
   .notes-list-scroll,
   .notes-notion-canvas,
@@ -102,6 +108,8 @@ html.is-scrolling::-webkit-scrollbar-thumb {
 )::-webkit-scrollbar-track,
 [data-theme] .app-shell :is(
   .goals-list,
+  .goal-task-scroll,
+  .goal-detail-scroll,
   .goal-milestones-list,
   .notes-list-scroll,
   .notes-notion-canvas,

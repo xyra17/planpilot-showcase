@@ -2453,9 +2453,10 @@
 }
 
 .app-shell .tech-goal-workspace-scope .goal-task-editor-controls {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  width: 100%;
   align-items: center;
-  flex-wrap: wrap;
   gap: 8px;
 }
 
@@ -2558,19 +2559,25 @@
 
 .app-shell .tech-goal-workspace-scope .goal-task-editor-actions {
   display: inline-flex;
+  justify-content: flex-end;
   align-items: center;
   gap: 6px;
   margin-left: auto;
 }
 
 .app-shell .tech-goal-workspace-scope :is(.goal-task-editor-save, .goal-task-editor-cancel) {
-  display: grid;
-  width: 34px;
+  display: inline-flex;
+  min-width: 64px;
   height: 34px;
   min-height: 34px;
-  padding: 0;
-  place-items: center;
+  align-items: center;
+  justify-content: center;
+  padding: 0 14px;
   border-radius: 10px;
+  font-size: 12px;
+  font-weight: 720;
+  line-height: 1;
+  white-space: nowrap;
   transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease, transform 150ms ease;
 }
 
@@ -3777,7 +3784,18 @@
 }
 
 .app-shell .tech-goal-workspace-scope .goal-plan-progress-fill {
-  background: linear-gradient(90deg, var(--workspace-accent), #6285d8);
+  background: linear-gradient(90deg, #4f7cff 0%, #35a9d6 48%, #35c79a 100%);
+}
+
+@media (max-width: 760px) {
+  .app-shell .tech-goal-workspace-scope .goal-task-editor-controls {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .app-shell .tech-goal-workspace-scope .goal-task-editor-actions {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
 }
 
 .app-shell .tech-goal-workspace-scope .goal-plan-phase {

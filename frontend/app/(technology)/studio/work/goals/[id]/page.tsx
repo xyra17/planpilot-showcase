@@ -842,11 +842,11 @@ function GoalTasksWorkspace({
                       ))}
                     </div>
                     <div className="goal-task-editor-actions">
-                      <button type="button" onClick={() => void saveEdit(task.id)} className="goal-task-editor-save" aria-label="保存编辑">
-                        <Check size={15} />
+                      <button type="button" onClick={() => void saveEdit(task.id)} className="goal-task-editor-save" aria-label="应用编辑">
+                        应用
                       </button>
                       <button type="button" onClick={() => setEditingId(null)} className="goal-task-editor-cancel" aria-label="取消编辑">
-                        <X size={15} />
+                        取消
                       </button>
                     </div>
                   </div>
