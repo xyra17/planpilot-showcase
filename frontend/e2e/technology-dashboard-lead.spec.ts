@@ -178,6 +178,21 @@ test("科技首页保留指标单位并把问候语放入深色洞察区", async
   await expect(completedTask.getByRole("button", { name: "记录实际投入" })).toBeVisible();
   await expect(completedTask.locator(".task-meta > small")).toHaveCount(0);
   await expect(completedTask.getByRole("button", { name: "完成动态规划练习优先级" })).toHaveCount(0);
+  const completionControl = completedTask.getByRole("button", { name: "标记为未完成：完成动态规划练习" });
+  await completionControl.focus();
+  const completionControlGeometry = await completionControl.evaluate((button) => {
+    const control = button as HTMLElement;
+    const list = control.closest(".task-list")!.getBoundingClientRect();
+    const rect = control.getBoundingClientRect();
+    const style = getComputedStyle(control);
+    const outlineExtent = Number.parseFloat(style.outlineWidth) + Number.parseFloat(style.outlineOffset);
+    return {
+      visibleLeftInset: rect.left - outlineExtent - list.left,
+      transform: style.transform,
+    };
+  });
+  expect(completionControlGeometry.visibleLeftInset).toBeGreaterThanOrEqual(3);
+  expect(completionControlGeometry.transform).toBe("none");
   const priorityColors = await Promise.all([
     todayPanel.getByRole("button", { name: "整理今日错题优先级" }),
     priorityPicker,

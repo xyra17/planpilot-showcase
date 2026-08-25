@@ -1722,7 +1722,7 @@ test("单目标进度加载失败显示错误并可重试", async ({ page }) => 
   await expect(page.locator(".goal-metric-card-progress")).toContainText("25%");
 });
 
-test("目标任务完成控件不越界且编辑器保持清晰层级", async ({ page }) => {
+test("目标任务编辑器保持清晰层级", async ({ page }) => {
   const today = new Date();
   const todayIso = [
     today.getFullYear(),
@@ -1754,25 +1754,6 @@ test("目标任务完成控件不越界且编辑器保持清晰层级", async ({
 
   await page.goto("/studio/work/goals/goal-tech-1");
   const row = page.locator(".goal-task-item").first();
-  const toggle = row.getByRole("button", { name: "标记为未完成" });
-  await toggle.focus();
-  const toggleGeometry = await row.evaluate((element) => {
-    const rowRect = element.getBoundingClientRect();
-    const button = element.querySelector<HTMLElement>(".goal-task-toggle")!;
-    const buttonRect = button.getBoundingClientRect();
-    const style = getComputedStyle(button);
-    return {
-      leftInset: buttonRect.left - rowRect.left,
-      outline: style.outlineStyle,
-      shadow: style.boxShadow,
-      overflow: getComputedStyle(element).overflow,
-    };
-  });
-  expect(toggleGeometry.leftInset).toBeGreaterThanOrEqual(12);
-  expect(toggleGeometry.outline).toBe("none");
-  expect(toggleGeometry.shadow).not.toBe("none");
-  expect(toggleGeometry.overflow).toBe("visible");
-
   await row.getByRole("button", { name: `编辑任务“${task.title}”` }).click();
   const editor = row.locator(".goal-task-inline-editor");
   await expect(editor.getByText("预计时长", { exact: true })).toBeVisible();

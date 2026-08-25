@@ -795,7 +795,7 @@ function GoalTasksWorkspace({
               data-search-target={focusTaskId === task.id ? "true" : undefined}
               className={cn("goal-task-item group flex items-start gap-2 rounded-xl px-2.5 py-2.5 transition", focusTaskId === task.id && "is-search-target")}
             >
-              <button type="button" onClick={() => onToggleTask(task.id)} className="goal-task-toggle mt-0.5 flex-shrink-0" aria-label={task.done ? "标记为未完成" : "标记为已完成"}>
+              <button type="button" onClick={() => onToggleTask(task.id)} className="mt-0.5 flex-shrink-0" aria-label={task.done ? "标记为未完成" : "标记为已完成"}>
                 {task.done
                   ? <CheckCircle2 size={15} style={{ color: "var(--accent)" }} />
                   : <Circle size={15} className="flex-shrink-0 text-gray-300 transition group-hover:text-gray-400" />}

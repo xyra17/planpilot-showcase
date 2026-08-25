@@ -337,7 +337,7 @@
   grid-template-columns: 36px 3px minmax(0, 1fr) auto;
   gap: 6px;
   min-height: 68px;
-  padding-left: 4px;
+  padding-left: 8px;
 }
 
 .app-shell .dashboard-page .task-item.is-navigable {
@@ -345,7 +345,7 @@
 }
 
 .app-shell .dashboard-page .task-checkbox {
-  transform: translateX(-3px);
+  transform: none;
 }
 
 .app-shell .dashboard-page .task-open-button {

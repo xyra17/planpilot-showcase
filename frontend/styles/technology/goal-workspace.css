@@ -2428,38 +2428,6 @@
   background: color-mix(in srgb, var(--workspace-accent) 5%, var(--workspace-panel));
 }
 
-.app-shell .tech-goal-workspace-scope .goal-task-item {
-  padding-left: 14px !important;
-  overflow: visible;
-}
-
-.app-shell .tech-goal-workspace-scope .goal-task-toggle {
-  display: grid;
-  width: 34px;
-  height: 34px;
-  min-height: 34px;
-  margin-right: 2px;
-  padding: 0;
-  place-items: center;
-  color: var(--workspace-secondary);
-  background: transparent;
-  border: 0;
-  border-radius: 10px;
-  transition: color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
-}
-
-.app-shell .tech-goal-workspace-scope .goal-task-toggle > svg {
-  width: 18px;
-  height: 18px;
-}
-
-.app-shell .tech-goal-workspace-scope .goal-task-toggle:is(:hover, :focus-visible) {
-  color: var(--workspace-accent);
-  background: color-mix(in srgb, var(--workspace-accent) 8%, var(--workspace-panel));
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--workspace-accent) 20%, transparent);
-  outline: none;
-}
-
 .app-shell .tech-goal-workspace-scope .goal-task-inline-editor {
   display: grid;
   gap: 10px;
