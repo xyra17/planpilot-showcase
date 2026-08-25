@@ -3265,6 +3265,36 @@
   line-height: 1;
 }
 
+/* Keep counts informative but visually subordinate to the navigation labels. */
+.knowledge-reference-page :is(
+  .knowledge-scope-shortcuts > button strong,
+  .knowledge-library-list > button strong,
+  .knowledge-library-list .knowledge-library-row > button strong,
+  .knowledge-goal-scroll > button strong,
+  .knowledge-folder-list > button strong
+) {
+  min-width: 18px;
+  height: auto;
+  padding: 0;
+  color: color-mix(in srgb, var(--knowledge-muted) 72%, transparent);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.knowledge-reference-page :is(
+  .knowledge-scope-shortcuts > button.is-active strong,
+  .knowledge-library-list > button.is-active strong,
+  .knowledge-library-list .knowledge-library-row > button.is-active strong,
+  .knowledge-goal-scroll > button.is-active strong,
+  .knowledge-folder-list > button.is-active strong
+) {
+  color: var(--knowledge-accent);
+  background: transparent;
+}
+
 .knowledge-reference-page :is(
   .knowledge-scope-shortcuts > button.is-active strong,
   .knowledge-library-list > button.is-active strong,
