@@ -221,14 +221,14 @@ const DEFAULT_FOCUS_TIMER: PiloFocusTimer = {
 };
 const INACTIVE_THRESHOLD_MS = 75_000;
 const EDIT_PAUSE_THRESHOLD_MS = 12_000;
-const STRETCH_REMINDER_INTERVAL_MS = 45 * 60 * 1000;
+const STRETCH_REMINDER_INTERVAL_MS = 60 * 60 * 1000;
 const HYDRATION_REMINDER_INTERVAL_MS = 90 * 60 * 1000;
 const FOCUS_TIMER_CHECK_MS = 24 * 60 * 1000;
 const STRETCH_REMINDER_CHECK_MS = 30_000;
 const NAVIGATION_REMINDER_QUIET_MS = 30_000;
 const STRETCH_REMINDER_MESSAGE = "坐久啦，起来伸个懒腰、活动一下吧。";
 const HYDRATION_REMINDER_MESSAGE = "已经专注一阵子了，喝几口水再继续吧。";
-const READING_AMBIENT_GUARD_CHANCE = 0.7;
+const READING_AMBIENT_GUARD_CHANCE = 0.88;
 const DEFAULT_PREFERENCES: PiloPreferences = {
   activity: "docked",
   activityDefaultVersion: ACTIVITY_DEFAULT_VERSION,
@@ -1806,8 +1806,8 @@ export function PiloCompanion() {
     const learnedScale = preferences.features.adaptiveTiming
       ? clamp(1 - learnedPreferences.reminderAffinity * .18, .8, 1.25)
       : 1;
-    const baseDelay = !ambientHasVariedRef.current ? 10_000 : 38_000;
-    const variance = !ambientHasVariedRef.current ? 4_000 : 24_000;
+    const baseDelay = !ambientHasVariedRef.current ? 18_000 : 65_000;
+    const variance = !ambientHasVariedRef.current ? 6_000 : 35_000;
     const delay = (baseDelay + scheduler.random() * variance) * initiativeScale * learnedScale;
     const timer = window.setTimeout(() => {
       ambientHasVariedRef.current = true;
@@ -3097,7 +3097,7 @@ export function PiloCompanion() {
                         <PiloSettingSwitch icon={Activity} label="自动生活动作" description="允许 Pilo 根据学习节律低频坐下、行走、茶歇或收尾" checked={preferences.features.lifestyleStates} onToggle={() => toggleFeature("lifestyleStates")} />
                         <PiloSettingSwitch icon={BookOpen} label="情境陪伴" description="理解你正在阅读、记录、复习还是推进目标，并调整 Pilo 的状态" checked={preferences.features.contextAwareness} onToggle={() => toggleFeature("contextAwareness")} />
                         <PiloSettingSwitch icon={MessageCircle} label="适时建议" description="只在发现明确下一步时轻声提醒；不会在输入和专注时打断" checked={preferences.features.proactiveHints} onToggle={() => toggleFeature("proactiveHints")} />
-                        <PiloSettingSwitch icon={TimerReset} label="久坐提醒" description="连续使用约 45 分钟后提醒活动" checked={preferences.features.stretchReminders} onToggle={() => toggleFeature("stretchReminders")} />
+                        <PiloSettingSwitch icon={TimerReset} label="久坐提醒" description="连续使用约 60 分钟后提醒活动" checked={preferences.features.stretchReminders} onToggle={() => toggleFeature("stretchReminders")} />
                       </div>
                     )}
                   </section>

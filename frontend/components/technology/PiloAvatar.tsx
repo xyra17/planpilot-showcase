@@ -69,9 +69,23 @@ const ATLAS_LIFE_ACTION_PHASE_FRAMES: Partial<Record<PiloLifeActionId, Record<Pi
   work: { entering: [0, 1], holding: [2, 3, 4, 5], leaving: [5, 1, 0] },
   wait: { entering: [0, 1], holding: [2, 3, 4, 5], leaving: [5, 1, 0] },
   stretch: { entering: [0, 1], holding: [2, 3], leaving: [4, 0] },
-  comfort: { entering: [0, 1, 2], holding: [3, 4, 5], leaving: [6, 7] },
+  // The first three comfort frames have a hand crossing the atlas cell edge;
+  // keep the settled hug frames in the loop so a neighbouring arm cannot leak
+  // into the preview card.
+  comfort: { entering: [0, 1, 2], holding: [4, 5, 6], leaving: [6, 7] },
   finish: { entering: [0, 1, 2], holding: [3], leaving: [3, 0] },
-  walk: { entering: [0, 1], holding: [2, 3, 4, 5, 6], leaving: [7, 0] },
+  // Walking is a full eight-frame gait. Looping only 2–6 made the stride snap
+  // back to an earlier leg position and read as a stuck animation.
+  walk: { entering: [0, 1], holding: [0, 1, 2, 3, 4, 5, 6, 7], leaving: [7, 6, 1, 0] },
+};
+const ATLAS_LIFE_ACTION_DURATIONS: Partial<Record<PiloLifeActionId, readonly number[]>> = {
+  read: [300, 300, 620, 760, 760, 920, 300, 300],
+  work: [180, 180, 220, 240, 240, 240, 220, 220],
+  wait: [260, 260, 420, 520, 520, 640, 260, 260],
+  stretch: [420, 500, 680, 820, 420, 420, 420, 420],
+  comfort: [320, 360, 420, 480, 560, 560, 480, 360],
+  finish: [260, 280, 320, 760, 320, 280, 260, 260],
+  walk: [120, 120, 120, 120, 120, 120, 120, 200],
 };
 const LIFE_ACTION_DURATIONS = [150, 150, 170, 260, 260, 260, 190, 220] as const;
 // These actions tell one small story and must settle on their final holding
@@ -303,7 +317,11 @@ export function PiloAvatar({
         }
         setFrame(sequence[nextPosition] ?? current);
         advance(nextPosition);
-      }, lifeActionBase ? LIFE_ACTION_DURATIONS[current] : animation?.durations[current] ?? 180);
+      }, lifeActionBase
+        ? LIFE_ACTION_DURATIONS[current]
+        : lifeAction && ATLAS_LIFE_ACTION_DURATIONS[lifeAction]
+          ? ATLAS_LIFE_ACTION_DURATIONS[lifeAction]?.[current] ?? animation?.durations[current] ?? 180
+          : animation?.durations[current] ?? 180);
     };
     advance(0);
     return () => {

@@ -8539,6 +8539,11 @@
 .pilo-companion__life-action-preview > .pilo-avatar .pilo-avatar__aura,
 .pilo-companion__life-action-preview > .pilo-avatar .pilo-avatar__chest-glow,
 .pilo-companion__life-action-preview > .pilo-avatar .pilo-avatar__status { display: none; }
+.pilo-avatar[data-pilo-life-action="comfort"] .pilo-avatar__sprite {
+  /* The comfort atlas has a hand crossing the left cell edge. Clip only that
+     transparent fringe while preserving the complete body silhouette. */
+  clip-path: inset(0 0 0 7%);
+}
 .pilo-companion__life-action-preview > .pilo-companion__life-action-preview {
   display: block;
   width: 54px;
