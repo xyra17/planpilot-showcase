@@ -8467,6 +8467,39 @@
   margin-top: 8px;
 }
 
+.pilo-companion__life-action-options { margin-top: 8px; }
+.pilo-companion__life-action-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+  padding: 4px;
+  background: rgba(12, 20, 38, .72);
+  border: 1px solid rgba(255, 255, 255, .08);
+  border-radius: 11px;
+}
+.pilo-companion__life-action-tabs > button {
+  min-height: 38px;
+  padding: 7px 10px;
+  color: #aebbd0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: color 160ms ease, background 160ms ease, border-color 160ms ease;
+}
+.pilo-companion__life-action-tabs > button:hover,
+.pilo-companion__life-action-tabs > button:focus-visible { color: #eaf4f6; background: rgba(155, 233, 207, .08); }
+.pilo-companion__life-action-tabs > button.is-active {
+  color: #eafff8;
+  background: rgba(55, 91, 105, .72);
+  border-color: rgba(155, 233, 207, .34);
+  box-shadow: 0 4px 12px rgba(3, 10, 26, .18);
+}
+.pilo-companion__life-action-tabs > button:focus-visible { outline: 2px solid #9be9cf; outline-offset: 1px; }
+
 .pilo-companion__life-action-grid > button {
   display: grid;
   min-width: 0;
@@ -8491,7 +8524,22 @@
   transform: translateY(-1px);
 }
 
-.pilo-companion__life-action-grid > button > span:first-child {
+.pilo-companion__life-action-grid > button > .pilo-companion__life-action-preview {
+  display: block;
+  width: 54px;
+  height: 62px;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+}
+.pilo-companion__life-action-preview > .pilo-avatar {
+  width: 58px;
+  height: 62px;
+}
+.pilo-companion__life-action-preview > .pilo-avatar .pilo-avatar__aura,
+.pilo-companion__life-action-preview > .pilo-avatar .pilo-avatar__chest-glow,
+.pilo-companion__life-action-preview > .pilo-avatar .pilo-avatar__status { display: none; }
+.pilo-companion__life-action-preview > .pilo-companion__life-action-preview {
   display: block;
   width: 54px;
   height: 62px;
@@ -10707,6 +10755,7 @@
 
 .pilo-companion__appearance-intro { grid-template-columns: 18px minmax(0, 1fr) auto; gap: 9px; }
 .pilo-companion__appearance-intro > svg { width: 16px; height: 16px; }
+.pilo-companion__appearance-intro strong { font-size: 15px; }
 .pilo-companion__settings-group.is-expanded > header,
 .pilo-companion__appearance-intro.is-expanded { border-bottom-color: rgba(255, 255, 255, .06); }
 

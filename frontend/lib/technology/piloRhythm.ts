@@ -79,7 +79,7 @@ export type PiloLifeActionDefinition = {
  */
 export const PILO_LIFE_ACTIONS: readonly PiloLifeActionDefinition[] = [
   { id: "read", label: "安静阅读", trigger: "打开资料或阅读笔记", state: "reading", accessory: "glasses", heldObject: "书", readiness: "loop-ready", entry: "拿起书并戴好眼镜", exit: "合上书并抬头", continuity: "resumable" },
-  { id: "work", label: "整理内容", trigger: "系统正在整理或生成", state: "working", accessory: "glasses", heldObject: "小电脑", readiness: "loop-ready", entry: "打开电脑", exit: "检查后合上电脑", continuity: "resumable" },
+  { id: "work", label: "敲电脑", trigger: "系统正在整理或生成", state: "working", accessory: "glasses", heldObject: "小电脑", readiness: "loop-ready", entry: "打开电脑", exit: "检查后合上电脑", continuity: "resumable" },
   { id: "rest", label: "坐下休息", trigger: "较长时间没有操作", state: "resting", accessory: "none", readiness: "loop-ready", entry: "由站立坐下", exit: "起身回到安静待机", continuity: "interruptible" },
   { id: "walk", label: "慢慢走动", trigger: "页面空间允许且当前没有任务事件", state: "walking", accessory: "none", readiness: "loop-ready", entry: "转向后起步", exit: "减速、停下并回头", continuity: "interruptible" },
   { id: "wait", label: "捧星等待", trigger: "等待用户确认", state: "waiting", accessory: "none", heldObject: "胸前星光", readiness: "loop-ready", entry: "捧起星光", exit: "将星光收回胸前", continuity: "resumable" },

@@ -67,12 +67,12 @@ import {
   PILO_LIFE_ACTIONS,
   type PiloActionPhase,
   type PiloInterruptionBudget,
+  type PiloLifeActionDefinition,
 } from "@/lib/technology/piloRhythm";
 import {
   PILO_STATE_EVENT,
   signalPiloState,
   type PiloAccessory,
-  type PiloLifeActionId,
   type PiloStateDetail,
   type PiloSystemState,
 } from "@/lib/technology/piloState";
@@ -109,6 +109,7 @@ type ActivityMode = "docked" | "gentle" | "active";
 type PiloCompanionMode = "quiet" | "balanced" | "focus" | "coach" | "custom";
 type PiloOutfit = "auto" | PiloAccessory;
 type PiloSettingsTab = "overview" | "scenes" | "functions";
+type PiloLifeActionTab = "basic" | "props";
 type PiloSettingsSection = "overview" | "presence" | "lifeActions" | "outfits" | "scenePreviews" | "activity" | "automatic" | "scenes" | "rhythm";
 
 const PILO_SETTINGS_TABS: readonly PiloSettingsTab[] = ["overview", "scenes", "functions"];
@@ -283,20 +284,8 @@ const PILO_SCENE_OPTIONS: ReadonlyArray<{ id: PiloSceneId; label: string; descri
   { id: "review", label: "晚间回顾", description: "Pilo 在暮色里写下今日观察", asset: "/pilo/scenes/v4/review-01.webp" },
 ];
 
-const USER_PREVIEW_LIFE_ACTION_IDS: readonly PiloLifeActionId[] = [
-  "tea-break",
-  "capture-idea",
-  "check-timer",
-  "tidy-desk",
-  "nurture-growth",
-  "relief",
-  "nap",
-  "sign-off",
-];
-
-const PILO_LIFE_ACTION_OPTIONS = PILO_LIFE_ACTIONS.filter(
-  (action) => USER_PREVIEW_LIFE_ACTION_IDS.includes(action.id),
-);
+const PILO_BASIC_LIFE_ACTION_OPTIONS = PILO_LIFE_ACTIONS.filter((action) => action.readiness === "loop-ready");
+const PILO_PROP_LIFE_ACTION_OPTIONS = PILO_LIFE_ACTIONS.filter((action) => action.readiness === "complete");
 
 const MODE_OPTIONS: ReadonlyArray<{
   id: Exclude<PiloCompanionMode, "custom">;
@@ -640,6 +629,7 @@ export function PiloCompanion() {
   const [contextMenu, setContextMenu] = useState<PiloPoint | null>(null);
   const [panelAnchor, setPanelAnchor] = useState<PiloPoint | null>(null);
   const [settingsTab, setSettingsTab] = useState<PiloSettingsTab>("overview");
+  const [lifeActionTab, setLifeActionTab] = useState<PiloLifeActionTab>("basic");
   const [expandedSections, setExpandedSections] = useState<Record<PiloSettingsSection, boolean>>({
     overview: false,
     presence: false,
@@ -895,7 +885,7 @@ export function PiloCompanion() {
     sceneTimerRef.current = window.setTimeout(() => closeScene(), scene.duration);
   }, [closeScene, learningContext.completedCount, learningContext.currentObjectTitle, learningContext.itemCount, preferences.features.personalizedSceneCopy, rememberPresence, scheduler, user?.id, user?.username]);
 
-  const previewLifeAction = useCallback((action: (typeof PILO_LIFE_ACTION_OPTIONS)[number]) => {
+  const previewLifeAction = useCallback((action: PiloLifeActionDefinition) => {
     setContextMenu(null);
     window.setTimeout(() => {
       scheduler.release("companion:interaction");
@@ -2898,7 +2888,7 @@ export function PiloCompanion() {
                 <div id="pilo-settings-panel-scenes" role="tabpanel" aria-labelledby="pilo-settings-tab-scenes" className="pilo-companion__settings-page pilo-companion__scene-page">
                   <section className={`pilo-companion__appearance-intro ${expandedSections.lifeActions ? "is-expanded" : "is-collapsed"}`}>
                     <PersonStanding size={17} />
-                    <span><strong>动作预览</strong><small>指定 Pilo 做一次动作；这里仅用于预览，不改变自动规则。</small></span>
+                    <span><strong>动作预览</strong><small>选择基础动作或道具动作，让 Pilo 做一次预览；不会改变自动规则。</small></span>
                     <button
                       type="button"
                       className="pilo-companion__collapse-toggle"
@@ -2911,13 +2901,54 @@ export function PiloCompanion() {
                     </button>
                   </section>
                   {expandedSections.lifeActions && (
-                    <div id="pilo-life-action-options" className="pilo-companion__life-action-grid" aria-label="选择要预览的 Pilo 生活动作">
-                      {PILO_LIFE_ACTION_OPTIONS.map((action) => (
-                        <button type="button" aria-label={`预览${action.label}动作`} onClick={() => previewLifeAction(action)} key={action.id}>
-                          <span style={{ backgroundImage: `url(/pilo/life/${action.id}/04.png)` }} aria-hidden="true" />
-                          <span><strong>{action.label}</strong><small>{action.trigger}</small></span>
-                        </button>
-                      ))}
+                    <div className="pilo-companion__life-action-options">
+                      <div className="pilo-companion__life-action-tabs" role="tablist" aria-label="选择动作类型">
+                        <button
+                          id="pilo-life-action-tab-basic"
+                          type="button"
+                          role="tab"
+                          aria-selected={lifeActionTab === "basic"}
+                          aria-controls="pilo-life-action-options-basic"
+                          className={lifeActionTab === "basic" ? "is-active" : ""}
+                          onClick={() => setLifeActionTab("basic")}
+                        >基础动作</button>
+                        <button
+                          id="pilo-life-action-tab-props"
+                          type="button"
+                          role="tab"
+                          aria-selected={lifeActionTab === "props"}
+                          aria-controls="pilo-life-action-options-props"
+                          className={lifeActionTab === "props" ? "is-active" : ""}
+                          onClick={() => setLifeActionTab("props")}
+                        >道具动作</button>
+                      </div>
+                      <div
+                        id={`pilo-life-action-options-${lifeActionTab}`}
+                        role="tabpanel"
+                        aria-labelledby={`pilo-life-action-tab-${lifeActionTab}`}
+                        className="pilo-companion__life-action-grid"
+                        aria-label={`选择要预览的 Pilo ${lifeActionTab === "basic" ? "基础" : "道具"}动作`}
+                      >
+                        {(lifeActionTab === "basic" ? PILO_BASIC_LIFE_ACTION_OPTIONS : PILO_PROP_LIFE_ACTION_OPTIONS).map((action) => (
+                          <button type="button" aria-label={`预览${action.label}动作`} onClick={() => previewLifeAction(action)} key={action.id}>
+                            <span className="pilo-companion__life-action-preview" aria-hidden="true">
+                              {lifeActionTab === "basic" ? (
+                                <PiloAvatar
+                                  size={58}
+                                  mood={moodForSystemState(action.state)}
+                                  accessory={action.accessory}
+                                  lifeAction={action.id}
+                                  actionPhase="holding"
+                                  instant
+                                />
+                              ) : (
+                                <span style={{ backgroundImage: `url(/pilo/life/${action.id}/04.png)` }} />
+                              )}
+                            </span>
+                            <span><strong>{action.label}</strong><small>{action.trigger}</small></span>
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   )}
 
