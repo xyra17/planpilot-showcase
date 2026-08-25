@@ -1,11 +1,11 @@
 "use client";
 
 import { ArrowLeft, ArrowRight, CheckCircle2, Eye, EyeOff, KeyRound, Loader2, UserRound } from "lucide-react";
-import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 
 import { AppBrand } from "@/components/app/AppBrand";
+import { PiloAvatar } from "@/components/technology/PiloAvatar";
 import { ApiError } from "@/lib/api";
 import { safeProductReturnPath } from "@/lib/technology/noticeActions";
 import { useAuthStore } from "@/lib/stores/authStore";
@@ -111,13 +111,14 @@ export default function LoginPage() {
             <p>继续今天的学习旅程，Pilo 已经在等你了。</p>
           </div>
           <div className="pp-login-pilo">
-            <span>我在这里</span>
-            <Image
-              src="/pilo/pilo-idle.webp"
-              width={210}
-              height={249}
-              alt="在欢迎页等你的 Pilo"
+            <span className="pp-login-pilo-bubble">我在这里</span>
+            <PiloAvatar
+              mood="working"
+              lifeAction="work"
+              actionPhase="holding"
+              size={128}
               priority
+              className="pp-login-pilo-avatar"
             />
           </div>
         </div>

@@ -1704,8 +1704,8 @@ export function PiloCompanion() {
       accessory: learningContext.surface === "goals" ? "wristwarmers" : "glasses",
       lifeAction: learningContext.surface === "notes" && learningContext.phase === "editing"
         ? "capture-idea"
-          : learningContext.surface === "knowledge" && learningContext.phase === "reading"
-            ? "work"
+        : learningContext.surface === "knowledge" && learningContext.phase === "reading"
+          ? "read"
           : learningContext.surface === "goals" && learningContext.phase === "reading"
             ? "nurture-growth"
             : undefined,

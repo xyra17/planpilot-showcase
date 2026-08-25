@@ -26,8 +26,9 @@ test("登录页保持等宽布局并可返回访客工作台", async ({ page }) 
   await page.setViewportSize({ width: 1200, height: 632 });
   await page.goto("/login");
 
-  const pilo = page.getByRole("img", { name: "在欢迎页等你的 Pilo" });
+  const pilo = page.getByRole("img", { name: "Pilo 戴着眼镜在小电脑前工作" });
   await expect(pilo).toBeVisible();
+  await expect(pilo).toHaveAttribute("data-pilo-life-action", "work");
   const [headingBox, piloBox] = await Promise.all([
     page.locator(".pp-login-heading").boundingBox(),
     pilo.boundingBox(),

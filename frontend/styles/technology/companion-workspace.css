@@ -3317,11 +3317,6 @@
   touch-action: none;
 }
 
-.app-shell:has(.knowledge-reference-page) .pilo-companion {
-  width: 96px;
-  height: 104px;
-}
-
 .pilo-companion__panel {
   position: absolute;
   right: 76px;
