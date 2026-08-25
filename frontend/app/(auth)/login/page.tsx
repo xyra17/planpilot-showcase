@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2, Eye, EyeOff, Loader2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle2, Eye, EyeOff, KeyRound, Loader2, UserRound } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -94,40 +94,47 @@ export default function LoginPage() {
   const submitting = isLoading || loginState === "success";
 
   return (
-    <div className="pp-auth-page">
-      <div className="pp-auth-card">
-        <div className="mb-8 text-center">
+    <div className="pp-auth-page pp-login-page">
+      <Link href="/studio/work" className="pp-auth-guest-return">
+        <ArrowLeft size={15} aria-hidden="true" />
+        返回访客工作台
+      </Link>
+      <div className="pp-auth-card pp-login-card">
+        <div className="pp-login-heading">
           <div className="pp-auth-mobile-brand">
-            <AppBrand href="/login" />
+            <AppBrand href="/studio/work" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">欢迎回来</h1>
-          <p className="mt-1 text-sm text-gray-500">继续今天的学习旅程</p>
+          <span className="pp-login-kicker">CONTINUE YOUR JOURNEY</span>
+          <h1>欢迎回来</h1>
+          <p>继续今天的学习旅程，Pilo 已经在等你了。</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-          <div>
-            <label htmlFor="login-identifier" className="mb-1 block text-sm font-medium text-gray-700">
+        <form onSubmit={handleSubmit} className="pp-login-form" noValidate>
+          <div className="pp-login-field">
+            <label htmlFor="login-identifier">
               用户名或邮箱
             </label>
-            <input
-              id="login-identifier"
-              name="identifier"
-              type="text"
-              value={identifier}
-              onChange={(event) => {
-                setIdentifier(event.target.value);
-                if (fieldErrors.identifier) setFieldErrors((current) => ({ ...current, identifier: undefined }));
-                resetStatus();
-              }}
-              autoComplete="username"
-              autoCapitalize="none"
-              spellCheck={false}
-              disabled={submitting}
-              placeholder="请输入用户名或邮箱"
-              aria-invalid={Boolean(fieldErrors.identifier)}
-              aria-describedby={fieldErrors.identifier ? "login-identifier-error" : undefined}
-              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none transition focus:border-transparent focus:ring-2 focus:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
-            />
+            <div className="pp-login-input-shell">
+              <UserRound size={17} aria-hidden="true" />
+              <input
+                id="login-identifier"
+                name="identifier"
+                type="text"
+                value={identifier}
+                onChange={(event) => {
+                  setIdentifier(event.target.value);
+                  if (fieldErrors.identifier) setFieldErrors((current) => ({ ...current, identifier: undefined }));
+                  resetStatus();
+                }}
+                autoComplete="username"
+                autoCapitalize="none"
+                spellCheck={false}
+                disabled={submitting}
+                placeholder="请输入用户名或邮箱"
+                aria-invalid={Boolean(fieldErrors.identifier)}
+                aria-describedby={fieldErrors.identifier ? "login-identifier-error" : undefined}
+              />
+            </div>
             {fieldErrors.identifier && (
               <p id="login-identifier-error" className="pp-auth-field-error">
                 {fieldErrors.identifier}
@@ -135,16 +142,10 @@ export default function LoginPage() {
             )}
           </div>
 
-          <div>
-            <div className="mb-1 flex items-center justify-between">
-              <label htmlFor="login-password" className="block text-sm font-medium text-gray-700">
-                密码
-              </label>
-              <Link href="/auth/recover" className="text-xs text-accent hover:underline">
-                忘记密码？
-              </Link>
-            </div>
-            <div className="pp-auth-password-field">
+          <div className="pp-login-field">
+            <label htmlFor="login-password">密码</label>
+            <div className="pp-login-input-shell pp-auth-password-field">
+              <KeyRound size={17} aria-hidden="true" />
               <input
                 id="login-password"
                 name="password"
@@ -160,7 +161,6 @@ export default function LoginPage() {
                 placeholder="请输入密码"
                 aria-invalid={Boolean(fieldErrors.password)}
                 aria-describedby={fieldErrors.password ? "login-password-error" : undefined}
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 pr-11 text-sm outline-none transition focus:border-transparent focus:ring-2 focus:ring-accent disabled:cursor-not-allowed disabled:opacity-60"
               />
               <button
                 type="button"
@@ -180,15 +180,18 @@ export default function LoginPage() {
             )}
           </div>
 
-          <label className="pp-auth-remember">
-            <input
-              type="checkbox"
-              checked={remember}
-              onChange={(event) => setRemember(event.target.checked)}
-              disabled={submitting}
-            />
-            <span>记住登录状态（30 天）</span>
-          </label>
+          <div className="pp-login-meta">
+            <label className="pp-auth-remember">
+              <input
+                type="checkbox"
+                checked={remember}
+                onChange={(event) => setRemember(event.target.checked)}
+                disabled={submitting}
+              />
+              <span>记住登录状态（30 天）</span>
+            </label>
+            <Link href="/auth/recover">忘记密码？</Link>
+          </div>
 
           {statusMessage && (
             <div
@@ -204,16 +207,17 @@ export default function LoginPage() {
             type="submit"
             disabled={submitting}
             aria-busy={isLoading}
-            className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg bg-accent py-2 text-sm font-medium text-white transition hover:bg-accent-dark disabled:cursor-not-allowed disabled:opacity-70"
+            className="pp-login-submit"
           >
             {isLoading && <Loader2 size={16} className="animate-spin" aria-hidden="true" />}
             {isLoading ? "登录中…" : loginState === "success" ? "登录成功" : "登录"}
+            {!isLoading && loginState !== "success" && <ArrowRight size={16} aria-hidden="true" />}
           </button>
         </form>
 
-        <p className="mt-5 text-center text-sm text-gray-500">
+        <p className="pp-login-switch">
           没有账号？{" "}
-          <Link href="/register" className="text-accent hover:underline">
+          <Link href="/register">
             注册
           </Link>
         </p>

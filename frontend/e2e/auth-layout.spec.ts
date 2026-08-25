@@ -22,6 +22,20 @@ test("登录页在常见笔记本高度下一屏完整显示", async ({ page }) 
   expect(viewport.scrollHeight).toBeLessThanOrEqual(viewport.height);
 });
 
+test("登录页保持等宽布局并可返回访客工作台", async ({ page }) => {
+  await page.setViewportSize({ width: 1200, height: 632 });
+  await page.goto("/login");
+
+  await expect(page.getByRole("img", { name: "挥手欢迎你的 Pilo" })).toBeVisible();
+  const columns = await page.locator(".pp-auth-shell > section").evaluateAll((sections) =>
+    sections.map((section) => section.getBoundingClientRect().width),
+  );
+  expect(Math.abs(columns[0] - columns[1])).toBeLessThanOrEqual(1);
+
+  await page.getByRole("link", { name: "返回访客工作台" }).click();
+  await expect(page).toHaveURL(/\/studio\/work$/);
+});
+
 test("登录表单提供字段错误与密码显隐状态", async ({ page }) => {
   await page.goto("/login");
   await page.getByRole("button", { name: "登录", exact: true }).click();
