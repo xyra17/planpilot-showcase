@@ -3298,6 +3298,18 @@
   flex: 0 0 auto;
 }
 
+.knowledge-reference-page .knowledge-resource-table article .knowledge-resource-goals em {
+  padding: 0;
+  color: #68758e;
+  background: transparent;
+  font-weight: 560;
+}
+
+.knowledge-reference-page .knowledge-resource-table article .knowledge-resource-goals em.is-unlinked {
+  color: #8a94a8;
+  background: transparent;
+}
+
 /* Keep counts informative but visually subordinate to the navigation labels. */
 .knowledge-reference-page :is(
   .knowledge-scope-shortcuts > button strong,
