@@ -1,6 +1,7 @@
 "use client";
 
 import { ArrowLeft, ArrowRight, CheckCircle2, Eye, EyeOff, KeyRound, Loader2, UserRound } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -100,13 +101,25 @@ export default function LoginPage() {
         返回访客工作台
       </Link>
       <div className="pp-auth-card pp-login-card">
-        <div className="pp-login-heading">
-          <div className="pp-auth-mobile-brand">
-            <AppBrand href="/studio/work" />
+        <div className="pp-login-intro">
+          <div className="pp-login-heading">
+            <div className="pp-auth-mobile-brand">
+              <AppBrand href="/studio/work" />
+            </div>
+            <span className="pp-login-kicker">CONTINUE YOUR JOURNEY</span>
+            <h1>欢迎回来</h1>
+            <p>继续今天的学习旅程，Pilo 已经在等你了。</p>
           </div>
-          <span className="pp-login-kicker">CONTINUE YOUR JOURNEY</span>
-          <h1>欢迎回来</h1>
-          <p>继续今天的学习旅程，Pilo 已经在等你了。</p>
+          <div className="pp-login-pilo">
+            <span>我在这里</span>
+            <Image
+              src="/pilo/pilo-idle.webp"
+              width={210}
+              height={249}
+              alt="在欢迎页等你的 Pilo"
+              priority
+            />
+          </div>
         </div>
 
         <form onSubmit={handleSubmit} className="pp-login-form" noValidate>

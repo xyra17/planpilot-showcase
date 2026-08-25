@@ -1,5 +1,4 @@
 import { BrainCircuit, CheckCircle2, ShieldCheck } from "lucide-react";
-import Image from "next/image";
 
 import { AppBrand } from "@/components/app/AppBrand";
 
@@ -18,16 +17,6 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
             <div><BrainCircuit size={17} /><span><strong>长期理解</strong><small>学习伙伴基于行为证据提供建议</small></span></div>
             <div><ShieldCheck size={17} /><span><strong>由你决定</strong><small>任何计划变更都需要你的确认</small></span></div>
           </div>
-        </div>
-        <div className="pp-auth-pilo">
-          <span>欢迎回来，我会继续陪你。</span>
-          <Image
-            src="/pilo/states/pilo-greeting.webp"
-            width={220}
-            height={220}
-            alt="挥手欢迎你的 Pilo"
-            priority
-          />
         </div>
         <p className="pp-auth-footnote">你的学习数据只用于提供个人学习支持。</p>
       </section>
