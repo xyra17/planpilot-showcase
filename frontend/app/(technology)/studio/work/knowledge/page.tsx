@@ -1485,7 +1485,7 @@ export default function KnowledgePage() {
 
       <div className="knowledge-reference-grid">
         <aside className="knowledge-rail-column">
-          <nav className="knowledge-library-rail" aria-label="资料分类">
+          <nav className="knowledge-library-rail" aria-label="资料分类" onScroll={revealScrollbarWhileScrolling}>
             <section className="knowledge-scope-shortcuts">
               <button type="button" className={!hasActiveFilters ? "is-active" : ""} onClick={clearFilters}><FileText size={15} /><span>全部资料</span><strong>{files.length}</strong></button>
               <button type="button" className={goalFilter === "unlinked" ? "is-active" : ""} onClick={() => { clearFilters(); setGoalFilter("unlinked"); }}><Link2 size={15} /><span>未关联资料</span><strong>{files.filter(isUnlinkedResource).length}</strong></button>

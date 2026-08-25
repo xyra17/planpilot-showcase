@@ -1620,7 +1620,7 @@
    use a readable minimum type scale across dense controls. */
 .knowledge-reference-grid {
   grid-template-columns: minmax(190px, 216px) minmax(0, 1fr) minmax(228px, 252px);
-  gap: 12px;
+  gap: 7px;
 }
 
 .knowledge-resource-panel,
@@ -1635,6 +1635,30 @@
 
 .knowledge-resource-table {
   overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+.knowledge-resource-table.is-scrolling {
+  scrollbar-color: color-mix(in srgb, var(--knowledge-accent) 42%, transparent) transparent;
+}
+
+.knowledge-resource-table::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+.knowledge-resource-table::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.knowledge-resource-table::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 999px;
+}
+
+.knowledge-resource-table.is-scrolling::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--knowledge-accent) 42%, transparent);
 }
 
 .knowledge-resource-table-head,

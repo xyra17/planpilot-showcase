@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type UIEvent } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useAuth } from "@/components/technology/AuthProvider";
 import { WorkspaceSkeleton } from "@/components/technology/WorkspaceSkeleton";
@@ -269,11 +269,24 @@ export default function NotesPage() {
   const [editorScrolling, setEditorScrolling] = useState(false);
   const saveInFlightRef = useRef<Promise<boolean> | null>(null);
   const editorScrollTimerRef = useRef<number | null>(null);
+  const scrollbarHideTimersRef = useRef(new Map<HTMLElement, number>());
   const draftRef = useRef<Note>(draft);
   const draftDirtyRef = useRef(draftDirty);
   const draftIsNewRef = useRef(draftIsNew);
   const filterPickerRef = useRef<HTMLDivElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
+
+  function revealScrollbarWhileScrolling(event: UIEvent<HTMLElement>) {
+    const container = event.currentTarget;
+    const previousTimer = scrollbarHideTimersRef.current.get(container);
+    if (previousTimer) window.clearTimeout(previousTimer);
+    container.classList.add("is-scrolling");
+    const nextTimer = window.setTimeout(() => {
+      container.classList.remove("is-scrolling");
+      scrollbarHideTimersRef.current.delete(container);
+    }, 720);
+    scrollbarHideTimersRef.current.set(container, nextTimer);
+  }
 
   useEffect(() => {
     draftRef.current = draft;
@@ -827,7 +840,7 @@ export default function NotesPage() {
               </AnimatePresence>
             </div>
           </header>
-          <div className="notes-list-scroll">
+          <div className="notes-list-scroll" onScroll={revealScrollbarWhileScrolling}>
             <AnimatePresence initial={false} mode="popLayout">
               {visibleNotes.map((note, index) => {
                 const active = selectedId === note.id;
