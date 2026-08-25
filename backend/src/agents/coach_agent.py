@@ -14,12 +14,13 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from pydantic import BaseModel, Field
 
 from src.config import settings
+from src.core.agent.persona import PILO_LEARNING_INSIGHT_TEMPLATE
 from src.core.llm_router import create_json_llm
 from src.core.model_gateway import ModelGateway, ModelGatewayError
 from src.services.runtime_model_config import get_runtime_model_config
 
 logger = logging.getLogger(__name__)
-PROMPT_VERSION = "coach-v2"
+PROMPT_VERSION = "pilo-coach-v1"
 
 
 class CoachNarrative(BaseModel):
@@ -106,15 +107,9 @@ class CoachAgent:
             "goal_context": context.get("goal_context"),
             "data_quality": context.get("data_quality"),
         }
-        system_content = (
-            system_template
-            or (
-                "你是 PlanPilot 学习伙伴。只根据提供的行为证据解释建议，"
-                "不得编造数据，不得声称已经修改计划。只输出一个 JSON 对象，字段为 "
-                "proposal_type、title、summary、reasoning。proposal_type 必须严格等于 "
-                "{expected_type}；reasoning 为 1 到 5 条简短中文理由。"
-            )
-        ).replace("{expected_type}", expected_type)
+        system_content = (system_template or PILO_LEARNING_INSIGHT_TEMPLATE).replace(
+            "{expected_type}", expected_type
+        )
         messages = [
             SystemMessage(content=system_content),
             HumanMessage(content=json.dumps(safe_context, ensure_ascii=False, default=str)),

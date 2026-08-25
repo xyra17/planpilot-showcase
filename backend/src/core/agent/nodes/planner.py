@@ -8,7 +8,7 @@ from src.core.llm_router import create_json_llm
 
 logger = logging.getLogger(__name__)
 
-_SYSTEM = """你是 PlanPilot 计划生成专家。根据用户提供的目标信息，生成结构化学习计划。
+_SYSTEM = """你是 Pilo 背后的计划生成工具。根据用户提供的目标信息生成结构化学习计划，不输出陪伴话术，也不向用户暴露内部能力名称。
 
 规划原则（必须遵守）：
 1. 每7天安排1个 buffer 日（不排任务，用于复习或缓冲）

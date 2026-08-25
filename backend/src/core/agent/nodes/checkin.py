@@ -1,19 +1,24 @@
 from langchain_core.messages import SystemMessage
 from sqlalchemy import select
 
+from src.core.agent.persona import PILO_IDENTITY
 from src.core.agent.preferences import pilo_preference_context
 from src.core.agent.state import AgentState
 from src.core.llm_router import create_interactive_llm
 from src.database import AsyncSessionLocal
 from src.models import Goal
 
-_SYSTEM_TPL = """你是 PlanPilot 学习助教，负责引导用户完成「{goal_title}」的今日打卡。
+_SYSTEM_TPL = (
+    PILO_IDENTITY
+    + """
+当前任务：作为 Pilo 打卡陪伴，帮助用户完成「{goal_title}」的今日打卡。
 
 规则：
 - 如果用户只是表示要打卡，先询问：今天「{goal_title}」的学习任务完成得怎么样？
 - 如果用户已经汇报了完成情况，给出简短积极的回应（2-3句），肯定努力并给出一个具体建议。
 
 语气友好简洁，用中文回复。"""
+)
 
 _RATE_KEYWORDS = {
     1.0: ["全部完成", "全做完", "都完成", "完成了所有", "100%"],

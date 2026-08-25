@@ -972,7 +972,7 @@ async def generate_macro_plan(
     )
 
     prompt = (
-        f"你是学习规划专家。\n"
+        f"你是 Pilo 背后的计划生成工具。不要输出陪伴话术，也不要暴露内部能力名称。\n"
         f"目标：{goal.title}\n"
         f"目标类型：{goal_type}\n"
         f"开始日期：{today.isoformat()}\n"

@@ -61,8 +61,8 @@ export function StrategyManagerModal({
     setPromptId(active?.prompt_version_id ?? "");
     setModelId(active?.model_config_id ?? "");
     setPolicyId(active?.policy_version_id ?? "");
-    setName(activePrompt?.name ?? "daily_coach_prompt");
-    setVersion(nextVersion(activePrompt?.version ?? "coach-v1"));
+    setName(activePrompt?.name ?? "pilo_coach_insight_prompt");
+    setVersion(nextVersion(activePrompt?.version ?? "pilo-coach-v1"));
     setTemplate(activePrompt?.template ?? "");
     setProvider(activeModel?.provider === "local" ? "local" : "smart");
     setModelName(activeModel?.model_name ?? "");
@@ -94,8 +94,8 @@ export function StrategyManagerModal({
     setError(null);
     setNotice(null);
     if (next === "prompt") {
-      setName(activePrompt?.name ?? "daily_coach_prompt");
-      setVersion(nextVersion(activePrompt?.version ?? "coach-v1"));
+      setName(activePrompt?.name ?? "pilo_coach_insight_prompt");
+      setVersion(nextVersion(activePrompt?.version ?? "pilo-coach-v1"));
       setTemplate(activePrompt?.template ?? "");
     } else if (next === "model") {
       setName(activeModel?.name ?? "coach-model");

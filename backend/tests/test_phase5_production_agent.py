@@ -102,6 +102,9 @@ async def test_admin_control_api_and_versioned_evaluation(client, auth, goal_id,
 @pytest.mark.asyncio
 async def test_experiment_assignment_is_stable_and_exposure_is_recorded(db):
     runtime = await agent_control_service.ensure_baseline(db)
+    assert runtime.prompt.name == "pilo_coach_insight_prompt"
+    assert runtime.prompt.version == "pilo-coach-v1"
+    assert "你是 Pilo" in runtime.prompt.template
     user = User(
         email=f"phase5-{uuid.uuid4().hex}@test.com",
         username=f"phase5-{uuid.uuid4().hex[:12]}",

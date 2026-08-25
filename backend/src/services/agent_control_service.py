@@ -13,6 +13,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config import settings
+from src.core.agent.persona import PILO_LEARNING_INSIGHT_TEMPLATE
 from src.core.llm_router import get_model_role_contracts
 from src.core.time import utc_now
 from src.models import (
@@ -32,12 +33,8 @@ from src.models import (
 )
 from src.services.privacy_service import experiments_allowed
 
-COACH_TEMPLATE = (
-    "你是 PlanPilot 学习伙伴。只根据提供的行为证据解释建议，"
-    "不得编造数据，不得声称已经修改计划。只输出一个 JSON 对象，字段为 "
-    "proposal_type、title、summary、reasoning。proposal_type 必须严格等于 "
-    "{expected_type}；reasoning 为 1 到 5 条简短中文理由。"
-)
+INSIGHT_PROMPT_NAME = "pilo_coach_insight_prompt"
+INSIGHT_PROMPT_VERSION = "pilo-coach-v1"
 BASELINE_RULES = {
     "allowed_proposal_types": [
         "reschedule_overdue_tasks",
@@ -76,21 +73,21 @@ async def ensure_baseline(db: AsyncSession, *, environment: str | None = None) -
     prompt = await db.scalar(
         select(PromptVersion).where(
             PromptVersion.agent_type == "coach",
-            PromptVersion.name == "daily_coach_prompt",
-            PromptVersion.version == "coach-v2",
+            PromptVersion.name == INSIGHT_PROMPT_NAME,
+            PromptVersion.version == INSIGHT_PROMPT_VERSION,
         )
     )
     if prompt is None:
         prompt = PromptVersion(
             agent_type="coach",
-            name="daily_coach_prompt",
-            version="coach-v2",
-            template=COACH_TEMPLATE,
+            name=INSIGHT_PROMPT_NAME,
+            version=INSIGHT_PROMPT_VERSION,
+            template=PILO_LEARNING_INSIGHT_TEMPLATE,
             variables_schema={"type": "object", "additionalProperties": False},
             output_schema={"required": ["proposal_type", "title", "summary", "reasoning"]},
-            content_hash=canonical_hash({"template": COACH_TEMPLATE}),
+            content_hash=canonical_hash({"template": PILO_LEARNING_INSIGHT_TEMPLATE}),
             status="approved",
-            change_note="学习伙伴产品称呼基线；行为与安全边界不变",
+            change_note="统一为 Pilo 学习洞察身份；明确只解释建议、不决定或执行变更",
             created_by="system",
         )
         db.add(prompt)
@@ -146,23 +143,46 @@ async def ensure_baseline(db: AsyncSession, *, environment: str | None = None) -
             AgentDeployment.status == "active",
         )
     )
-    if deployment is not None and deployment.model_config_id != model.id:
+    if deployment is not None:
+        deployed_prompt = await db.get(PromptVersion, deployment.prompt_version_id)
         deployed_model = await db.get(ModelConfig, deployment.model_config_id)
+        deployed_policy = await db.get(AgentPolicyVersion, deployment.policy_version_id)
+        is_legacy_prompt = bool(
+            deployed_prompt
+            and (
+                (
+                    deployed_prompt.name == "daily_coach_prompt"
+                    and deployed_prompt.version == "coach-v2"
+                )
+                or (
+                    deployed_prompt.name == "pilo_learning_insight_prompt"
+                    and deployed_prompt.version == "pilo-insight-v1"
+                )
+            )
+        )
         is_legacy_router = bool(
             deployed_model
             and deployed_model.name == "coach-routine"
             and deployed_model.version == "v1"
             and deployed_model.provider == "configured-router"
         )
-        if is_legacy_router:
+        if (
+            is_legacy_prompt
+            or is_legacy_router
+            or not all((deployed_prompt, deployed_model, deployed_policy))
+        ):
             deployment.status = "superseded"
             await db.flush()
             deployment = AgentDeployment(
                 agent_type="coach",
                 environment=environment,
-                prompt_version_id=prompt.id,
-                model_config_id=model.id,
-                policy_version_id=policy.id,
+                prompt_version_id=(
+                    prompt.id if is_legacy_prompt or not deployed_prompt else deployed_prompt.id
+                ),
+                model_config_id=(
+                    model.id if is_legacy_router or not deployed_model else deployed_model.id
+                ),
+                policy_version_id=(policy.id if not deployed_policy else deployed_policy.id),
                 status="active",
                 revision=deployment.revision + 1,
                 deployed_by="system:model-role-migration",
@@ -184,7 +204,15 @@ async def ensure_baseline(db: AsyncSession, *, environment: str | None = None) -
         )
         db.add(deployment)
         await db.flush()
-    return ResolvedRuntime(deployment=deployment, prompt=prompt, model=model, policy=policy)
+    deployed_prompt = await db.get(PromptVersion, deployment.prompt_version_id)
+    deployed_model = await db.get(ModelConfig, deployment.model_config_id)
+    deployed_policy = await db.get(AgentPolicyVersion, deployment.policy_version_id)
+    return ResolvedRuntime(
+        deployment=deployment,
+        prompt=deployed_prompt or prompt,
+        model=deployed_model or model,
+        policy=deployed_policy or policy,
+    )
 
 
 async def resolve_runtime(

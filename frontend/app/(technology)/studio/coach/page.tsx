@@ -390,7 +390,7 @@ function CoachProposal({
     >
       <header>
         <div>
-          <span className="companion-proposal-kicker"><Sparkles size={12} /> 学习洞察</span>
+          <span className="companion-proposal-kicker"><Sparkles size={12} /> Pilo 学习洞察</span>
           <h2>{proposal.title}</h2>
         </div>
         <span className={`companion-status is-${proposal.status}`}>

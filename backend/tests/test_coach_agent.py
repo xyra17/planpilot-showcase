@@ -8,6 +8,7 @@ import pytest
 from scripts.evaluate_coach_agent import evaluate
 from src.agents.coach_agent import CoachAgent
 from src.config import settings
+from src.core.agent.persona import PILO_IDENTITY, PILO_LEARNING_INSIGHT_TEMPLATE
 
 
 def _context():
@@ -54,6 +55,16 @@ async def test_coach_agent_accepts_valid_structured_narrative():
     assert result.title == "把难题放在上午"
     assert result.model_name == "test-model"
     assert result.trace["fallback"] is False
+    system_prompt = llm.ainvoke.call_args.args[0][0].content
+    assert "你是 Pilo" in system_prompt
+    assert "当前任务：生成学习洞察" in system_prompt
+    assert "Pilo·Coach" not in system_prompt
+
+
+def test_pilo_identity_hides_internal_capability_names_from_users():
+    assert "Pilo" in PILO_IDENTITY
+    assert "不得向用户暴露内部能力英文名" in PILO_IDENTITY
+    assert "学习洞察" in PILO_LEARNING_INSIGHT_TEMPLATE
 
 
 @pytest.mark.asyncio
