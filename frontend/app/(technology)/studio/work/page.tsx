@@ -795,6 +795,9 @@ export default function WorkPage() {
   const remainingAvailability = scheduleAvailability
     .map((range) => ({ ...range, startMinute: pageDate === todayIso ? Math.max(range.startMinute, Math.ceil(plannerNowMinute / 15) * 15) : range.startMinute }))
     .filter((range) => range.endMinute > range.startMinute);
+  const remainingAvailabilityLabels = remainingAvailability.map(
+    (range) => `${formatScheduleHour(range.startMinute / 60)}–${formatScheduleHour(range.endMinute / 60)}`,
+  );
   const schedulePreview = useMemo(() => {
     if (!schedulePlannerOpen) return null;
     return planDaySchedule({
@@ -2038,12 +2041,18 @@ export default function WorkPage() {
                     <span>{pageDateLabel === "今天" ? "今日可用时段" : `${pageDateLabel}可用时段`}</span>
                     <strong
                       className={activeScheduleScroll === "availability" ? "is-scrolling" : ""}
-                      aria-label="今天剩余可用时段"
+                      aria-label={`今天剩余可用时段：${remainingAvailabilityLabels.length ? remainingAvailabilityLabels.join("、") : `${pageDateLabel}已没有剩余可用时间`}`}
                       tabIndex={0}
-                      onScroll={() => revealScheduleScrollbar("availability")}
-                    >{remainingAvailability.length
-                        ? remainingAvailability.map((range) => `${formatScheduleHour(range.startMinute / 60)}–${formatScheduleHour(range.endMinute / 60)}`).join("、")
-                        : `${pageDateLabel}已没有剩余可用时间`}</strong>
+                    >
+                      <span className="today-schedule-planner-availability-primary">
+                        {remainingAvailabilityLabels[0] ?? `${pageDateLabel}已没有剩余可用时间`}
+                      </span>
+                      {remainingAvailabilityLabels.length > 1 && (
+                        <span className="today-schedule-planner-availability-more" role="tooltip">
+                          其余可用时段：{remainingAvailabilityLabels.slice(1).join("、")}
+                        </span>
+                      )}
+                    </strong>
                     <Link href="/studio/settings?returnTo=%2Fstudio%2Fwork">调整</Link>
                   </div>
                   <div className="today-schedule-planner-footer-actions">
@@ -2165,7 +2174,7 @@ export default function WorkPage() {
           <section className="coach-strip coach-strip-top coach-strip-goal-advice" aria-label="学习伙伴提醒">
             <span className="coach-avatar">P</span>
             <div>
-              <small>PlanPilot 学习伙伴</small>
+              <small>Pilo · 长期学习伙伴</small>
               <strong>{weekPlannedMinutes === 0
                 ? "本周任务还没有形成完整安排。"
                 : hasWeekOverload

@@ -1560,8 +1560,9 @@
   display: grid;
   width: auto;
   min-width: 0;
+  min-height: 32px;
   align-items: center;
-  grid-template-columns: auto minmax(0, auto) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 8px;
   margin: 0;
   padding: 0;
@@ -1574,40 +1575,62 @@
 }
 
 .app-shell .today-schedule-planner-availability strong {
-  display: block;
+  position: relative;
+  display: inline-flex;
   min-width: 0;
-  flex: 1 1 auto;
-  overflow-x: auto;
-  overflow-y: hidden;
-  padding: 2px 0;
+  min-height: 32px;
+  align-items: center;
+  overflow: visible;
+  padding: 0;
   color: var(--workspace-secondary);
   font-size: 12px;
   font-weight: 650;
   font-variant-numeric: tabular-nums;
-  scrollbar-color: transparent transparent;
-  scrollbar-width: thin;
+  line-height: 1;
   white-space: nowrap;
 }
 
-.app-shell .today-schedule-planner-availability strong::-webkit-scrollbar {
-  height: 4px;
+.app-shell .today-schedule-planner-availability > span,
+.app-shell .today-schedule-planner-availability > a {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  line-height: 1;
 }
 
-.app-shell .today-schedule-planner-availability strong::-webkit-scrollbar-track {
-  background: transparent;
+.app-shell .today-schedule-planner-availability-primary {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.app-shell .today-schedule-planner-availability strong::-webkit-scrollbar-thumb {
-  border-radius: 999px;
-  background: transparent;
+.app-shell .today-schedule-planner-availability-more {
+  position: absolute;
+  z-index: 40;
+  left: 50%;
+  bottom: calc(100% + 7px);
+  width: max-content;
+  max-width: min(320px, calc(100vw - 48px));
+  padding: 7px 10px;
+  color: #fff;
+  background: color-mix(in srgb, var(--workspace-text) 92%, transparent);
+  border-radius: 7px;
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--workspace-text) 18%, transparent);
+  font-size: 11px;
+  font-weight: 560;
+  line-height: 1.4;
+  opacity: 0;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+  transform: translate(-50%, 4px);
+  transition: opacity 140ms ease, transform 160ms ease;
+  white-space: normal;
 }
 
-.app-shell .today-schedule-planner-availability strong.is-scrolling {
-  scrollbar-color: color-mix(in srgb, var(--workspace-accent) 42%, transparent) transparent;
-}
-
-.app-shell .today-schedule-planner-availability strong.is-scrolling::-webkit-scrollbar-thumb {
-  background: color-mix(in srgb, var(--workspace-accent) 42%, transparent);
+.app-shell .today-schedule-planner-availability strong:hover .today-schedule-planner-availability-more,
+.app-shell .today-schedule-planner-availability strong:focus .today-schedule-planner-availability-more,
+.app-shell .today-schedule-planner-availability strong:focus-visible .today-schedule-planner-availability-more {
+  opacity: 1;
+  transform: translate(-50%, 0);
 }
 
 .app-shell .today-schedule-planner-availability a {

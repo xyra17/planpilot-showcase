@@ -327,7 +327,7 @@ test("首页自动规划读取设置页保存的逐日可用时段", async ({ pa
   const weeklyAvailability = Object.fromEntries(
     ["mon", "tue", "wed", "thu", "fri", "sat", "sun"].map((day) => [
       day,
-      day === weekdayKey ? [{ start: "14:00", end: "15:30" }] : [],
+      day === weekdayKey ? [{ start: "14:00", end: "15:30" }, { start: "20:00", end: "21:00" }] : [],
     ]),
   );
 
@@ -362,7 +362,14 @@ test("首页自动规划读取设置页保存的逐日可用时段", async ({ pa
   await panel.getByRole("button", { name: "打开时间规划" }).click();
 
   const planner = panel.getByRole("dialog", { name: "自动规划今天的任务" });
-  await expect(planner.locator(".today-schedule-planner-availability")).toContainText("14:00–15:30");
+  const availability = planner.locator(".today-schedule-planner-availability");
+  const availabilityValue = availability.locator("strong");
+  const extraAvailability = availability.getByRole("tooltip");
+  await expect(availability.locator(".today-schedule-planner-availability-primary")).toHaveText("14:00–15:30");
+  await expect(extraAvailability).toContainText("20:00–21:00");
+  await expect(extraAvailability).toHaveCSS("opacity", "0");
+  await availabilityValue.focus();
+  await expect(extraAvailability).toHaveCSS("opacity", "1");
   await expect(planner.getByText(/14:00–14:/)).toBeVisible();
 });
 
@@ -504,6 +511,8 @@ test("卡片内规划面板实时预览节奏并在应用后更新安排", async
   expect(Number.parseInt(await balancedTooltip.evaluate((tooltip) => getComputedStyle(tooltip).zIndex), 10)).toBeGreaterThanOrEqual(100);
   const availability = planner.locator(".today-schedule-planner-availability");
   await expect(availability).toContainText("今日可用时段");
+  await expect(availability.locator(".today-schedule-planner-availability-primary")).toHaveText("09:00–11:00");
+  await expect(availability.locator(".today-schedule-planner-availability-more")).toHaveCSS("opacity", "0");
   await expect(planner.getByText("安排预览", { exact: true })).toHaveCount(0);
   await expect(planner.getByText(/个时间块$/)).toHaveCount(0);
   await expect(availability).toHaveCSS("border-top-width", "0px");
@@ -515,7 +524,8 @@ test("卡片内规划面板实时预览节奏并在应用后更新安排", async
   await expect(cancelButton).toHaveCSS("white-space", "nowrap");
   const footerOrder = await planner.evaluate((dialog) => {
     const preview = dialog.querySelector(".today-schedule-planner-preview")!.getBoundingClientRect();
-    const available = dialog.querySelector(".today-schedule-planner-availability")!.getBoundingClientRect();
+    const availabilityElement = dialog.querySelector(".today-schedule-planner-availability")!;
+    const available = availabilityElement.getBoundingClientRect();
     const footerElement = dialog.querySelector("footer")!;
     const footer = footerElement.getBoundingClientRect();
     const cancel = footerElement.querySelector("button:not(.is-primary)")!.getBoundingClientRect();
@@ -529,6 +539,10 @@ test("卡片内规划面板实时预览节奏并在应用后更新安排", async
       cancelTop: cancel.top,
       applyTop: apply.top,
       actionsCenter: (cancel.top + Math.max(cancel.height, apply.height) / 2),
+      availabilityChildCenters: Array.from(availabilityElement.querySelectorAll(":scope > span, :scope > strong, :scope > a")).map((element) => {
+        const rect = element.getBoundingClientRect();
+        return rect.top + rect.height / 2;
+      }),
       cancelHeight: cancel.height,
       applyHeight: apply.height,
     };
@@ -537,6 +551,7 @@ test("卡片内规划面板实时预览节奏并在应用后更新安排", async
   expect(footerOrder.availabilityTop).toBeGreaterThanOrEqual(footerOrder.footerTop);
   expect(Math.abs(footerOrder.cancelTop - footerOrder.applyTop)).toBeLessThanOrEqual(1);
   expect(Math.abs(footerOrder.availabilityCenter - footerOrder.actionsCenter)).toBeLessThanOrEqual(2);
+  expect(Math.max(...footerOrder.availabilityChildCenters) - Math.min(...footerOrder.availabilityChildCenters)).toBeLessThanOrEqual(1);
   expect(Math.abs(footerOrder.cancelHeight - footerOrder.applyHeight)).toBeLessThanOrEqual(2);
   await expect(planner.getByText("09:50–10:30")).toBeVisible();
   await expect(panel.locator(".task-item").first()).toContainText("09:00–09:40");
