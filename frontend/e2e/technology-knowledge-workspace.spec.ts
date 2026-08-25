@@ -130,8 +130,17 @@ test("知识空间独立组织目标与个人文件夹", async ({ page }) => {
 
 test("资料表为关联目标留出空间，并说明收藏与编辑操作", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
+  const rows = page.locator(".knowledge-resource-table article");
+  const rowGoalStates = await rows.evaluateAll((items) => items.map((item) => !item.querySelector(".knowledge-resource-goals .is-unlinked")));
+  expect(rowGoalStates).toEqual([...rowGoalStates].sort((a, b) => Number(b) - Number(a)));
+
+  const headerCheckbox = await page.getByLabel("选择全部资料").boundingBox();
+  const firstRowCheckbox = await rows.first().locator('input[type="checkbox"]').boundingBox();
+  expect(Math.abs((headerCheckbox?.x ?? 0) - (firstRowCheckbox?.x ?? 0))).toBeLessThanOrEqual(1);
+
   const firstRow = page.locator(".knowledge-resource-table article").first();
   const cells = firstRow.locator(":scope > *");
+  const nameCell = await cells.nth(1).boundingBox();
   const goalCell = await cells.nth(2).boundingBox();
   const dateCell = await cells.nth(4).boundingBox();
   const actionCell = await cells.nth(5).boundingBox();
@@ -139,9 +148,10 @@ test("资料表为关联目标留出空间，并说明收藏与编辑操作", as
   expect(dateCell?.width ?? 999).toBeLessThanOrEqual(78);
   expect(actionCell?.width ?? 999).toBeLessThanOrEqual(68);
   expect(goalCell?.width ?? 0).toBeGreaterThan((dateCell?.width ?? 999) * 2);
+  expect((nameCell?.width ?? 0) / (goalCell?.width ?? 1)).toBeLessThanOrEqual(1.65);
 
-  const favorite = firstRow.locator(".knowledge-row-actions button").first();
-  const edit = firstRow.locator(".knowledge-row-actions button").nth(1);
+  const favorite = firstRow.locator(".knowledge-row-action-cell button").first();
+  const edit = firstRow.locator(".knowledge-row-action-cell button").nth(1);
   await expect(favorite).toHaveAttribute("data-tooltip", "收藏资料");
   await expect(edit).toHaveAttribute("data-tooltip", "编辑资料");
   await favorite.hover();

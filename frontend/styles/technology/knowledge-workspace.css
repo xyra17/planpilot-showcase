@@ -6138,7 +6138,7 @@
    group; this intentionally comes last so earlier density rules cannot drift. */
 .knowledge-reference-page .knowledge-resource-table-head,
 .knowledge-reference-page .knowledge-resource-table article {
-  grid-template-columns: 24px minmax(190px, 1.7fr) minmax(110px, .9fr) 86px 52px 52px;
+  grid-template-columns: 24px minmax(280px, 1.15fr) minmax(190px, 1fr) 86px 52px 52px;
   column-gap: 6px;
 }
 
@@ -6148,6 +6148,11 @@
 }
 
 .knowledge-reference-page .knowledge-resource-table-head > span:first-child {
+  display: grid;
+  place-items: center;
+}
+
+.knowledge-reference-page .knowledge-resource-table article > span:first-child {
   display: grid;
   place-items: center;
 }

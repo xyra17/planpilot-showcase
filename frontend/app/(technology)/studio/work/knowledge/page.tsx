@@ -511,11 +511,12 @@ export default function KnowledgePage() {
         const matchesFavorite = !favoritesOnly || favorites.has(file.id);
         return matchesGoal && matchesLibrary && matchesType && matchesStatus && matchesQuery && matchesFavorite;
       });
-      const ordered = [...matched].sort((a, b) => Number(isUnlinkedResource(a)) - Number(isUnlinkedResource(b)));
+      const goalLinkOrder = (resource: Resource) => Number(resource.goalTitles.length === 0);
+      const ordered = [...matched].sort((a, b) => goalLinkOrder(a) - goalLinkOrder(b));
       if (sortMode === "recent") {
         const position = new Map(recentResourceIds.map((id, index) => [id, index]));
         return ordered.sort((a, b) => {
-          const unlinkedOrder = Number(isUnlinkedResource(a)) - Number(isUnlinkedResource(b));
+          const unlinkedOrder = goalLinkOrder(a) - goalLinkOrder(b);
           return unlinkedOrder || (position.get(a.id) ?? 9999) - (position.get(b.id) ?? 9999);
         });
       }
