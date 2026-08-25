@@ -27,6 +27,7 @@ from src.core.time import local_date_for_timezone, utc_now
 from src.database import get_db
 from src.deps import get_current_user
 from src.events.publisher import emit
+from src.intelligence.decision_context import DecisionContextBuilder
 from src.models import (
     CheckinRecord,
     DailyBriefCache,
@@ -562,23 +563,121 @@ def _distribute_tasks_by_day(
     available_dates: list[date],
     daily_hours: float,
 ) -> list[date]:
-    """按每日学习预算将任务分配到具体日期，多个任务可落在同一天。"""
+    """按每日预算分配任务，并在给定时间窗内尽量均匀展开。"""
     if not available_dates:
         return [date.today()] * len(tasks)
     daily_budget_mins = max(30, daily_hours * 60)
     result: list[date] = []
     day_idx = 0
-    day_used = 0.0
-    for task in tasks:
+    day_used = [0.0] * len(available_dates)
+    task_count = len(tasks)
+    for task_idx, task in enumerate(tasks):
+        if task_count > 1 and len(available_dates) > 1:
+            target_idx = round(task_idx * (len(available_dates) - 1) / (task_count - 1))
+            day_idx = max(day_idx, target_idx)
         task_mins = float(task.get("estimated_mins") or 30)
-        if day_used + task_mins > daily_budget_mins and day_used > 0:
+        while (
+            day_idx < len(available_dates) - 1
+            and day_used[day_idx] > 0
+            and day_used[day_idx] + task_mins > daily_budget_mins
+        ):
             day_idx += 1
-            day_used = 0.0
-        if day_idx >= len(available_dates):
-            day_idx = len(available_dates) - 1
         result.append(available_dates[day_idx])
-        day_used += task_mins
+        day_used[day_idx] += task_mins
     return result
+
+
+def _schedule_plan_phases(
+    phases: list[dict], available_dates: list[date], daily_hours: float
+) -> list[date]:
+    """按连续且不重叠的阶段时间窗排程，保持阶段和任务的先后顺序。"""
+    if not available_dates:
+        return [date.today()] * sum(len(phase.get("tasks") or []) for phase in phases)
+
+    scheduled: list[date] = []
+    cursor = 0
+    for phase in phases:
+        phase_days = max(0, int(phase.get("days") or 0))
+        window = available_dates[cursor : cursor + phase_days]
+        cursor += phase_days
+        if not window:
+            fallback_idx = min(max(cursor, 1), len(available_dates)) - 1
+            window = [available_dates[fallback_idx]]
+        scheduled.extend(_distribute_tasks_by_day(phase.get("tasks") or [], window, daily_hours))
+    return scheduled
+
+
+def _allocate_phase_days(weights: list[int], available_days: int) -> list[int]:
+    """用最大余数法分配阶段天数，保证结果之和严格等于可用天数。"""
+    if not weights:
+        return []
+    total_days = max(1, available_days)
+    minimums = [1 if index < total_days else 0 for index in range(len(weights))]
+    remaining = total_days - sum(minimums)
+    if remaining <= 0:
+        return minimums
+
+    safe_weights = [max(1, int(weight or 1)) for weight in weights]
+    total_weight = sum(safe_weights)
+    raw_shares = [remaining * weight / total_weight for weight in safe_weights]
+    allocations = [minimum + int(share) for minimum, share in zip(minimums, raw_shares)]
+    leftovers = total_days - sum(allocations)
+    remainder_order = sorted(
+        range(len(weights)), key=lambda index: raw_shares[index] % 1, reverse=True
+    )
+    for index in remainder_order[:leftovers]:
+        allocations[index] += 1
+    return allocations
+
+
+def _format_plan_personalization(context: dict) -> str:
+    """把经隐私许可的长期证据压缩成规划软约束。"""
+    quality = context.get("data_quality") or {}
+    if quality.get("personalization_enabled") is False:
+        return "【个性化依据】用户未启用个性化；只采用本次目标的显式设置。\n"
+
+    profile = context.get("profile") or {}
+    evidence_count = int(profile.get("event_count") or quality.get("profile_event_count") or 0)
+    evidence: list[str] = []
+    if evidence_count >= 5:
+        if profile.get("avg_session_duration_mins") is not None:
+            evidence.append(f"历史单次学习平均 {profile['avg_session_duration_mins']:.0f} 分钟")
+        if profile.get("avg_daily_investment_mins") is not None:
+            evidence.append(f"历史日均投入 {profile['avg_daily_investment_mins']:.0f} 分钟")
+        if profile.get("preferred_weekdays"):
+            labels = "一二三四五六日"
+            weekdays = "、".join(
+                f"周{labels[int(day)]}"
+                for day in profile["preferred_weekdays"]
+                if 0 <= int(day) < 7
+            )
+            if weekdays:
+                evidence.append(f"较常学习日为 {weekdays}")
+        if profile.get("reschedule_rate") is not None:
+            evidence.append(f"近期待改期率 {profile['reschedule_rate']:.0%}")
+        if profile.get("estimation_accuracy") is not None:
+            evidence.append(f"历史时长估算准确度 {profile['estimation_accuracy']:.0%}")
+
+    for pattern in (context.get("active_patterns") or [])[:3]:
+        explanation = str(pattern.get("explanation") or "").strip()
+        if explanation:
+            evidence.append(f"行为模式：{explanation}")
+
+    memory_rows = (context.get("memories") or {}).get("semantic", []) + (
+        context.get("memories") or {}
+    ).get("episodic", [])
+    for memory in memory_rows[:3]:
+        summary = str(memory.get("summary") or "").strip()
+        if summary:
+            evidence.append(f"相关记忆：{summary}")
+
+    if not evidence:
+        return "【个性化依据】长期行为证据不足；只采用本次目标的显式设置。\n"
+    return (
+        "【个性化软约束】以下是经用户许可、且已有证据的数据："
+        + "；".join(evidence)
+        + "。它们只用于调整任务粒度和节奏；用户本次明确设置始终优先，不得据此虚构偏好。\n"
+    )
 
 
 @router.get("/plan-context/{goal_id}")
@@ -728,9 +827,9 @@ async def generate_macro_plan(
         p.is_current = False
 
     # 计算可学天数
-    today = date.today()
+    today = local_date_for_timezone(current_user.timezone)
     deadline_date = date.fromisoformat(goal.deadline)
-    work_schedule: str = (goal.meta or {}).get("work_schedule", "all")
+    work_schedule: str = goal.work_schedule or (goal.meta or {}).get("work_schedule", "all")
     kb_id: str | None = goal.knowledge_base_id or (goal.meta or {}).get("kb_id")
     goal_type: str = goal.type or "skill"
 
@@ -850,14 +949,23 @@ async def generate_macro_plan(
             f"【用户特别说明】（请将以下要求作为高优先级约束融入计划）：{user_intent_supplement}\n"
         )
 
+    try:
+        decision_context = await DecisionContextBuilder.build(
+            db, current_user.id, goal_id=goal_id, recent_event_limit=8
+        )
+    except Exception as exc:
+        logger.warning("build macro plan personalization context failed: %s", exc)
+        decision_context = {}
+    personalization_note = _format_plan_personalization(decision_context)
+
     # 获取所有可用日期列表（含截止日当天）
     available_dates = _get_available_dates(today, deadline_date, work_schedule)
     available_days = max(1, len(available_dates))
     total_study_hours = round(available_days * goal.daily_hours, 1)
     total_study_mins = int(total_study_hours * 60)
-    # 建议每个任务平均30分钟，估算任务数量区间
-    suggested_tasks_min = max(available_days, total_study_mins // 45)
-    suggested_tasks_max = total_study_mins // 20
+    # 每日时长是容量上限，不应强迫模型用碎任务填满所有分钟。
+    suggested_tasks_min = max(4, min(available_days, 24))
+    suggested_tasks_max = max(suggested_tasks_min, min(36, available_days * 2))
 
     rest_note = {"weekday": "（已排除周末）", "weekend": "（已排除工作日）", "all": ""}.get(
         work_schedule, ""
@@ -873,13 +981,15 @@ async def generate_macro_plan(
         f"总可用学习时长：{total_study_hours} 小时（约 {total_study_mins} 分钟）\n"
         f"当前水平：{goal.current_level}\n"
         + intent_note
+        + personalization_note
         + kb_instruction
         + pacing_note
-        + f"\n请生成一份完整的学习计划，覆盖全部 {available_days} 天，划分成 2-4 个阶段。\n"
-        f"【任务数量】所有阶段的任务 estimated_mins 之和应接近 {total_study_mins} 分钟，"
-        f"建议生成 {suggested_tasks_min}~{suggested_tasks_max} 个任务。\n"
-        f"【阶段划分】用 days 字段表示每阶段占用天数，各阶段 days 之和等于 {available_days}。\n"
-        "每个阶段包含若干具体任务，任务按阶段顺序排列。\n"
+        + f"\n请生成一份完整的学习计划，时间范围覆盖全部 {available_days} 个可学习日，划分成 2-4 个连续阶段。\n"
+        f"【容量边界】每日 {goal.daily_hours} 小时和总计 {total_study_mins} 分钟均为上限，不是必须填满的配额；"
+        "按完成目标真正需要的工作量估算，不要为了填满时间制造重复任务。\n"
+        f"【任务数量】建议生成 {suggested_tasks_min}~{suggested_tasks_max} 个有明确产出的任务，每项通常 15~60 分钟。\n"
+        f"【阶段划分】days 表示连续阶段所占的可学习日，所有阶段 days 之和必须等于 {available_days}；"
+        "阶段不得重叠，任务必须按前置依赖和实际执行顺序排列。不要输出日期，系统会在阶段时间窗内确定性排期。\n"
         "【成功标准要求】每个任务的 objective 字段必须包含可观测的行为动词（如：能独立写出/能解释/能完成）"
         "+ 具体数量或时长指标。\n"
         "  ❌ 模糊示例：「熟练掌握循环语法」\n"
@@ -897,7 +1007,7 @@ async def generate_macro_plan(
     result = await ainvoke_structured_checked(
         [HumanMessage(content=prompt)],
         validator=require_json_object,
-        max_tokens=2048,
+        max_tokens=4096,
         temperature=0.3,
         model_kwargs={"response_format": {"type": "json_object"}},
     )
@@ -918,15 +1028,8 @@ async def generate_macro_plan(
 
     # 后处理：将 AI 返回的 days 按比例重新分配，确保总和等于实际可用天数
     weights = [max(1, p.get("days", 1)) for p in phases]
-    total_weight = sum(weights)
-    remaining = available_days
-    for i, (p, w) in enumerate(zip(phases, weights)):
-        if i == len(phases) - 1:
-            p["days"] = max(1, remaining)
-        else:
-            alloc = max(1, round(w / total_weight * available_days))
-            p["days"] = alloc
-            remaining -= alloc
+    for phase, phase_days in zip(phases, _allocate_phase_days(weights, available_days)):
+        phase["days"] = phase_days
 
     # 创建 Plan 记录
     plan = Plan(
@@ -962,10 +1065,13 @@ async def generate_macro_plan(
             .all()
         )
 
-    all_tasks_flat = [t for phase in phases for t in (phase.get("tasks") or [])]
-    scheduled = _distribute_tasks_by_day(all_tasks_flat, available_dates, goal.daily_hours)
+    task_rows = [
+        (phase.get("name", ""), task) for phase in phases for task in (phase.get("tasks") or [])
+    ]
+    all_tasks_flat = [task for _, task in task_rows]
+    scheduled = _schedule_plan_phases(phases, available_dates, goal.daily_hours)
 
-    for i, (td, sched_date) in enumerate(zip(all_tasks_flat, scheduled)):
+    for i, ((stage_label, td), sched_date) in enumerate(zip(task_rows, scheduled)):
         task_title = td.get("title", f"任务 {i + 1}")
         task_obj = td.get("objective") or None
         task = Task(
@@ -977,6 +1083,8 @@ async def generate_macro_plan(
             estimated_mins=int(td.get("estimated_mins") or 30),
             type=td.get("type", "study"),
             scheduled_date=sched_date.isoformat(),
+            stage_label=stage_label or None,
+            sequence_in_plan=i,
             status="pending",
             kb_refs=await _match_kb_refs(kb_items_all, task_title),
         )

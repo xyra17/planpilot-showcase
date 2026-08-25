@@ -14,7 +14,7 @@
 - HTTP 异常处理（由router负责）
 """
 
-from collections import defaultdict
+from collections import defaultdict, deque
 from datetime import date, timedelta
 
 from pydantic import BaseModel, Field, ValidationInfo, field_validator, model_validator
@@ -51,6 +51,41 @@ _WORK_SCHEDULE_ALIASES = {
     "all": "all",
 }
 _PRIVATE_KNOWLEDGE_TYPES = {"chat_note", "daily_log", "flash_card", "task_note", "quick_note"}
+
+
+def _align_plan_tasks_to_baseline(tasks: list[Task], phases: list[dict]) -> list[Task]:
+    """优先使用持久化顺序；旧计划则按基线标题恢复阶段归属。"""
+    ordered = sorted(
+        tasks,
+        key=lambda task: (
+            task.sequence_in_plan is None,
+            task.sequence_in_plan if task.sequence_in_plan is not None else 0,
+            task.scheduled_date or "",
+            task.created_at.isoformat() if task.created_at else "",
+            task.id,
+        ),
+    )
+    if any(task.sequence_in_plan is not None for task in ordered):
+        return ordered
+
+    by_title: dict[str, deque[Task]] = defaultdict(deque)
+    for task in ordered:
+        by_title[task.title].append(task)
+
+    aligned: list[Task] = []
+    used_ids: set[str] = set()
+    for phase in phases:
+        for baseline_task in phase.get("tasks") or []:
+            title = str(baseline_task.get("title") or "")
+            while by_title[title] and by_title[title][0].id in used_ids:
+                by_title[title].popleft()
+            if by_title[title]:
+                task = by_title[title].popleft()
+                aligned.append(task)
+                used_ids.add(task.id)
+
+    aligned.extend(task for task in ordered if task.id not in used_ids)
+    return aligned
 
 
 class GoalPatchValidationError(ValueError):
@@ -909,10 +944,22 @@ async def get_goal_plan(
 
     # 当前 plan 下的任务（用于阶段明细）
     plan_tasks = (
-        (await db.execute(select(Task).where(Task.goal_id == goal_id, Task.plan_id == plan.id)))
+        (
+            await db.execute(
+                select(Task)
+                .where(Task.goal_id == goal_id, Task.plan_id == plan.id)
+                .order_by(
+                    Task.sequence_in_plan.is_(None),
+                    Task.sequence_in_plan.asc(),
+                    Task.scheduled_date.asc(),
+                    Task.created_at.asc(),
+                )
+            )
+        )
         .scalars()
         .all()
     )
+    plan_tasks = _align_plan_tasks_to_baseline(plan_tasks, phases)
 
     # 目标下全部任务（用于整体进度）
     all_goal_tasks = (await db.execute(select(Task).where(Task.goal_id == goal_id))).scalars().all()
