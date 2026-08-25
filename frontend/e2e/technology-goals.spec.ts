@@ -1721,3 +1721,98 @@ test("单目标进度加载失败显示错误并可重试", async ({ page }) => 
   await page.getByRole("button", { name: "重新加载", exact: true }).click();
   await expect(page.locator(".goal-metric-card-progress")).toContainText("25%");
 });
+
+test("目标任务完成控件不越界且编辑器保持清晰层级", async ({ page }) => {
+  const today = new Date();
+  const todayIso = [
+    today.getFullYear(),
+    String(today.getMonth() + 1).padStart(2, "0"),
+    String(today.getDate()).padStart(2, "0"),
+  ].join("-");
+  const task = {
+    id: "task-inline-editor",
+    goalId: goal.id,
+    goalTitle: goal.title,
+    title: "知识图谱链",
+    description: "agent 开发",
+    date: todayIso,
+    done: true,
+    estimatedMinutes: 40,
+    priority: "medium",
+  };
+
+  await page.route("**/api/v1/auth/me", (route) => route.fulfill({
+    json: { id: "task-editor-user", email: "editor@example.com", username: "任务用户", email_verified: true, onboarding_completed: true },
+  }));
+  await page.route("**/api/v1/goals/goal-tech-1/progress", (route) => route.fulfill({
+    json: { goal_id: goal.id, total_tasks: 1, completed_tasks: 1, avg_completion_rate: 1, streak_days: 1, debt_count: 0, days_ahead_or_behind: 0 },
+  }));
+  await page.route("**/api/v1/goals/goal-tech-1/plan", (route) => route.fulfill({ json: { plan: null } }));
+  await page.route("**/api/v1/goals/goal-tech-1", (route) => route.fulfill({ json: goal }));
+  await page.route("**/api/v1/tasks", (route) => route.fulfill({ json: [task] }));
+  await page.route("**/api/v1/debts/goal-tech-1", (route) => route.fulfill({ json: [] }));
+
+  await page.goto("/studio/work/goals/goal-tech-1");
+  const row = page.locator(".goal-task-item").first();
+  const toggle = row.getByRole("button", { name: "标记为未完成" });
+  await toggle.focus();
+  const toggleGeometry = await row.evaluate((element) => {
+    const rowRect = element.getBoundingClientRect();
+    const button = element.querySelector<HTMLElement>(".goal-task-toggle")!;
+    const buttonRect = button.getBoundingClientRect();
+    const style = getComputedStyle(button);
+    return {
+      leftInset: buttonRect.left - rowRect.left,
+      outline: style.outlineStyle,
+      shadow: style.boxShadow,
+      overflow: getComputedStyle(element).overflow,
+    };
+  });
+  expect(toggleGeometry.leftInset).toBeGreaterThanOrEqual(12);
+  expect(toggleGeometry.outline).toBe("none");
+  expect(toggleGeometry.shadow).not.toBe("none");
+  expect(toggleGeometry.overflow).toBe("visible");
+
+  await row.getByRole("button", { name: `编辑任务“${task.title}”` }).click();
+  const editor = row.locator(".goal-task-inline-editor");
+  await expect(editor.getByText("预计时长", { exact: true })).toBeVisible();
+  await expect(editor.getByText("优先级", { exact: true })).toBeVisible();
+  await expect(editor.getByRole("button", { name: "中", exact: true })).toHaveAttribute("aria-pressed", "true");
+  const editorGeometry = await editor.evaluate((element) => {
+    const rowRect = element.closest(".goal-task-item")!.getBoundingClientRect();
+    const editorRect = element.getBoundingClientRect();
+    const title = element.querySelector<HTMLElement>(".goal-task-editor-title")!;
+    const minutes = element.querySelector<HTMLElement>(".goal-task-minutes")!;
+    const priorities = [...element.querySelectorAll<HTMLElement>(".goal-task-priority-option")];
+    const actions = [...element.querySelectorAll<HTMLElement>(".goal-task-editor-actions button")];
+    return {
+      rightOverflow: editorRect.right - rowRect.right,
+      titleFont: getComputedStyle(title).fontSize,
+      minutesFont: getComputedStyle(minutes).fontSize,
+      priorityFonts: priorities.map((button) => getComputedStyle(button).fontSize),
+      priorityHeights: priorities.map((button) => button.getBoundingClientRect().height),
+      actionSizes: actions.map((button) => ({ width: button.getBoundingClientRect().width, height: button.getBoundingClientRect().height })),
+    };
+  });
+  expect(editorGeometry.rightOverflow).toBeLessThanOrEqual(0);
+  expect(editorGeometry.titleFont).toBe("14px");
+  expect(editorGeometry.minutesFont).toBe("13px");
+  expect(new Set(editorGeometry.priorityFonts)).toEqual(new Set(["12px"]));
+  expect(Math.min(...editorGeometry.priorityHeights)).toBeGreaterThanOrEqual(28);
+  expect(editorGeometry.actionSizes).toEqual([{ width: 34, height: 34 }, { width: 34, height: 34 }]);
+
+  await page.setViewportSize({ width: 375, height: 812 });
+  const mobileGeometry = await editor.evaluate((element) => {
+    const rowRect = element.closest(".goal-task-item")!.getBoundingClientRect();
+    const editorRect = element.getBoundingClientRect();
+    const controls = element.querySelector<HTMLElement>(".goal-task-editor-controls")!.getBoundingClientRect();
+    return {
+      leftOverflow: rowRect.left - editorRect.left,
+      rightOverflow: editorRect.right - rowRect.right,
+      controlsHeight: controls.height,
+    };
+  });
+  expect(mobileGeometry.leftOverflow).toBeLessThanOrEqual(0);
+  expect(mobileGeometry.rightOverflow).toBeLessThanOrEqual(0);
+  expect(mobileGeometry.controlsHeight).toBeGreaterThanOrEqual(38);
+});

@@ -795,13 +795,13 @@ function GoalTasksWorkspace({
               data-search-target={focusTaskId === task.id ? "true" : undefined}
               className={cn("goal-task-item group flex items-start gap-2 rounded-xl px-2.5 py-2.5 transition", focusTaskId === task.id && "is-search-target")}
             >
-              <button type="button" onClick={() => onToggleTask(task.id)} className="mt-0.5 flex-shrink-0" aria-label={task.done ? "标记为未完成" : "标记为已完成"}>
+              <button type="button" onClick={() => onToggleTask(task.id)} className="goal-task-toggle mt-0.5 flex-shrink-0" aria-label={task.done ? "标记为未完成" : "标记为已完成"}>
                 {task.done
                   ? <CheckCircle2 size={15} style={{ color: "var(--accent)" }} />
                   : <Circle size={15} className="flex-shrink-0 text-gray-300 transition group-hover:text-gray-400" />}
               </button>
               {editingId === task.id ? (
-                <div className="min-w-0 flex-1">
+                <div className="goal-task-inline-editor min-w-0 flex-1">
                   <input
                     value={editTitle}
                     onChange={(event) => setEditTitle(event.target.value)}
@@ -810,41 +810,45 @@ function GoalTasksWorkspace({
                       if (event.key === "Escape") setEditingId(null);
                     }}
                     aria-label="编辑任务名称"
-                    className="w-full rounded-lg border border-gray-100 bg-transparent px-2 py-1 text-[13px] font-medium text-gray-700 outline-none"
+                    className="goal-task-editor-title w-full outline-none"
                     autoFocus
                   />
-                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                    <label className="flex items-center gap-1 text-[10px] text-gray-400">
-                      <Clock size={10} />
+                  <div className="goal-task-editor-controls">
+                    <label className="goal-task-duration-control">
+                      <span className="goal-task-control-label">预计时长</span>
+                      <Clock size={13} aria-hidden="true" />
                       <input
                         type="number"
                         min={5}
                         max={480}
                         value={editMinutes}
                         onChange={(event) => setEditMinutes(Number(event.target.value))}
-                        className="goal-task-minutes w-12 rounded-md border border-gray-100 bg-transparent px-1 py-0.5 text-center outline-none"
+                        className="goal-task-minutes text-center outline-none"
                       />
-                      分钟
+                      <em>分钟</em>
                     </label>
-                    {(["high", "medium", "low"] as Priority[]).map((priority) => (
-                      <button
-                        key={priority}
-                        type="button"
-                        onClick={() => setEditPriority(priority)}
-                        className={cn(
-                          "rounded-md px-1.5 py-0.5 text-[10px] transition",
-                          PRIORITY_CLS[priority][editPriority === priority ? "on" : "off"]
-                        )}
-                      >
-                        {PRIORITY_LABEL[priority]}
+                    <div className="goal-task-priority-options" aria-label="任务优先级">
+                      <span className="goal-task-control-label">优先级</span>
+                      {(["high", "medium", "low"] as Priority[]).map((priority) => (
+                        <button
+                          key={priority}
+                          type="button"
+                          onClick={() => setEditPriority(priority)}
+                          aria-pressed={editPriority === priority}
+                          className={`goal-task-priority-option is-${priority}`}
+                        >
+                          {PRIORITY_LABEL[priority]}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="goal-task-editor-actions">
+                      <button type="button" onClick={() => void saveEdit(task.id)} className="goal-task-editor-save" aria-label="保存编辑">
+                        <Check size={15} />
                       </button>
-                    ))}
-                    <button type="button" onClick={() => void saveEdit(task.id)} className="ml-auto rounded-md p-1" style={{ color: "var(--accent)" }} aria-label="保存编辑">
-                      <Check size={12} />
-                    </button>
-                    <button type="button" onClick={() => setEditingId(null)} className="rounded-md p-1 text-gray-400" aria-label="取消编辑">
-                      <X size={12} />
-                    </button>
+                      <button type="button" onClick={() => setEditingId(null)} className="goal-task-editor-cancel" aria-label="取消编辑">
+                        <X size={15} />
+                      </button>
+                    </div>
                   </div>
                 </div>
               ) : (

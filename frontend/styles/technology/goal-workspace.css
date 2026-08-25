@@ -2428,6 +2428,208 @@
   background: color-mix(in srgb, var(--workspace-accent) 5%, var(--workspace-panel));
 }
 
+.app-shell .tech-goal-workspace-scope .goal-task-item {
+  padding-left: 14px !important;
+  overflow: visible;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-task-toggle {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  min-height: 34px;
+  margin-right: 2px;
+  padding: 0;
+  place-items: center;
+  color: var(--workspace-secondary);
+  background: transparent;
+  border: 0;
+  border-radius: 10px;
+  transition: color 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-task-toggle > svg {
+  width: 18px;
+  height: 18px;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-task-toggle:is(:hover, :focus-visible) {
+  color: var(--workspace-accent);
+  background: color-mix(in srgb, var(--workspace-accent) 8%, var(--workspace-panel));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--workspace-accent) 20%, transparent);
+  outline: none;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-task-inline-editor {
+  display: grid;
+  gap: 10px;
+  padding: 1px 1px 3px;
+}
+
+.app-shell .tech-goal-workspace-scope input.goal-task-editor-title {
+  min-height: 42px;
+  padding: 0 13px;
+  color: var(--workspace-text);
+  background: var(--workspace-panel);
+  border: 1px solid color-mix(in srgb, var(--workspace-accent) 38%, var(--workspace-border));
+  border-radius: 12px;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--workspace-accent) 7%, transparent);
+  font-size: 14px;
+  font-weight: 680;
+  line-height: 1.4;
+}
+
+.app-shell .tech-goal-workspace-scope input.goal-task-editor-title:focus {
+  border-color: var(--workspace-accent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--workspace-accent) 12%, transparent);
+}
+
+.app-shell .tech-goal-workspace-scope .goal-task-editor-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.app-shell .tech-goal-workspace-scope :is(.goal-task-duration-control, .goal-task-priority-options) {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 8px;
+  color: var(--workspace-secondary);
+  background: color-mix(in srgb, var(--workspace-panel-subtle) 78%, var(--workspace-panel));
+  border: 1px solid var(--workspace-border);
+  border-radius: 11px;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-task-control-label {
+  color: var(--workspace-secondary);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 680;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-task-duration-control > svg {
+  color: var(--workspace-accent);
+}
+
+.app-shell .tech-goal-workspace-scope input.goal-task-minutes {
+  width: 48px;
+  height: 28px;
+  padding: 0 5px;
+  color: var(--workspace-text);
+  background: var(--workspace-panel);
+  border: 1px solid var(--workspace-border-strong);
+  border-radius: 8px;
+  box-shadow: none;
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.app-shell .tech-goal-workspace-scope input.goal-task-minutes:focus {
+  border-color: var(--workspace-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--workspace-accent) 11%, transparent);
+}
+
+.app-shell .tech-goal-workspace-scope .goal-task-duration-control > em {
+  color: var(--workspace-secondary);
+  font-size: 12px;
+  font-style: normal;
+  white-space: nowrap;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-task-priority-options {
+  gap: 4px;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-task-priority-option {
+  display: inline-grid;
+  min-width: 32px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0 8px;
+  place-items: center;
+  color: var(--workspace-secondary);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 720;
+  line-height: 1;
+  transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease, transform 150ms ease;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-task-priority-option:is(:hover, :focus-visible) {
+  background: var(--workspace-hover);
+  border-color: var(--workspace-border-strong);
+  outline: none;
+  transform: translateY(-1px);
+}
+
+.app-shell .tech-goal-workspace-scope .goal-task-priority-option.is-high[aria-pressed="true"] {
+  color: #b93834;
+  background: color-mix(in srgb, #d85a55 11%, var(--workspace-panel));
+  border-color: color-mix(in srgb, #d85a55 30%, var(--workspace-border));
+}
+
+.app-shell .tech-goal-workspace-scope .goal-task-priority-option.is-medium[aria-pressed="true"] {
+  color: #9a7100;
+  background: color-mix(in srgb, #e8b923 14%, var(--workspace-panel));
+  border-color: color-mix(in srgb, #d9aa16 32%, var(--workspace-border));
+}
+
+.app-shell .tech-goal-workspace-scope .goal-task-priority-option.is-low[aria-pressed="true"] {
+  color: var(--workspace-text);
+  background: color-mix(in srgb, var(--workspace-secondary) 11%, var(--workspace-panel));
+  border-color: color-mix(in srgb, var(--workspace-secondary) 30%, var(--workspace-border));
+}
+
+.app-shell .tech-goal-workspace-scope .goal-task-editor-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.app-shell .tech-goal-workspace-scope :is(.goal-task-editor-save, .goal-task-editor-cancel) {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  min-height: 34px;
+  padding: 0;
+  place-items: center;
+  border-radius: 10px;
+  transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease, transform 150ms ease;
+}
+
+.app-shell .tech-goal-workspace-scope .goal-task-editor-save {
+  color: var(--workspace-on-accent, #fff);
+  background: var(--workspace-accent);
+  border: 1px solid var(--workspace-accent);
+  box-shadow: 0 7px 16px color-mix(in srgb, var(--workspace-accent) 20%, transparent);
+}
+
+.app-shell .tech-goal-workspace-scope .goal-task-editor-cancel {
+  color: var(--workspace-secondary);
+  background: var(--workspace-panel);
+  border: 1px solid var(--workspace-border);
+}
+
+.app-shell .tech-goal-workspace-scope :is(.goal-task-editor-save, .goal-task-editor-cancel):is(:hover, :focus-visible) {
+  outline: none;
+  transform: translateY(-1px);
+}
+
+.app-shell .tech-goal-workspace-scope .goal-task-editor-cancel:is(:hover, :focus-visible) {
+  color: var(--workspace-text);
+  background: var(--workspace-hover);
+  border-color: var(--workspace-border-strong);
+}
+
 .app-shell .tech-goal-workspace-scope .goal-task-item.is-search-target {
   background: color-mix(in srgb, var(--workspace-accent) 9%, var(--workspace-panel));
   box-shadow:
