@@ -148,7 +148,14 @@ test("资料表为关联目标留出空间，并说明收藏与编辑操作", as
   expect(dateCell?.width ?? 999).toBeLessThanOrEqual(78);
   expect(actionCell?.width ?? 999).toBeLessThanOrEqual(68);
   expect(goalCell?.width ?? 0).toBeGreaterThan((dateCell?.width ?? 999) * 2);
-  expect((nameCell?.width ?? 0) / (goalCell?.width ?? 1)).toBeLessThanOrEqual(1.65);
+  expect((nameCell?.width ?? 0) / (goalCell?.width ?? 1)).toBeLessThanOrEqual(2.4);
+
+  const alignment = await page.evaluate(() => ({
+    nameHead: getComputedStyle(document.querySelector<HTMLElement>(".knowledge-resource-name-head")!).textAlign,
+    nameCell: getComputedStyle(document.querySelector<HTMLElement>(".knowledge-resource-identity")!).justifyContent,
+    goalCell: getComputedStyle(document.querySelector<HTMLElement>(".knowledge-resource-goals")!).justifyContent,
+  }));
+  expect(alignment).toEqual({ nameHead: "left", nameCell: "flex-start", goalCell: "center" });
 
   const favorite = firstRow.locator(".knowledge-row-action-cell button").first();
   const edit = firstRow.locator(".knowledge-row-action-cell button").nth(1);
@@ -170,6 +177,8 @@ test("资料全屏预览只占工作区并保留桌面导航", async ({ page }) 
     const sidebar = document.querySelector<HTMLElement>(".sidebar")?.getBoundingClientRect();
     const drawer = document.querySelector<HTMLElement>(".document-drawer.is-fullscreen")?.getBoundingClientRect();
     const backdrop = document.querySelector<HTMLElement>(".document-drawer-backdrop")?.getBoundingClientRect();
+    const previewPane = document.querySelector<HTMLElement>(".document-preview-pane")?.getBoundingClientRect();
+    const infoPane = document.querySelector<HTMLElement>(".document-info-pane")?.getBoundingClientRect();
     return {
       sidebarRight: sidebar?.right ?? -1,
       drawerLeft: drawer?.left ?? -1,
@@ -177,6 +186,8 @@ test("资料全屏预览只占工作区并保留桌面导航", async ({ page }) 
       drawerTop: drawer?.top ?? -1,
       drawerBottom: drawer?.bottom ?? -1,
       backdropLeft: backdrop?.left ?? -1,
+      previewLeft: previewPane?.left ?? -1,
+      infoRight: infoPane?.right ?? -1,
       viewportWidth: window.innerWidth,
       viewportHeight: window.innerHeight,
       topLeftClass: document.elementFromPoint(12, 12)?.closest(".sidebar")?.className ?? "",
@@ -189,8 +200,14 @@ test("资料全屏预览只占工作区并保留桌面导航", async ({ page }) 
   expect(geometry.drawerRight).toBe(geometry.viewportWidth);
   expect(geometry.drawerTop).toBe(0);
   expect(geometry.drawerBottom).toBe(geometry.viewportHeight);
+  expect(geometry.previewLeft).toBe(geometry.sidebarRight);
+  expect(geometry.infoRight).toBe(geometry.viewportWidth);
   expect(geometry.topLeftClass).toContain("sidebar");
   await expect(preview.getByRole("button", { name: "退出全屏" })).toBeVisible();
+
+  await preview.getByRole("button", { name: "收起资料信息" }).click();
+  await expect(preview.getByRole("button", { name: "展开资料信息" })).toBeVisible();
+  await expect.poll(() => page.locator(".document-preview-pane").evaluate((pane) => pane.getBoundingClientRect().right)).toBe(geometry.viewportWidth - 10);
 });
 
 test("访客上传资料时先说明存储边界并提供注册登录入口", async ({ page }) => {

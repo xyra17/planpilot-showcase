@@ -367,9 +367,16 @@ export function GoalFormSurface({
                 })}
               </div>
             </fieldset>
+          </section>
 
-            <label className="tech-goal-field">
-              <span><TextCursorInput size={17} />目标名称</span>
+          <section className="tech-goal-form-step" aria-labelledby="goal-form-step-two">
+            <header className="tech-goal-form-step-heading">
+              <span aria-hidden="true">2</span>
+              <div><h2 id="goal-form-step-two">目标名称</h2><p>定义一个清晰、可执行的目标</p></div>
+            </header>
+
+            <label className="tech-goal-field tech-goal-name-field">
+              <span className="visually-hidden"><TextCursorInput size={17} />目标名称</span>
               <input
                 value={title}
                 onChange={(event) => onTitleChange(event.target.value)}
@@ -379,7 +386,12 @@ export function GoalFormSurface({
             </label>
           </section>
 
-          <section className="tech-goal-form-step" aria-label={isEdit ? "目标状态与计划" : "目标计划"}>
+          <section className="tech-goal-form-step" aria-labelledby="goal-form-step-three">
+            <header className="tech-goal-form-step-heading">
+              <span aria-hidden="true">3</span>
+              <div><h2 id="goal-form-step-three">学习计划</h2><p>设定节奏、周期与每日投入</p></div>
+            </header>
+
             {isEdit && status && onStatusChange && (
               <fieldset className="tech-goal-create-section tech-goal-status-section">
                 <legend><ListChecks size={17} />目标状态</legend>
@@ -391,7 +403,7 @@ export function GoalFormSurface({
               </fieldset>
             )}
 
-            <div className={`tech-goal-preference-grid ${usesCurrentLevel ? "" : "is-single"}`}>
+            <div className={`tech-goal-plan-grid ${usesCurrentLevel ? "has-current-level" : ""}`}>
               <fieldset className="tech-goal-create-section tech-goal-segment-section">
                 <legend><CalendarDays size={17} />学习安排</legend>
                 <div className="tech-goal-segmented-control">
@@ -401,7 +413,7 @@ export function GoalFormSurface({
                 </div>
               </fieldset>
 
-              {usesCurrentLevel && (
+              {usesCurrentLevel && isEdit && (
                 <fieldset className="tech-goal-create-section tech-goal-segment-section">
                   <legend><BarChart3 size={17} />当前水平</legend>
                   <div className="tech-goal-segmented-control">
@@ -411,9 +423,7 @@ export function GoalFormSurface({
                   </div>
                 </fieldset>
               )}
-            </div>
 
-            <div className="tech-goal-create-two-column">
               <div className="tech-goal-field tech-goal-date-field">
                 <span><CalendarCheck2 size={17} />截止日期</span>
                 <GoalDatePicker value={deadline} onChange={onDeadlineChange} />
@@ -427,7 +437,6 @@ export function GoalFormSurface({
                 </div>
               </div>
             </div>
-
           </section>
 
           {error && <p className="tech-goal-form-error" role="alert">{error}</p>}

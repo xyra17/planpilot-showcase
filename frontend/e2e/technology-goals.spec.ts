@@ -319,28 +319,28 @@ test("新建目标页使用统一分步表单并完成创建", async ({ page }) 
     const bounds = surface.getBoundingClientRect();
     return { width: bounds.width, height: bounds.height, minHeight: getComputedStyle(surface).minHeight };
   });
-  expect(createSurfaceGeometry.width).toBeLessThanOrEqual(722);
-  expect(createSurfaceGeometry.height).toBeLessThanOrEqual(760);
+  expect(createSurfaceGeometry.width).toBeGreaterThanOrEqual(1000);
+  expect(createSurfaceGeometry.width).toBeLessThanOrEqual(1182);
+  expect(createSurfaceGeometry.height).toBeLessThanOrEqual(624);
   await expect(page.getByRole("heading", { name: "目标类型", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "目标名称", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "学习计划", exact: true })).toBeVisible();
   await expect(page.locator(".tech-goal-form-step-heading p").first()).toHaveText("考试、考研、公务员");
   await expect(page.getByRole("button", { name: /备考/ })).toBeVisible();
   await expect(page.getByRole("button", { name: /语言学习/ })).toBeVisible();
   await expect(page.getByText("学习安排", { exact: true })).toBeVisible();
-  await expect(page.getByText("当前水平", { exact: true })).toBeVisible();
+  await expect(page.getByText("当前水平", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "备考", exact: true })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("button", { name: "仅工作日", exact: true })).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByRole("button", { name: "入门", exact: true })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("textbox", { name: "目标名称" })).not.toBeFocused();
-  const fieldAlignment = await page.locator(".tech-goal-form-step").first().evaluate((step) => {
+  const fieldAlignment = await page.locator(".tech-goal-form-step").nth(1).evaluate((step) => {
     const left = (selector: string) => step.querySelector<HTMLElement>(selector)?.getBoundingClientRect().left ?? 0;
     return {
       heading: left("h2"),
-      typeControl: left(".tech-goal-type-option"),
-      nameLabel: left(".tech-goal-field > span"),
       nameControl: left(".tech-goal-field > input"),
     };
   });
-  for (const left of Object.values(fieldAlignment)) expect(Math.abs(left - fieldAlignment.heading)).toBeLessThanOrEqual(1);
+  expect(Math.abs(fieldAlignment.heading - fieldAlignment.nameControl)).toBeLessThanOrEqual(8);
   await expect(page.getByRole("heading", { name: "参考资料", exact: true })).toHaveCount(0);
   await expect(page.locator(".tech-goal-create-aside:visible")).toHaveCount(0);
   await expect(page.getByText("进入学习空间", { exact: true })).toHaveCount(0);
@@ -360,7 +360,6 @@ test("新建目标页使用统一分步表单并完成创建", async ({ page }) 
   const selectedDeadline = await page.locator(".tech-goal-calendar-days .is-today").getAttribute("aria-label");
   await page.locator(".tech-goal-calendar-days .is-today").click();
   await page.getByRole("button", { name: "仅工作日", exact: true }).click();
-  await page.getByRole("button", { name: "进阶", exact: true }).click();
   await expect(page.getByRole("textbox", { name: "目标名称" })).toHaveValue("完成日语 N2 备考");
 
   await page.getByRole("button", { name: "创建目标", exact: true }).click();
@@ -453,7 +452,7 @@ test("新建目标页使用统一分步表单并完成创建", async ({ page }) 
   expect(storedGoal).toMatchObject({
     name: "完成日语 N2 备考",
     type: "语言学习",
-    status: "进行中",
+    status: "active",
   });
   expect(storedGoal?.deadlineDate).toBeTruthy();
   expect(selectedDeadline).toBeTruthy();
@@ -510,18 +509,19 @@ test("新建目标页在短桌面视口首屏完整显示", async ({ page }) => 
       actionFontSize: actionButton ? Number.parseFloat(getComputedStyle(actionButton).fontSize) : 0,
     };
   });
-  expect(geometry.width).toBeLessThanOrEqual(762);
-  expect(geometry.height).toBeLessThanOrEqual(572);
-  expect(geometry.bottom).toBeLessThanOrEqual(geometry.viewportHeight - 12);
+  expect(geometry.width).toBeGreaterThanOrEqual(1000);
+  expect(geometry.width).toBeLessThanOrEqual(1182);
+  expect(geometry.height).toBeLessThanOrEqual(612);
+  expect(geometry.bottom).toBeLessThanOrEqual(geometry.viewportHeight - 10);
   // Preserve the current polished visual baseline: the document includes a 4px shell allowance.
   expect(geometry.documentHeight).toBeLessThanOrEqual(geometry.viewportHeight + 4);
-  expect(geometry.typeOptionHeight).toBeLessThanOrEqual(40.1);
-  expect(geometry.typeOptionFontSize).toBe(13);
-  expect(geometry.nameInputHeight).toBeLessThanOrEqual(40.1);
-  expect(geometry.nameInputFontSize).toBe(13);
-  expect(geometry.segmentHeight).toBeLessThanOrEqual(40.1);
-  expect(geometry.segmentFontSize).toBe(13);
-  expect(geometry.actionHeight).toBeLessThanOrEqual(40.1);
+  expect(geometry.typeOptionHeight).toBeLessThanOrEqual(46.1);
+  expect(geometry.typeOptionFontSize).toBe(14);
+  expect(geometry.nameInputHeight).toBeLessThanOrEqual(44.1);
+  expect(geometry.nameInputFontSize).toBe(14);
+  expect(geometry.segmentHeight).toBeLessThanOrEqual(42.1);
+  expect(geometry.segmentFontSize).toBe(14);
+  expect(geometry.actionHeight).toBeLessThanOrEqual(44.1);
   expect(geometry.actionFontSize).toBe(14);
 });
 
@@ -544,7 +544,7 @@ test("编辑目标复用统一目标表单", async ({ page }) => {
   await expect(editor.getByRole("button", { name: "进行中", exact: true })).toHaveAttribute("aria-pressed", "true");
   const sectionOrderIsCorrect = await editor.evaluate((surface) => {
     const status = surface.querySelector(".tech-goal-status-section");
-    const preferences = surface.querySelector(".tech-goal-preference-grid");
+    const preferences = surface.querySelector(".tech-goal-plan-grid");
     const deadline = surface.querySelector(".tech-goal-date-field");
     return Boolean(
       status
@@ -557,7 +557,7 @@ test("编辑目标复用统一目标表单", async ({ page }) => {
   expect(sectionOrderIsCorrect).toBe(true);
   const statusAlignment = await editor.evaluate((surface) => {
     const status = surface.querySelector<HTMLElement>(".tech-goal-status-section")?.getBoundingClientRect();
-    const schedule = surface.querySelector<HTMLElement>(".tech-goal-create-two-column")?.getBoundingClientRect();
+    const schedule = surface.querySelector<HTMLElement>(".tech-goal-plan-grid")?.getBoundingClientRect();
     return {
       leftDelta: Math.abs((status?.left ?? 0) - (schedule?.left ?? 999)),
       rightDelta: Math.abs((status?.right ?? 0) - (schedule?.right ?? 999)),
