@@ -1,5 +1,42 @@
 import { expect, test } from "@playwright/test";
 
+test("暗黑与手帐侧栏保持单行状态和完整账户卡片", async ({ page }) => {
+  await page.setViewportSize({ width: 1200, height: 660 });
+  await page.goto("/studio/settings");
+
+  for (const theme of [
+    { button: /暗黑模式/, value: "dark", consoleLabel: "WORKSPACE" },
+    { button: /手帐纸张/, value: "notebook", consoleLabel: "JOURNAL" },
+  ]) {
+    await page.getByRole("button", { name: theme.button }).click();
+    await expect(page.locator("html")).toHaveAttribute("data-theme", theme.value);
+    await expect(page.locator(".sidebar-console-status > span")).toHaveText(theme.consoleLabel);
+
+    const geometry = await page.locator(".sidebar").evaluate((sidebar) => {
+      const sideBounds = sidebar.getBoundingClientRect();
+      const status = sidebar.querySelector<HTMLElement>(".sidebar-rotating-status > span")!;
+      const statusBounds = status.getBoundingClientRect();
+      const footBounds = sidebar.querySelector<HTMLElement>(".sidebar-foot")!.getBoundingClientRect();
+      const labels = Array.from(sidebar.querySelectorAll<HTMLElement>(".sidebar-nav a > span"));
+      return {
+        horizontalOverflow: sidebar.scrollWidth - sidebar.clientWidth,
+        verticalOverflow: sidebar.scrollHeight - sidebar.clientHeight,
+        statusHeight: statusBounds.height,
+        statusWhiteSpace: getComputedStyle(status).whiteSpace,
+        footBottomGap: sideBounds.bottom - footBounds.bottom,
+        labelsFit: labels.every((label) => label.scrollWidth <= label.clientWidth && label.scrollHeight <= label.clientHeight),
+      };
+    });
+
+    expect(geometry.horizontalOverflow).toBe(0);
+    expect(geometry.verticalOverflow).toBe(0);
+    expect(geometry.statusHeight).toBeLessThanOrEqual(22);
+    expect(geometry.statusWhiteSpace).toBe("nowrap");
+    expect(geometry.footBottomGap).toBeGreaterThanOrEqual(0);
+    expect(geometry.labelsFit).toBe(true);
+  }
+});
+
 test("设置页对齐主题层级并压平学习时间编辑器", async ({ page }, testInfo) => {
   await page.goto("/studio/settings");
 

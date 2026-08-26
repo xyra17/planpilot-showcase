@@ -512,7 +512,7 @@ export function ProductShell({
           <div className="sidebar-account-card">
             <div className="sidebar-console-status" aria-hidden="true">
               <i />
-              <span>{theme === "notebook" ? "LEARNING JOURNAL" : "WORKSPACE"}</span>
+              <span>{theme === "notebook" ? "JOURNAL" : "WORKSPACE"}</span>
               <b>READY</b>
             </div>
             <div className="sidebar-account-row">
