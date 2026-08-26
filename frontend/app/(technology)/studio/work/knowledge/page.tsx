@@ -46,6 +46,10 @@ import { useAuth } from "@/components/technology/AuthProvider";
 import { WorkspaceSkeleton } from "@/components/technology/WorkspaceSkeleton";
 import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { DataSyncNotice } from "@/components/ui/DataSyncNotice";
+import {
+  ResourceColumnResizeHandle,
+  useResourceTableColumns,
+} from "@/components/technology/ResourceTableColumns";
 import { signalPiloContext } from "@/lib/technology/piloContext";
 import { signalPiloState } from "@/lib/technology/piloState";
 import {
@@ -339,6 +343,7 @@ export default function KnowledgePage() {
   const [dataError, setDataError] = useState("");
   const [classificationSplit, setClassificationSplit] = useState(50);
   const [railWidth, setRailWidth] = useState(208);
+  const resourceColumns = useResourceTableColumns();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const replacementInputRef = useRef<HTMLInputElement>(null);
   const objectUrls = useRef<string[]>([]);
@@ -1681,8 +1686,8 @@ export default function KnowledgePage() {
             </div>
             </div>
           </header>
-          <div className="knowledge-resource-table" role="table" aria-label="知识空间资料" onScroll={revealScrollbarWhileScrolling}>
-            <div className="knowledge-resource-table-head" role="row">
+          <div className="knowledge-resource-table" role="table" aria-label="知识空间资料" style={resourceColumns.tableStyle} onScroll={revealScrollbarWhileScrolling}>
+            <div className="knowledge-resource-table-head" role="row" ref={resourceColumns.headerRef}>
               <span><input type="checkbox" aria-label="选择全部资料" checked={Boolean(visibleFiles.length) && selectedRows.size === visibleFiles.length} onChange={(event) => setSelectedRows(event.target.checked ? new Set(visibleFiles.map((file) => file.id)) : new Set())} /></span>
               <span className="knowledge-resource-name-head"><span>资料名称</span>
                 {selectedRows.size > 0 && (
@@ -1700,7 +1705,38 @@ export default function KnowledgePage() {
                     )}
                   </span>
                 )}
-              </span><span>关联目标</span><span>更新时间</span><span>收藏</span><span>编辑</span>
+                <ResourceColumnResizeHandle
+                  active={resourceColumns.activeBoundary === "name-goal"}
+                  boundary="name-goal"
+                  headerRef={resourceColumns.headerRef}
+                  label="调整资料名称列宽度"
+                  onDoubleClick={resourceColumns.resetColumns}
+                  onKeyDown={resourceColumns.resizeByKeyboard}
+                  onPointerDown={resourceColumns.startResize}
+                />
+              </span>
+              <span>关联目标
+                <ResourceColumnResizeHandle
+                  active={resourceColumns.activeBoundary === "goal-date"}
+                  boundary="goal-date"
+                  headerRef={resourceColumns.headerRef}
+                  label="调整关联目标列宽度"
+                  onDoubleClick={resourceColumns.resetColumns}
+                  onKeyDown={resourceColumns.resizeByKeyboard}
+                  onPointerDown={resourceColumns.startResize}
+                />
+              </span>
+              <span>更新时间
+                <ResourceColumnResizeHandle
+                  active={resourceColumns.activeBoundary === "date-end"}
+                  boundary="date-end"
+                  headerRef={resourceColumns.headerRef}
+                  label="调整更新时间列宽度"
+                  onDoubleClick={resourceColumns.resetColumns}
+                  onKeyDown={resourceColumns.resizeByKeyboard}
+                  onPointerDown={resourceColumns.startResize}
+                />
+              </span><span>收藏</span><span>编辑</span>
             </div>
             {visibleFiles.map((file) => {
               const isSelected = selectedRows.has(file.id);

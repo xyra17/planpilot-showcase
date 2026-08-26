@@ -155,7 +155,7 @@ test("资料表为关联目标留出空间，并说明收藏与编辑操作", as
     nameCell: getComputedStyle(document.querySelector<HTMLElement>(".knowledge-resource-identity")!).justifyContent,
     goalCell: getComputedStyle(document.querySelector<HTMLElement>(".knowledge-resource-goals")!).justifyContent,
   }));
-  expect(alignment).toEqual({ nameHead: "left", nameCell: "flex-start", goalCell: "center" });
+  expect(alignment).toEqual({ nameHead: "center", nameCell: "flex-start", goalCell: "center" });
 
   const favorite = firstRow.locator(".knowledge-row-action-cell button").first();
   const edit = firstRow.locator(".knowledge-row-action-cell button").nth(1);
@@ -165,6 +165,38 @@ test("资料表为关联目标留出空间，并说明收藏与编辑操作", as
   await expect.poll(() => favorite.evaluate((button) => getComputedStyle(button, "::after").opacity)).toBe("1");
   await edit.focus();
   await expect.poll(() => edit.evaluate((button) => getComputedStyle(button, "::after").opacity)).toBe("1");
+});
+
+test("资料表可从表头调整整列宽度并保留本机偏好", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const header = page.locator(".knowledge-resource-table-head");
+  const firstRow = page.locator(".knowledge-resource-table article").first();
+  const nameHandle = page.getByRole("separator", { name: "调整资料名称列宽度" });
+  const headerName = header.locator(":scope > span").nth(1);
+  const rowName = firstRow.locator(":scope > *").nth(1);
+  const initialHeaderWidth = (await headerName.boundingBox())?.width ?? 0;
+
+  const handleBox = await nameHandle.boundingBox();
+  await page.mouse.move((handleBox?.x ?? 0) + (handleBox?.width ?? 0) / 2, (handleBox?.y ?? 0) + (handleBox?.height ?? 0) / 2);
+  await page.mouse.down();
+  await page.mouse.move((handleBox?.x ?? 0) + (handleBox?.width ?? 0) / 2 + 24, (handleBox?.y ?? 0) + (handleBox?.height ?? 0) / 2);
+  await page.mouse.up();
+  const resizedHeaderWidth = (await headerName.boundingBox())?.width ?? 0;
+  const resizedRowWidth = (await rowName.boundingBox())?.width ?? 0;
+  expect(resizedHeaderWidth).toBeGreaterThan(initialHeaderWidth + 12);
+  expect(Math.abs(resizedHeaderWidth - resizedRowWidth)).toBeLessThanOrEqual(1);
+
+  const saved = await page.evaluate(() => localStorage.getItem("planpilot:knowledge-resource-columns:v1"));
+  expect(saved).toContain("name");
+
+  const goalHandle = page.getByRole("separator", { name: "调整关联目标列宽度" });
+  const goalBeforeKeyboard = (await header.locator(":scope > span").nth(2).boundingBox())?.width ?? 0;
+  await goalHandle.focus();
+  await goalHandle.press("ArrowLeft");
+  expect((await header.locator(":scope > span").nth(2).boundingBox())?.width ?? 0).toBeLessThan(goalBeforeKeyboard - 4);
+
+  await nameHandle.dblclick();
+  expect(Math.abs(((await page.locator(".knowledge-resource-table-head > span").nth(1).boundingBox())?.width ?? 0) - initialHeaderWidth)).toBeLessThanOrEqual(2);
 });
 
 test("资料全屏预览只占工作区并保留桌面导航", async ({ page }) => {
