@@ -10,13 +10,42 @@ html[data-theme="notebook"] .app-shell {
   --notebook-muted-ink: var(--muted);
   --notebook-paper-main: var(--surface);
   --notebook-paper-soft: var(--surface-soft);
-  --notebook-paper-tint: color-mix(in srgb, var(--amber-soft) 38%, var(--surface));
+  --notebook-paper-tint: color-mix(in srgb, var(--notebook-ink-accent-soft) 38%, var(--surface));
   --notebook-paper-cool: color-mix(in srgb, var(--blue-soft) 42%, var(--surface));
   --notebook-rule-strong: color-mix(in srgb, var(--text) 28%, var(--line));
   --notebook-ink-accent: var(--purple);
+  --notebook-ink-accent-soft: var(--purple-soft);
   --notebook-paper-shadow:
     1px 2px 0 color-mix(in srgb, var(--text) 9%, transparent),
     0 14px 34px color-mix(in srgb, var(--text) 8%, transparent);
+}
+
+/* Paper palettes own their interaction ink. Keep this inside notebook so the
+ * native and dark accent systems retain their independent semantics. */
+html[data-theme="notebook"] .app-shell .settings-page-redesign .color-options button {
+  color: var(--muted);
+  background: var(--surface-soft);
+  border-color: var(--notebook-rule-strong);
+}
+
+html[data-theme="notebook"] .app-shell .settings-page-redesign .color-options button:is(:hover, :focus-visible) {
+  color: var(--text);
+  background: color-mix(in srgb, var(--notebook-ink-accent-soft) 58%, var(--surface));
+  border-color: color-mix(in srgb, var(--notebook-ink-accent) 62%, var(--line));
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--notebook-ink-accent) 12%, transparent);
+}
+
+html[data-theme="notebook"] .app-shell .settings-page-redesign .color-options button.is-selected {
+  color: var(--text);
+  background: color-mix(in srgb, var(--notebook-ink-accent-soft) 78%, var(--surface));
+  border: 1.5px solid var(--notebook-ink-accent);
+  box-shadow:
+    inset 3px 0 0 var(--notebook-ink-accent),
+    1px 2px 0 color-mix(in srgb, var(--notebook-ink-accent) 13%, transparent);
+}
+
+html[data-theme="notebook"] .app-shell .settings-page-redesign .color-options button.is-selected > svg {
+  color: var(--notebook-ink-accent);
 }
 
 /* Shared overlays and menus are not always descendants of their workspace. */
@@ -201,7 +230,7 @@ html[data-theme="notebook"] .knowledge-reference-page :is(.knowledge-demo-intro,
   width: 92px;
   height: 24px;
   content: "";
-  background: color-mix(in srgb, var(--amber-soft) 74%, var(--surface));
+  background: color-mix(in srgb, var(--notebook-ink-accent-soft) 74%, var(--surface));
   box-shadow: 1px 2px 3px color-mix(in srgb, var(--text) 10%, transparent);
   clip-path: polygon(3% 4%, 98% 0, 95% 94%, 0 100%);
   opacity: .76;
@@ -225,7 +254,7 @@ html[data-theme="notebook"] .knowledge-reference-page :is(.knowledge-demo-intro-
 
 html[data-theme="notebook"] .knowledge-reference-page .knowledge-guest-gate-message {
   color: var(--knowledge-muted);
-  background: color-mix(in srgb, var(--amber-soft) 34%, var(--knowledge-panel));
+  background: color-mix(in srgb, var(--notebook-ink-accent-soft) 34%, var(--knowledge-panel));
   border-color: var(--knowledge-line-strong);
   border-radius: 6px 11px 7px 10px;
 }
@@ -343,9 +372,9 @@ html[data-theme="notebook"] .app-shell .companion-workspace .companion-lamp-pull
 
 html[data-theme="notebook"] .app-shell .companion-workspace .companion-lamp-pull__shade,
 html[data-theme="notebook"] .app-shell .companion-workspace .companion-lamp-pull.is-light .companion-lamp-pull__shade {
-  background: color-mix(in srgb, var(--amber-soft) 58%, var(--surface));
-  border-color: color-mix(in srgb, var(--amber) 34%, var(--comp-line));
-  box-shadow: 0 5px 16px color-mix(in srgb, var(--amber) 12%, transparent);
+  background: color-mix(in srgb, var(--notebook-ink-accent-soft) 58%, var(--surface));
+  border-color: color-mix(in srgb, var(--notebook-ink-accent) 34%, var(--comp-line));
+  box-shadow: 0 5px 16px color-mix(in srgb, var(--notebook-ink-accent) 12%, transparent);
 }
 
 html[data-theme="notebook"] .app-shell .companion-workspace .companion-lamp-pull__cord,
@@ -494,16 +523,16 @@ html[data-theme="notebook"] .app-shell :is(.task-priority-label, .week-focus-tas
   letter-spacing: .02em;
 }
 html[data-theme="notebook"] .app-shell .task-priority-trigger {
-  color: color-mix(in srgb, var(--amber) 82%, var(--text));
+  color: color-mix(in srgb, var(--notebook-ink-accent) 82%, var(--text));
   background: transparent;
   border: 0;
-  border-bottom: 1px solid color-mix(in srgb, var(--amber) 48%, var(--line));
+  border-bottom: 1px solid color-mix(in srgb, var(--notebook-ink-accent) 48%, var(--line));
   border-radius: 0;
 }
 
 html[data-theme="notebook"] .app-shell .task-priority-label,
 html[data-theme="notebook"] .app-shell .week-focus-task-priority.is-medium {
-  color: color-mix(in srgb, var(--amber) 80%, var(--text));
+  color: color-mix(in srgb, var(--notebook-ink-accent) 80%, var(--text));
 }
 
 html[data-theme="notebook"] .app-shell .week-focus-task-priority.is-high { color: color-mix(in srgb, #a34a3d 78%, var(--text)); }
@@ -537,7 +566,7 @@ html[data-theme="notebook"][data-theme][data-theme] .app-shell .dashboard-page >
     repeating-linear-gradient(0deg, transparent 0 29px, color-mix(in srgb, var(--blue) 7%, transparent) 30px),
     var(--surface) !important;
   border: 1.5px solid var(--notebook-rule-strong) !important;
-  outline: 1px dashed color-mix(in srgb, var(--amber) 32%, transparent);
+  outline: 1px dashed color-mix(in srgb, var(--notebook-ink-accent) 32%, transparent);
   outline-offset: -6px;
   border-radius: 7px 13px 8px 11px;
   box-shadow: var(--notebook-paper-shadow) !important;
@@ -551,9 +580,9 @@ html[data-theme="notebook"] .app-shell .coach-strip-goal-advice .coach-avatar {
   border-radius: 7px 10px 8px 9px;
 }
 html[data-theme="notebook"] .app-shell .coach-strip-goal-advice :is(small, strong, p) { color: var(--text); }
-html[data-theme="notebook"] .app-shell .coach-strip-goal-advice small { color: color-mix(in srgb, var(--amber) 82%, var(--text)); font-weight: 750; }
+html[data-theme="notebook"] .app-shell .coach-strip-goal-advice small { color: color-mix(in srgb, var(--notebook-ink-accent) 82%, var(--text)); font-weight: 750; }
 html[data-theme="notebook"] .app-shell .coach-strip-goal-advice p { color: var(--muted); }
-html[data-theme="notebook"] .app-shell .coach-strip-goal-advice a { color: color-mix(in srgb, var(--amber) 84%, var(--text)); }
+html[data-theme="notebook"] .app-shell .coach-strip-goal-advice a { color: color-mix(in srgb, var(--notebook-ink-accent) 84%, var(--text)); }
 
 html[data-theme="notebook"] .app-shell .rhythm-week-entry {
   display: inline-flex;
@@ -573,7 +602,7 @@ html[data-theme="notebook"] .app-shell .rhythm-week-entry {
   border-radius: 7px 10px 8px 9px;
 }
 html[data-theme="notebook"] .app-shell .rhythm-week-entry > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-html[data-theme="notebook"] .app-shell .rhythm-week-entry > svg { flex: 0 0 auto; color: var(--amber); }
+html[data-theme="notebook"] .app-shell .rhythm-week-entry > svg { flex: 0 0 auto; color: var(--notebook-ink-accent); }
 
 html[data-theme="notebook"] .app-shell .week-plan-board-redesign :is(.week-load-card, .week-risk-card, .week-agenda) {
   color: var(--text);
@@ -583,11 +612,11 @@ html[data-theme="notebook"] .app-shell .week-plan-board-redesign .week-load-trac
   border: 1px solid color-mix(in srgb, var(--text) 22%, var(--line));
   border-radius: 5px 8px 6px 7px;
 }
-html[data-theme="notebook"] .app-shell .week-plan-board-redesign .week-load-plan-fill { background: color-mix(in srgb, var(--amber) 78%, var(--text)); }
+html[data-theme="notebook"] .app-shell .week-plan-board-redesign .week-load-plan-fill { background: color-mix(in srgb, var(--notebook-ink-accent) 78%, var(--text)); }
 html[data-theme="notebook"] .app-shell .week-plan-board-redesign .week-load-complete-fill { background: color-mix(in srgb, var(--mint) 72%, var(--text)); }
 html[data-theme="notebook"] .app-shell .week-plan-board-redesign .week-load-chart > button:is(:hover, :focus-visible, .is-selected) {
-  background: color-mix(in srgb, var(--amber-soft) 34%, var(--surface));
-  outline: 1px solid color-mix(in srgb, var(--amber) 44%, var(--line));
+  background: color-mix(in srgb, var(--notebook-ink-accent-soft) 34%, var(--surface));
+  outline: 1px solid color-mix(in srgb, var(--notebook-ink-accent) 44%, var(--line));
 }
 
 /* Goals: replace the modern violet cards with paper sheets and ink accents. */
@@ -608,25 +637,25 @@ html[data-theme="notebook"] .app-shell .tech-goals-page .filter-tabs button { co
 html[data-theme="notebook"] .app-shell .tech-goals-page .filter-tabs button.is-active {
   color: var(--text);
   background: var(--surface);
-  border-color: color-mix(in srgb, var(--amber) 72%, var(--text));
-  box-shadow: 0 2px 0 color-mix(in srgb, var(--amber) 42%, transparent);
+  border-color: color-mix(in srgb, var(--notebook-ink-accent) 72%, var(--text));
+  box-shadow: 0 2px 0 color-mix(in srgb, var(--notebook-ink-accent) 42%, transparent);
 }
 html[data-theme="notebook"] .app-shell .tech-goals-page .goal-list-row {
   background: color-mix(in srgb, var(--surface) 92%, var(--surface-soft));
   border-color: var(--notebook-rule-strong);
   border-radius: 6px 11px 7px 10px;
 }
-html[data-theme="notebook"] .app-shell .tech-goals-page .goal-list-row:hover { background: var(--surface); border-color: color-mix(in srgb, var(--amber) 46%, var(--line)); }
+html[data-theme="notebook"] .app-shell .tech-goals-page .goal-list-row:hover { background: var(--surface); border-color: color-mix(in srgb, var(--notebook-ink-accent) 46%, var(--line)); }
 html[data-theme="notebook"] .app-shell .tech-goals-page :is(.goal-list-icon, .goal-list-status, .goal-legend span, .goal-milestone-switcher-trigger) { color: var(--text); background: var(--surface-soft); border-color: var(--notebook-rule-strong); }
-html[data-theme="notebook"] .app-shell .tech-goals-page .goal-list-icon :is(svg, i) { color: color-mix(in srgb, var(--amber) 82%, var(--text)); }
+html[data-theme="notebook"] .app-shell .tech-goals-page .goal-list-icon :is(svg, i) { color: color-mix(in srgb, var(--notebook-ink-accent) 82%, var(--text)); }
 html[data-theme="notebook"] .app-shell .tech-goals-page .goal-list-main > i { background: color-mix(in srgb, var(--line) 68%, var(--surface)); }
-html[data-theme="notebook"] .app-shell .tech-goals-page .goal-list-main > i span { background: color-mix(in srgb, var(--amber) 78%, var(--text)); }
-html[data-theme="notebook"] .app-shell .tech-goals-page .goal-list-progress strong { color: color-mix(in srgb, var(--amber) 82%, var(--text)); }
-html[data-theme="notebook"] .app-shell .tech-goals-page .goal-insight-panel::before { background: var(--amber); }
+html[data-theme="notebook"] .app-shell .tech-goals-page .goal-list-main > i span { background: color-mix(in srgb, var(--notebook-ink-accent) 78%, var(--text)); }
+html[data-theme="notebook"] .app-shell .tech-goals-page .goal-list-progress strong { color: color-mix(in srgb, var(--notebook-ink-accent) 82%, var(--text)); }
+html[data-theme="notebook"] .app-shell .tech-goals-page .goal-insight-panel::before { background: var(--notebook-ink-accent); }
 html[data-theme="notebook"] .app-shell .tech-goals-page .goal-donut {
   background: conic-gradient(
     from -90deg,
-    color-mix(in srgb, var(--amber) 78%, var(--text)) 0 var(--goal-progress-value),
+    color-mix(in srgb, var(--notebook-ink-accent) 78%, var(--text)) 0 var(--goal-progress-value),
     color-mix(in srgb, var(--line) 64%, var(--surface)) var(--goal-progress-value) 100%
   );
   border: 1.5px solid var(--notebook-rule-strong);
@@ -655,21 +684,21 @@ html[data-theme="notebook"] .app-shell .tech-goals-page .goal-legend > span {
 html[data-theme="notebook"] .app-shell .tech-goals-page .goal-legend > span:hover {
   color: var(--text);
   background: var(--surface);
-  border-color: color-mix(in srgb, var(--amber) 48%, var(--line));
+  border-color: color-mix(in srgb, var(--notebook-ink-accent) 48%, var(--line));
   box-shadow: 1px 2px 0 color-mix(in srgb, var(--text) 8%, transparent);
   transform: none;
 }
 html[data-theme="notebook"] .app-shell .tech-goals-page .goal-legend > span > i {
-  background: color-mix(in srgb, var(--amber) 74%, var(--text));
+  background: color-mix(in srgb, var(--notebook-ink-accent) 74%, var(--text));
   border-radius: 45% 55% 52% 48%;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--amber-soft) 55%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--notebook-ink-accent-soft) 55%, transparent);
 }
 html[data-theme="notebook"] .app-shell .tech-goals-page .goal-legend > span[data-tone="risk"] > i { background: color-mix(in srgb, #a96532 76%, var(--text)); }
 html[data-theme="notebook"] .app-shell .tech-goals-page .goal-legend > span[data-tone="done"] > i { background: color-mix(in srgb, var(--mint) 68%, var(--text)); }
 html[data-theme="notebook"] .app-shell .tech-goals-page .goal-legend > span > strong {
   color: var(--text);
   background: transparent;
-  border: 1px solid color-mix(in srgb, var(--amber) 42%, var(--line));
+  border: 1px solid color-mix(in srgb, var(--notebook-ink-accent) 42%, var(--line));
   border-radius: 4px 7px 5px 6px;
   font-family: "Iowan Old Style", "Kaiti SC", "STKaiti", "KaiTi", serif;
 }
@@ -686,20 +715,20 @@ html[data-theme="notebook"] .app-shell .knowledge-reference-page :is(.knowledge-
 html[data-theme="notebook"] .app-shell .knowledge-resource-table-head { background: var(--surface-soft); font-weight: 750; text-align: center; }
 html[data-theme="notebook"] .app-shell .knowledge-resource-table-head > span { color: var(--text); text-align: center; }
 html[data-theme="notebook"] .app-shell .knowledge-resource-table article { background: transparent; text-align: center; }
-html[data-theme="notebook"] .app-shell .knowledge-resource-table article:hover { background: color-mix(in srgb, var(--amber-soft) 16%, var(--surface)); }
+html[data-theme="notebook"] .app-shell .knowledge-resource-table article:hover { background: color-mix(in srgb, var(--notebook-ink-accent-soft) 16%, var(--surface)); }
 html[data-theme="notebook"] .app-shell .knowledge-resource-table article > :not(.knowledge-resource-identity) { justify-self: center; text-align: center; }
 html[data-theme="notebook"] .app-shell .knowledge-resource-table :is(.knowledge-resource-identity, .knowledge-resource-identity strong, .knowledge-resource-identity small) { text-align: left; }
 html[data-theme="notebook"] .app-shell .knowledge-resource-identity strong { color: var(--text); }
 html[data-theme="notebook"] .app-shell .knowledge-resource-identity small { color: var(--muted); }
-html[data-theme="notebook"] .app-shell .knowledge-resource-table article em { color: color-mix(in srgb, var(--amber) 82%, var(--text)); background: var(--surface-soft); border: 1px solid color-mix(in srgb, var(--amber) 32%, var(--line)); }
+html[data-theme="notebook"] .app-shell .knowledge-resource-table article em { color: color-mix(in srgb, var(--notebook-ink-accent) 82%, var(--text)); background: var(--surface-soft); border: 1px solid color-mix(in srgb, var(--notebook-ink-accent) 32%, var(--line)); }
 html[data-theme="notebook"] .app-shell .knowledge-resource-table article .knowledge-resource-goals em.is-unlinked { color: var(--muted); background: var(--surface-soft); }
-html[data-theme="notebook"] .app-shell .knowledge-reference-page :is(.knowledge-reference-tabs button.is-active, .knowledge-library-filter.is-active, .knowledge-goal-item.is-active) { color: var(--text); background: var(--surface-soft); border-color: color-mix(in srgb, var(--amber) 42%, var(--line)); }
+html[data-theme="notebook"] .app-shell .knowledge-reference-page :is(.knowledge-reference-tabs button.is-active, .knowledge-library-filter.is-active, .knowledge-goal-item.is-active) { color: var(--text); background: var(--surface-soft); border-color: color-mix(in srgb, var(--notebook-ink-accent) 42%, var(--line)); }
 html[data-theme="notebook"] .app-shell .knowledge-reference-page :is(.knowledge-resource-toolbar input, .knowledge-resource-toolbar > button, select) { color: var(--text); background: var(--surface-soft); border-color: var(--notebook-rule-strong); }
-html[data-theme="notebook"] .app-shell .knowledge-reference-page .knowledge-file-glyph { color: color-mix(in srgb, var(--amber) 82%, var(--text)); background: var(--surface-soft); }
+html[data-theme="notebook"] .app-shell .knowledge-reference-page .knowledge-file-glyph { color: color-mix(in srgb, var(--notebook-ink-accent) 82%, var(--text)); background: var(--surface-soft); }
 html[data-theme="notebook"] .app-shell .knowledge-reference-page :is(.knowledge-scope-shortcuts > button.is-active, .knowledge-library-rail button.is-active) {
   color: var(--text);
   background: var(--surface-soft);
-  border-color: color-mix(in srgb, var(--amber) 44%, var(--line));
+  border-color: color-mix(in srgb, var(--notebook-ink-accent) 44%, var(--line));
   box-shadow: none;
 }
 
@@ -714,7 +743,7 @@ html[data-theme="notebook"] .app-shell .companion-workspace :is(.companion-input
 html[data-theme="notebook"] .app-shell .companion-workspace .companion-input-dock { background: transparent; border: 0; }
 html[data-theme="notebook"] .app-shell .companion-workspace .companion-chat-panel { background: transparent; }
 html[data-theme="notebook"] .app-shell .companion-workspace .companion-composer { box-shadow: var(--notebook-paper-shadow); }
-html[data-theme="notebook"] .app-shell .companion-workspace .companion-composer-icon { color: var(--amber); background: var(--surface-soft); }
+html[data-theme="notebook"] .app-shell .companion-workspace .companion-composer-icon { color: var(--notebook-ink-accent); background: var(--surface-soft); }
 html[data-theme="notebook"] .app-shell .companion-workspace .companion-input-dock .companion-composer {
   background: var(--surface) !important;
   background-image: none !important;
@@ -722,7 +751,7 @@ html[data-theme="notebook"] .app-shell .companion-workspace .companion-input-doc
 }
 html[data-theme="notebook"] .app-shell .companion-workspace .companion-input-dock .companion-composer::after { display: none !important; }
 html[data-theme="notebook"] .app-shell .companion-workspace .companion-composer textarea::placeholder { color: var(--muted); opacity: 1; }
-html[data-theme="notebook"] .app-shell .companion-workspace .companion-prompt-chips > button:hover { color: var(--text); background: var(--surface-soft); border-color: color-mix(in srgb, var(--amber) 46%, var(--line)); }
+html[data-theme="notebook"] .app-shell .companion-workspace .companion-prompt-chips > button:hover { color: var(--text); background: var(--surface-soft); border-color: color-mix(in srgb, var(--notebook-ink-accent) 46%, var(--line)); }
 html[data-theme="notebook"] .app-shell .companion-workspace :is(.companion-context-scope, .companion-context-section > :not(.companion-context-section__toggle), .companion-context-empty, .companion-gap-card, .companion-memory-list, .companion-resource-list) { color: var(--text); background: var(--surface); border-color: var(--notebook-rule-strong); }
 html[data-theme="notebook"] .app-shell .companion-workspace .companion-context-section__toggle { color: var(--text); background: var(--surface-soft); border-color: var(--notebook-rule-strong); }
 html[data-theme="notebook"] .app-shell .companion-workspace .companion-context-section__toggle strong { color: var(--text); }
@@ -757,7 +786,7 @@ html[data-theme="notebook"] .app-shell .companion-workspace .companion-setting-s
 html[data-theme="notebook"] .app-shell .companion-workspace :is(.companion-setting-options > button.is-active, .companion-detail-options > button.is-active) {
   color: var(--text);
   background: var(--surface-soft);
-  border-color: color-mix(in srgb, var(--amber) 46%, var(--line));
+  border-color: color-mix(in srgb, var(--notebook-ink-accent) 46%, var(--line));
 }
 html[data-theme="notebook"] .app-shell .companion-workspace .companion-settings-saved { color: var(--muted); }
 html[data-theme="notebook"] .app-shell .companion-workspace .companion-sidepanel:is(.is-settings, .is-context, .is-history) {
@@ -766,18 +795,18 @@ html[data-theme="notebook"] .app-shell .companion-workspace .companion-sidepanel
   --coach-drawer-text: var(--text);
   --coach-drawer-muted: var(--muted);
   --coach-drawer-faint: color-mix(in srgb, var(--muted) 72%, var(--surface));
-  --coach-drawer-accent: color-mix(in srgb, var(--amber) 82%, var(--text));
-  --coach-drawer-accent-strong: color-mix(in srgb, var(--amber) 88%, var(--text));
+  --coach-drawer-accent: color-mix(in srgb, var(--notebook-ink-accent) 82%, var(--text));
+  --coach-drawer-accent-strong: color-mix(in srgb, var(--notebook-ink-accent) 88%, var(--text));
   --coach-drawer-mint: color-mix(in srgb, var(--mint) 72%, var(--text));
   --coach-drawer-control: var(--surface-soft);
-  --coach-drawer-hover: color-mix(in srgb, var(--amber-soft) 26%, var(--surface));
+  --coach-drawer-hover: color-mix(in srgb, var(--notebook-ink-accent-soft) 26%, var(--surface));
   --coach-drawer-line: var(--notebook-rule-strong);
   --coach-drawer-line-soft: color-mix(in srgb, var(--line) 72%, var(--text));
 }
 html[data-theme="notebook"] .app-shell .companion-sidepanel:is(.is-settings, .is-context, .is-history) :is(h2, h3, strong, p, span, small, button, input, a, time) { color: var(--text); }
 html[data-theme="notebook"] .app-shell .companion-sidepanel:is(.is-settings, .is-context, .is-history) :is(p, small, .companion-panel-note, .companion-context-header > span) { color: var(--muted); }
 html[data-theme="notebook"] .app-shell .companion-sidepanel:is(.is-settings, .is-context, .is-history) :is(button, input, .companion-history-search, .companion-history-filter, .companion-history-favorites, .companion-history-period, .companion-history-archive, .companion-history-date-picker, .companion-history-group .companion-thread-item) { background: var(--surface-soft); border-color: var(--notebook-rule-strong); }
-html[data-theme="notebook"] .app-shell .companion-sidepanel:is(.is-settings, .is-context, .is-history) :is(button:hover, button:focus-visible, .companion-history-favorites:hover) { background: var(--surface); border-color: color-mix(in srgb, var(--amber) 46%, var(--line)); }
+html[data-theme="notebook"] .app-shell .companion-sidepanel:is(.is-settings, .is-context, .is-history) :is(button:hover, button:focus-visible, .companion-history-favorites:hover) { background: var(--surface); border-color: color-mix(in srgb, var(--notebook-ink-accent) 46%, var(--line)); }
 
 /* Floating Pilo hint: one paper close control, no stacked pseudo-element tile. */
 html[data-theme="notebook"] .pilo-companion .pilo-companion__hint-dismiss { position: relative; color: var(--text); background: transparent; border: 0; box-shadow: none; }
@@ -787,9 +816,9 @@ html[data-theme="notebook"] .pilo-companion .pilo-companion__hint-dismiss > svg 
 /* Goal detail: keep the product structure, but make every active layer read as
    one restrained paper workspace instead of native cards pasted on paper. */
 html[data-theme="notebook"] .app-shell .tech-goal-workspace-scope:has(.goal-detail-page) {
-  --goal-title-accent: color-mix(in srgb, var(--amber) 82%, var(--text));
-  --workspace-accent: color-mix(in srgb, var(--amber) 82%, var(--text));
-  --workspace-accent-soft: color-mix(in srgb, var(--amber-soft) 48%, var(--surface));
+  --goal-title-accent: color-mix(in srgb, var(--notebook-ink-accent) 82%, var(--text));
+  --workspace-accent: color-mix(in srgb, var(--notebook-ink-accent) 82%, var(--text));
+  --workspace-accent-soft: color-mix(in srgb, var(--notebook-ink-accent-soft) 48%, var(--surface));
 }
 
 html[data-theme="notebook"] .app-shell .tech-goal-workspace-scope .goal-detail-header {
@@ -802,9 +831,9 @@ html[data-theme="notebook"] .app-shell .tech-goal-workspace-scope .goal-detail-h
 }
 
 html[data-theme="notebook"] .app-shell .tech-goal-workspace-scope .goal-detail-title-line .goal-status {
-  color: color-mix(in srgb, var(--amber) 84%, var(--text)) !important;
-  background: color-mix(in srgb, var(--amber-soft) 38%, var(--surface)) !important;
-  border-color: color-mix(in srgb, var(--amber) 38%, var(--line));
+  color: color-mix(in srgb, var(--notebook-ink-accent) 84%, var(--text)) !important;
+  background: color-mix(in srgb, var(--notebook-ink-accent-soft) 38%, var(--surface)) !important;
+  border-color: color-mix(in srgb, var(--notebook-ink-accent) 38%, var(--line));
   border-radius: 5px 8px 6px 7px;
 }
 
@@ -827,12 +856,12 @@ html[data-theme="notebook"] .app-shell .tech-goal-workspace-scope :is(.goal-prim
 }
 
 html[data-theme="notebook"] .app-shell .tech-goal-workspace-scope :is(.goal-primary-tab, .goal-right-tab)[aria-pressed="true"] {
-  color: color-mix(in srgb, var(--amber) 84%, var(--text));
+  color: color-mix(in srgb, var(--notebook-ink-accent) 84%, var(--text));
 }
 
 html[data-theme="notebook"] .app-shell .tech-goal-workspace-scope :is(.goal-primary-tab, .goal-right-tab)[aria-pressed="true"]::after {
   height: 2px;
-  background: color-mix(in srgb, var(--amber) 78%, var(--text));
+  background: color-mix(in srgb, var(--notebook-ink-accent) 78%, var(--text));
   border-radius: 43% 57% 46% 54%;
   transform: rotate(-.35deg);
 }
@@ -844,9 +873,9 @@ html[data-theme="notebook"] .app-shell .tech-goal-workspace-scope .goal-task-emp
 }
 
 html[data-theme="notebook"] .app-shell .tech-goal-workspace-scope :is(.goal-task-empty-icon, .goal-execution-empty-icon) {
-  color: color-mix(in srgb, var(--amber) 84%, var(--text));
-  background: color-mix(in srgb, var(--amber-soft) 46%, var(--surface));
-  border: 1.5px solid color-mix(in srgb, var(--amber) 34%, var(--line));
+  color: color-mix(in srgb, var(--notebook-ink-accent) 84%, var(--text));
+  background: color-mix(in srgb, var(--notebook-ink-accent-soft) 46%, var(--surface));
+  border: 1.5px solid color-mix(in srgb, var(--notebook-ink-accent) 34%, var(--line));
   border-radius: 46% 54% 49% 51%;
   box-shadow: 1px 2px 0 color-mix(in srgb, var(--text) 8%, transparent);
 }
@@ -858,8 +887,8 @@ html[data-theme="notebook"] .app-shell .tech-goal-workspace-scope .goal-executio
 
 html[data-theme="notebook"] .app-shell .tech-goal-workspace-scope :is(.goal-task-empty button, .goal-execution-empty-content > button) {
   color: var(--surface);
-  background: color-mix(in srgb, var(--amber) 80%, var(--text));
-  border-color: color-mix(in srgb, var(--amber) 72%, var(--text));
+  background: color-mix(in srgb, var(--notebook-ink-accent) 80%, var(--text));
+  border-color: color-mix(in srgb, var(--notebook-ink-accent) 72%, var(--text));
   border-radius: 6px 9px 7px 8px;
   box-shadow: 1px 2px 0 color-mix(in srgb, var(--text) 12%, transparent);
 }
@@ -876,7 +905,7 @@ html[data-theme="notebook"] .app-shell .tech-goal-workspace-scope :is(.goal-prog
 }
 
 html[data-theme="notebook"] .app-shell .tech-goal-workspace-scope :is(.goal-progress-metric-heading > svg, .goal-execution-kpis dt > svg, .goal-execution-section-header > span > svg) {
-  color: color-mix(in srgb, var(--amber) 82%, var(--text));
+  color: color-mix(in srgb, var(--notebook-ink-accent) 82%, var(--text));
 }
 
 html[data-theme="notebook"] .app-shell .tech-goal-workspace-scope .goal-execution-kpis > div {
@@ -889,13 +918,13 @@ html[data-theme="notebook"] .app-shell .tech-goal-workspace-scope .goal-executio
 }
 
 html[data-theme="notebook"] .app-shell .tech-goal-workspace-scope .goal-execution-capacity-track > i {
-  background: linear-gradient(90deg, color-mix(in srgb, var(--amber) 72%, var(--text)), color-mix(in srgb, var(--mint) 60%, var(--text)));
+  background: linear-gradient(90deg, color-mix(in srgb, var(--notebook-ink-accent) 72%, var(--text)), color-mix(in srgb, var(--mint) 60%, var(--text)));
 }
 
 /* Companion: a broad journal entry, quiet annotations and one paper composer. */
 html[data-theme="notebook"] .app-shell .companion-workspace {
-  --comp-violet: color-mix(in srgb, var(--amber) 82%, var(--text));
-  --comp-violet-bright: color-mix(in srgb, var(--amber) 88%, var(--text));
+  --comp-violet: color-mix(in srgb, var(--notebook-ink-accent) 82%, var(--text));
+  --comp-violet-bright: color-mix(in srgb, var(--notebook-ink-accent) 88%, var(--text));
   --comp-cyan: color-mix(in srgb, var(--blue) 56%, var(--text));
   --comp-mint: color-mix(in srgb, var(--mint) 68%, var(--text));
 }
@@ -926,8 +955,8 @@ html[data-theme="notebook"] .app-shell .companion-workspace :is(.companion-goal-
 
 html[data-theme="notebook"] .app-shell .companion-workspace :is(.companion-goal-trigger, .companion-settings-link, .companion-icon-button):is(:hover, :focus-visible) {
   color: var(--text);
-  background: color-mix(in srgb, var(--amber-soft) 24%, transparent);
-  border-bottom-color: color-mix(in srgb, var(--amber) 52%, var(--line));
+  background: color-mix(in srgb, var(--notebook-ink-accent-soft) 24%, transparent);
+  border-bottom-color: color-mix(in srgb, var(--notebook-ink-accent) 52%, var(--line));
   outline: none;
 }
 
@@ -950,10 +979,10 @@ html[data-theme="notebook"] .app-shell .companion-workspace .companion-insight-c
 }
 
 html[data-theme="notebook"] .app-shell .companion-workspace .companion-opening-card-actions > button {
-  color: color-mix(in srgb, var(--amber) 82%, var(--text));
+  color: color-mix(in srgb, var(--notebook-ink-accent) 82%, var(--text));
   background: transparent;
   border: 0;
-  border-bottom: 1px solid color-mix(in srgb, var(--amber) 30%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--notebook-ink-accent) 30%, transparent);
   border-radius: 0;
 }
 
@@ -963,10 +992,10 @@ html[data-theme="notebook"] .app-shell .companion-workspace .companion-insight-m
 }
 
 html[data-theme="notebook"] .app-shell .companion-workspace .companion-insight-card.is-opening-card > footer > button.is-primary {
-  color: color-mix(in srgb, var(--amber) 86%, var(--text));
+  color: color-mix(in srgb, var(--notebook-ink-accent) 86%, var(--text));
   background: transparent;
   border: 0;
-  border-bottom: 1.5px solid color-mix(in srgb, var(--amber) 62%, var(--line));
+  border-bottom: 1.5px solid color-mix(in srgb, var(--notebook-ink-accent) 62%, var(--line));
   border-radius: 0;
   box-shadow: none;
 }
@@ -994,11 +1023,11 @@ html[data-theme="notebook"] .app-shell .companion-workspace :is(.companion-promp
 }
 
 html[data-theme="notebook"] .app-shell .companion-workspace .companion-prompt-chips > button::after {
-  background: color-mix(in srgb, var(--amber) 28%, transparent);
+  background: color-mix(in srgb, var(--notebook-ink-accent) 28%, transparent);
 }
 
 html[data-theme="notebook"] .app-shell .companion-workspace .companion-prompt-chips > button:hover::after {
-  background: color-mix(in srgb, var(--amber) 68%, var(--text));
+  background: color-mix(in srgb, var(--notebook-ink-accent) 68%, var(--text));
 }
 
 html[data-theme="notebook"] .app-shell .companion-workspace .companion-input-dock .companion-composer {
@@ -1013,12 +1042,12 @@ html[data-theme="notebook"] .app-shell .companion-workspace .companion-input-doc
 }
 
 html[data-theme="notebook"] .app-shell .companion-workspace .companion-input-dock .companion-composer:focus-within {
-  border-color: color-mix(in srgb, var(--amber) 56%, var(--text)) !important;
-  box-shadow: 2px 3px 0 color-mix(in srgb, var(--amber) 14%, transparent), 0 0 0 3px color-mix(in srgb, var(--amber) 9%, transparent);
+  border-color: color-mix(in srgb, var(--notebook-ink-accent) 56%, var(--text)) !important;
+  box-shadow: 2px 3px 0 color-mix(in srgb, var(--notebook-ink-accent) 14%, transparent), 0 0 0 3px color-mix(in srgb, var(--notebook-ink-accent) 9%, transparent);
 }
 
 html[data-theme="notebook"] .app-shell .companion-workspace .companion-composer-icon {
-  color: color-mix(in srgb, var(--amber) 84%, var(--text));
+  color: color-mix(in srgb, var(--notebook-ink-accent) 84%, var(--text));
   background: transparent;
   border-right: 1px solid color-mix(in srgb, var(--line) 68%, var(--text));
   border-radius: 0;
@@ -1026,8 +1055,8 @@ html[data-theme="notebook"] .app-shell .companion-workspace .companion-composer-
 
 html[data-theme="notebook"] .app-shell .companion-workspace .companion-composer-side > button:not(:disabled) {
   color: var(--surface);
-  background: color-mix(in srgb, var(--amber) 80%, var(--text));
-  border-color: color-mix(in srgb, var(--amber) 74%, var(--text));
+  background: color-mix(in srgb, var(--notebook-ink-accent) 80%, var(--text));
+  border-color: color-mix(in srgb, var(--notebook-ink-accent) 74%, var(--text));
   box-shadow: 1px 2px 0 color-mix(in srgb, var(--text) 10%, transparent);
 }
 
