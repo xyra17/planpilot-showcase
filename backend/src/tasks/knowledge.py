@@ -277,6 +277,11 @@ async def _process(item_id: str) -> None:
                 await db.commit()
                 return
 
+            # Persist extracted text before the potentially slow/optional
+            # embedding step. This keeps document previews usable even when
+            # the local embedding service is unavailable or times out.
+            await db.commit()
+
             chunks = chunk_text(item.content)
             if not chunks:
                 raise KnowledgeProcessingError("文档内容为空，无法分块")
