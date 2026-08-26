@@ -70,8 +70,8 @@
   }
 }
 
-/* New goal: reproduce the reference's spacious three-step dialog while the
- * edit form keeps the denser shared editor treatment. */
+/* New goal keeps the three-step flow inside the same compact dialog width as
+ * the shared goal editor. Do not let desktop viewport width stretch the form. */
 .app-shell .tech-goal-form-page.is-dialog.is-creating {
   z-index: 140;
   padding: 18px;
@@ -86,7 +86,7 @@ body:has(.tech-goal-form-page.is-dialog) .pp-confirm-backdrop {
 }
 
 .app-shell .tech-goal-form-page.is-dialog.is-creating .tech-goal-create-main {
-  width: min(1180px, calc(100vw - 36px));
+  width: min(720px, calc(100vw - 36px));
   height: min(624px, calc(100vh - 36px));
   max-height: calc(100vh - 36px);
   padding: 26px 36px 20px;

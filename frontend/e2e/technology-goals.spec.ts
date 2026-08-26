@@ -319,8 +319,8 @@ test("新建目标页使用统一分步表单并完成创建", async ({ page }) 
     const bounds = surface.getBoundingClientRect();
     return { width: bounds.width, height: bounds.height, minHeight: getComputedStyle(surface).minHeight };
   });
-  expect(createSurfaceGeometry.width).toBeGreaterThanOrEqual(1000);
-  expect(createSurfaceGeometry.width).toBeLessThanOrEqual(1182);
+  expect(createSurfaceGeometry.width).toBeGreaterThanOrEqual(716);
+  expect(createSurfaceGeometry.width).toBeLessThanOrEqual(722);
   expect(createSurfaceGeometry.height).toBeLessThanOrEqual(624);
   await expect(page.getByRole("heading", { name: "目标类型", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "目标名称", exact: true })).toBeVisible();
