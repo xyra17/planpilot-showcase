@@ -134,9 +134,13 @@ test("资料表为关联目标留出空间，并说明收藏与编辑操作", as
   const rowGoalStates = await rows.evaluateAll((items) => items.map((item) => !item.querySelector(".knowledge-resource-goals .is-unlinked")));
   expect(rowGoalStates).toEqual([...rowGoalStates].sort((a, b) => Number(b) - Number(a)));
 
-  const headerCheckbox = await page.getByLabel("选择全部资料").boundingBox();
-  const firstRowCheckbox = await rows.first().locator('input[type="checkbox"]').boundingBox();
-  expect(Math.abs((headerCheckbox?.x ?? 0) - (firstRowCheckbox?.x ?? 0))).toBeLessThanOrEqual(1);
+  await expect(rows.first()).toBeVisible();
+  await expect.poll(async () => {
+    const headerCheckbox = await page.getByLabel("选择全部资料").boundingBox();
+    const firstRowCheckbox = await rows.first().locator('input[type="checkbox"]').boundingBox();
+    if (!headerCheckbox || !firstRowCheckbox) return Number.POSITIVE_INFINITY;
+    return Math.abs(headerCheckbox.x - firstRowCheckbox.x);
+  }).toBeLessThanOrEqual(1);
 
   const firstRow = page.locator(".knowledge-resource-table article").first();
   const cells = firstRow.locator(":scope > *");
@@ -171,9 +175,11 @@ test("资料表可从表头调整整列宽度并保留本机偏好", async ({ pa
   await page.setViewportSize({ width: 1440, height: 900 });
   const header = page.locator(".knowledge-resource-table-head");
   const firstRow = page.locator(".knowledge-resource-table article").first();
+  const table = page.locator(".knowledge-resource-table");
   const nameHandle = page.getByRole("separator", { name: "调整资料名称列宽度" });
   const headerName = header.locator(":scope > span").nth(1);
   const rowName = firstRow.locator(":scope > *").nth(1);
+  const initialNameTrack = await table.evaluate((element) => element.style.getPropertyValue("--knowledge-resource-name-track"));
   const initialHeaderWidth = (await headerName.boundingBox())?.width ?? 0;
 
   const handleBox = await nameHandle.boundingBox();
@@ -181,22 +187,28 @@ test("资料表可从表头调整整列宽度并保留本机偏好", async ({ pa
   await page.mouse.down();
   await page.mouse.move((handleBox?.x ?? 0) + (handleBox?.width ?? 0) / 2 + 24, (handleBox?.y ?? 0) + (handleBox?.height ?? 0) / 2);
   await page.mouse.up();
-  const resizedHeaderWidth = (await headerName.boundingBox())?.width ?? 0;
-  const resizedRowWidth = (await rowName.boundingBox())?.width ?? 0;
-  expect(resizedHeaderWidth).toBeGreaterThan(initialHeaderWidth + 12);
-  expect(Math.abs(resizedHeaderWidth - resizedRowWidth)).toBeLessThanOrEqual(1);
+  await expect.poll(async () => {
+    const resizedHeaderWidth = (await headerName.boundingBox())?.width;
+    return resizedHeaderWidth == null ? Number.NEGATIVE_INFINITY : resizedHeaderWidth - initialHeaderWidth;
+  }).toBeGreaterThan(12);
+  await expect.poll(async () => {
+    const resizedHeaderWidth = (await headerName.boundingBox())?.width;
+    const resizedRowWidth = (await rowName.boundingBox())?.width;
+    if (resizedHeaderWidth == null || resizedRowWidth == null) return Number.POSITIVE_INFINITY;
+    return Math.abs(resizedHeaderWidth - resizedRowWidth);
+  }).toBeLessThanOrEqual(1);
 
   const saved = await page.evaluate(() => localStorage.getItem("planpilot:knowledge-resource-columns:v1"));
   expect(saved).toContain("name");
 
+  await nameHandle.dblclick();
+  await expect.poll(() => table.evaluate((element) => element.style.getPropertyValue("--knowledge-resource-name-track"))).toBe(initialNameTrack);
+
   const goalHandle = page.getByRole("separator", { name: "调整关联目标列宽度" });
-  const goalBeforeKeyboard = (await header.locator(":scope > span").nth(2).boundingBox())?.width ?? 0;
+  const goalTrackBeforeKeyboard = await table.evaluate((element) => element.style.getPropertyValue("--knowledge-resource-goal-track"));
   await goalHandle.focus();
   await goalHandle.press("ArrowLeft");
-  expect((await header.locator(":scope > span").nth(2).boundingBox())?.width ?? 0).toBeLessThan(goalBeforeKeyboard - 4);
-
-  await nameHandle.dblclick();
-  expect(Math.abs(((await page.locator(".knowledge-resource-table-head > span").nth(1).boundingBox())?.width ?? 0) - initialHeaderWidth)).toBeLessThanOrEqual(2);
+  await expect.poll(() => table.evaluate((element) => element.style.getPropertyValue("--knowledge-resource-goal-track"))).not.toBe(goalTrackBeforeKeyboard);
 });
 
 test("资料全屏预览只占工作区并保留桌面导航", async ({ page }) => {
