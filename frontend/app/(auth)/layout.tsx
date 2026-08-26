@@ -4,7 +4,7 @@ import { AppBrand } from "@/components/app/AppBrand";
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
-    <main className="pp-auth-shell">
+    <main className="pp-auth-shell pp-auth-native">
       <section className="pp-auth-story">
         <div className="pp-auth-ambient" aria-hidden="true" />
         <AppBrand href="/studio/work" />

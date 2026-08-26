@@ -477,7 +477,7 @@ export default function CoachPage() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [abilitiesOpen, setAbilitiesOpen] = useState(false);
   const [goalMenuOpen, setGoalMenuOpen] = useState(false);
-  const [coachTheme, setCoachTheme] = useState<"light" | "dark">("light");
+  const [coachTheme, setCoachTheme] = useState<"light" | "dark">("dark");
   const [lampPulling, setLampPulling] = useState(false);
   const [composerFocused, setComposerFocused] = useState(false);
   const [openingObservationExpanded, setOpeningObservationExpanded] = useState(true);
@@ -671,7 +671,7 @@ export default function CoachPage() {
   const archiveIsExpanded = historyArchiveExpanded || historyIsFiltering;
   useEffect(() => {
     const storedTheme = window.localStorage.getItem(COACH_THEME_STORAGE_KEY);
-    setCoachTheme(storedTheme === "dark" ? "dark" : "light");
+    setCoachTheme(storedTheme === "light" ? "light" : "dark");
     return () => {
       if (lampTimerRef.current !== undefined) window.clearTimeout(lampTimerRef.current);
     };

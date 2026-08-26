@@ -561,6 +561,116 @@ body { background: var(--pp-canvas); color: var(--pp-ink); }
   .pp-action-kpis .pp-admin-stat-card { min-height:122px; }
   .pp-action-funnel-grid { grid-template-columns:1fr; }
 }
+
+/* Authentication stays on the native appearance regardless of the saved
+ * workspace theme. The auth shell is deliberately isolated from dark-mode
+ * utility rules so returning users always see the same login experience. */
+[data-theme="dark"] .pp-auth-native {
+  --pp-canvas: #f5f7fb;
+  --pp-panel: rgba(255,255,255,.92);
+  --pp-panel-solid: #fff;
+  --pp-ink: #172033;
+  --pp-muted: #6f7888;
+  --pp-soft: #929bab;
+  --pp-line: #e7eaf0;
+  color: var(--pp-ink);
+  background: var(--pp-canvas);
+}
+
+[data-theme="dark"] .pp-auth-native .pp-auth-story {
+  color: #fff;
+  background:
+    radial-gradient(circle at 86% 8%,rgba(104,91,219,.52),transparent 38%),
+    radial-gradient(circle at 8% 92%,rgba(54,202,185,.16),transparent 34%),
+    linear-gradient(145deg,#11182c 0%,#202a4e 55%,#40368b 135%) !important;
+}
+
+[data-theme="dark"] .pp-auth-native .pp-auth-content {
+  color: var(--pp-ink);
+  background:
+    radial-gradient(circle at 92% 4%,rgba(118,99,231,.14),transparent 34%),
+    radial-gradient(circle at 4% 94%,rgba(67,202,185,.1),transparent 30%),
+    linear-gradient(145deg,#fbfcff 0%,#f5f7fb 50%,#edf0f8 100%);
+}
+
+[data-theme="dark"] .pp-auth-native .pp-auth-card {
+  color: var(--pp-ink);
+  background: #fff !important;
+  border-color: var(--pp-line) !important;
+}
+
+[data-theme="dark"] .pp-auth-native .pp-login-card {
+  background: transparent !important;
+  border: 0 !important;
+}
+
+[data-theme="dark"] .pp-auth-native .pp-auth-guest-return {
+  color: #4f42bd;
+  border-color: rgba(105,90,206,.28);
+  background: linear-gradient(135deg,rgba(242,239,255,.96),rgba(232,237,255,.82));
+  box-shadow: 0 8px 22px rgba(72,58,164,.08), inset 0 1px 0 rgba(255,255,255,.9);
+}
+
+[data-theme="dark"] .pp-auth-native .pp-auth-guest-return:hover {
+  color: #fff;
+  border-color: #5f50c9;
+  background: linear-gradient(115deg,#4c45a8,#6556d5);
+  box-shadow: 0 13px 28px rgba(82,67,189,.2);
+}
+
+[data-theme="dark"] .pp-auth-native .pp-login-pilo span {
+  color: #574ab9;
+  border-color: rgba(108,92,211,.2);
+  background: rgba(248,247,255,.9);
+}
+
+[data-theme="dark"] .pp-auth-native .pp-login-input-shell {
+  color: #7c8496;
+  border-color: rgba(190,195,211,.8);
+  background: rgba(255,255,255,.7);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.9), 0 8px 24px rgba(42,48,81,.035);
+}
+
+[data-theme="dark"] .pp-auth-native .pp-login-input-shell:hover {
+  border-color: #aaa4cf;
+  background: rgba(255,255,255,.86);
+}
+
+[data-theme="dark"] .pp-auth-native .pp-login-input-shell:focus-within {
+  border-color: var(--pp-primary);
+  background: rgba(255,255,255,.96);
+  box-shadow: 0 0 0 4px rgba(117,98,231,.11), 0 12px 30px rgba(65,52,148,.08);
+}
+
+[data-theme="dark"] .pp-auth-native input:not([type="checkbox"]),
+[data-theme="dark"] .pp-auth-native textarea {
+  color: var(--pp-ink) !important;
+  background: transparent !important;
+  border-color: var(--pp-line) !important;
+  box-shadow: none;
+}
+
+[data-theme="dark"] .pp-auth-native :is(.pp-login-heading h1, .pp-login-field > label) {
+  color: var(--pp-ink);
+}
+
+[data-theme="dark"] .pp-auth-native :is(
+  .pp-login-heading > p,
+  .pp-login-switch,
+  .pp-auth-remember,
+  .pp-auth-legal-links
+) {
+  color: var(--pp-muted);
+}
+
+[data-theme="dark"] .pp-auth-native .pp-auth-password-toggle {
+  color: var(--pp-muted);
+}
+
+[data-theme="dark"] .pp-auth-native .pp-auth-password-toggle:hover {
+  color: var(--pp-ink);
+  background: #eef0f5;
+}
 .pp-product-primary-action,
 .pp-product-secondary-action {
   display:inline-flex;

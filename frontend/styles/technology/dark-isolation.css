@@ -1,0 +1,363 @@
+/* Dark theme isolation.
+ * Geometry continues to follow the native product; this layer only replaces
+ * materials and interaction colours that would otherwise leak in as white or
+ * near-black plates from the base theme. */
+
+html[data-theme="dark"] .app-shell {
+  --dark-surface: #11192a;
+  --dark-surface-raised: #172136;
+  --dark-surface-hover: #1d2941;
+  --dark-surface-active: #26294d;
+  --dark-line: rgba(171, 186, 218, .16);
+  --dark-line-strong: rgba(171, 186, 218, .25);
+}
+
+/* Native footer geometry, with an isolated night palette. */
+html[data-theme="dark"] .app-shell .sidebar-foot {
+  padding: 8px 4px 0;
+  background: transparent !important;
+  border: 0 !important;
+}
+
+html[data-theme="dark"] .app-shell .sidebar-account-card {
+  padding: 6px;
+  background: transparent;
+  border: 0;
+  border-top: 1px solid var(--dark-line);
+  border-radius: 0;
+  box-shadow: none;
+}
+
+html[data-theme="dark"] .app-shell .sidebar-console-status {
+  display: flex;
+  height: 18px;
+  align-items: center;
+  gap: 5px;
+  padding: 0 3px 4px;
+  color: var(--workspace-tertiary);
+  background: transparent;
+  border: 0;
+  font-size: 7px;
+  font-weight: 650;
+  letter-spacing: .1em;
+}
+
+html[data-theme="dark"] .app-shell .sidebar-console-status i {
+  width: 5px;
+  height: 5px;
+  background: var(--workspace-positive);
+  border-radius: 50%;
+  box-shadow: 0 0 8px color-mix(in srgb, var(--workspace-positive) 42%, transparent);
+}
+
+html[data-theme="dark"] .app-shell .sidebar-console-status b {
+  margin-left: auto;
+  color: var(--workspace-secondary);
+  font-size: 7px;
+  font-weight: 700;
+}
+
+html[data-theme="dark"] .app-shell .sidebar-account-row {
+  display: grid;
+  min-height: 42px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 6px;
+  align-items: center;
+  padding: 5px 2px 3px;
+  background: transparent;
+}
+
+html[data-theme="dark"] .app-shell .sidebar-account-avatar {
+  width: 34px;
+  height: 34px;
+  color: var(--workspace-text);
+  background: var(--dark-surface-raised);
+  border: 1px solid var(--dark-line);
+  border-radius: 9px;
+  box-shadow: none;
+}
+
+html[data-theme="dark"] .app-shell .sidebar-account-row > div {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+  justify-items: start;
+  padding-left: 4px;
+  text-align: left;
+}
+
+html[data-theme="dark"] .app-shell .sidebar-account-row strong {
+  overflow: hidden;
+  color: var(--workspace-text);
+  font-size: 11px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+html[data-theme="dark"] .app-shell .sidebar-account-row small {
+  color: var(--workspace-tertiary);
+  font-size: 8px;
+}
+
+html[data-theme="dark"] .app-shell .sidebar-account-settings {
+  width: 30px;
+  min-width: 30px;
+  height: 30px;
+  min-height: 30px;
+  color: var(--workspace-secondary);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+}
+
+html[data-theme="dark"] .app-shell .sidebar-account-settings:hover,
+html[data-theme="dark"] .app-shell .sidebar-account-settings.is-active {
+  color: var(--workspace-text);
+  background: var(--dark-surface-hover);
+  border-color: var(--dark-line);
+}
+
+/* Knowledge navigation and table states must never inherit light cards. */
+html[data-theme="dark"] .app-shell:has(.knowledge-reference-page) {
+  --knowledge-canvas: #0b1020;
+  --knowledge-panel: #11192a;
+  --knowledge-panel-soft: #172136;
+  --knowledge-accent-soft: #25284a;
+  --knowledge-line: rgba(171, 186, 218, .15);
+  --knowledge-line-strong: rgba(171, 186, 218, .24);
+  --knowledge-text: #eef2fb;
+  --knowledge-muted: #aeb9ce;
+  --knowledge-faint: #7e8ba5;
+}
+
+html[data-theme="dark"] .knowledge-reference-page :is(
+  .knowledge-navigation > button,
+  .knowledge-scope-shortcuts > button,
+  .knowledge-goal-list > button,
+  .knowledge-library-list > button,
+  .knowledge-library-row > button:first-child,
+  .knowledge-quick-access > button,
+  .knowledge-folder-list > button
+) {
+  color: var(--knowledge-muted);
+  background: transparent;
+}
+
+html[data-theme="dark"] .knowledge-reference-page :is(
+  .knowledge-navigation > button,
+  .knowledge-scope-shortcuts > button,
+  .knowledge-goal-list > button,
+  .knowledge-library-list > button,
+  .knowledge-library-row > button:first-child,
+  .knowledge-quick-access > button,
+  .knowledge-folder-list > button
+):hover {
+  color: #d8d3ff;
+  background: #1d2941;
+}
+
+html[data-theme="dark"] .knowledge-reference-page :is(
+  .knowledge-navigation > button,
+  .knowledge-scope-shortcuts > button,
+  .knowledge-goal-list > button,
+  .knowledge-library-list > button,
+  .knowledge-library-row > button:first-child,
+  .knowledge-quick-access > button,
+  .knowledge-folder-list > button
+).is-active {
+  color: #c8c0ff;
+  background: linear-gradient(90deg, #292b55, #202943);
+  box-shadow: inset 3px 0 0 #9b8cff;
+}
+
+html[data-theme="dark"] .knowledge-reference-page :is(
+  .knowledge-navigation > button,
+  .knowledge-scope-shortcuts > button,
+  .knowledge-goal-list > button,
+  .knowledge-library-list > button,
+  .knowledge-library-row > button:first-child,
+  .knowledge-quick-access > button,
+  .knowledge-folder-list > button
+).is-active strong {
+  color: #aea4ff;
+}
+
+html[data-theme="dark"] .knowledge-reference-page .knowledge-resource-toolbar > button {
+  color: var(--knowledge-muted);
+  background: var(--knowledge-panel-soft);
+  border-color: var(--knowledge-line);
+}
+
+html[data-theme="dark"] .knowledge-reference-page .knowledge-resource-toolbar > button:hover,
+html[data-theme="dark"] .knowledge-reference-page .knowledge-resource-toolbar > button.is-active {
+  color: #d8d3ff;
+  background: var(--dark-surface-hover);
+  border-color: rgba(155, 140, 255, .4);
+}
+
+html[data-theme="dark"] .knowledge-reference-page .knowledge-resource-table-head {
+  color: var(--knowledge-muted);
+  background: linear-gradient(180deg, #182238, #151e31);
+  border-color: var(--knowledge-line-strong);
+}
+
+html[data-theme="dark"] .knowledge-reference-page .knowledge-resource-table article {
+  color: var(--knowledge-muted);
+  background: transparent;
+  border-color: var(--knowledge-line);
+}
+
+html[data-theme="dark"] .knowledge-reference-page .knowledge-resource-table article:hover,
+html[data-theme="dark"] .knowledge-reference-page .knowledge-resource-table article.is-selected {
+  background: #182238;
+}
+
+html[data-theme="dark"] .knowledge-reference-page .knowledge-resource-table article.is-selected {
+  box-shadow: inset 3px 0 0 rgba(155, 140, 255, .76);
+}
+
+html[data-theme="dark"] .knowledge-reference-page :is(
+  .knowledge-resource-identity strong,
+  .knowledge-resource-copy strong
+) {
+  color: var(--knowledge-text);
+}
+
+html[data-theme="dark"] .knowledge-reference-page .knowledge-import-menu,
+html[data-theme="dark"] .app-shell .knowledge-import-dialog {
+  color: var(--knowledge-text);
+  background: linear-gradient(155deg, #151e31, #11192a);
+  border-color: var(--knowledge-line-strong);
+  box-shadow: 0 24px 64px rgba(2, 6, 18, .46), inset 0 1px 0 rgba(255, 255, 255, .025);
+}
+
+html[data-theme="dark"] .knowledge-reference-page .knowledge-import-menu button:hover,
+html[data-theme="dark"] .knowledge-reference-page .knowledge-import-step-action:hover:not(:disabled),
+html[data-theme="dark"] .knowledge-reference-page .knowledge-import-dialog .resource-destination-group label:hover {
+  color: var(--knowledge-text);
+  background: var(--dark-surface-hover);
+}
+
+html[data-theme="dark"] .app-shell .knowledge-import-dialog > header {
+  background: rgba(17, 25, 42, .94);
+  border-bottom-color: var(--knowledge-line);
+}
+
+html[data-theme="dark"] .app-shell .knowledge-import-dialog > header button:hover:not(:disabled) {
+  color: var(--knowledge-text);
+  background: var(--dark-surface-hover);
+  border-color: var(--knowledge-line-strong);
+}
+
+html[data-theme="dark"] .knowledge-reference-page .knowledge-import-source-card,
+html[data-theme="dark"] .knowledge-reference-page .resource-import-destination-section {
+  background: var(--knowledge-panel-soft);
+  border-color: var(--knowledge-line);
+  box-shadow: none;
+}
+
+html[data-theme="dark"] .app-shell .knowledge-upload-dropzone {
+  color: var(--knowledge-text);
+  background: rgba(105, 91, 219, .055);
+  border-color: rgba(155, 140, 255, .48);
+}
+
+html[data-theme="dark"] .app-shell .knowledge-upload-dropzone:hover:not(:disabled),
+html[data-theme="dark"] .app-shell .knowledge-upload-dropzone.is-dragging {
+  background: rgba(105, 91, 219, .12);
+  border-color: #9b8cff;
+}
+
+html[data-theme="dark"] .app-shell .knowledge-import-dialog > footer.knowledge-import-footer {
+  background: #121b2d;
+  border-top-color: var(--knowledge-line);
+}
+
+/* Inputs use one continuous surface. The global legacy dark rule paints each
+ * nested control; transparent children prevent the stacked black rectangles. */
+html[data-theme="dark"] .app-shell :is(
+  .knowledge-global-query,
+  .knowledge-resource-toolbar,
+  .knowledge-url-fields,
+  .companion-composer,
+  .companion-history-search,
+  .settings-field,
+  .form-field,
+  .search-field
+) :is(input:not([type="checkbox"]):not([type="radio"]), textarea) {
+  color: var(--workspace-text) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+html[data-theme="dark"] .app-shell :is(input, textarea, select) {
+  border-color: var(--dark-line) !important;
+}
+
+html[data-theme="dark"] .app-shell :is(input, textarea, select):focus-visible {
+  border-color: color-mix(in srgb, var(--workspace-accent) 58%, var(--dark-line)) !important;
+  outline-color: color-mix(in srgb, var(--workspace-accent) 44%, transparent);
+}
+
+html[data-theme="dark"] .app-shell .companion-workspace.is-dark .companion-input-dock,
+html[data-theme="dark"] .app-shell .companion-workspace.is-dark .companion-input-dock::before {
+  background: transparent;
+}
+
+html[data-theme="dark"] .app-shell .companion-workspace.is-dark .companion-commandbar {
+  color: #eef3fb;
+  background:
+    radial-gradient(circle at 74% 4%, rgba(126, 111, 226, .1), transparent 34%),
+    linear-gradient(105deg, #18263e, #17243a 58%, #14263a);
+  border-color: rgba(139, 229, 197, .26);
+  box-shadow: 0 10px 28px rgba(2, 7, 19, .24), inset 0 1px 0 rgba(255, 255, 255, .035);
+}
+
+html[data-theme="dark"] .app-shell .companion-workspace.is-dark :is(
+  .companion-toolbar-action,
+  .companion-goal-trigger.companion-toolbar-action,
+  .companion-settings-link.companion-toolbar-action,
+  .companion-icon-button.companion-toolbar-action
+) {
+  color: #d7dfec;
+}
+
+html[data-theme="dark"] .app-shell .companion-workspace.is-dark .companion-toolbar-action > svg,
+html[data-theme="dark"] .app-shell .companion-workspace.is-dark .companion-toolbar-action .companion-goal-icon,
+html[data-theme="dark"] .app-shell .companion-workspace.is-dark .companion-toolbar-action .companion-goal-chevron {
+  color: #aea4ff;
+}
+
+html[data-theme="dark"] .app-shell .companion-workspace.is-dark .companion-goal-trigger .companion-goal-copy > small,
+html[data-theme="dark"] .app-shell .companion-workspace.is-dark .companion-brand-presence,
+html[data-theme="dark"] .app-shell .companion-workspace.is-dark .companion-brand > div > p {
+  color: #aeb9ce;
+}
+
+html[data-theme="dark"] .app-shell .companion-workspace.is-dark .companion-goal-trigger .companion-goal-copy > strong,
+html[data-theme="dark"] .app-shell .companion-workspace.is-dark .companion-brand > div > strong {
+  color: #eef3fb;
+  text-shadow: none;
+}
+
+html[data-theme="dark"] .app-shell .companion-workspace.is-dark .companion-input-dock .companion-composer {
+  background: linear-gradient(100deg, #1a2942, #18263e 56%, #16233a);
+  border-color: rgba(171, 186, 218, .22);
+  box-shadow: 0 14px 34px rgba(2, 7, 19, .25), inset 0 1px 0 rgba(255, 255, 255, .035);
+}
+
+html[data-theme="dark"] .app-shell .companion-workspace.is-dark .companion-input-dock .companion-composer::after {
+  display: none;
+}
+
+html[data-theme="dark"] .app-shell .companion-workspace.is-dark .companion-composer-icon {
+  color: #bdb5ff;
+  background: rgba(125, 109, 238, .12);
+}
+
+@media (max-width: 980px) {
+  html[data-theme="dark"] .app-shell .sidebar-foot {
+    padding: 8px 4px 0;
+  }
+}
