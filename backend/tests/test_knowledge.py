@@ -8,7 +8,8 @@ from sqlalchemy import select
 from src.core.agent_v2.registry import build_registry
 from src.core.agent_v2.schemas import ToolContext
 from src.core.embedding import EmbeddingUnavailableError
-from src.models import KnowledgeChunk, KnowledgeItem
+from src.models import KnowledgeChunk, KnowledgeItem, KnowledgeItemFileVersion
+from src.services.object_storage import get_object_storage
 
 
 async def test_upload_txt(client: AsyncClient, auth: dict):
@@ -39,7 +40,11 @@ async def test_list_files(client: AsyncClient, auth: dict):
     assert "list_test.txt" in names
 
 
-async def test_delete_file(client: AsyncClient, auth: dict):
+async def test_delete_file_cleans_source_versions_and_chunks(
+    client: AsyncClient,
+    auth: dict,
+    db,
+):
     content = b"delete me"
     r_up = await client.post(
         "/api/v1/knowledge/upload",
@@ -47,8 +52,42 @@ async def test_delete_file(client: AsyncClient, auth: dict):
         headers=auth,
     )
     item_id = r_up.json()["id"]
+    item = await db.get(KnowledgeItem, item_id)
+    assert item is not None and item.file_path
+    source_reference = item.file_path
+    storage = get_object_storage()
+    version_reference = await storage.put(
+        f"knowledge/versions/{item_id}/test.txt",
+        b"old version",
+        "text/plain",
+    )
+    db.add(
+        KnowledgeItemFileVersion(
+            item_id=item_id,
+            file_path=version_reference,
+            filename="del.txt",
+            size_bytes=11,
+        )
+    )
+    db.add(
+        KnowledgeChunk(
+            item_id=item_id,
+            chunk_index=0,
+            content="delete me",
+            start_char=0,
+            end_char=9,
+        )
+    )
+    await db.commit()
+
     r_del = await client.delete(f"/api/v1/knowledge/{item_id}", headers=auth)
     assert r_del.status_code == 204
+    assert await db.get(KnowledgeItem, item_id) is None
+    assert (
+        await db.execute(select(KnowledgeChunk).where(KnowledgeChunk.item_id == item_id))
+    ).scalar_one_or_none() is None
+    assert not await storage.exists(source_reference)
+    assert not await storage.exists(version_reference)
 
 
 async def test_delete_file_not_found(client: AsyncClient, auth: dict):

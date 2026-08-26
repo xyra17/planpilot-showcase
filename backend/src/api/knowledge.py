@@ -811,20 +811,35 @@ async def delete_item(
     ).scalar_one_or_none()
     if not item:
         raise HTTPException(404, "文件不存在")
-    storage = get_object_storage()
-    if item.file_path:
-        await storage.delete(item.file_path)
-    versions = (
-        (
-            await db.execute(
-                select(KnowledgeItemFileVersion).where(KnowledgeItemFileVersion.item_id == item.id)
+
+    async def delete_stored_assets(target: KnowledgeItem) -> None:
+        storage = get_object_storage()
+        references = {
+            reference
+            for reference in (
+                target.file_path,
+                getattr(target, "media_playback_path", None),
+                getattr(target, "media_poster_path", None),
+                getattr(target, "media_waveform_path", None),
             )
+            if reference
+        }
+        versions = (
+            (
+                await db.execute(
+                    select(KnowledgeItemFileVersion).where(
+                        KnowledgeItemFileVersion.item_id == target.id
+                    )
+                )
+            )
+            .scalars()
+            .all()
         )
-        .scalars()
-        .all()
-    )
-    for version in versions:
-        await storage.delete(version.file_path)
+        references.update(version.file_path for version in versions)
+        for reference in references:
+            await storage.delete(reference)
+
+    await delete_stored_assets(item)
     # 级联删除该笔记的专属附件
     attachments = (
         (await db.execute(select(KnowledgeItem).where(KnowledgeItem.note_id == item_id)))
@@ -832,8 +847,7 @@ async def delete_item(
         .all()
     )
     for att in attachments:
-        if att.file_path:
-            await storage.delete(att.file_path)
+        await delete_stored_assets(att)
         await db.delete(att)
     await db.delete(item)
     await db.commit()
