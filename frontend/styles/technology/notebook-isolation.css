@@ -641,6 +641,7 @@ html[data-theme="notebook"] .app-shell .companion-workspace :is(.companion-input
   box-shadow: none;
 }
 html[data-theme="notebook"] .app-shell .companion-workspace .companion-input-dock { background: transparent; border: 0; }
+html[data-theme="notebook"] .app-shell .companion-workspace .companion-chat-panel { background: transparent; }
 html[data-theme="notebook"] .app-shell .companion-workspace .companion-composer { box-shadow: var(--notebook-paper-shadow); }
 html[data-theme="notebook"] .app-shell .companion-workspace .companion-composer-icon { color: var(--amber); background: var(--surface-soft); }
 html[data-theme="notebook"] .app-shell .companion-workspace .companion-input-dock .companion-composer {
@@ -688,6 +689,24 @@ html[data-theme="notebook"] .app-shell .companion-workspace :is(.companion-setti
   border-color: color-mix(in srgb, var(--amber) 46%, var(--line));
 }
 html[data-theme="notebook"] .app-shell .companion-workspace .companion-settings-saved { color: var(--muted); }
+html[data-theme="notebook"] .app-shell .companion-workspace .companion-sidepanel:is(.is-settings, .is-context, .is-history) {
+  --coach-drawer-title: var(--text);
+  --coach-drawer-body: var(--text);
+  --coach-drawer-text: var(--text);
+  --coach-drawer-muted: var(--muted);
+  --coach-drawer-faint: color-mix(in srgb, var(--muted) 72%, var(--surface));
+  --coach-drawer-accent: color-mix(in srgb, var(--amber) 82%, var(--text));
+  --coach-drawer-accent-strong: color-mix(in srgb, var(--amber) 88%, var(--text));
+  --coach-drawer-mint: color-mix(in srgb, var(--mint) 72%, var(--text));
+  --coach-drawer-control: var(--surface-soft);
+  --coach-drawer-hover: color-mix(in srgb, var(--amber-soft) 26%, var(--surface));
+  --coach-drawer-line: var(--notebook-rule-strong);
+  --coach-drawer-line-soft: color-mix(in srgb, var(--line) 72%, var(--text));
+}
+html[data-theme="notebook"] .app-shell .companion-sidepanel:is(.is-settings, .is-context, .is-history) :is(h2, h3, strong, p, span, small, button, input, a, time) { color: var(--text); }
+html[data-theme="notebook"] .app-shell .companion-sidepanel:is(.is-settings, .is-context, .is-history) :is(p, small, .companion-panel-note, .companion-context-header > span) { color: var(--muted); }
+html[data-theme="notebook"] .app-shell .companion-sidepanel:is(.is-settings, .is-context, .is-history) :is(button, input, .companion-history-search, .companion-history-filter, .companion-history-favorites, .companion-history-period, .companion-history-archive, .companion-history-date-picker, .companion-history-group .companion-thread-item) { background: var(--surface-soft); border-color: var(--notebook-rule-strong); }
+html[data-theme="notebook"] .app-shell .companion-sidepanel:is(.is-settings, .is-context, .is-history) :is(button:hover, button:focus-visible, .companion-history-favorites:hover) { background: var(--surface); border-color: color-mix(in srgb, var(--amber) 46%, var(--line)); }
 
 /* Floating Pilo hint: one paper close control, no stacked pseudo-element tile. */
 html[data-theme="notebook"] .pilo-companion .pilo-companion__hint-dismiss { position: relative; color: var(--text); background: transparent; border: 0; box-shadow: none; }
