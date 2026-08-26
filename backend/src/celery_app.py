@@ -143,9 +143,4 @@ celery_app.conf.beat_schedule = {
         "schedule": crontab(hour=3, minute=35),
         "options": {"expires": 3600},
     },
-    "collect-orphaned-storage": {
-        "task": "src.tasks.storage_gc.collect_orphaned_storage",
-        "schedule": crontab(hour=4, minute=10),
-        "options": {"expires": 3600},
-    },
 }
