@@ -289,7 +289,7 @@ test("科技学习笔记保留完整状态与操作按钮", async ({ page }) => 
     clock: Number.parseFloat(getComputedStyle(element.querySelector("time")!).fontSize),
   }));
   expect(Math.abs(dateTypography.clock - dateTypography.date)).toBeLessThanOrEqual(0.1);
-  expect(dateTypography.date).toBe(9);
+  expect(dateTypography.date).toBe(13);
   const previewLayout = await page.locator(".note-list-preview").first().evaluate((element) => {
     const style = getComputedStyle(element);
     return {
