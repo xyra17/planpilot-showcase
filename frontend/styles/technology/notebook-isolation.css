@@ -489,9 +489,16 @@ html[data-theme="notebook"] .pilo-companion .pilo-companion__online {
 /* untouched.                                                                 */
 
 html[data-theme="notebook"] .app-shell :is(.task-priority-label, .week-focus-task-priority, .task-priority-option-copy strong) {
-  font-family: inherit;
+  font-family: "Kaiti SC", "STKaiti", "KaiTi", "Bradley Hand", "Comic Sans MS", "PingFang SC", cursive;
   font-weight: 750;
   letter-spacing: .02em;
+}
+html[data-theme="notebook"] .app-shell .task-priority-trigger {
+  color: color-mix(in srgb, var(--amber) 82%, var(--text));
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--amber) 48%, var(--line));
+  border-radius: 0;
 }
 
 html[data-theme="notebook"] .app-shell .task-priority-label,
@@ -520,6 +527,21 @@ html[data-theme="notebook"] .app-shell .dashboard-page .coach-strip-goal-advice 
   padding: 16px 20px;
   color: var(--text);
   background-color: var(--surface);
+}
+html[data-theme="notebook"][data-theme][data-theme] .app-shell .dashboard-page > .theme-lead-notebook {
+  margin-top: 4px;
+}
+html[data-theme="notebook"][data-theme][data-theme] .app-shell .dashboard-page > .coach-strip-goal-advice {
+  color: var(--text) !important;
+  background:
+    repeating-linear-gradient(0deg, transparent 0 29px, color-mix(in srgb, var(--blue) 7%, transparent) 30px),
+    var(--surface) !important;
+  border: 1.5px solid var(--notebook-rule-strong) !important;
+  outline: 1px dashed color-mix(in srgb, var(--amber) 32%, transparent);
+  outline-offset: -6px;
+  border-radius: 7px 13px 8px 11px;
+  box-shadow: var(--notebook-paper-shadow) !important;
+  clip-path: none;
 }
 
 html[data-theme="notebook"] .app-shell .coach-strip-goal-advice .coach-avatar {
@@ -601,7 +623,56 @@ html[data-theme="notebook"] .app-shell .tech-goals-page .goal-list-main > i { ba
 html[data-theme="notebook"] .app-shell .tech-goals-page .goal-list-main > i span { background: color-mix(in srgb, var(--amber) 78%, var(--text)); }
 html[data-theme="notebook"] .app-shell .tech-goals-page .goal-list-progress strong { color: color-mix(in srgb, var(--amber) 82%, var(--text)); }
 html[data-theme="notebook"] .app-shell .tech-goals-page .goal-insight-panel::before { background: var(--amber); }
-html[data-theme="notebook"] .app-shell .tech-goals-page .goal-donut { box-shadow: 0 8px 20px color-mix(in srgb, var(--amber) 13%, transparent), 0 0 0 5px color-mix(in srgb, var(--amber) 6%, transparent); }
+html[data-theme="notebook"] .app-shell .tech-goals-page .goal-donut {
+  background: conic-gradient(
+    from -90deg,
+    color-mix(in srgb, var(--amber) 78%, var(--text)) 0 var(--goal-progress-value),
+    color-mix(in srgb, var(--line) 64%, var(--surface)) var(--goal-progress-value) 100%
+  );
+  border: 1.5px solid var(--notebook-rule-strong);
+  box-shadow: 2px 3px 0 color-mix(in srgb, var(--text) 10%, transparent);
+}
+html[data-theme="notebook"] .app-shell .tech-goals-page .goal-donut::before {
+  background:
+    repeating-linear-gradient(0deg, transparent 0 18px, color-mix(in srgb, var(--blue) 7%, transparent) 19px),
+    var(--surface);
+  box-shadow: inset 0 0 0 1px var(--notebook-rule-strong);
+}
+html[data-theme="notebook"] .app-shell .tech-goals-page .goal-donut::after { display: none; }
+html[data-theme="notebook"] .app-shell .tech-goals-page .goal-donut strong {
+  color: var(--text);
+  font-family: "Iowan Old Style", "Kaiti SC", "STKaiti", "KaiTi", serif;
+  font-weight: 750;
+  text-shadow: none;
+}
+html[data-theme="notebook"] .app-shell .tech-goals-page .goal-legend > span {
+  color: var(--text);
+  background: var(--surface-soft);
+  border: 1px solid var(--notebook-rule-strong);
+  border-radius: 5px 9px 6px 8px;
+  box-shadow: none;
+}
+html[data-theme="notebook"] .app-shell .tech-goals-page .goal-legend > span:hover {
+  color: var(--text);
+  background: var(--surface);
+  border-color: color-mix(in srgb, var(--amber) 48%, var(--line));
+  box-shadow: 1px 2px 0 color-mix(in srgb, var(--text) 8%, transparent);
+  transform: none;
+}
+html[data-theme="notebook"] .app-shell .tech-goals-page .goal-legend > span > i {
+  background: color-mix(in srgb, var(--amber) 74%, var(--text));
+  border-radius: 45% 55% 52% 48%;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--amber-soft) 55%, transparent);
+}
+html[data-theme="notebook"] .app-shell .tech-goals-page .goal-legend > span[data-tone="risk"] > i { background: color-mix(in srgb, #a96532 76%, var(--text)); }
+html[data-theme="notebook"] .app-shell .tech-goals-page .goal-legend > span[data-tone="done"] > i { background: color-mix(in srgb, var(--mint) 68%, var(--text)); }
+html[data-theme="notebook"] .app-shell .tech-goals-page .goal-legend > span > strong {
+  color: var(--text);
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--amber) 42%, var(--line));
+  border-radius: 4px 7px 5px 6px;
+  font-family: "Iowan Old Style", "Kaiti SC", "STKaiti", "KaiTi", serif;
+}
 
 /* Knowledge: all table surfaces use the same paper and only the data name is left aligned. */
 html[data-theme="notebook"] .app-shell .knowledge-reference-page :is(.knowledge-library-rail, .knowledge-resource-panel, .knowledge-resource-table, .knowledge-resource-table-head, .knowledge-resource-table article, .knowledge-global-query, .knowledge-reference-switcher) {
