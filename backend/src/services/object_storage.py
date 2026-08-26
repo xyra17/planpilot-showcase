@@ -10,6 +10,8 @@ from __future__ import annotations
 import asyncio
 import re
 import shutil
+from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import AsyncIterator, Protocol
 
@@ -23,6 +25,13 @@ class ObjectStorageError(RuntimeError):
     pass
 
 
+@dataclass(frozen=True)
+class StoredObject:
+    reference: str
+    size: int
+    modified_at: datetime
+
+
 class ObjectStorage(Protocol):
     async def put(self, key: str, data: bytes, content_type: str) -> str: ...
     async def put_file(self, key: str, path: str, content_type: str) -> str: ...
@@ -34,6 +43,7 @@ class ObjectStorage(Protocol):
     async def copy(self, source: str, target_key: str) -> str: ...
     async def delete(self, reference: str) -> None: ...
     async def size(self, reference: str) -> int | None: ...
+    async def list_objects(self, prefix: str) -> list[StoredObject]: ...
     async def healthcheck(self) -> None: ...
 
 
@@ -154,6 +164,32 @@ class LocalObjectStorage:
             return (await asyncio.to_thread(self._path(reference).stat)).st_size
         except FileNotFoundError:
             return None
+
+    async def list_objects(self, prefix: str) -> list[StoredObject]:
+        normalized = _validate_key(prefix).rstrip("/")
+        base = (self.root / normalized).resolve()
+        if self.root not in base.parents and base != self.root:
+            raise ObjectStorageError("object prefix escapes storage root")
+
+        def collect() -> list[StoredObject]:
+            if not base.exists():
+                return []
+            objects: list[StoredObject] = []
+            for path in base.rglob("*"):
+                if not path.is_file() or path.name.startswith("."):
+                    continue
+                stat = path.stat()
+                key = path.relative_to(self.root).as_posix()
+                objects.append(
+                    StoredObject(
+                        reference=object_reference(key),
+                        size=stat.st_size,
+                        modified_at=datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc),
+                    )
+                )
+            return objects
+
+        return await asyncio.to_thread(collect)
 
     async def healthcheck(self) -> None:
         await asyncio.to_thread(self.root.mkdir, parents=True, exist_ok=True)
@@ -319,6 +355,31 @@ class S3ObjectStorage:
             return int(result["ContentLength"])
         except Exception:
             return None
+
+    async def list_objects(self, prefix: str) -> list[StoredObject]:
+        normalized = _validate_key(prefix).rstrip("/") + "/"
+
+        def collect() -> list[StoredObject]:
+            paginator = self.client.get_paginator("list_objects_v2")
+            objects: list[StoredObject] = []
+            for page in paginator.paginate(Bucket=self.bucket, Prefix=normalized):
+                for row in page.get("Contents", []):
+                    modified = row["LastModified"]
+                    if modified.tzinfo is None:
+                        modified = modified.replace(tzinfo=timezone.utc)
+                    objects.append(
+                        StoredObject(
+                            reference=object_reference(row["Key"]),
+                            size=int(row.get("Size", 0)),
+                            modified_at=modified.astimezone(timezone.utc),
+                        )
+                    )
+            return objects
+
+        try:
+            return await asyncio.to_thread(collect)
+        except Exception as exc:
+            raise ObjectStorageError("object listing failed") from exc
 
     async def healthcheck(self) -> None:
         try:

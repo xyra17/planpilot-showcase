@@ -3,10 +3,13 @@ import pytest
 from src.services.object_storage import (
     LocalObjectStorage,
     ObjectStorageError,
+    StoredObject,
     extension_for_reference,
     object_reference,
     reference_key,
 )
+from src.services.storage_gc_service import select_orphaned_objects
+from datetime import datetime, timedelta, timezone
 
 
 @pytest.mark.asyncio
@@ -50,3 +53,18 @@ def test_object_reference_rejects_path_traversal() -> None:
     with pytest.raises(ObjectStorageError):
         reference_key("/not-an-object")
     assert extension_for_reference("object://knowledge/file.PDF") == "pdf"
+
+
+def test_storage_gc_keeps_referenced_and_recent_objects() -> None:
+    now = datetime.now(timezone.utc)
+    objects = [
+        StoredObject("object://knowledge/keep.txt", 10, now - timedelta(days=3)),
+        StoredObject("object://knowledge/orphan.txt", 20, now - timedelta(days=3)),
+        StoredObject("object://knowledge/recent.txt", 30, now - timedelta(hours=1)),
+    ]
+    result = select_orphaned_objects(
+        objects,
+        {"object://knowledge/keep.txt"},
+        cutoff=now - timedelta(days=2),
+    )
+    assert [item.reference for item in result] == ["object://knowledge/orphan.txt"]

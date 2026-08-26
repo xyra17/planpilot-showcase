@@ -33,6 +33,7 @@ celery_app = Celery(
         "src.tasks.phase6_tasks",
         "src.tasks.privacy_tasks",
         "src.tasks.beta_readiness_tasks",
+        "src.tasks.storage_gc",
     ],
 )
 
@@ -140,6 +141,11 @@ celery_app.conf.beat_schedule = {
     "cleanup-beta-review-samples": {
         "task": "src.tasks.beta_readiness_tasks.cleanup_review_samples",
         "schedule": crontab(hour=3, minute=35),
+        "options": {"expires": 3600},
+    },
+    "collect-orphaned-storage": {
+        "task": "src.tasks.storage_gc.collect_orphaned_storage",
+        "schedule": crontab(hour=4, minute=10),
         "options": {"expires": 3600},
     },
 }
