@@ -1,0 +1,484 @@
+/* Notebook theme isolation.
+ *
+ * Domain workspaces intentionally own independent light/dark palettes. This
+ * final notebook-only layer maps those palettes back to the selected paper and
+ * ink tokens so a native violet surface cannot leak into the journal theme.
+ */
+
+html[data-theme="notebook"] .app-shell {
+  --notebook-ink: var(--text);
+  --notebook-muted-ink: var(--muted);
+  --notebook-paper-main: var(--surface);
+  --notebook-paper-soft: var(--surface-soft);
+  --notebook-paper-tint: color-mix(in srgb, var(--amber-soft) 38%, var(--surface));
+  --notebook-paper-cool: color-mix(in srgb, var(--blue-soft) 42%, var(--surface));
+  --notebook-rule-strong: color-mix(in srgb, var(--text) 28%, var(--line));
+  --notebook-ink-accent: var(--purple);
+  --notebook-paper-shadow:
+    1px 2px 0 color-mix(in srgb, var(--text) 9%, transparent),
+    0 14px 34px color-mix(in srgb, var(--text) 8%, transparent);
+}
+
+/* Shared overlays and menus are not always descendants of their workspace. */
+html[data-theme="notebook"] :is(.dialog-backdrop, .knowledge-demo-intro-backdrop, .knowledge-auth-gate-backdrop) {
+  background: color-mix(in srgb, var(--text) 31%, transparent);
+  backdrop-filter: sepia(.08) blur(3px);
+  -webkit-backdrop-filter: sepia(.08) blur(3px);
+}
+
+html[data-theme="notebook"] :is(.app-dialog, [role="dialog"]):not(.availability-time-picker) {
+  color: var(--notebook-ink, var(--text));
+}
+
+html[data-theme="notebook"] .app-shell :is(
+  .app-dialog,
+  .dropdown-menu,
+  .select-menu,
+  .command-menu,
+  .quick-task-select-menu
+) {
+  color: var(--notebook-ink);
+  background:
+    repeating-linear-gradient(0deg, transparent 0 30px, color-mix(in srgb, var(--blue) 9%, transparent) 31px),
+    var(--notebook-paper-main);
+  border-color: var(--notebook-rule-strong);
+  box-shadow: var(--notebook-paper-shadow);
+}
+
+/* Account editor is portalled to the document root and has a native-only skin. */
+html[data-theme="notebook"] .avatar-crop-overlay {
+  background: color-mix(in srgb, var(--text) 31%, transparent);
+  backdrop-filter: sepia(.08) blur(3px);
+  -webkit-backdrop-filter: sepia(.08) blur(3px);
+}
+
+html[data-theme="notebook"] .avatar-crop-dialog {
+  color: var(--text);
+  background:
+    repeating-linear-gradient(0deg, transparent 0 30px, color-mix(in srgb, var(--blue) 9%, transparent) 31px),
+    var(--surface);
+  border: 1.5px solid color-mix(in srgb, var(--line) 54%, var(--text));
+  border-radius: 8px 14px 9px 12px;
+  box-shadow: var(--notebook-paper-shadow);
+}
+
+html[data-theme="notebook"] .avatar-crop-dialog :is(
+  .avatar-crop-header p,
+  .avatar-crop-tip,
+  .avatar-crop-zoom,
+  .avatar-crop-zoom > label > span
+) {
+  color: var(--muted);
+}
+
+html[data-theme="notebook"] .avatar-crop-dialog :is(
+  .avatar-crop-header > button,
+  .avatar-crop-zoom output
+) {
+  color: var(--purple);
+}
+
+html[data-theme="notebook"] .avatar-crop-dialog .avatar-crop-zoom input {
+  accent-color: var(--purple);
+}
+
+html[data-theme="notebook"] .avatar-crop-dialog .avatar-crop-actions {
+  border-top-color: color-mix(in srgb, var(--line) 58%, var(--text));
+}
+
+html[data-theme="notebook"] .avatar-crop-dialog .avatar-crop-actions > button {
+  color: var(--text);
+  background: var(--surface-soft);
+  border-color: color-mix(in srgb, var(--line) 58%, var(--text));
+  border-radius: 7px 11px 8px 10px;
+}
+
+html[data-theme="notebook"] .avatar-crop-dialog .avatar-crop-actions > button.is-primary {
+  color: var(--surface);
+  background: color-mix(in srgb, var(--text) 88%, var(--purple));
+  border-color: var(--text);
+  box-shadow: 1px 2px 0 color-mix(in srgb, var(--text) 15%, transparent);
+}
+
+/* Knowledge owns a separate palette, including the guest experience dialog. */
+html[data-theme="notebook"] .app-shell:has(.knowledge-reference-page),
+html[data-theme="notebook"] .knowledge-reference-page {
+  --knowledge-accent: var(--purple);
+  --knowledge-accent-strong: color-mix(in srgb, var(--purple) 82%, var(--text));
+  --knowledge-accent-soft: color-mix(in srgb, var(--purple-soft) 72%, var(--surface));
+  --knowledge-canvas: var(--bg);
+  --knowledge-panel: var(--surface);
+  --knowledge-panel-soft: var(--surface-soft);
+  --knowledge-line: color-mix(in srgb, var(--line) 82%, var(--text));
+  --knowledge-line-strong: color-mix(in srgb, var(--line) 58%, var(--text));
+  --knowledge-text: var(--text);
+  --knowledge-muted: var(--muted);
+  --knowledge-faint: color-mix(in srgb, var(--muted) 76%, var(--surface));
+}
+
+html[data-theme="notebook"] .app-shell:has(.knowledge-reference-page) .app-main {
+  background:
+    linear-gradient(90deg, transparent 68px, var(--notebook-margin) 69px, transparent 70px),
+    repeating-linear-gradient(0deg, transparent 0 31px, var(--notebook-rule) 32px),
+    var(--bg);
+}
+
+html[data-theme="notebook"] .knowledge-reference-page :is(
+  .knowledge-global-query,
+  .knowledge-reference-switcher,
+  .knowledge-library-rail,
+  .knowledge-resource-panel,
+  .knowledge-resource-table,
+  .knowledge-insights-rail > section,
+  .knowledge-ai-card
+) {
+  color: var(--knowledge-text);
+  background-color: var(--knowledge-panel);
+  border-color: var(--knowledge-line-strong);
+  box-shadow: 1px 2px 0 color-mix(in srgb, var(--knowledge-text) 8%, transparent);
+}
+
+html[data-theme="notebook"] .knowledge-reference-page :is(
+  .knowledge-library-rail,
+  .knowledge-resource-panel,
+  .knowledge-resource-table
+) {
+  background-image: repeating-linear-gradient(
+    0deg,
+    transparent 0 30px,
+    color-mix(in srgb, var(--blue) 8%, transparent) 31px
+  );
+}
+
+html[data-theme="notebook"] .knowledge-reference-page :is(
+  .knowledge-primary-action,
+  .knowledge-import-primary,
+  .knowledge-guest-gate-login
+) {
+  color: var(--surface);
+  background:
+    repeating-linear-gradient(-10deg, color-mix(in srgb, white 7%, transparent) 0 5px, transparent 5px 9px),
+    color-mix(in srgb, var(--text) 88%, var(--purple));
+  border-color: var(--text);
+  box-shadow: 1px 2px 0 color-mix(in srgb, var(--text) 18%, transparent);
+}
+
+html[data-theme="notebook"] .knowledge-reference-page :is(
+  .knowledge-quiet-action,
+  .knowledge-guest-gate-register,
+  .knowledge-guest-gate-dismiss
+) {
+  color: var(--knowledge-text);
+  background: var(--knowledge-panel-soft);
+  border-color: var(--knowledge-line-strong);
+  box-shadow: none;
+}
+
+html[data-theme="notebook"] .knowledge-reference-page :is(
+  .knowledge-reference-tabs button.is-active,
+  .knowledge-library-filter.is-active,
+  .knowledge-goal-item.is-active
+) {
+  color: var(--knowledge-text);
+  background: var(--knowledge-accent-soft);
+  border-color: color-mix(in srgb, var(--knowledge-accent) 36%, var(--knowledge-line));
+}
+
+html[data-theme="notebook"] .knowledge-reference-page :is(.knowledge-demo-intro, .knowledge-auth-gate) {
+  background:
+    linear-gradient(90deg, transparent 45px, var(--notebook-margin) 46px, transparent 47px),
+    repeating-linear-gradient(0deg, transparent 0 30px, var(--notebook-rule) 31px),
+    var(--knowledge-panel);
+  border: 1.5px solid var(--knowledge-line-strong);
+  border-radius: 8px 14px 9px 12px;
+  box-shadow: var(--notebook-paper-shadow);
+}
+
+html[data-theme="notebook"] .knowledge-reference-page :is(.knowledge-demo-intro, .knowledge-auth-gate)::before {
+  position: absolute;
+  top: -12px;
+  left: 42%;
+  width: 92px;
+  height: 24px;
+  content: "";
+  background: color-mix(in srgb, var(--amber-soft) 74%, var(--surface));
+  box-shadow: 1px 2px 3px color-mix(in srgb, var(--text) 10%, transparent);
+  clip-path: polygon(3% 4%, 98% 0, 95% 94%, 0 100%);
+  opacity: .76;
+}
+
+html[data-theme="notebook"] .knowledge-reference-page :is(.knowledge-demo-intro-close, .knowledge-auth-gate-close) {
+  color: var(--knowledge-muted);
+  background: var(--knowledge-panel-soft);
+  border-color: var(--knowledge-line-strong);
+  border-radius: 8px 11px 7px 10px;
+  box-shadow: 1px 2px 0 color-mix(in srgb, var(--knowledge-text) 7%, transparent);
+}
+
+html[data-theme="notebook"] .knowledge-reference-page :is(.knowledge-demo-intro-icon, .knowledge-auth-gate-icon) {
+  color: var(--knowledge-accent);
+  background: var(--knowledge-accent-soft);
+  border-color: color-mix(in srgb, var(--knowledge-accent) 34%, var(--knowledge-line));
+  border-radius: 6px 10px 7px 9px;
+  box-shadow: none;
+}
+
+html[data-theme="notebook"] .knowledge-reference-page .knowledge-guest-gate-message {
+  color: var(--knowledge-muted);
+  background: color-mix(in srgb, var(--amber-soft) 34%, var(--knowledge-panel));
+  border-color: var(--knowledge-line-strong);
+  border-radius: 6px 11px 7px 10px;
+}
+
+/* The full Pilo workspace has its own native light palette. */
+html[data-theme="notebook"] .app-shell .companion-workspace {
+  --comp-night: var(--bg);
+  --comp-night-raised: var(--surface);
+  --comp-night-soft: var(--surface-soft);
+  --comp-violet: var(--purple);
+  --comp-violet-bright: color-mix(in srgb, var(--purple) 78%, var(--text));
+  --comp-cyan: var(--blue);
+  --comp-mint: var(--mint);
+  --comp-ink: var(--text);
+  --comp-muted: var(--muted);
+  --comp-subtle: color-mix(in srgb, var(--muted) 76%, var(--surface));
+  --comp-canvas: var(--surface);
+  --comp-panel: var(--surface);
+  --comp-panel-soft: var(--surface-soft);
+  --comp-line: color-mix(in srgb, var(--line) 82%, var(--text));
+  --comp-line-strong: color-mix(in srgb, var(--line) 58%, var(--text));
+  --comp-shadow: var(--notebook-paper-shadow);
+  color: var(--comp-ink);
+  background:
+    linear-gradient(90deg, transparent 68px, var(--notebook-margin) 69px, transparent 70px),
+    repeating-linear-gradient(0deg, transparent 0 31px, var(--notebook-rule) 32px),
+    var(--bg);
+}
+
+html[data-theme="notebook"] .app-shell .companion-workspace::before {
+  background-image: radial-gradient(color-mix(in srgb, var(--text) 13%, transparent) .7px, transparent .8px);
+  background-size: 18px 18px;
+  opacity: .18;
+  mask-image: none;
+}
+
+html[data-theme="notebook"] .app-shell .companion-workspace :is(
+  .companion-commandbar,
+  .companion-scopebar,
+  .companion-chat-panel,
+  .companion-input-dock,
+  .companion-composer
+) {
+  color: var(--comp-ink);
+  background-color: var(--comp-panel);
+  border-color: var(--comp-line-strong);
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+html[data-theme="notebook"] .app-shell .companion-workspace .companion-commandbar {
+  background:
+    repeating-linear-gradient(0deg, transparent 0 30px, color-mix(in srgb, var(--blue) 8%, transparent) 31px),
+    var(--comp-panel);
+  border-bottom: 2px solid var(--notebook-pencil);
+}
+
+html[data-theme="notebook"] .app-shell .companion-workspace :is(
+  .companion-brand-presence,
+  .companion-brand > div > p,
+  .companion-day-separator,
+  .companion-intro-copy > header > small,
+  .companion-input-note,
+  .companion-composer-side > span
+) {
+  color: var(--comp-muted);
+}
+
+html[data-theme="notebook"] .app-shell .companion-workspace :is(
+  .companion-brand > div > strong,
+  .companion-intro-copy > header > span,
+  .companion-opening-summary > h1,
+  .companion-markdown
+) {
+  color: var(--comp-ink);
+}
+
+html[data-theme="notebook"] .app-shell .companion-workspace :is(
+  .companion-goal-trigger .companion-goal-icon,
+  .companion-goal-trigger .companion-goal-copy > strong,
+  .companion-goal-trigger .companion-goal-chevron,
+  .companion-settings-link > svg,
+  .companion-icon-button > svg,
+  .companion-opening-card-header > span,
+  .companion-message-header > strong,
+  .companion-entry-context__source,
+  .companion-opening-card-actions > button,
+  .companion-message > div > footer button
+) {
+  color: var(--comp-violet);
+}
+
+html[data-theme="notebook"] .app-shell .companion-workspace :is(
+  .companion-goal-trigger,
+  .companion-settings-link,
+  .companion-icon-button,
+  .companion-prompt-chips > button,
+  .companion-more-capabilities > button,
+  .companion-evidence-button
+) {
+  color: var(--comp-ink);
+  background: var(--comp-panel-soft);
+  border-color: var(--comp-line-strong);
+  border-radius: 7px 11px 8px 10px;
+  box-shadow: 1px 2px 0 color-mix(in srgb, var(--comp-ink) 7%, transparent);
+}
+
+html[data-theme="notebook"] .app-shell .companion-workspace .companion-lamp-pull {
+  color: var(--comp-violet);
+  background: var(--comp-panel-soft);
+  border-color: var(--comp-line-strong);
+  box-shadow: 1px 2px 0 color-mix(in srgb, var(--comp-ink) 7%, transparent);
+}
+
+html[data-theme="notebook"] .app-shell .companion-workspace .companion-lamp-pull__shade,
+html[data-theme="notebook"] .app-shell .companion-workspace .companion-lamp-pull.is-light .companion-lamp-pull__shade {
+  background: color-mix(in srgb, var(--amber-soft) 58%, var(--surface));
+  border-color: color-mix(in srgb, var(--amber) 34%, var(--comp-line));
+  box-shadow: 0 5px 16px color-mix(in srgb, var(--amber) 12%, transparent);
+}
+
+html[data-theme="notebook"] .app-shell .companion-workspace .companion-lamp-pull__cord,
+html[data-theme="notebook"] .app-shell .companion-workspace .companion-lamp-pull__cord > i {
+  background-color: color-mix(in srgb, var(--text) 48%, var(--line));
+}
+
+html[data-theme="notebook"] .app-shell .companion-workspace :is(
+  .companion-insight-card.is-opening-card,
+  .companion-entry-context,
+  .companion-message > div,
+  .companion-proposal
+) {
+  color: var(--comp-ink);
+  background:
+    repeating-linear-gradient(0deg, transparent 0 30px, color-mix(in srgb, var(--blue) 8%, transparent) 31px),
+    var(--comp-panel);
+  border-color: var(--comp-line-strong);
+  border-radius: 7px 13px 8px 11px;
+  box-shadow: var(--notebook-paper-shadow);
+}
+
+html[data-theme="notebook"] .app-shell .companion-workspace .companion-message.is-user > div {
+  background: var(--notebook-paper-cool);
+}
+
+html[data-theme="notebook"] .app-shell .companion-workspace .companion-prompt-chips > button[data-prompt-kind="discuss"] > svg {
+  color: var(--comp-violet);
+}
+
+html[data-theme="notebook"] .app-shell .companion-workspace .companion-prompt-chips > button[data-prompt-kind="rhythm"] > svg {
+  color: var(--comp-cyan);
+}
+
+html[data-theme="notebook"] .app-shell .companion-workspace .companion-prompt-chips > button[data-prompt-kind="review"] > svg {
+  color: var(--comp-mint);
+}
+
+html[data-theme="notebook"] .app-shell .companion-workspace :is(
+  .companion-insight-card > footer > button.is-primary,
+  .companion-proposal > footer button.is-primary,
+  .companion-opening-card-actions > button
+) {
+  color: var(--comp-violet);
+  background: color-mix(in srgb, var(--purple-soft) 66%, var(--surface));
+  border-color: color-mix(in srgb, var(--purple) 34%, var(--comp-line));
+  box-shadow: 1px 2px 0 color-mix(in srgb, var(--comp-ink) 7%, transparent);
+}
+
+html[data-theme="notebook"] .app-shell .companion-workspace .companion-day-separator > span {
+  background: var(--bg);
+}
+
+html[data-theme="notebook"] .app-shell .companion-workspace .companion-composer textarea {
+  color: var(--comp-ink);
+  background: transparent;
+}
+
+/* The roaming companion is global and otherwise always uses its dark native skin. */
+html[data-theme="notebook"] .pilo-companion :is(.pilo-companion__hint, .pilo-companion__panel) {
+  color: var(--text);
+  background:
+    repeating-linear-gradient(0deg, transparent 0 29px, color-mix(in srgb, var(--blue) 9%, transparent) 30px),
+    var(--surface);
+  border: 1.5px solid color-mix(in srgb, var(--line) 54%, var(--text));
+  border-radius: 7px 13px 8px 11px;
+  box-shadow: var(--notebook-paper-shadow);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  scrollbar-color: color-mix(in srgb, var(--purple) 42%, transparent) transparent;
+}
+
+html[data-theme="notebook"] .pilo-companion .pilo-companion__hint-main {
+  color: var(--text);
+}
+
+html[data-theme="notebook"] .pilo-companion :is(
+  .pilo-companion__hint-source,
+  .pilo-companion__hint-main > strong,
+  .pilo-companion__panel > header > span,
+  .pilo-companion__reason-toggle
+) {
+  color: var(--purple);
+}
+
+html[data-theme="notebook"] .pilo-companion :is(
+  .pilo-companion__panel h2,
+  .pilo-companion__panel-reason > p,
+  .pilo-companion__panel > div > a
+) {
+  color: var(--text);
+}
+
+html[data-theme="notebook"] .pilo-companion :is(
+  .pilo-companion__panel > p,
+  .pilo-companion__panel-reason > small,
+  .pilo-companion__tip
+) {
+  color: var(--muted);
+}
+
+html[data-theme="notebook"] .pilo-companion :is(
+  .pilo-companion__hint-dismiss,
+  .pilo-companion__panel > header button,
+  .pilo-companion__panel > div > a
+) {
+  background: var(--surface-soft);
+  border-color: color-mix(in srgb, var(--line) 60%, var(--text));
+  box-shadow: none;
+}
+
+html[data-theme="notebook"] .pilo-companion .pilo-companion__hint-dismiss::before {
+  background: color-mix(in srgb, var(--purple-soft) 72%, var(--surface));
+  border-color: color-mix(in srgb, var(--purple) 34%, var(--line));
+  box-shadow: 1px 2px 0 color-mix(in srgb, var(--text) 7%, transparent);
+}
+
+html[data-theme="notebook"] .pilo-companion .pilo-companion__online {
+  border-color: var(--surface);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--mint) 18%, transparent);
+}
+
+@media (max-width: 760px) {
+  html[data-theme="notebook"] .knowledge-reference-page :is(.knowledge-demo-intro, .knowledge-auth-gate) {
+    background:
+      repeating-linear-gradient(0deg, transparent 0 30px, var(--notebook-rule) 31px),
+      var(--knowledge-panel);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-theme="notebook"] .knowledge-reference-page :is(.knowledge-primary-action, .knowledge-guest-gate-login),
+  html[data-theme="notebook"] .pilo-companion :is(.pilo-companion__hint, .pilo-companion__panel) {
+    transition: none;
+  }
+}

@@ -37,6 +37,63 @@ test("暗黑与手帐侧栏保持单行状态和完整账户卡片", async ({ pa
   }
 });
 
+test("手帐主题隔离知识、访客弹窗、Pilo 工作区和浮动建议", async ({ page }) => {
+  await page.setViewportSize({ width: 1200, height: 660 });
+  await page.goto("/studio/settings");
+  await page.getByRole("button", { name: /手帐纸张/ }).click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "notebook");
+
+  await page.goto("/studio/work/knowledge");
+  const knowledge = page.locator(".knowledge-reference-page");
+  await expect(knowledge).toBeVisible();
+  const knowledgePalette = await knowledge.evaluate((element) => {
+    const styles = getComputedStyle(element);
+    return {
+      accent: styles.getPropertyValue("--knowledge-accent").trim(),
+      panel: styles.getPropertyValue("--knowledge-panel").trim(),
+      text: styles.getPropertyValue("--knowledge-text").trim(),
+    };
+  });
+  expect(knowledgePalette.accent).not.toBe("#6753eb");
+  expect(knowledgePalette.panel).not.toBe("#ffffff");
+  expect(knowledgePalette.text).not.toBe("#1d2435");
+  await expect(knowledge.locator(".knowledge-import-primary")).not.toHaveCSS("background-image", /linear-gradient\(135deg, rgb\(120, 102, 242\)/);
+
+  await page.goto("/studio/work");
+  await page.evaluate(() => window.sessionStorage.removeItem("planpilot:guest-home-intro-seen:v1"));
+  await page.reload();
+  const guestDialog = page.getByRole("dialog", { name: "访客体验" });
+  await expect(guestDialog).toBeVisible();
+  expect(await guestDialog.evaluate((element) => getComputedStyle(element).backgroundImage)).toContain("repeating-linear-gradient");
+  expect(Number.parseFloat(await guestDialog.evaluate((element) => getComputedStyle(element).borderRadius))).toBeLessThan(15);
+  await guestDialog.getByRole("button", { name: "继续体验" }).click();
+
+  const hint = page.locator(".pilo-companion__hint");
+  if (await hint.isVisible()) {
+    const hintColors = await hint.evaluate((element) => ({
+      color: getComputedStyle(element).color,
+      background: getComputedStyle(element).backgroundColor,
+    }));
+    expect(hintColors.color).not.toBe("rgb(238, 242, 248)");
+    expect(hintColors.background).not.toBe("rgba(18, 28, 49, 0.94)");
+  }
+
+  await page.goto("/studio/coach");
+  const companion = page.locator(".companion-workspace");
+  await expect(companion).toBeVisible();
+  const companionPalette = await companion.evaluate((element) => {
+    const styles = getComputedStyle(element);
+    return {
+      canvas: styles.getPropertyValue("--comp-canvas").trim(),
+      ink: styles.getPropertyValue("--comp-ink").trim(),
+      backgroundImage: styles.backgroundImage,
+    };
+  });
+  expect(companionPalette.canvas).not.toBe("#f3f6fb");
+  expect(companionPalette.ink).not.toBe("#172033");
+  expect(companionPalette.backgroundImage).toContain("repeating-linear-gradient");
+});
+
 test("设置页对齐主题层级并压平学习时间编辑器", async ({ page }, testInfo) => {
   await page.goto("/studio/settings");
 
