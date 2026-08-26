@@ -482,3 +482,182 @@ html[data-theme="notebook"] .pilo-companion .pilo-companion__online {
     transition: none;
   }
 }
+
+/* -------------------------------------------------------------------------- */
+/* Notebook completion pass: keep native domain selectors inside the paper    */
+/* system. These rules intentionally stay theme-scoped so base/dark remain   */
+/* untouched.                                                                 */
+
+html[data-theme="notebook"] .app-shell :is(.task-priority-label, .week-focus-task-priority, .task-priority-option-copy strong) {
+  font-family: inherit;
+  font-weight: 750;
+  letter-spacing: .02em;
+}
+
+html[data-theme="notebook"] .app-shell .task-priority-label,
+html[data-theme="notebook"] .app-shell .week-focus-task-priority.is-medium {
+  color: color-mix(in srgb, var(--amber) 80%, var(--text));
+}
+
+html[data-theme="notebook"] .app-shell .week-focus-task-priority.is-high { color: color-mix(in srgb, #a34a3d 78%, var(--text)); }
+html[data-theme="notebook"] .app-shell .week-focus-task-priority.is-low { color: var(--muted); }
+
+/* Dashboard / week plan: paper panels, restrained bars, and stable entry copy. */
+html[data-theme="notebook"] .app-shell .dashboard-page :is(.today-panel, .rhythm-panel, .coach-strip-goal-advice),
+html[data-theme="notebook"] .app-shell .week-plan-board-redesign :is(.week-load-card, .week-risk-card, .week-agenda) {
+  background:
+    repeating-linear-gradient(0deg, transparent 0 29px, color-mix(in srgb, var(--blue) 7%, transparent) 30px),
+    var(--surface);
+  border: 1.5px solid var(--notebook-rule-strong);
+  border-radius: 7px 13px 8px 11px;
+  box-shadow: var(--notebook-paper-shadow);
+}
+
+html[data-theme="notebook"] .app-shell .dashboard-page .coach-strip-goal-advice {
+  display: grid;
+  min-height: 92px;
+  margin-top: 12px;
+  padding: 16px 20px;
+  color: var(--text);
+  background-color: var(--surface);
+}
+
+html[data-theme="notebook"] .app-shell .coach-strip-goal-advice .coach-avatar {
+  color: var(--surface);
+  background: var(--text);
+  border: 0;
+  border-radius: 7px 10px 8px 9px;
+}
+html[data-theme="notebook"] .app-shell .coach-strip-goal-advice :is(small, strong, p) { color: var(--text); }
+html[data-theme="notebook"] .app-shell .coach-strip-goal-advice small { color: color-mix(in srgb, var(--amber) 82%, var(--text)); font-weight: 750; }
+html[data-theme="notebook"] .app-shell .coach-strip-goal-advice p { color: var(--muted); }
+html[data-theme="notebook"] .app-shell .coach-strip-goal-advice a { color: color-mix(in srgb, var(--amber) 84%, var(--text)); }
+
+html[data-theme="notebook"] .app-shell .rhythm-week-entry {
+  display: inline-flex;
+  width: auto;
+  min-width: 84px;
+  max-width: 112px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding-inline: 10px;
+  white-space: nowrap;
+  word-break: keep-all;
+  color: var(--text);
+  background: var(--surface-soft);
+  border: 1px solid var(--notebook-rule-strong);
+  border-radius: 7px 10px 8px 9px;
+}
+html[data-theme="notebook"] .app-shell .rhythm-week-entry > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+html[data-theme="notebook"] .app-shell .rhythm-week-entry > svg { flex: 0 0 auto; color: var(--amber); }
+
+html[data-theme="notebook"] .app-shell .week-plan-board-redesign :is(.week-load-card, .week-risk-card, .week-agenda) {
+  color: var(--text);
+}
+html[data-theme="notebook"] .app-shell .week-plan-board-redesign .week-load-track {
+  background: color-mix(in srgb, var(--line) 62%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--text) 22%, var(--line));
+  border-radius: 5px 8px 6px 7px;
+}
+html[data-theme="notebook"] .app-shell .week-plan-board-redesign .week-load-plan-fill { background: color-mix(in srgb, var(--amber) 78%, var(--text)); }
+html[data-theme="notebook"] .app-shell .week-plan-board-redesign .week-load-complete-fill { background: color-mix(in srgb, var(--mint) 72%, var(--text)); }
+html[data-theme="notebook"] .app-shell .week-plan-board-redesign .week-load-chart > button:is(:hover, :focus-visible, .is-selected) {
+  background: color-mix(in srgb, var(--amber-soft) 34%, var(--surface));
+  outline: 1px solid color-mix(in srgb, var(--amber) 44%, var(--line));
+}
+
+/* Goals: replace the modern violet cards with paper sheets and ink accents. */
+html[data-theme="notebook"] .app-shell .tech-goals-page :is(.goals-list-panel, .goal-insight-panel, .goal-actions-panel) {
+  background:
+    repeating-linear-gradient(0deg, transparent 0 29px, color-mix(in srgb, var(--blue) 7%, transparent) 30px),
+    var(--surface);
+  border-color: var(--notebook-rule-strong);
+  border-radius: 7px 13px 8px 11px;
+  box-shadow: var(--notebook-paper-shadow);
+}
+html[data-theme="notebook"] .app-shell .tech-goals-page .filter-tabs {
+  background: var(--surface-soft);
+  border-color: var(--notebook-rule-strong);
+  border-radius: 7px 11px 8px 10px;
+}
+html[data-theme="notebook"] .app-shell .tech-goals-page .filter-tabs button { color: var(--muted); font-family: inherit; }
+html[data-theme="notebook"] .app-shell .tech-goals-page .filter-tabs button.is-active {
+  color: var(--text);
+  background: var(--surface);
+  border-color: color-mix(in srgb, var(--amber) 72%, var(--text));
+  box-shadow: 0 2px 0 color-mix(in srgb, var(--amber) 42%, transparent);
+}
+html[data-theme="notebook"] .app-shell .tech-goals-page .goal-list-row {
+  background: color-mix(in srgb, var(--surface) 92%, var(--surface-soft));
+  border-color: var(--notebook-rule-strong);
+  border-radius: 6px 11px 7px 10px;
+}
+html[data-theme="notebook"] .app-shell .tech-goals-page .goal-list-row:hover { background: var(--surface); border-color: color-mix(in srgb, var(--amber) 46%, var(--line)); }
+html[data-theme="notebook"] .app-shell .tech-goals-page :is(.goal-list-icon, .goal-list-status, .goal-legend span, .goal-milestone-switcher-trigger) { color: var(--text); background: var(--surface-soft); border-color: var(--notebook-rule-strong); }
+html[data-theme="notebook"] .app-shell .tech-goals-page .goal-list-icon :is(svg, i) { color: color-mix(in srgb, var(--amber) 82%, var(--text)); }
+html[data-theme="notebook"] .app-shell .tech-goals-page .goal-list-main > i { background: color-mix(in srgb, var(--line) 68%, var(--surface)); }
+html[data-theme="notebook"] .app-shell .tech-goals-page .goal-list-main > i span { background: color-mix(in srgb, var(--amber) 78%, var(--text)); }
+html[data-theme="notebook"] .app-shell .tech-goals-page .goal-list-progress strong { color: color-mix(in srgb, var(--amber) 82%, var(--text)); }
+html[data-theme="notebook"] .app-shell .tech-goals-page .goal-insight-panel::before { background: var(--amber); }
+html[data-theme="notebook"] .app-shell .tech-goals-page .goal-donut { box-shadow: 0 8px 20px color-mix(in srgb, var(--amber) 13%, transparent), 0 0 0 5px color-mix(in srgb, var(--amber) 6%, transparent); }
+
+/* Knowledge: all table surfaces use the same paper and only the data name is left aligned. */
+html[data-theme="notebook"] .app-shell .knowledge-reference-page :is(.knowledge-library-rail, .knowledge-resource-panel, .knowledge-resource-table, .knowledge-resource-table-head, .knowledge-resource-table article, .knowledge-global-query, .knowledge-reference-switcher) {
+  color: var(--text);
+  background-color: var(--surface);
+  border-color: var(--notebook-rule-strong);
+}
+html[data-theme="notebook"] .app-shell .knowledge-reference-page :is(.knowledge-library-rail, .knowledge-resource-panel, .knowledge-resource-table) {
+  background-image: repeating-linear-gradient(0deg, transparent 0 29px, color-mix(in srgb, var(--blue) 7%, transparent) 30px);
+}
+html[data-theme="notebook"] .app-shell .knowledge-resource-table-head { background: var(--surface-soft); font-weight: 750; text-align: center; }
+html[data-theme="notebook"] .app-shell .knowledge-resource-table-head > span { color: var(--text); text-align: center; }
+html[data-theme="notebook"] .app-shell .knowledge-resource-table article { background: transparent; text-align: center; }
+html[data-theme="notebook"] .app-shell .knowledge-resource-table article:hover { background: color-mix(in srgb, var(--amber-soft) 16%, var(--surface)); }
+html[data-theme="notebook"] .app-shell .knowledge-resource-table article > :not(.knowledge-resource-identity) { justify-self: center; text-align: center; }
+html[data-theme="notebook"] .app-shell .knowledge-resource-table :is(.knowledge-resource-identity, .knowledge-resource-identity strong, .knowledge-resource-identity small) { text-align: left; }
+html[data-theme="notebook"] .app-shell .knowledge-resource-identity strong { color: var(--text); }
+html[data-theme="notebook"] .app-shell .knowledge-resource-identity small { color: var(--muted); }
+html[data-theme="notebook"] .app-shell .knowledge-resource-table article em { color: color-mix(in srgb, var(--amber) 82%, var(--text)); background: var(--surface-soft); border: 1px solid color-mix(in srgb, var(--amber) 32%, var(--line)); }
+html[data-theme="notebook"] .app-shell .knowledge-resource-table article .knowledge-resource-goals em.is-unlinked { color: var(--muted); background: var(--surface-soft); }
+html[data-theme="notebook"] .app-shell .knowledge-reference-page :is(.knowledge-reference-tabs button.is-active, .knowledge-library-filter.is-active, .knowledge-goal-item.is-active) { color: var(--text); background: var(--surface-soft); border-color: color-mix(in srgb, var(--amber) 42%, var(--line)); }
+html[data-theme="notebook"] .app-shell .knowledge-reference-page :is(.knowledge-resource-toolbar input, .knowledge-resource-toolbar > button, select) { color: var(--text); background: var(--surface-soft); border-color: var(--notebook-rule-strong); }
+html[data-theme="notebook"] .app-shell .knowledge-reference-page .knowledge-file-glyph { color: color-mix(in srgb, var(--amber) 82%, var(--text)); background: var(--surface-soft); }
+html[data-theme="notebook"] .app-shell .knowledge-reference-page :is(.knowledge-scope-shortcuts > button.is-active, .knowledge-library-rail button.is-active) {
+  color: var(--text);
+  background: var(--surface-soft);
+  border-color: color-mix(in srgb, var(--amber) 44%, var(--line));
+  box-shadow: none;
+}
+
+/* Companion page and its drawers: remove the pale/modern inner blocks. */
+html[data-theme="notebook"] .app-shell .companion-workspace :is(.companion-input-dock, .companion-composer, .companion-prompt-chips > button, .companion-more-capabilities > button, .companion-goal-trigger, .companion-settings-link, .companion-icon-button) {
+  color: var(--text);
+  background: var(--surface);
+  border-color: var(--notebook-rule-strong);
+  border-radius: 6px 10px 7px 9px;
+  box-shadow: none;
+}
+html[data-theme="notebook"] .app-shell .companion-workspace .companion-input-dock { background: transparent; border: 0; }
+html[data-theme="notebook"] .app-shell .companion-workspace .companion-composer { box-shadow: var(--notebook-paper-shadow); }
+html[data-theme="notebook"] .app-shell .companion-workspace .companion-composer-icon { color: var(--amber); background: var(--surface-soft); }
+html[data-theme="notebook"] .app-shell .companion-workspace .companion-input-dock .companion-composer {
+  background: var(--surface) !important;
+  background-image: none !important;
+  border-color: var(--notebook-rule-strong) !important;
+}
+html[data-theme="notebook"] .app-shell .companion-workspace .companion-input-dock .companion-composer::after { display: none !important; }
+html[data-theme="notebook"] .app-shell .companion-workspace .companion-composer textarea::placeholder { color: var(--muted); opacity: 1; }
+html[data-theme="notebook"] .app-shell .companion-workspace .companion-prompt-chips > button:hover { color: var(--text); background: var(--surface-soft); border-color: color-mix(in srgb, var(--amber) 46%, var(--line)); }
+html[data-theme="notebook"] .app-shell .companion-workspace :is(.companion-context-scope, .companion-context-section > :not(.companion-context-section__toggle), .companion-context-empty, .companion-gap-card, .companion-memory-list, .companion-resource-list) { color: var(--text); background: var(--surface); border-color: var(--notebook-rule-strong); }
+html[data-theme="notebook"] .app-shell .companion-workspace .companion-context-section__toggle { color: var(--text); background: var(--surface-soft); border-color: var(--notebook-rule-strong); }
+html[data-theme="notebook"] .app-shell .companion-workspace .companion-context-section__toggle strong { color: var(--text); }
+html[data-theme="notebook"] .app-shell .companion-workspace .companion-context-section__toggle small { color: var(--muted); background: transparent; }
+html[data-theme="notebook"] .app-shell .companion-workspace :is(.companion-sidepanel, .companion-history-panel, .companion-settings-panel) { color: var(--text); background: var(--surface); border-color: var(--notebook-rule-strong); box-shadow: var(--notebook-paper-shadow); }
+
+/* Floating Pilo hint: one paper close control, no stacked pseudo-element tile. */
+html[data-theme="notebook"] .pilo-companion .pilo-companion__hint-dismiss { position: relative; color: var(--text); background: transparent; border: 0; box-shadow: none; }
+html[data-theme="notebook"] .pilo-companion .pilo-companion__hint-dismiss::before { display: none; }
+html[data-theme="notebook"] .pilo-companion .pilo-companion__hint-dismiss > svg { width: 24px; height: 24px; padding: 5px; color: var(--muted); background: var(--surface-soft); border: 1px solid var(--notebook-rule-strong); border-radius: 7px 10px 8px 9px; }
