@@ -656,6 +656,38 @@ html[data-theme="notebook"] .app-shell .companion-workspace .companion-context-s
 html[data-theme="notebook"] .app-shell .companion-workspace .companion-context-section__toggle strong { color: var(--text); }
 html[data-theme="notebook"] .app-shell .companion-workspace .companion-context-section__toggle small { color: var(--muted); background: transparent; }
 html[data-theme="notebook"] .app-shell .companion-workspace :is(.companion-sidepanel, .companion-history-panel, .companion-settings-panel) { color: var(--text); background: var(--surface); border-color: var(--notebook-rule-strong); box-shadow: var(--notebook-paper-shadow); }
+html[data-theme="notebook"] .app-shell .companion-workspace :is(.companion-sidepanel.is-settings, .companion-sidepanel.is-context, .companion-sidepanel.is-history) {
+  color: var(--text);
+  background:
+    repeating-linear-gradient(0deg, transparent 0 29px, color-mix(in srgb, var(--blue) 7%, transparent) 30px),
+    var(--surface);
+}
+html[data-theme="notebook"] .app-shell .companion-workspace .companion-settings-section__toggle {
+  color: var(--text);
+  background: var(--surface-soft);
+  border-color: var(--notebook-rule-strong);
+  border-radius: 6px 10px 7px 9px;
+}
+html[data-theme="notebook"] .app-shell .companion-workspace .companion-settings-section__toggle strong,
+html[data-theme="notebook"] .app-shell .companion-workspace .companion-settings-section__toggle small { color: var(--text); }
+html[data-theme="notebook"] .app-shell .companion-workspace .companion-settings-section__content {
+  color: var(--text);
+  background: var(--surface);
+  border-color: var(--notebook-rule-strong);
+}
+html[data-theme="notebook"] .app-shell .companion-workspace .companion-setting-options > button,
+html[data-theme="notebook"] .app-shell .companion-workspace .companion-detail-options > button,
+html[data-theme="notebook"] .app-shell .companion-workspace .companion-setting-switches > button {
+  color: var(--text);
+  background: transparent;
+  border-color: var(--notebook-rule-strong);
+}
+html[data-theme="notebook"] .app-shell .companion-workspace :is(.companion-setting-options > button.is-active, .companion-detail-options > button.is-active) {
+  color: var(--text);
+  background: var(--surface-soft);
+  border-color: color-mix(in srgb, var(--amber) 46%, var(--line));
+}
+html[data-theme="notebook"] .app-shell .companion-workspace .companion-settings-saved { color: var(--muted); }
 
 /* Floating Pilo hint: one paper close control, no stacked pseudo-element tile. */
 html[data-theme="notebook"] .pilo-companion .pilo-companion__hint-dismiss { position: relative; color: var(--text); background: transparent; border: 0; box-shadow: none; }
