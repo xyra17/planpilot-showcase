@@ -12,6 +12,294 @@ html[data-theme="dark"] .app-shell {
   --dark-line-strong: rgba(171, 186, 218, .25);
 }
 
+/* The dark dashboard reuses the native lead component and geometry. Only the
+ * material is night-specific, so switching themes cannot change information
+ * order, density, or responsive behaviour. */
+html[data-theme="dark"] .app-shell .theme-lead-tech {
+  position: relative;
+  min-width: 0;
+  min-height: 218px;
+  margin: -6px 0 12px;
+  overflow: hidden;
+  color: #f7f9ff;
+  background:
+    radial-gradient(circle at var(--tech-x, 72%) var(--tech-y, 30%), rgba(168, 159, 255, .18), transparent 22%),
+    radial-gradient(ellipse at 88% 130%, rgba(136, 233, 206, .22), transparent 46%),
+    linear-gradient(145deg, #070919 0%, #0b0e22 54%, #151737 100%);
+  border: 1px solid rgba(145, 157, 230, .24);
+  border-radius: 18px;
+  box-shadow: none;
+}
+
+html[data-theme="dark"] .app-shell .theme-lead-tech::before,
+html[data-theme="dark"] .app-shell .theme-lead-tech::after {
+  position: absolute;
+  content: "";
+  pointer-events: none;
+}
+
+html[data-theme="dark"] .app-shell .theme-lead-tech::before {
+  top: -252px;
+  right: -54px;
+  width: 520px;
+  height: 310px;
+  border: 1px solid rgba(150, 162, 255, .24);
+  border-radius: 50%;
+  transform: rotate(-8deg);
+}
+
+html[data-theme="dark"] .app-shell .theme-lead-tech::after {
+  inset: 0;
+  opacity: .18;
+  background-image: radial-gradient(circle, rgba(255, 255, 255, .54) .8px, transparent .8px);
+  background-size: 24px 24px;
+  mask-image: linear-gradient(90deg, transparent 45%, black);
+}
+
+html[data-theme="dark"] .app-shell .tech-scan {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 32%;
+  opacity: .28;
+  background: linear-gradient(90deg, transparent, rgba(118, 231, 207, .16), transparent);
+  transform: skewX(-18deg) translateX(-130%);
+}
+
+html[data-theme="dark"] .app-shell .theme-lead-copy {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  min-width: 0;
+  min-height: 112px;
+  grid-template-columns: 46px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 15px;
+  padding: 12px 24px;
+}
+
+html[data-theme="dark"] .app-shell .theme-lead-copy > div:nth-child(2) {
+  min-width: 0;
+}
+
+html[data-theme="dark"] .app-shell .theme-lead-icon {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  place-items: center;
+  color: #a9f0d8;
+  background: rgba(255, 255, 255, .08);
+  border: 1px solid rgba(255, 255, 255, .14);
+  border-radius: 12px;
+}
+
+html[data-theme="dark"] .app-shell .theme-lead-copy small {
+  color: rgba(214, 221, 255, .58);
+  font-size: 12px;
+  letter-spacing: .12em;
+}
+
+html[data-theme="dark"] .app-shell .theme-lead-copy h2 {
+  margin: 6px 0 5px;
+  color: #fbfcff;
+  font-size: 18px;
+  font-weight: 620;
+  letter-spacing: -.025em;
+}
+
+html[data-theme="dark"] .app-shell .theme-lead-insight-line {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 9px;
+}
+
+html[data-theme="dark"] .app-shell .theme-lead-insight-line p {
+  min-width: 0;
+  margin: 0;
+  color: rgba(224, 230, 255, .64);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+html[data-theme="dark"] .app-shell .theme-lead-insight-line > a {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  color: #9cefd5;
+  background: transparent;
+  border: 0;
+  font-size: 10px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+html[data-theme="dark"] .app-shell .theme-lead-actions {
+  display: flex;
+  min-width: 94px;
+  align-items: flex-end;
+  flex-direction: column;
+  gap: 8px;
+}
+
+html[data-theme="dark"] .app-shell .theme-lead-search {
+  display: inline-flex;
+  min-height: 28px;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 2px;
+  color: rgba(230, 234, 255, .74);
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  font-size: 11.5px;
+  font-weight: 620;
+}
+
+html[data-theme="dark"] .app-shell .theme-lead-search:hover,
+html[data-theme="dark"] .app-shell .theme-lead-search:focus-visible {
+  color: #fff;
+  background: transparent;
+  outline: none;
+  transform: translateX(-2px);
+}
+
+html[data-theme="dark"] .app-shell .tech-telemetry {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  padding: 13px 18px 18px;
+  border-top: 1px solid rgba(199, 207, 255, .08);
+}
+
+html[data-theme="dark"] .app-shell .tech-telemetry article {
+  display: flex;
+  min-width: 0;
+  min-height: 72px;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 12px 13px;
+  background: linear-gradient(145deg, rgba(255, 255, 255, .085), rgba(183, 195, 255, .045));
+  border: 0;
+  border-radius: 11px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .07), 0 8px 18px rgba(3, 7, 24, .12);
+}
+
+html[data-theme="dark"] .app-shell .tech-telemetry article:hover,
+html[data-theme="dark"] .app-shell .tech-telemetry article:focus-within {
+  background: linear-gradient(145deg, rgba(255, 255, 255, .12), rgba(183, 195, 255, .065));
+  transform: translateY(-2px);
+}
+
+html[data-theme="dark"] .app-shell .tech-metric-link {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 11px;
+  color: inherit;
+  outline: none;
+}
+
+html[data-theme="dark"] .app-shell .tech-metric-icon {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  place-items: center;
+  margin-right: 3px;
+  color: #a9f0d8;
+  background: rgba(255, 255, 255, .06);
+  border: 1px solid rgba(255, 255, 255, .09);
+  border-radius: 8px;
+}
+
+html[data-theme="dark"] .app-shell .tech-metric-copy {
+  display: grid;
+  min-width: 0;
+  flex: 0 1 auto;
+  align-items: baseline;
+  justify-content: start;
+  gap: 2px;
+}
+
+html[data-theme="dark"] .app-shell .tech-metric-heading {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+html[data-theme="dark"] .app-shell .tech-metric-heading > strong {
+  color: #f8f9ff;
+  font-size: 18px;
+  font-weight: 650;
+}
+
+html[data-theme="dark"] .app-shell .tech-metric-unit,
+html[data-theme="dark"] .app-shell .tech-metric-heading > span {
+  flex: 0 0 auto;
+  color: rgba(225, 231, 255, .66);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+html[data-theme="dark"] .app-shell .tech-metric-copy > small {
+  max-width: 100%;
+  overflow: hidden;
+  color: rgba(216, 223, 255, .54);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+html[data-theme="dark"] .app-shell .tech-metric-arrow {
+  flex: 0 0 auto;
+  margin-right: -3px;
+  margin-left: 1px;
+  color: rgba(225, 231, 255, .62);
+  opacity: .72;
+  transform: translateX(2px);
+}
+
+/* Native week-entry geometry fixes the dark-only vertical stacking and keeps
+ * the label inside the panel header. */
+html[data-theme="dark"] .app-shell .rhythm-week-entry {
+  display: inline-flex;
+  width: auto;
+  min-width: 81px;
+  min-height: 34px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 9px;
+  color: #f8f9ff;
+  background: linear-gradient(135deg, #171d38, #242b50);
+  border: 1px solid rgba(70, 80, 132, .78);
+  border-radius: 8px;
+  box-shadow: 0 6px 14px rgba(2, 6, 20, .28);
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+html[data-theme="dark"] .app-shell .rhythm-week-entry:hover,
+html[data-theme="dark"] .app-shell .rhythm-week-entry:focus-visible {
+  color: #fff;
+  background: linear-gradient(135deg, #202846, #303964);
+  border-color: rgba(112, 124, 191, .74);
+}
+
 /* Native footer geometry, with an isolated night palette. */
 html[data-theme="dark"] .app-shell .sidebar-foot {
   padding: 8px 4px 0;
@@ -183,6 +471,19 @@ html[data-theme="dark"] .knowledge-reference-page :is(
   color: #aea4ff;
 }
 
+html[data-theme="dark"] .knowledge-reference-page .knowledge-resource-goals em,
+html[data-theme="dark"] .knowledge-reference-page .knowledge-resource-table article .knowledge-resource-goals em {
+  color: #b7c4f4;
+  background: transparent;
+  border: 0;
+  text-shadow: none;
+}
+
+html[data-theme="dark"] .knowledge-reference-page .knowledge-resource-goals em.is-unlinked,
+html[data-theme="dark"] .knowledge-reference-page .knowledge-resource-table article .knowledge-resource-goals em.is-unlinked {
+  color: #8f9bb4;
+}
+
 html[data-theme="dark"] .knowledge-reference-page .knowledge-resource-toolbar > button {
   color: var(--knowledge-muted);
   background: var(--knowledge-panel-soft);
@@ -284,10 +585,31 @@ html[data-theme="dark"] .app-shell :is(
   .companion-history-search,
   .settings-field,
   .form-field,
-  .search-field
+  .search-field,
+  .notes-command-search,
+  .note-title-editor
 ) :is(input:not([type="checkbox"]):not([type="radio"]), textarea) {
   color: var(--workspace-text) !important;
   background: transparent !important;
+  box-shadow: none !important;
+}
+
+html[data-theme="dark"] .app-shell .tech-notes-migrated .notes-command-search,
+html[data-theme="dark"] .app-shell .tech-notes-migrated .note-title-editor {
+  background-color: transparent;
+}
+
+html[data-theme="dark"] .app-shell .tech-notes-migrated .notes-command-search {
+  background:
+    radial-gradient(circle at 12% 50%, color-mix(in srgb, var(--notes-accent) 9%, transparent), transparent 62%),
+    color-mix(in srgb, var(--notes-accent) 4%, var(--notes-panel));
+}
+
+html[data-theme="dark"] .app-shell .tech-notes-migrated .notes-command-search input,
+html[data-theme="dark"] .app-shell .tech-notes-migrated .note-title-editor .note-title-input {
+  background: transparent !important;
+  border: 0 !important;
+  outline: 0 !important;
   box-shadow: none !important;
 }
 
@@ -359,5 +681,35 @@ html[data-theme="dark"] .app-shell .companion-workspace.is-dark .companion-compo
 @media (max-width: 980px) {
   html[data-theme="dark"] .app-shell .sidebar-foot {
     padding: 8px 4px 0;
+  }
+}
+
+@media (max-width: 1180px) {
+  html[data-theme="dark"] .app-shell .theme-lead-insight-line {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  html[data-theme="dark"] .app-shell .theme-lead-insight-line p {
+    white-space: normal;
+  }
+}
+
+@media (max-width: 760px) {
+  html[data-theme="dark"] .app-shell .theme-lead-copy {
+    grid-template-columns: 46px minmax(0, 1fr);
+    padding-inline: 15px;
+  }
+
+  html[data-theme="dark"] .app-shell .theme-lead-actions {
+    grid-column: 2;
+    min-width: min(100%, 180px);
+    align-items: flex-start;
+    justify-self: start;
+  }
+
+  html[data-theme="dark"] .app-shell .tech-telemetry {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

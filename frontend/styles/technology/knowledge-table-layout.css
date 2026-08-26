@@ -1,0 +1,74 @@
+/* Shared resource-table geometry.
+ * All material themes keep the same information architecture; only their
+ * palette is allowed to vary in the theme isolation layers. */
+
+@media (min-width: 961px) {
+  .knowledge-reference-page .knowledge-resource-table-head,
+  .knowledge-reference-page .knowledge-resource-table article {
+    grid-template-columns:
+      24px
+      minmax(260px, 1.75fr)
+      minmax(126px, .75fr)
+      94px
+      48px
+      48px;
+    column-gap: 6px;
+  }
+
+  .knowledge-reference-page .knowledge-resource-table-head > span,
+  .knowledge-reference-page .knowledge-resource-table article > :is(span, time, button) {
+    min-width: 0;
+    justify-self: stretch;
+    text-align: center;
+  }
+
+  .knowledge-reference-page .knowledge-resource-name-head,
+  .knowledge-reference-page .knowledge-resource-name-head > span:first-child {
+    width: 100%;
+    text-align: center;
+  }
+
+  .knowledge-reference-page .knowledge-resource-identity {
+    width: 100%;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .knowledge-reference-page .knowledge-resource-identity > span:last-child,
+  .knowledge-reference-page .knowledge-resource-copy {
+    min-width: 0;
+    text-align: center;
+  }
+
+  .knowledge-reference-page .knowledge-resource-copy > :is(strong, small) {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .knowledge-reference-page .knowledge-resource-goals {
+    width: 100%;
+    justify-content: center;
+    padding-inline: 4px;
+    text-align: center;
+  }
+
+  .knowledge-reference-page .knowledge-resource-table article .knowledge-resource-goals em {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    font-size: 12px;
+    font-weight: 650;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .knowledge-reference-page .knowledge-row-action-cell {
+    justify-self: stretch;
+  }
+}

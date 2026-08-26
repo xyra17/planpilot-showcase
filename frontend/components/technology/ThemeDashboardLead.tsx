@@ -4,7 +4,6 @@ import Link from "next/link";
 import type { CSSProperties, PointerEvent } from "react";
 import {
   ArrowRight,
-  Command,
   type LucideIcon,
   NotebookTabs,
   ScanLine,
@@ -143,40 +142,9 @@ function NotebookLead({ data }: { data: DashboardLeadData }) {
   );
 }
 
-function DarkLead({ data }: { data: DashboardLeadData }) {
-  const { habitInsight } = data;
-  return (
-    <section className="theme-lead theme-lead-dark" aria-label="暗黑风专注控制台">
-      <div className="dark-command-head">
-        <span><i /> FOCUS ENGINE ONLINE</span>
-        <small>MODEL / LONG-TERM HABIT · REAL DATA ONLY</small>
-      </div>
-      <div className="dark-focus-grid">
-        <div className="dark-focus-primary">
-          <Command size={18} />
-          <small>LEARNER PROFILE</small>
-          <h2>{habitInsight.title}</h2>
-          <p>{habitInsight.description}</p>
-          <Link aria-label={habitInsight.actionLabel} href={habitInsight.href}>{habitInsight.actionLabel} <ArrowRight size={14} /></Link>
-        </div>
-        <div className="dark-telemetry">
-          {data.metrics.map(({ label, value, unit }) => (
-            <article key={label}>
-              <span>{label}</span>
-              <strong>{metricText(value, unit)}</strong>
-              <i />
-            </article>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
 export function ThemeDashboardLead({ data }: { data: DashboardLeadData }) {
   const { theme } = useTheme();
 
   if (theme === "notebook") return <NotebookLead data={data} />;
-  if (theme === "dark") return <DarkLead data={data} />;
   return <TechLead data={data} />;
 }

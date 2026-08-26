@@ -20,6 +20,7 @@ import "@/styles/technology/today-workspace.css";
 import "@/styles/technology/personalization-workspace.css";
 import "@/styles/technology/notebook-isolation.css";
 import "@/styles/technology/dark-isolation.css";
+import "@/styles/technology/knowledge-table-layout.css";
 import "@/styles/technology/scrollbar-visibility.css";
 
 export default function TechnologyWorkspaceLayout({
