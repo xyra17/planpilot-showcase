@@ -365,9 +365,10 @@ html[data-theme="notebook"] .app-shell .companion-workspace :is(
 
 html[data-theme="notebook"] .app-shell .companion-workspace .companion-lamp-pull {
   color: var(--comp-violet);
-  background: var(--comp-panel-soft);
-  border-color: var(--comp-line-strong);
-  box-shadow: 1px 2px 0 color-mix(in srgb, var(--comp-ink) 7%, transparent);
+  /* The pull cord is a single control; do not render a second tile behind it. */
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
 }
 
 html[data-theme="notebook"] .app-shell .companion-workspace .companion-lamp-pull__shade,
@@ -411,6 +412,14 @@ html[data-theme="notebook"] .app-shell .companion-workspace .companion-prompt-ch
 
 html[data-theme="notebook"] .app-shell .companion-workspace .companion-prompt-chips > button[data-prompt-kind="review"] > svg {
   color: var(--comp-mint);
+}
+
+/* Notebook prompt suggestions sit directly on the ruled page. The native
+ * input dock surface was leaking through as a pale rectangular block. */
+html[data-theme="notebook"] .app-shell .companion-workspace .companion-input-dock {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
 }
 
 html[data-theme="notebook"] .app-shell .companion-workspace :is(
