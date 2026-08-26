@@ -783,3 +783,260 @@ html[data-theme="notebook"] .app-shell .companion-sidepanel:is(.is-settings, .is
 html[data-theme="notebook"] .pilo-companion .pilo-companion__hint-dismiss { position: relative; color: var(--text); background: transparent; border: 0; box-shadow: none; }
 html[data-theme="notebook"] .pilo-companion .pilo-companion__hint-dismiss::before { display: none; }
 html[data-theme="notebook"] .pilo-companion .pilo-companion__hint-dismiss > svg { width: 24px; height: 24px; padding: 5px; color: var(--muted); background: var(--surface-soft); border: 1px solid var(--notebook-rule-strong); border-radius: 7px 10px 8px 9px; }
+
+/* Goal detail: keep the product structure, but make every active layer read as
+   one restrained paper workspace instead of native cards pasted on paper. */
+html[data-theme="notebook"] .app-shell .tech-goal-workspace-scope:has(.goal-detail-page) {
+  --goal-title-accent: color-mix(in srgb, var(--amber) 82%, var(--text));
+  --workspace-accent: color-mix(in srgb, var(--amber) 82%, var(--text));
+  --workspace-accent-soft: color-mix(in srgb, var(--amber-soft) 48%, var(--surface));
+}
+
+html[data-theme="notebook"] .app-shell .tech-goal-workspace-scope .goal-detail-header {
+  background:
+    repeating-linear-gradient(0deg, transparent 0 29px, color-mix(in srgb, var(--blue) 7%, transparent) 30px),
+    var(--surface);
+  border: 1.5px solid var(--notebook-rule-strong);
+  border-radius: 7px 13px 8px 11px;
+  box-shadow: 2px 3px 0 color-mix(in srgb, var(--text) 8%, transparent);
+}
+
+html[data-theme="notebook"] .app-shell .tech-goal-workspace-scope .goal-detail-title-line .goal-status {
+  color: color-mix(in srgb, var(--amber) 84%, var(--text)) !important;
+  background: color-mix(in srgb, var(--amber-soft) 38%, var(--surface)) !important;
+  border-color: color-mix(in srgb, var(--amber) 38%, var(--line));
+  border-radius: 5px 8px 6px 7px;
+}
+
+html[data-theme="notebook"] .app-shell .tech-goal-workspace-scope :is(.goal-detail-left, .goal-detail-right) {
+  background:
+    repeating-linear-gradient(0deg, transparent 0 29px, color-mix(in srgb, var(--blue) 6%, transparent) 30px),
+    var(--surface);
+  border: 1.5px solid var(--notebook-rule-strong);
+  border-radius: 7px 12px 8px 10px;
+  box-shadow: 2px 3px 0 color-mix(in srgb, var(--text) 7%, transparent);
+}
+
+html[data-theme="notebook"] .app-shell .tech-goal-workspace-scope :is(.goal-primary-tabs, .goal-right-tabs) {
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 74%, var(--text)) !important;
+}
+
+html[data-theme="notebook"] .app-shell .tech-goal-workspace-scope :is(.goal-primary-tab, .goal-right-tab) {
+  color: var(--text);
+}
+
+html[data-theme="notebook"] .app-shell .tech-goal-workspace-scope :is(.goal-primary-tab, .goal-right-tab)[aria-pressed="true"] {
+  color: color-mix(in srgb, var(--amber) 84%, var(--text));
+}
+
+html[data-theme="notebook"] .app-shell .tech-goal-workspace-scope :is(.goal-primary-tab, .goal-right-tab)[aria-pressed="true"]::after {
+  height: 2px;
+  background: color-mix(in srgb, var(--amber) 78%, var(--text));
+  border-radius: 43% 57% 46% 54%;
+  transform: rotate(-.35deg);
+}
+
+html[data-theme="notebook"] .app-shell .tech-goal-workspace-scope .goal-task-empty {
+  min-height: clamp(230px, 38vh, 350px);
+  align-content: start;
+  padding-top: clamp(70px, 11vh, 104px);
+}
+
+html[data-theme="notebook"] .app-shell .tech-goal-workspace-scope :is(.goal-task-empty-icon, .goal-execution-empty-icon) {
+  color: color-mix(in srgb, var(--amber) 84%, var(--text));
+  background: color-mix(in srgb, var(--amber-soft) 46%, var(--surface));
+  border: 1.5px solid color-mix(in srgb, var(--amber) 34%, var(--line));
+  border-radius: 46% 54% 49% 51%;
+  box-shadow: 1px 2px 0 color-mix(in srgb, var(--text) 8%, transparent);
+}
+
+html[data-theme="notebook"] .app-shell .tech-goal-workspace-scope .goal-task-empty p,
+html[data-theme="notebook"] .app-shell .tech-goal-workspace-scope .goal-execution-empty-content > p {
+  color: var(--muted);
+}
+
+html[data-theme="notebook"] .app-shell .tech-goal-workspace-scope :is(.goal-task-empty button, .goal-execution-empty-content > button) {
+  color: var(--surface);
+  background: color-mix(in srgb, var(--amber) 80%, var(--text));
+  border-color: color-mix(in srgb, var(--amber) 72%, var(--text));
+  border-radius: 6px 9px 7px 8px;
+  box-shadow: 1px 2px 0 color-mix(in srgb, var(--text) 12%, transparent);
+}
+
+html[data-theme="notebook"] .app-shell .tech-goal-workspace-scope .goal-execution-metrics {
+  background: transparent;
+  border-bottom-color: var(--notebook-rule-strong);
+}
+
+html[data-theme="notebook"] .app-shell .tech-goal-workspace-scope :is(.goal-progress-summary, .goal-execution-kpis) {
+  background: transparent;
+  border-color: var(--notebook-rule-strong);
+  box-shadow: none;
+}
+
+html[data-theme="notebook"] .app-shell .tech-goal-workspace-scope :is(.goal-progress-metric-heading > svg, .goal-execution-kpis dt > svg, .goal-execution-section-header > span > svg) {
+  color: color-mix(in srgb, var(--amber) 82%, var(--text));
+}
+
+html[data-theme="notebook"] .app-shell .tech-goal-workspace-scope .goal-execution-kpis > div {
+  background: transparent;
+  border-color: color-mix(in srgb, var(--line) 72%, var(--text));
+}
+
+html[data-theme="notebook"] .app-shell .tech-goal-workspace-scope .goal-execution-capacity-track {
+  background: color-mix(in srgb, var(--line) 42%, var(--surface));
+}
+
+html[data-theme="notebook"] .app-shell .tech-goal-workspace-scope .goal-execution-capacity-track > i {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--amber) 72%, var(--text)), color-mix(in srgb, var(--mint) 60%, var(--text)));
+}
+
+/* Companion: a broad journal entry, quiet annotations and one paper composer. */
+html[data-theme="notebook"] .app-shell .companion-workspace {
+  --comp-violet: color-mix(in srgb, var(--amber) 82%, var(--text));
+  --comp-violet-bright: color-mix(in srgb, var(--amber) 88%, var(--text));
+  --comp-cyan: color-mix(in srgb, var(--blue) 56%, var(--text));
+  --comp-mint: color-mix(in srgb, var(--mint) 68%, var(--text));
+}
+
+html[data-theme="notebook"] .app-shell .companion-workspace .companion-commandbar,
+html[data-theme="notebook"] .app-shell .companion-workspace.is-light .companion-commandbar {
+  margin: 8px 14px 0;
+  background:
+    repeating-linear-gradient(0deg, transparent 0 29px, color-mix(in srgb, var(--blue) 7%, transparent) 30px),
+    var(--surface);
+  border: 1.5px solid var(--notebook-rule-strong);
+  border-bottom-width: 2px;
+  border-radius: 7px 13px 8px 11px;
+  box-shadow: 2px 3px 0 color-mix(in srgb, var(--text) 8%, transparent);
+}
+
+html[data-theme="notebook"] .app-shell .companion-workspace .companion-commandbar::before {
+  display: none;
+}
+
+html[data-theme="notebook"] .app-shell .companion-workspace :is(.companion-goal-trigger, .companion-settings-link, .companion-icon-button) {
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+html[data-theme="notebook"] .app-shell .companion-workspace :is(.companion-goal-trigger, .companion-settings-link, .companion-icon-button):is(:hover, :focus-visible) {
+  color: var(--text);
+  background: color-mix(in srgb, var(--amber-soft) 24%, transparent);
+  border-bottom-color: color-mix(in srgb, var(--amber) 52%, var(--line));
+  outline: none;
+}
+
+html[data-theme="notebook"] .app-shell .companion-workspace .companion-feed {
+  width: min(900px, calc(100% - 40px));
+  margin-inline: auto;
+  padding-inline: 0;
+}
+
+html[data-theme="notebook"] .app-shell .companion-workspace .companion-insight-card.is-opening-card {
+  width: min(720px, 100%);
+  max-width: 720px;
+  margin-inline: auto;
+  background:
+    repeating-linear-gradient(0deg, transparent 0 29px, color-mix(in srgb, var(--blue) 7%, transparent) 30px),
+    var(--surface);
+  border: 1.5px solid var(--notebook-rule-strong);
+  border-radius: 6px 11px 7px 9px;
+  box-shadow: 2px 3px 0 color-mix(in srgb, var(--text) 8%, transparent);
+}
+
+html[data-theme="notebook"] .app-shell .companion-workspace .companion-opening-card-actions > button {
+  color: color-mix(in srgb, var(--amber) 82%, var(--text));
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--amber) 30%, transparent);
+  border-radius: 0;
+}
+
+html[data-theme="notebook"] .app-shell .companion-workspace .companion-insight-meta {
+  color: var(--muted);
+  border-color: color-mix(in srgb, var(--line) 68%, var(--text));
+}
+
+html[data-theme="notebook"] .app-shell .companion-workspace .companion-insight-card.is-opening-card > footer > button.is-primary {
+  color: color-mix(in srgb, var(--amber) 86%, var(--text));
+  background: transparent;
+  border: 0;
+  border-bottom: 1.5px solid color-mix(in srgb, var(--amber) 62%, var(--line));
+  border-radius: 0;
+  box-shadow: none;
+}
+
+html[data-theme="notebook"] .app-shell .companion-workspace .companion-input-dock {
+  width: min(900px, calc(100% - 40px));
+  margin-inline: auto;
+  padding: 10px 0 14px;
+  background: transparent;
+}
+
+html[data-theme="notebook"] .app-shell .companion-workspace .companion-prompt-chips {
+  gap: 14px;
+  padding-inline: 10px;
+}
+
+html[data-theme="notebook"] .app-shell .companion-workspace :is(.companion-prompt-chips > button, .companion-more-capabilities > button) {
+  min-height: 36px;
+  padding-inline: 2px;
+  color: var(--text);
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+html[data-theme="notebook"] .app-shell .companion-workspace .companion-prompt-chips > button::after {
+  background: color-mix(in srgb, var(--amber) 28%, transparent);
+}
+
+html[data-theme="notebook"] .app-shell .companion-workspace .companion-prompt-chips > button:hover::after {
+  background: color-mix(in srgb, var(--amber) 68%, var(--text));
+}
+
+html[data-theme="notebook"] .app-shell .companion-workspace .companion-input-dock .companion-composer {
+  min-height: 60px;
+  padding: 6px 8px;
+  background:
+    repeating-linear-gradient(0deg, transparent 0 29px, color-mix(in srgb, var(--blue) 6%, transparent) 30px),
+    var(--surface) !important;
+  border: 1.5px solid var(--notebook-rule-strong) !important;
+  border-radius: 6px 11px 7px 9px;
+  box-shadow: 2px 3px 0 color-mix(in srgb, var(--text) 8%, transparent);
+}
+
+html[data-theme="notebook"] .app-shell .companion-workspace .companion-input-dock .companion-composer:focus-within {
+  border-color: color-mix(in srgb, var(--amber) 56%, var(--text)) !important;
+  box-shadow: 2px 3px 0 color-mix(in srgb, var(--amber) 14%, transparent), 0 0 0 3px color-mix(in srgb, var(--amber) 9%, transparent);
+}
+
+html[data-theme="notebook"] .app-shell .companion-workspace .companion-composer-icon {
+  color: color-mix(in srgb, var(--amber) 84%, var(--text));
+  background: transparent;
+  border-right: 1px solid color-mix(in srgb, var(--line) 68%, var(--text));
+  border-radius: 0;
+}
+
+html[data-theme="notebook"] .app-shell .companion-workspace .companion-composer-side > button:not(:disabled) {
+  color: var(--surface);
+  background: color-mix(in srgb, var(--amber) 80%, var(--text));
+  border-color: color-mix(in srgb, var(--amber) 74%, var(--text));
+  box-shadow: 1px 2px 0 color-mix(in srgb, var(--text) 10%, transparent);
+}
+
+@media (max-width: 760px) {
+  html[data-theme="notebook"] .app-shell .companion-workspace :is(.companion-feed, .companion-input-dock) {
+    width: calc(100% - 20px);
+  }
+
+  html[data-theme="notebook"] .app-shell .companion-workspace .companion-commandbar {
+    margin-inline: 8px;
+  }
+}
