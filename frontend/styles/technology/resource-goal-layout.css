@@ -70,8 +70,12 @@
   }
 }
 
-/* New goal keeps the three-step flow inside the same compact dialog width as
- * the shared goal editor. Do not let desktop viewport width stretch the form. */
+/* Goal dialogs are centered inside the workspace to the right of the fixed
+ * navigation rail. Creation and editing share the same compact width. */
+.app-shell .tech-goal-form-page.is-dialog.is-editing .tech-goal-create-main {
+  width: min(760px, calc(100vw - 36px));
+}
+
 .app-shell .tech-goal-form-page.is-dialog.is-creating {
   z-index: 140;
   padding: 18px;
@@ -86,11 +90,22 @@ body:has(.tech-goal-form-page.is-dialog) .pp-confirm-backdrop {
 }
 
 .app-shell .tech-goal-form-page.is-dialog.is-creating .tech-goal-create-main {
-  width: min(720px, calc(100vw - 36px));
+  width: min(760px, calc(100vw - 36px));
   height: min(624px, calc(100vh - 36px));
   max-height: calc(100vh - 36px);
   padding: 26px 36px 20px;
   border-radius: 20px;
+}
+
+@media (min-width: 981px) {
+  .app-shell .tech-goal-form-page.is-dialog {
+    inset: 0 0 0 220px;
+    width: auto;
+  }
+
+  .app-shell .tech-goal-form-page.is-dialog:is(.is-creating, .is-editing) .tech-goal-create-main {
+    width: min(760px, calc(100vw - 220px - 36px));
+  }
 }
 
 .app-shell .tech-goal-form-page.is-dialog.is-creating .tech-goal-form-dialog-close {

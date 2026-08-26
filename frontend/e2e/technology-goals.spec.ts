@@ -317,10 +317,17 @@ test("新建目标页使用统一分步表单并完成创建", async ({ page }) 
   await expect(page.getByText("设置时间与计划，帮助你持续推进", { exact: true })).toHaveCount(0);
   const createSurfaceGeometry = await page.locator(".tech-goal-form-page.is-dialog .tech-goal-create-main").evaluate((surface) => {
     const bounds = surface.getBoundingClientRect();
-    return { width: bounds.width, height: bounds.height, minHeight: getComputedStyle(surface).minHeight };
+    return {
+      width: bounds.width,
+      height: bounds.height,
+      centerX: bounds.left + bounds.width / 2,
+      workspaceCenterX: 220 + (window.innerWidth - 220) / 2,
+      minHeight: getComputedStyle(surface).minHeight,
+    };
   });
-  expect(createSurfaceGeometry.width).toBeGreaterThanOrEqual(716);
-  expect(createSurfaceGeometry.width).toBeLessThanOrEqual(722);
+  expect(createSurfaceGeometry.width).toBeGreaterThanOrEqual(756);
+  expect(createSurfaceGeometry.width).toBeLessThanOrEqual(762);
+  expect(Math.abs(createSurfaceGeometry.centerX - createSurfaceGeometry.workspaceCenterX)).toBeLessThanOrEqual(1);
   expect(createSurfaceGeometry.height).toBeLessThanOrEqual(624);
   await expect(page.getByRole("heading", { name: "目标类型", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "目标名称", exact: true })).toBeVisible();
@@ -536,6 +543,17 @@ test("编辑目标复用统一目标表单", async ({ page }) => {
   const editor = page.locator(".tech-goal-form-page.is-editing");
   await expect(editor).toBeVisible();
   await expect(editor.getByRole("heading", { name: "编辑目标", exact: true })).toBeVisible();
+  const editSurfaceGeometry = await editor.locator(".tech-goal-create-main").evaluate((surface) => {
+    const bounds = surface.getBoundingClientRect();
+    return {
+      width: bounds.width,
+      centerX: bounds.left + bounds.width / 2,
+      workspaceCenterX: 220 + (window.innerWidth - 220) / 2,
+    };
+  });
+  expect(editSurfaceGeometry.width).toBeGreaterThanOrEqual(756);
+  expect(editSurfaceGeometry.width).toBeLessThanOrEqual(762);
+  expect(Math.abs(editSurfaceGeometry.centerX - editSurfaceGeometry.workspaceCenterX)).toBeLessThanOrEqual(1);
   await expect(editor.getByRole("heading", { name: "目标类型", exact: true })).toBeVisible();
   await expect(editor.getByText("如何完成目标", { exact: true })).toHaveCount(0);
   await expect(editor.getByRole("textbox", { name: "目标名称" })).toHaveValue("agent 开发");
