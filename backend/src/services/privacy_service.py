@@ -306,7 +306,18 @@ async def build_user_export(db: AsyncSession, user: User) -> dict[str, Any]:
         "tasks": [_public_row(row) for row in tasks],
         "plans": [_public_row(row) for row in plans],
         "knowledge_items": [
-            _public_row(row, omit={"file_path", "embedding"}) for row in item_rows
+            _public_row(
+                row,
+                omit={
+                    "file_path",
+                    "embedding",
+                    "media_playback_path",
+                    "media_poster_path",
+                    "media_waveform_path",
+                    "media_source_version",
+                },
+            )
+            for row in item_rows
         ],
     }
     for name, (model, omit) in owned_models.items():

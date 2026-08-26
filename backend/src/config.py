@@ -92,6 +92,8 @@ class Settings(BaseSettings):
     storage_s3_secret_key: str = ""
     storage_s3_secure: bool = True
     storage_s3_server_side_encryption: str = ""
+    media_preview_timeout_seconds: int = 600
+    media_preview_max_upload_bytes: int = 500 * 1024 * 1024
     otel_service_name: str = "planpilot-api"
     otel_exporter_otlp_endpoint: str = ""
     otel_traces_sample_ratio: float = 0.1
@@ -157,6 +159,10 @@ class Settings(BaseSettings):
             raise ValueError("S3 存储必须配置 bucket、access key 和 secret key")
         if self.storage_s3_server_side_encryption not in {"", "AES256", "aws:kms"}:
             raise ValueError("S3 服务端加密只能为空、AES256 或 aws:kms")
+        if self.media_preview_timeout_seconds < 30:
+            raise ValueError("MEDIA_PREVIEW_TIMEOUT_SECONDS 不能小于 30 秒")
+        if self.media_preview_max_upload_bytes < 20 * 1024 * 1024:
+            raise ValueError("MEDIA_PREVIEW_MAX_UPLOAD_BYTES 不能小于 20 MB")
         if not 0.0 <= self.otel_traces_sample_ratio <= 1.0:
             raise ValueError("OTEL_TRACES_SAMPLE_RATIO 必须在 0 到 1 之间")
         if self.access_token_expire_minutes < 5 or self.access_token_expire_minutes > 30:

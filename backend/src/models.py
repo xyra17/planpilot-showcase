@@ -439,6 +439,16 @@ class KnowledgeItem(Base):
     source_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     file_path: Mapped[str | None] = mapped_column(Text, nullable=True)
     file_size_bytes: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    media_preview_status: Mapped[str] = mapped_column(
+        String, default="none", server_default="none", index=True
+    )
+    media_preview_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    media_metadata: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, server_default="{}")
+    media_source_version: Mapped[str | None] = mapped_column(String, nullable=True)
+    media_playback_path: Mapped[str | None] = mapped_column(Text, nullable=True)
+    media_poster_path: Mapped[str | None] = mapped_column(Text, nullable=True)
+    media_waveform_path: Mapped[str | None] = mapped_column(Text, nullable=True)
+    media_previewed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     task_id: Mapped[str | None] = mapped_column(
         String, ForeignKey("tasks.id", ondelete="SET NULL"), nullable=True, index=True
     )

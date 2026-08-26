@@ -23,6 +23,7 @@ import {
   Link2,
   LoaderCircle,
   MessageCircle,
+  Music2,
   Maximize2,
   Minimize2,
   Pencil,
@@ -35,6 +36,7 @@ import {
   Target,
   Trash2,
   Upload,
+  Video,
   X,
 } from "lucide-react";
 import Link from "next/link";
@@ -57,6 +59,7 @@ import {
   type ApiGoal,
   type ApiKnowledgeFile,
   type ApiKnowledgeFileVersion,
+  type ApiMediaPreview,
 } from "@/lib/technology/productApi";
 import { readScopedJson, writeScopedJson } from "@/lib/technology/scopedStorage";
 import { GUEST_RESOURCES, guestApiGoals } from "@/lib/technology/guestData";
@@ -81,6 +84,24 @@ const NotionResourceEditor = dynamic(
   },
 );
 
+const PdfDocumentPreview = dynamic(
+  () => import("@/components/technology/PdfDocumentPreview").then((module) => module.PdfDocumentPreview),
+  {
+    ssr: false,
+    loading: () => <div className="pdf-preview-loading">正在准备 PDF 阅读器…</div>,
+  },
+);
+
+const ImageDocumentPreview = dynamic(
+  () => import("@/components/technology/ImageDocumentPreview").then((module) => module.ImageDocumentPreview),
+  { ssr: false },
+);
+
+const MediaDocumentPreview = dynamic(
+  () => import("@/components/technology/MediaDocumentPreview").then((module) => module.MediaDocumentPreview),
+  { ssr: false },
+);
+
 type Resource = {
   id: number | string;
   name: string;
@@ -93,8 +114,15 @@ type Resource = {
   size?: string;
   mime?: string;
   url?: string;
+  previewData?: ArrayBuffer;
   content?: string;
   contentFormat?: "plain" | "markdown" | "html";
+  mediaPreviewStatus?: ApiKnowledgeFile["mediaPreviewStatus"];
+  mediaPreviewError?: string | null;
+  mediaMetadata?: ApiKnowledgeFile["mediaMetadata"];
+  mediaHasPlayback?: boolean;
+  mediaHasPoster?: boolean;
+  mediaHasWaveform?: boolean;
   source: "sample" | "upload" | "url";
   isDemo?: boolean;
   kbId?: string;
@@ -135,6 +163,8 @@ function getFileType(file: File) {
   const extension = file.name.split(".").pop()?.toLowerCase();
   if (file.type === "application/pdf" || extension === "pdf") return "PDF";
   if (file.type.startsWith("image/")) return "图片";
+  if (file.type.startsWith("audio/") || ["mp3", "wav", "m4a", "aac", "ogg", "flac"].includes(extension ?? "")) return "音频";
+  if (file.type.startsWith("video/") || ["mp4", "webm", "mov", "m4v", "mkv"].includes(extension ?? "")) return "视频";
   if (extension === "md" || extension === "markdown") return "Markdown";
   if (file.type.startsWith("text/") || ["txt", "csv", "json", "js", "ts", "tsx", "html", "css"].includes(extension ?? "")) {
     return "文本";
@@ -152,6 +182,8 @@ function apiFileType(type: string) {
   if (normalized === "txt") return "文本";
   if (normalized === "url") return "网页";
   if (["png", "jpg", "jpeg", "gif", "webp"].includes(normalized)) return "图片";
+  if (["mp3", "wav", "m4a", "aac", "ogg", "flac"].includes(normalized)) return "音频";
+  if (["mp4", "webm", "mov", "m4v", "mkv"].includes(normalized)) return "视频";
   if (normalized === "docx" || normalized === "doc") return "Word";
   if (normalized === "excel" || normalized === "xlsx" || normalized === "csv") return "表格";
   if (normalized === "pptx" || normalized === "ppt") return "演示文稿";
@@ -194,6 +226,12 @@ function resourceFromApi(
     processingError: file.error,
     content: file.content,
     contentFormat: file.contentFormat ?? (file.type.toLowerCase() === "md" ? "markdown" : "plain"),
+    mediaPreviewStatus: file.mediaPreviewStatus,
+    mediaPreviewError: file.mediaPreviewError,
+    mediaMetadata: file.mediaMetadata,
+    mediaHasPlayback: file.mediaHasPlayback,
+    mediaHasPoster: file.mediaHasPoster,
+    mediaHasWaveform: file.mediaHasWaveform,
   };
 }
 
@@ -204,7 +242,7 @@ function formatSize(bytes: number) {
 }
 
 const SUPPORTED_UPLOAD_EXTENSIONS = new Set([
-  "pdf", "png", "jpg", "jpeg", "webp", "gif", "md", "markdown", "txt", "csv", "json", "docx", "xlsx", "pptx",
+  "pdf", "png", "jpg", "jpeg", "webp", "gif", "mp3", "wav", "m4a", "aac", "ogg", "flac", "mp4", "webm", "mov", "m4v", "mkv", "md", "markdown", "txt", "csv", "json", "docx", "xlsx", "pptx",
 ]);
 
 function uploadFileKey(file: File) {
@@ -217,6 +255,11 @@ function validateUploadFile(file: File) {
     return "暂不支持这种文件格式";
   }
   if (file.size === 0) return "文件内容为空";
+  const mediaFile = file.type.startsWith("audio/")
+    || file.type.startsWith("video/")
+    || ["mp3", "wav", "m4a", "aac", "ogg", "flac", "mp4", "webm", "mov", "m4v", "mkv"].includes(extension);
+  const maxBytes = mediaFile ? 500 * 1024 * 1024 : 20 * 1024 * 1024;
+  if (file.size > maxBytes) return `文件不能超过 ${mediaFile ? 500 : 20} MB`;
   return "";
 }
 
@@ -226,6 +269,10 @@ function isTextResource(resource: Resource) {
 
 function isMarkdownResource(resource: Resource) {
   return resource.type === "Markdown" || resource.contentFormat === "markdown";
+}
+
+function isMediaResource(resource: Resource) {
+  return resource.type === "音频" || resource.type === "视频";
 }
 
 function resourceToEditingDraft(resource: Resource): Resource {
@@ -269,6 +316,8 @@ function MarkdownPreview({ content }: { content: string }) {
 
 function ResourceGlyph({ type }: { type: string }) {
   if (type === "图片") return <FileImage size={17} />;
+  if (type === "音频") return <Music2 size={17} />;
+  if (type === "视频") return <Video size={17} />;
   if (type === "Markdown" || type === "文本" || type === "笔记") return <FilePenLine size={17} />;
   if (type === "网页") return <Globe2 size={17} />;
   return <FileText size={17} />;
@@ -562,6 +611,19 @@ export default function KnowledgePage() {
     || sortMode !== "newest"
     || Boolean(query.trim());
 
+  const applyMediaPreview = useCallback((id: Resource["id"], preview: ApiMediaPreview) => {
+    const patch = {
+      mediaPreviewStatus: preview.status,
+      mediaPreviewError: preview.error,
+      mediaMetadata: preview.metadata,
+      mediaHasPlayback: preview.hasPlayback,
+      mediaHasPoster: preview.hasPoster,
+      mediaHasWaveform: preview.hasWaveform,
+    };
+    setFiles((current) => current.map((file) => file.id === id ? { ...file, ...patch } : file));
+    setDraft((current) => current?.id === id ? { ...current, ...patch } : current);
+  }, []);
+
   useEffect(() => {
     signalPiloContext({ kind: "scope", surface: "knowledge", itemCount: files.length });
   }, [files.length]);
@@ -623,16 +685,75 @@ export default function KnowledgePage() {
     return () => { cancelled = true; };
   }, [authStatus]);
 
+  // File parsing/embedding runs asynchronously. Keep the list (and an open
+  // preview) in sync until every queued item reaches a terminal state.
   useEffect(() => {
-    if (authStatus !== "authenticated" || !selected || typeof selected.id !== "string" || selected.source !== "upload" || selected.url) return;
+    if (authStatus !== "authenticated" || !files.some((file) => ["queued", "parsing", "embedding", "processing"].includes(file.processingStatus ?? ""))) return;
+    let cancelled = false;
+    let timer: number | undefined;
+    const poll = async () => {
+      try {
+        const latest = await productApi.listKnowledgeFiles();
+        if (cancelled) return;
+        const byId = new Map(latest.map((item) => [item.id, item]));
+        setFiles((current) => current.map((file) => {
+          const item = byId.get(String(file.id));
+          if (!item) return file;
+          return {
+            ...file,
+            content: item.content,
+            contentFormat: item.contentFormat ?? file.contentFormat,
+            processingStatus: item.status,
+            processingError: item.error,
+            status: item.status === "ready" ? "可用于 AI" : "处理中",
+            summary: item.summary || file.summary,
+          };
+        }));
+        setDraft((current) => {
+          if (!current) return current;
+          const item = byId.get(String(current.id));
+          if (!item) return current;
+          return {
+            ...current,
+            content: item.content,
+            contentFormat: item.contentFormat ?? current.contentFormat,
+            processingStatus: item.status,
+            processingError: item.error,
+            status: item.status === "ready" ? "可用于 AI" : "处理中",
+            summary: item.summary || current.summary,
+          };
+        });
+        if (latest.some((item) => ["queued", "parsing", "embedding", "processing"].includes(item.status))) {
+          timer = window.setTimeout(() => void poll(), 2000);
+        }
+      } catch {
+        if (!cancelled) timer = window.setTimeout(() => void poll(), 3000);
+      }
+    };
+    timer = window.setTimeout(() => void poll(), 1200);
+    return () => {
+      cancelled = true;
+      if (timer) window.clearTimeout(timer);
+    };
+  }, [authStatus, files]);
+
+  useEffect(() => {
+    if (authStatus !== "authenticated" || !selected || typeof selected.id !== "string" || selected.source !== "upload" || selected.url || isMediaResource(selected)) return;
     let cancelled = false;
     setPreviewLoading(true);
-    void productApi.fetchKnowledgeFile(selected.id).then((blob) => {
+    void productApi.fetchKnowledgeFile(selected.id).then(async (blob) => {
       if (cancelled) return;
       const url = URL.createObjectURL(blob);
       objectUrls.current.push(url);
-      setFiles((current) => current.map((file) => file.id === selected.id ? { ...file, url } : file));
-      setDraft((current) => current?.id === selected.id ? { ...current, url } : current);
+      if (selected.type === "PDF") {
+        const previewData = await blob.arrayBuffer();
+        if (cancelled) return;
+        setFiles((current) => current.map((file) => file.id === selected.id ? { ...file, url, previewData } : file));
+        setDraft((current) => current?.id === selected.id ? { ...current, url, previewData } : current);
+      } else {
+        setFiles((current) => current.map((file) => file.id === selected.id ? { ...file, url } : file));
+        setDraft((current) => current?.id === selected.id ? { ...current, url } : current);
+      }
     }).catch((reason) => {
       if (!cancelled) setDataError(reason instanceof Error ? reason.message : "文件预览加载失败");
     }).finally(() => {
@@ -640,6 +761,35 @@ export default function KnowledgePage() {
     });
     return () => { cancelled = true; };
   }, [authStatus, selected]);
+
+  useEffect(() => {
+    if (
+      authStatus !== "authenticated"
+      || !selected
+      || typeof selected.id !== "string"
+      || !isMediaResource(selected)
+      || !["queued", "processing"].includes(selected.mediaPreviewStatus ?? "none")
+    ) return;
+    let cancelled = false;
+    let timer: number | undefined;
+    const poll = async () => {
+      try {
+        const preview = await productApi.getMediaPreview(String(selected.id));
+        if (cancelled) return;
+        applyMediaPreview(selected.id, preview);
+        if (preview.status === "queued" || preview.status === "processing") {
+          timer = window.setTimeout(() => void poll(), 2000);
+        }
+      } catch (reason) {
+        if (!cancelled) setDataError(reason instanceof Error ? reason.message : "媒体预览状态读取失败");
+      }
+    };
+    void poll();
+    return () => {
+      cancelled = true;
+      if (timer) window.clearTimeout(timer);
+    };
+  }, [applyMediaPreview, authStatus, selected]);
 
   useEffect(() => {
     try {
@@ -955,6 +1105,10 @@ export default function KnowledgePage() {
     let generatedUrl = "";
     let filename = resource.name;
 
+    if (!url && isMediaResource(resource) && typeof resource.id === "string") {
+      url = productApi.mediaAssetUrl(resource.id, "source");
+    }
+
     if (isTextResource(resource)) {
       const content = resource.content || resource.summary || "";
       const mime = resource.contentFormat === "html"
@@ -1010,7 +1164,7 @@ export default function KnowledgePage() {
 
   function openLocalEditFlow() {
     if (!selected || typeof selected.id !== "string" || selected.source !== "upload") return;
-    if (!selected.url) {
+    if (!selected.url && !isMediaResource(selected)) {
       setToast("原文件仍在加载，请稍后再试");
       return;
     }
@@ -1028,7 +1182,7 @@ export default function KnowledgePage() {
       applyUpdatedApiResource(updated);
       await loadFileVersions(selected.id);
       setLocalEditOpen(false);
-      setToast("修改版已上传，正在重新解析和建立索引");
+      setToast(isMediaResource(selected) ? "修改版已上传，正在重新生成媒体预览" : "修改版已上传，正在重新解析和建立索引");
     } catch (reason) {
       setDataError(reason instanceof Error ? reason.message : "修改版上传失败");
     } finally {
@@ -1406,7 +1560,7 @@ export default function KnowledgePage() {
   }
 
   function renderPreview(resource: Resource) {
-    if (previewLoading && resource.source === "upload" && !resource.url) {
+    if (previewLoading && resource.source === "upload" && !resource.url && !isMediaResource(resource)) {
       return <div className="document-preview-loading"><RefreshCw size={20} /> 正在加载原文件…</div>;
     }
     if (resource.contentFormat === "html") {
@@ -1428,12 +1582,30 @@ export default function KnowledgePage() {
       );
     }
     if (resource.type === "图片" && resource.url) {
-      // Object URLs and authenticated attachments cannot be optimized by next/image.
-      // eslint-disable-next-line @next/next/no-img-element
-      return <img className="image-document-preview" src={resource.url} alt={resource.name} />;
+      return <ImageDocumentPreview src={resource.url} name={resource.name} />;
     }
-    if (resource.type === "PDF" && resource.url) {
-      return <iframe className="pdf-document-preview" src={resource.url} title={`${resource.name} 预览`} />;
+    if (resource.type === "PDF" && resource.previewData) {
+      return <PdfDocumentPreview data={resource.previewData} name={resource.name} />;
+    }
+    if (isMediaResource(resource) && typeof resource.id === "string") {
+      const mediaId = String(resource.id);
+      const ready = resource.mediaPreviewStatus === "ready";
+      return (
+        <MediaDocumentPreview
+          name={resource.name}
+          kind={resource.type === "音频" ? "audio" : "video"}
+          status={resource.mediaPreviewStatus ?? "none"}
+          error={resource.mediaPreviewError}
+          metadata={resource.mediaMetadata ?? {}}
+          playbackUrl={ready && resource.mediaHasPlayback ? productApi.mediaAssetUrl(mediaId, "playback") : ""}
+          posterUrl={ready && resource.mediaHasPoster ? productApi.mediaAssetUrl(mediaId, "poster") : undefined}
+          waveformUrl={ready && resource.mediaHasWaveform ? productApi.mediaAssetUrl(mediaId, "waveform") : undefined}
+          onRetry={async () => {
+            const preview = await productApi.retryMediaPreview(mediaId);
+            applyMediaPreview(resource.id, preview);
+          }}
+        />
+      );
     }
     if (["Word", "表格", "演示文稿"].includes(resource.type)) {
       const lines = (resource.content || "").split(/\r?\n/).filter(Boolean);
@@ -1500,7 +1672,7 @@ export default function KnowledgePage() {
             </button>
             {importMenuOpen && (
               <div className="knowledge-import-menu">
-                <button type="button" onClick={() => openImport("upload")}><Upload size={16} /><span><strong>上传文件</strong><small>PDF、图片与办公文档</small></span></button>
+                <button type="button" onClick={() => openImport("upload")}><Upload size={16} /><span><strong>上传文件</strong><small>文档、图片与音视频</small></span></button>
                 <button type="button" onClick={() => openImport("url")}><Link2 size={16} /><span><strong>导入网址</strong><small>保存并索引网页内容</small></span></button>
               </div>
             )}
@@ -1827,14 +1999,14 @@ export default function KnowledgePage() {
               >
                 <span><CloudUpload size={28} /></span>
                 <strong>{uploadQueue.length ? "继续添加文件" : "拖入文件，或从设备选择"}</strong>
-                <small>PDF、图片、Markdown、文本及常用办公文件 · 支持多选</small>
+                <small>文档与图片单个不超过 20 MB，音视频不超过 500 MB · 支持多选</small>
               </button>
               <input
                 ref={fileInputRef}
                 className="visually-hidden"
                 type="file"
                 multiple
-                accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,.md,.markdown,.txt,.csv,.json,.docx,.xlsx,.pptx,text/*,image/*,application/pdf"
+                accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,.mp3,.wav,.m4a,.aac,.ogg,.flac,.mp4,.webm,.mov,.m4v,.mkv,.md,.markdown,.txt,.csv,.json,.docx,.xlsx,.pptx,text/*,image/*,audio/*,video/*,application/pdf"
                 onChange={(event) => {
                   if (event.target.files?.length) queueFiles(event.target.files);
                   event.target.value = "";
@@ -2017,7 +2189,7 @@ export default function KnowledgePage() {
                 </div>
               </div>
               <div className="document-actions">
-                {(isTextResource(selected) || (selected.url && selected.source === "upload")) && (
+                {(isTextResource(selected) || isMediaResource(selected) || (selected.url && selected.source === "upload")) && (
                   <button
                     type="button"
                     className="document-download-action"
@@ -2039,7 +2211,7 @@ export default function KnowledgePage() {
                 </button>
                 {!editing && isTextResource(selected) && <button type="button" className="drawer-edit-action" onClick={startEditingResource}><Pencil size={15} /> 编辑</button>}
                 {!editing && !isTextResource(selected) && authStatus === "authenticated" && selected.source === "upload" && (
-                  <button type="button" className="document-local-edit-action" onClick={openLocalEditFlow} disabled={!selected.url || previewLoading}><FolderInput size={15} /> 本地编辑</button>
+                  <button type="button" className="document-local-edit-action" onClick={openLocalEditFlow} disabled={(!selected.url && !isMediaResource(selected)) || previewLoading}><FolderInput size={15} /> 本地编辑</button>
                 )}
                 {!editing && !isTextResource(selected) && !(authStatus === "authenticated" && selected.source === "upload") && <span className="document-edit-unavailable">此格式暂不支持在线编辑</span>}
                 <button

@@ -17,7 +17,16 @@ async def test_local_object_storage_crud_and_copy(tmp_path) -> None:
     assert reference == "object://knowledge/user/file.txt"
     assert await storage.exists(reference)
     assert await storage.read(reference) == b"hello"
+    assert await storage.read_range(reference, 1, 3) == b"ell"
+    chunks = [chunk async for chunk in storage.iter_chunks(reference, 2)]
+    assert chunks == [b"he", b"ll", b"o"]
     assert await storage.size(reference) == 5
+    source = tmp_path / "source.bin"
+    source.write_bytes(b"streamed")
+    streamed = await storage.put_file("knowledge/user/streamed.bin", str(source), "application/octet-stream")
+    target = tmp_path / "download.bin"
+    await storage.download_to_file(streamed, str(target))
+    assert target.read_bytes() == b"streamed"
     copied = await storage.copy(reference, "knowledge/versions/copy.txt")
     assert await storage.read(copied) == b"hello"
     await storage.delete(reference)

@@ -455,7 +455,7 @@ function RichTextToolbar({
     setHighlightMenuPosition(null);
   }
 
-  const toolbarEnd = (
+  const toolbarEnd = modeOptions.length === 1 ? end : (
     <div className="notion-toolbar-end">
       <div ref={viewSwitchRef} className={`notion-view-switch ${viewSwitchCollapsed ? "is-collapsed" : ""}`} aria-label="文档编辑模式">
         <button

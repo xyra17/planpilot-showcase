@@ -27,6 +27,57 @@ async def test_upload_txt(client: AsyncClient, auth: dict):
     return data["id"]
 
 
+async def test_pdf_is_served_inline_with_preview_mime(client: AsyncClient, auth: dict):
+    uploaded = await client.post(
+        "/api/v1/knowledge/upload",
+        files={"file": ("preview.pdf", io.BytesIO(b"%PDF-1.4\n%%EOF"), "application/pdf")},
+        headers=auth,
+    )
+    assert uploaded.status_code == 200
+
+    served = await client.get(
+        f"/api/v1/knowledge/files/{uploaded.json()['id']}/serve",
+        headers=auth,
+    )
+    assert served.status_code == 200
+    assert served.headers["content-type"] == "application/pdf"
+    assert served.headers["content-disposition"].startswith("inline;")
+    assert served.headers["x-content-type-options"] == "nosniff"
+
+
+async def test_media_upload_queues_preview_and_supports_byte_ranges(
+    client: AsyncClient,
+    auth: dict,
+):
+    uploaded = await client.post(
+        "/api/v1/knowledge/upload",
+        files={"file": ("lesson.mp3", io.BytesIO(b"0123456789"), "audio/mpeg")},
+        headers=auth,
+    )
+    assert uploaded.status_code == 200
+    payload = uploaded.json()
+    assert payload["type"] == "mp3"
+    assert payload["mediaPreviewStatus"] == "queued"
+    assert payload["mediaMetadata"] == {}
+
+    served = await client.get(
+        f"/api/v1/knowledge/files/{payload['id']}/serve",
+        headers={**auth, "Range": "bytes=2-5"},
+    )
+    assert served.status_code == 206
+    assert served.content == b"2345"
+    assert served.headers["content-range"] == "bytes 2-5/10"
+    assert served.headers["accept-ranges"] == "bytes"
+    assert served.headers["content-type"] == "audio/mpeg"
+
+    status = await client.get(
+        f"/api/v1/knowledge/files/{payload['id']}/media-preview",
+        headers=auth,
+    )
+    assert status.status_code == 200
+    assert status.json()["status"] == "queued"
+
+
 async def test_list_files(client: AsyncClient, auth: dict):
     content = b"test content"
     await client.post(
@@ -219,6 +270,9 @@ async def test_replace_and_restore_file_preserves_associations(
         headers=auth,
     )
     assert served_replacement.content == replacement_bytes
+    assert served_replacement.headers["content-type"] == "image/png"
+    assert served_replacement.headers["content-disposition"].startswith("inline;")
+    assert served_replacement.headers["x-content-type-options"] == "nosniff"
 
     versions = await client.get(
         f"/api/v1/knowledge/files/{item_id}/versions",

@@ -496,6 +496,13 @@ async def delete_me(
         for version in versions:
             await storage.delete(version.file_path)
     for item in knowledge_items:
+        for preview_reference in (
+            item.media_playback_path,
+            item.media_poster_path,
+            item.media_waveform_path,
+        ):
+            if preview_reference:
+                await storage.delete(preview_reference)
         if item.file_path:
             await storage.delete(item.file_path)
         await db.delete(item)

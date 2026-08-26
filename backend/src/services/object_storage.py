@@ -9,8 +9,9 @@ from __future__ import annotations
 
 import asyncio
 import re
+import shutil
 from pathlib import Path
-from typing import Protocol
+from typing import AsyncIterator, Protocol
 
 from src.config import settings
 
@@ -24,7 +25,11 @@ class ObjectStorageError(RuntimeError):
 
 class ObjectStorage(Protocol):
     async def put(self, key: str, data: bytes, content_type: str) -> str: ...
+    async def put_file(self, key: str, path: str, content_type: str) -> str: ...
     async def read(self, reference: str) -> bytes: ...
+    async def read_range(self, reference: str, start: int, end: int) -> bytes: ...
+    async def download_to_file(self, reference: str, path: str) -> None: ...
+    def iter_chunks(self, reference: str, chunk_size: int = 1024 * 1024) -> AsyncIterator[bytes]: ...
     async def exists(self, reference: str) -> bool: ...
     async def copy(self, source: str, target_key: str) -> str: ...
     async def delete(self, reference: str) -> None: ...
@@ -82,11 +87,58 @@ class LocalObjectStorage:
         await asyncio.to_thread(write)
         return reference
 
+    async def put_file(self, key: str, path: str, content_type: str) -> str:
+        del content_type
+        reference = object_reference(key)
+        target = self._path(reference)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        temporary = target.with_name(f".{target.name}.tmp")
+
+        def copy() -> None:
+            shutil.copyfile(path, temporary)
+            temporary.replace(target)
+
+        await asyncio.to_thread(copy)
+        return reference
+
     async def read(self, reference: str) -> bytes:
         try:
             return await asyncio.to_thread(self._path(reference).read_bytes)
         except FileNotFoundError as exc:
             raise ObjectStorageError("object not found") from exc
+
+    async def read_range(self, reference: str, start: int, end: int) -> bytes:
+        if start < 0 or end < start:
+            raise ObjectStorageError("invalid byte range")
+
+        def read() -> bytes:
+            with self._path(reference).open("rb") as handle:
+                handle.seek(start)
+                return handle.read(end - start + 1)
+
+        try:
+            return await asyncio.to_thread(read)
+        except FileNotFoundError as exc:
+            raise ObjectStorageError("object not found") from exc
+
+    async def download_to_file(self, reference: str, path: str) -> None:
+        try:
+            await asyncio.to_thread(shutil.copyfile, self._path(reference), path)
+        except FileNotFoundError as exc:
+            raise ObjectStorageError("object not found") from exc
+
+    async def iter_chunks(
+        self, reference: str, chunk_size: int = 1024 * 1024
+    ) -> AsyncIterator[bytes]:
+        try:
+            handle = await asyncio.to_thread(self._path(reference).open, "rb")
+        except FileNotFoundError as exc:
+            raise ObjectStorageError("object not found") from exc
+        try:
+            while chunk := await asyncio.to_thread(handle.read, chunk_size):
+                yield chunk
+        finally:
+            await asyncio.to_thread(handle.close)
 
     async def exists(self, reference: str) -> bool:
         return await asyncio.to_thread(self._path(reference).is_file)
@@ -138,6 +190,23 @@ class S3ObjectStorage:
             raise ObjectStorageError("object write failed") from exc
         return object_reference(normalized)
 
+    async def put_file(self, key: str, path: str, content_type: str) -> str:
+        normalized = _validate_key(key)
+        options: dict[str, str] = {"ContentType": content_type or "application/octet-stream"}
+        if settings.storage_s3_server_side_encryption:
+            options["ServerSideEncryption"] = settings.storage_s3_server_side_encryption
+        try:
+            await asyncio.to_thread(
+                self.client.upload_file,
+                path,
+                self.bucket,
+                normalized,
+                ExtraArgs=options,
+            )
+        except Exception as exc:
+            raise ObjectStorageError("object write failed") from exc
+        return object_reference(normalized)
+
     async def read(self, reference: str) -> bytes:
         if not reference.startswith(OBJECT_PREFIX):
             return await self.legacy.read(reference)
@@ -146,6 +215,56 @@ class S3ObjectStorage:
                 self.client.get_object, Bucket=self.bucket, Key=reference_key(reference)
             )
             return await asyncio.to_thread(response["Body"].read)
+        except Exception as exc:
+            raise ObjectStorageError("object read failed") from exc
+
+    async def read_range(self, reference: str, start: int, end: int) -> bytes:
+        if not reference.startswith(OBJECT_PREFIX):
+            return await self.legacy.read_range(reference, start, end)
+        if start < 0 or end < start:
+            raise ObjectStorageError("invalid byte range")
+        try:
+            response = await asyncio.to_thread(
+                self.client.get_object,
+                Bucket=self.bucket,
+                Key=reference_key(reference),
+                Range=f"bytes={start}-{end}",
+            )
+            return await asyncio.to_thread(response["Body"].read)
+        except Exception as exc:
+            raise ObjectStorageError("object read failed") from exc
+
+    async def download_to_file(self, reference: str, path: str) -> None:
+        if not reference.startswith(OBJECT_PREFIX):
+            await self.legacy.download_to_file(reference, path)
+            return
+        try:
+            await asyncio.to_thread(
+                self.client.download_file,
+                self.bucket,
+                reference_key(reference),
+                path,
+            )
+        except Exception as exc:
+            raise ObjectStorageError("object read failed") from exc
+
+    async def iter_chunks(
+        self, reference: str, chunk_size: int = 1024 * 1024
+    ) -> AsyncIterator[bytes]:
+        if not reference.startswith(OBJECT_PREFIX):
+            async for chunk in self.legacy.iter_chunks(reference, chunk_size):
+                yield chunk
+            return
+        try:
+            response = await asyncio.to_thread(
+                self.client.get_object, Bucket=self.bucket, Key=reference_key(reference)
+            )
+            body = response["Body"]
+            try:
+                while chunk := await asyncio.to_thread(body.read, chunk_size):
+                    yield chunk
+            finally:
+                await asyncio.to_thread(body.close)
         except Exception as exc:
             raise ObjectStorageError("object read failed") from exc
 

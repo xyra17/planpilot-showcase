@@ -1,4 +1,4 @@
-import { api, apiFetch, authFetch } from "@/lib/api";
+import { api, apiFetch, authFetch, resolveApiAssetUrl } from "@/lib/api";
 
 export type ApiGoal = {
   id: string;
@@ -81,6 +81,34 @@ export type ApiKnowledgeFile = {
   sourceUrl: string | null;
   content: string;
   contentFormat: "plain" | "markdown" | "html";
+  mediaPreviewStatus: "none" | "queued" | "processing" | "ready" | "failed";
+  mediaPreviewError: string | null;
+  mediaMetadata: ApiMediaMetadata;
+  mediaHasPlayback: boolean;
+  mediaHasPoster: boolean;
+  mediaHasWaveform: boolean;
+};
+
+export type ApiMediaMetadata = {
+  kind?: "audio" | "video";
+  duration?: number | null;
+  width?: number | null;
+  height?: number | null;
+  videoCodec?: string | null;
+  audioCodec?: string | null;
+  bitRate?: number | null;
+  sourceFormat?: string;
+  sourceSize?: number;
+  previewFormat?: string;
+};
+
+export type ApiMediaPreview = {
+  status: ApiKnowledgeFile["mediaPreviewStatus"];
+  error: string | null;
+  metadata: ApiMediaMetadata;
+  hasPlayback: boolean;
+  hasPoster: boolean;
+  hasWaveform: boolean;
 };
 
 export type ApiKnowledgeFileVersion = {
@@ -347,6 +375,13 @@ export const productApi = {
     if (!response.ok) throw new Error(`文件预览加载失败 (${response.status})`);
     return response.blob();
   },
+  getMediaPreview: (id: string) => api.get<ApiMediaPreview>(`/api/v1/knowledge/files/${id}/media-preview`),
+  retryMediaPreview: (id: string) => api.post<ApiMediaPreview>(`/api/v1/knowledge/files/${id}/media-preview/retry`, {}),
+  mediaAssetUrl: (id: string, asset: "source" | "playback" | "poster" | "waveform") => resolveApiAssetUrl(
+    asset === "source"
+      ? `/api/v1/knowledge/files/${id}/serve`
+      : `/api/v1/knowledge/files/${id}/media/${asset}`,
+  ) ?? "",
   listKnowledgeFileVersions: (id: string) => api.get<ApiKnowledgeFileVersion[]>(`/api/v1/knowledge/files/${id}/versions`),
   replaceKnowledgeFile: (id: string, file: File) => {
     const form = new FormData();

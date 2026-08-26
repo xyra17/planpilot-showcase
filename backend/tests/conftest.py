@@ -114,6 +114,7 @@ async def client(db: AsyncSession) -> AsyncClient:
     redis_mock.exists.return_value = 0
     with (
         patch("src.tasks.knowledge.process_knowledge_item.apply_async", return_value=None),
+        patch("src.tasks.media_preview.process_media_preview.apply_async", return_value=None),
         patch("src.tasks.agent_runs.execute_agent_run.apply_async", return_value=None),
         patch("src.services.checkin_service._dispatch_deviation_check", return_value=None),
         patch(

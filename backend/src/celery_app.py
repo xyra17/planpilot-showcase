@@ -23,6 +23,7 @@ celery_app = Celery(
         "src.tasks.email_verification",
         "src.tasks.password_recovery",
         "src.tasks.knowledge",
+        "src.tasks.media_preview",
         "src.tasks.agent_suggestions",
         "src.tasks.agent_runs",
         "src.tasks.pattern_tasks",

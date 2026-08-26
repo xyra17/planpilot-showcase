@@ -1,17 +1,21 @@
+import mimetypes
 import os
+import re
+import tempfile
 import uuid
 from datetime import UTC, datetime
 from typing import Literal
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
-from fastapi.responses import Response
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import delete as sql_delete
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from src.config import settings
 from src.core.time import utc_now
 from src.database import get_db
 from src.deps import get_current_user
@@ -39,7 +43,11 @@ router = APIRouter(prefix="/api/v1/knowledge", tags=["knowledge"])
 
 MAX_UPLOAD_BYTES = 20 * 1024 * 1024
 INDEXABLE_EXTENSIONS = {"txt", "md", "json", "pdf", "docx", "csv", "xlsx", "pptx"}
-ATTACHMENT_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp"}
+IMAGE_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp"}
+AUDIO_EXTENSIONS = {"mp3", "wav", "m4a", "aac", "ogg", "flac"}
+VIDEO_EXTENSIONS = {"mp4", "webm", "mov", "m4v", "mkv"}
+MEDIA_EXTENSIONS = AUDIO_EXTENSIONS | VIDEO_EXTENSIONS
+ATTACHMENT_EXTENSIONS = IMAGE_EXTENSIONS | MEDIA_EXTENSIONS
 ALLOWED_EXTENSIONS = INDEXABLE_EXTENSIONS | ATTACHMENT_EXTENSIONS
 MIME_TYPES = {
     "txt": {"text/plain"},
@@ -55,6 +63,17 @@ MIME_TYPES = {
     "jpeg": {"image/jpeg"},
     "gif": {"image/gif"},
     "webp": {"image/webp"},
+    "mp3": {"audio/mpeg", "audio/mp3"},
+    "wav": {"audio/wav", "audio/x-wav", "audio/wave"},
+    "m4a": {"audio/mp4", "audio/x-m4a"},
+    "aac": {"audio/aac", "audio/x-aac"},
+    "ogg": {"audio/ogg", "application/ogg"},
+    "flac": {"audio/flac", "audio/x-flac"},
+    "mp4": {"video/mp4"},
+    "webm": {"video/webm"},
+    "mov": {"video/quicktime"},
+    "m4v": {"video/x-m4v", "video/mp4"},
+    "mkv": {"video/x-matroska", "application/octet-stream"},
 }
 
 
@@ -79,6 +98,21 @@ class KnowledgeFileOut(BaseModel):
     sourceUrl: str | None
     content: str
     contentFormat: str
+    mediaPreviewStatus: str
+    mediaPreviewError: str | None
+    mediaMetadata: dict
+    mediaHasPlayback: bool
+    mediaHasPoster: bool
+    mediaHasWaveform: bool
+
+
+class MediaPreviewOut(BaseModel):
+    status: str
+    error: str | None
+    metadata: dict
+    hasPlayback: bool
+    hasPoster: bool
+    hasWaveform: bool
 
 
 class KnowledgeFileVersionOut(BaseModel):
@@ -215,12 +249,36 @@ def _bytes_size_str(size: int) -> str:
     return f"{size / 1024 / 1024:.1f} MB" if size >= 1024 * 1024 else f"{max(1, size // 1024)} KB"
 
 
+async def _spool_upload(file: UploadFile, max_bytes: int) -> tuple[str, int, bytes]:
+    temporary = tempfile.NamedTemporaryFile(prefix="planpilot-upload-", delete=False)
+    size = 0
+    signature = b""
+    try:
+        while chunk := await file.read(1024 * 1024):
+            size += len(chunk)
+            if size > max_bytes:
+                raise HTTPException(413, f"文件不能超过 {max_bytes // 1024 // 1024} MB")
+            if len(signature) < 16:
+                signature += chunk[: 16 - len(signature)]
+            temporary.write(chunk)
+        temporary.close()
+        if size == 0:
+            raise HTTPException(400, "文件为空")
+        return temporary.name, size, signature
+    except Exception:
+        temporary.close()
+        os.unlink(temporary.name)
+        raise
+
+
 def _file_type(source_type: str, file_path: str | None) -> str:
     if file_path:
         ext = file_path.rsplit(".", 1)[-1].lower()
         if ext in ("xlsx", "xls", "csv"):
             return "excel"
         if ext in ("pdf", "docx", "doc", "txt", "md", "pptx", "ppt"):
+            return ext
+        if ext in AUDIO_EXTENSIONS | VIDEO_EXTENSIONS | IMAGE_EXTENSIONS:
             return ext
     return source_type
 
@@ -275,6 +333,12 @@ def _to_file_out(
         sourceUrl=item.source_url,
         content=item.content,
         contentFormat=item.content_format,
+        mediaPreviewStatus=item.media_preview_status,
+        mediaPreviewError=item.media_preview_error,
+        mediaMetadata=item.media_metadata or {},
+        mediaHasPlayback=bool(item.media_playback_path),
+        mediaHasPoster=bool(item.media_poster_path),
+        mediaHasWaveform=bool(item.media_waveform_path),
     )
 
 
@@ -393,6 +457,63 @@ def _dispatch_processing(item: KnowledgeItem) -> None:
         # The row has already been committed. Preserve it and expose a retryable state.
         item.processing_status = "failed"
         item.processing_error = f"处理任务派发失败：{type(exc).__name__}"[:500]
+
+
+def _dispatch_media_preview(item: KnowledgeItem) -> None:
+    from src.tasks.media_preview import process_media_preview
+
+    if not item.media_source_version:
+        return
+    try:
+        process_media_preview.apply_async(
+            args=[item.id, item.media_source_version], countdown=2
+        )
+    except Exception as exc:
+        item.media_preview_status = "failed"
+        item.media_preview_error = f"媒体预览任务派发失败：{type(exc).__name__}"[:500]
+
+
+async def _clear_media_preview(item: KnowledgeItem) -> None:
+    storage = get_object_storage()
+    for reference in (
+        item.media_playback_path,
+        item.media_poster_path,
+        item.media_waveform_path,
+    ):
+        if reference:
+            try:
+                await storage.delete(reference)
+            except ObjectStorageError:
+                # Cache cleanup must not make the source file impossible to replace.
+                pass
+    item.media_preview_status = "none"
+    item.media_preview_error = None
+    item.media_metadata = {}
+    item.media_source_version = None
+    item.media_playback_path = None
+    item.media_poster_path = None
+    item.media_waveform_path = None
+    item.media_previewed_at = None
+
+
+def _queue_media_preview(item: KnowledgeItem, ext: str) -> None:
+    if ext in MEDIA_EXTENSIONS:
+        item.media_source_version = str(uuid.uuid4())
+        item.media_preview_status = "queued"
+        item.media_preview_error = None
+    else:
+        item.media_preview_status = "none"
+
+
+def _media_preview_out(item: KnowledgeItem) -> MediaPreviewOut:
+    return MediaPreviewOut(
+        status=item.media_preview_status,
+        error=item.media_preview_error,
+        metadata=item.media_metadata or {},
+        hasPlayback=bool(item.media_playback_path),
+        hasPoster=bool(item.media_poster_path),
+        hasWaveform=bool(item.media_waveform_path),
+    )
 
 
 async def _get_user_file(item_id: str, user_id: str, db: AsyncSession) -> KnowledgeItem:
@@ -691,16 +812,6 @@ async def upload_file(
     ):
         raise HTTPException(415, "文件扩展名与内容类型不匹配")
 
-    raw = await file.read(MAX_UPLOAD_BYTES + 1)
-    if not raw:
-        raise HTTPException(400, "文件为空")
-    if len(raw) > MAX_UPLOAD_BYTES:
-        raise HTTPException(413, "文件不能超过 20 MB")
-    if ext == "pdf" and not raw.startswith(b"%PDF"):
-        raise HTTPException(415, "PDF 文件签名无效")
-    if ext in {"docx", "xlsx", "pptx"} and not raw.startswith(b"PK"):
-        raise HTTPException(415, "Office 文件签名无效")
-
     goal_ids = await _validate_goal_ids(goal_ids, current_user.id, db)
     if task_id:
         task = await _get_user_task(task_id, current_user.id, db)
@@ -711,15 +822,26 @@ async def upload_file(
     requested_kb_ids = [*kb_ids, *([kb_id] if kb_id else [])]
     kb_ids = await _validate_kb_ids(requested_kb_ids, current_user.id, db)
 
+    max_bytes = settings.media_preview_max_upload_bytes if ext in MEDIA_EXTENSIONS else MAX_UPLOAD_BYTES
+    temporary_path, upload_size, signature = await _spool_upload(file, max_bytes)
+    if ext == "pdf" and not signature.startswith(b"%PDF"):
+        os.unlink(temporary_path)
+        raise HTTPException(415, "PDF 文件签名无效")
+    if ext in {"docx", "xlsx", "pptx"} and not signature.startswith(b"PK"):
+        os.unlink(temporary_path)
+        raise HTTPException(415, "Office 文件签名无效")
+
     storage = get_object_storage()
     try:
-        saved_path = await storage.put(
+        saved_path = await storage.put_file(
             f"knowledge/{current_user.id}/{uuid.uuid4()}.{ext}",
-            raw,
+            temporary_path,
             content_type or "application/octet-stream",
         )
     except ObjectStorageError as exc:
         raise HTTPException(500, "文件保存失败") from exc
+    finally:
+        os.unlink(temporary_path)
 
     item = KnowledgeItem(
         id=str(uuid.uuid4()),
@@ -732,10 +854,11 @@ async def upload_file(
         content="",
         source_type="upload",
         file_path=saved_path,
-        file_size_bytes=len(raw),
+        file_size_bytes=upload_size,
         processing_status="queued" if ext in INDEXABLE_EXTENSIONS else "ready",
         processed_at=(utc_now() if ext in ATTACHMENT_EXTENSIONS else None),
     )
+    _queue_media_preview(item, ext)
     try:
         db.add(item)
         db.add_all(
@@ -755,6 +878,10 @@ async def upload_file(
     if ext in INDEXABLE_EXTENSIONS:
         _dispatch_processing(item)
         if item.processing_status == "failed":
+            await db.commit()
+    if ext in MEDIA_EXTENSIONS:
+        _dispatch_media_preview(item)
+        if item.media_preview_status == "failed":
             await db.commit()
 
     return _to_file_out(item, goal_ids=goal_ids, kb_ids=kb_ids)
@@ -853,9 +980,56 @@ async def delete_item(
     await db.commit()
 
 
+async def _serve_reference(
+    request: Request,
+    reference: str,
+    filename: str,
+    content_type: str,
+) -> Response:
+    storage = get_object_storage()
+    size = await storage.size(reference)
+    if size is None:
+        raise HTTPException(status_code=404, detail="文件不存在")
+    encoded_name = quote(filename, safe="")
+    headers = {
+        "Accept-Ranges": "bytes",
+        "Content-Disposition": f"inline; filename*=UTF-8''{encoded_name}",
+        "X-Content-Type-Options": "nosniff",
+    }
+    range_header = request.headers.get("range")
+    if range_header:
+        match = re.fullmatch(r"bytes=(\d*)-(\d*)", range_header.strip())
+        if not match or (not match.group(1) and not match.group(2)):
+            raise HTTPException(416, "无效的字节范围", headers={"Content-Range": f"bytes */{size}"})
+        if match.group(1):
+            start = int(match.group(1))
+            end = int(match.group(2)) if match.group(2) else size - 1
+        else:
+            suffix = int(match.group(2))
+            if suffix <= 0:
+                raise HTTPException(416, "无效的字节范围", headers={"Content-Range": f"bytes */{size}"})
+            start = max(0, size - suffix)
+            end = size - 1
+        if start >= size or end < start:
+            raise HTTPException(416, "字节范围超出文件大小", headers={"Content-Range": f"bytes */{size}"})
+        end = min(end, size - 1)
+        try:
+            body = await storage.read_range(reference, start, end)
+        except ObjectStorageError as exc:
+            raise HTTPException(404, "文件不存在") from exc
+        headers["Content-Range"] = f"bytes {start}-{end}/{size}"
+        headers["Content-Length"] = str(len(body))
+        return Response(body, status_code=206, media_type=content_type, headers=headers)
+    headers["Content-Length"] = str(size)
+    return StreamingResponse(
+        storage.iter_chunks(reference), media_type=content_type, headers=headers
+    )
+
+
 @router.get("/files/{file_id}/serve")
 async def serve_file(
     file_id: str,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> Response:
@@ -870,16 +1044,68 @@ async def serve_file(
     storage = get_object_storage()
     if not item or not item.file_path or not await storage.exists(item.file_path):
         raise HTTPException(status_code=404, detail="文件不存在")
-    try:
-        body = await storage.read(item.file_path)
-    except ObjectStorageError as exc:
-        raise HTTPException(status_code=404, detail="文件不存在") from exc
-    encoded_name = quote(item.title, safe="")
-    return Response(
-        body,
-        media_type="application/octet-stream",
-        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{encoded_name}"},
+    content_type = (
+        mimetypes.guess_type(item.title)[0]
+        or mimetypes.guess_type(item.file_path)[0]
+        or "application/octet-stream"
     )
+    return await _serve_reference(request, item.file_path, item.title, content_type)
+
+
+@router.get("/files/{file_id}/media-preview", response_model=MediaPreviewOut)
+async def get_media_preview(
+    file_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> MediaPreviewOut:
+    item = await _get_user_file(file_id, current_user.id, db)
+    if extension_for_reference(item.file_path or "") not in MEDIA_EXTENSIONS:
+        raise HTTPException(409, "该文件不是音频或视频")
+    return _media_preview_out(item)
+
+
+@router.get("/files/{file_id}/media/{asset}")
+async def serve_media_preview_asset(
+    file_id: str,
+    asset: str,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> Response:
+    item = await _get_user_file(file_id, current_user.id, db)
+    metadata = item.media_metadata or {}
+    assets = {
+        "playback": (item.media_playback_path, "preview.mp3" if metadata.get("kind") == "audio" else "preview.mp4", "audio/mpeg" if metadata.get("kind") == "audio" else "video/mp4"),
+        "poster": (item.media_poster_path, "poster.jpg", "image/jpeg"),
+        "waveform": (item.media_waveform_path, "waveform.png", "image/png"),
+    }
+    if asset not in assets:
+        raise HTTPException(404, "预览资源不存在")
+    reference, filename, content_type = assets[asset]
+    if item.media_preview_status != "ready" or not reference:
+        raise HTTPException(404, "预览资源尚未生成")
+    return await _serve_reference(request, reference, filename, content_type)
+
+
+@router.post("/files/{file_id}/media-preview/retry", response_model=MediaPreviewOut)
+async def retry_media_preview(
+    file_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> MediaPreviewOut:
+    item = await _get_user_file(file_id, current_user.id, db)
+    ext = extension_for_reference(item.file_path or "")
+    if ext not in MEDIA_EXTENSIONS:
+        raise HTTPException(409, "该文件不是音频或视频")
+    if item.media_preview_status not in {"failed", "none"}:
+        raise HTTPException(409, "该媒体当前不需要重试")
+    await _clear_media_preview(item)
+    _queue_media_preview(item, ext)
+    await db.commit()
+    _dispatch_media_preview(item)
+    await db.commit()
+    await db.refresh(item)
+    return _media_preview_out(item)
 
 
 @router.get("/files/{item_id}/versions", response_model=list[KnowledgeFileVersionOut])
@@ -936,17 +1162,20 @@ async def replace_file(
         and content_type not in MIME_TYPES[ext]
     ):
         raise HTTPException(415, "文件扩展名与内容类型不匹配")
-    raw = await file.read(MAX_UPLOAD_BYTES + 1)
-    if not raw:
-        raise HTTPException(400, "文件为空")
-    if len(raw) > MAX_UPLOAD_BYTES:
-        raise HTTPException(413, "文件不能超过 20 MB")
-    if ext == "pdf" and not raw.startswith(b"%PDF"):
+    max_bytes = settings.media_preview_max_upload_bytes if ext in MEDIA_EXTENSIONS else MAX_UPLOAD_BYTES
+    temporary_path, upload_size, signature = await _spool_upload(file, max_bytes)
+    if ext == "pdf" and not signature.startswith(b"%PDF"):
+        os.unlink(temporary_path)
         raise HTTPException(415, "PDF 文件签名无效")
-    if ext in {"docx", "xlsx", "pptx"} and not raw.startswith(b"PK"):
+    if ext in {"docx", "xlsx", "pptx"} and not signature.startswith(b"PK"):
+        os.unlink(temporary_path)
         raise HTTPException(415, "Office 文件签名无效")
 
-    await _archive_current_file(item, db)
+    try:
+        await _archive_current_file(item, db)
+    except Exception:
+        os.unlink(temporary_path)
+        raise
     storage = get_object_storage()
     try:
         target_key = (
@@ -955,17 +1184,20 @@ async def replace_file(
             else f"knowledge/{current_user.id}/{uuid.uuid4()}.{ext}"
         )
         old_path = item.file_path
-        item.file_path = await storage.put(
-            target_key, raw, content_type or "application/octet-stream"
+        item.file_path = await storage.put_file(
+            target_key, temporary_path, content_type or "application/octet-stream"
         )
         if old_path != item.file_path:
             await storage.delete(old_path)
     except ObjectStorageError as exc:
         await db.rollback()
         raise HTTPException(500, "替换文件保存失败") from exc
+    finally:
+        os.unlink(temporary_path)
 
+    await _clear_media_preview(item)
     item.content = ""
-    item.file_size_bytes = len(raw)
+    item.file_size_bytes = upload_size
     item.content_format = "markdown" if ext == "md" else "plain"
     item.content_length = 0
     item.embedding = None
@@ -973,6 +1205,7 @@ async def replace_file(
     item.retry_count = 0
     item.processing_status = "queued" if ext in INDEXABLE_EXTENSIONS else "ready"
     item.processed_at = utc_now() if ext in ATTACHMENT_EXTENSIONS else None
+    _queue_media_preview(item, ext)
     await db.execute(sql_delete(KnowledgeChunk).where(KnowledgeChunk.item_id == item.id))
     await _prune_file_versions(item.id, db)
     await db.commit()
@@ -980,6 +1213,10 @@ async def replace_file(
     if ext in INDEXABLE_EXTENSIONS:
         _dispatch_processing(item)
         if item.processing_status == "failed":
+            await db.commit()
+    if ext in MEDIA_EXTENSIONS:
+        _dispatch_media_preview(item)
+        if item.media_preview_status == "failed":
             await db.commit()
     return _to_file_out(
         item,
@@ -1017,6 +1254,7 @@ async def restore_file_version(
         await db.rollback()
         raise HTTPException(500, "历史版本恢复失败") from exc
     old_path = item.file_path
+    await _clear_media_preview(item)
     item.file_path = restored_path
     item.file_size_bytes = version.size_bytes
     item.title = version.filename
@@ -1028,6 +1266,7 @@ async def restore_file_version(
     item.retry_count = 0
     item.processing_status = "queued" if ext in INDEXABLE_EXTENSIONS else "ready"
     item.processed_at = utc_now() if ext in ATTACHMENT_EXTENSIONS else None
+    _queue_media_preview(item, ext)
     await db.execute(sql_delete(KnowledgeChunk).where(KnowledgeChunk.item_id == item.id))
     await _prune_file_versions(item.id, db)
     await db.commit()
@@ -1037,6 +1276,10 @@ async def restore_file_version(
     if ext in INDEXABLE_EXTENSIONS:
         _dispatch_processing(item)
         if item.processing_status == "failed":
+            await db.commit()
+    if ext in MEDIA_EXTENSIONS:
+        _dispatch_media_preview(item)
+        if item.media_preview_status == "failed":
             await db.commit()
     return _to_file_out(
         item,
