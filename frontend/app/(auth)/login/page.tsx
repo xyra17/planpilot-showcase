@@ -2,7 +2,7 @@
 
 import { ArrowLeft, ArrowRight, CheckCircle2, Eye, EyeOff, KeyRound, Loader2, UserRound } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { AppBrand } from "@/components/app/AppBrand";
 import { PiloAvatar } from "@/components/technology/PiloAvatar";
@@ -49,7 +49,7 @@ function messageForError(error: unknown): { state: LoginState; message: string }
 }
 
 export default function LoginPage() {
-  const { login, isLoading } = useAuthStore();
+  const { login, refreshUser, isLoading } = useAuthStore();
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -57,6 +57,19 @@ export default function LoginPage() {
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [loginState, setLoginState] = useState<LoginState>("default");
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    void refreshUser().then(() => {
+      if (!active) return;
+      const searchParams = new URLSearchParams(window.location.search);
+      const returnPath = searchParams.get("next") ?? searchParams.get("returnTo");
+      window.location.replace(safeProductReturnPath(returnPath));
+    }).catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [refreshUser]);
 
   function validate(): boolean {
     const nextErrors: FieldErrors = {};
@@ -116,7 +129,7 @@ export default function LoginPage() {
               mood="working"
               lifeAction="work"
               actionPhase="holding"
-              size={128}
+              size={136}
               priority
               className="pp-login-pilo-avatar"
             />
@@ -202,7 +215,7 @@ export default function LoginPage() {
                 onChange={(event) => setRemember(event.target.checked)}
                 disabled={submitting}
               />
-              <span>记住登录状态（30 天）</span>
+              <span>记住登录状态（7 天）</span>
             </label>
             <Link href="/auth/recover">忘记密码？</Link>
           </div>

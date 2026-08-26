@@ -216,12 +216,13 @@ def set_session_cookies(response: Response, issued: IssuedSession) -> None:
         "secure": settings.secure_auth_cookies,
         "samesite": settings.auth_cookie_samesite.lower(),
     }
+    access_max_age = settings.access_token_expire_minutes * 60 if issued.session.remember_me else None
     response.set_cookie(
         settings.auth_access_cookie_name,
         issued.access_token,
         httponly=True,
         path="/",
-        max_age=settings.access_token_expire_minutes * 60,
+        max_age=access_max_age,
         **common,
     )
     refresh_max_age = None

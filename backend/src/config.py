@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     # refresh token.  The access lifetime must stay short even when the user
     # selects "remember me"; that choice only changes refresh persistence.
     access_token_expire_minutes: int = 15
-    refresh_token_expire_days: int = 30
+    refresh_token_expire_days: int = 7
     session_refresh_token_expire_hours: int = 24
     refresh_token_reuse_grace_seconds: int = 5
     auth_redis_failure_policy: str = "session_authoritative"

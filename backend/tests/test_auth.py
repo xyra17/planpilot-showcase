@@ -145,7 +145,19 @@ async def test_login_access_token_is_short_lived_regardless_of_remember_me(clien
         if value.startswith(f"{settings.auth_refresh_cookie_name}=")
     )
     assert "Max-Age" not in session_cookie
-    assert "Max-Age" in remembered_cookie
+    assert f"Max-Age={settings.refresh_token_expire_days * 24 * 60 * 60}" in remembered_cookie
+    session_access_cookie = next(
+        value
+        for value in session_login.headers.get_list("set-cookie")
+        if value.startswith(f"{settings.auth_access_cookie_name}=")
+    )
+    remembered_access_cookie = next(
+        value
+        for value in remembered_login.headers.get_list("set-cookie")
+        if value.startswith(f"{settings.auth_access_cookie_name}=")
+    )
+    assert "Max-Age" not in session_access_cookie
+    assert f"Max-Age={settings.access_token_expire_minutes * 60}" in remembered_access_cookie
 
 
 async def test_auth_cookies_have_security_attributes(client: AsyncClient):

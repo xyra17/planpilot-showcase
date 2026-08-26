@@ -8,7 +8,7 @@ test("登录页在常见笔记本高度下一屏完整显示", async ({ page }) 
   await expect(page.getByLabel("用户名或邮箱")).toBeVisible();
   await expect(page.getByLabel("密码", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "显示密码" })).toBeVisible();
-  await expect(page.getByRole("checkbox", { name: "记住登录状态（30 天）" })).toBeVisible();
+  await expect(page.getByRole("checkbox", { name: "记住登录状态（7 天）" })).toBeVisible();
   await expect(page.getByRole("button", { name: "登录", exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: "忘记密码？" })).toBeVisible();
   await expect(page.getByRole("link", { name: "注册", exact: true })).toBeVisible();
@@ -36,6 +36,7 @@ test("登录页保持等宽布局并可返回访客工作台", async ({ page }) 
   expect(headingBox).not.toBeNull();
   expect(piloBox).not.toBeNull();
   expect(piloBox!.x).toBeGreaterThan(headingBox!.x);
+  expect(piloBox!.width).toBeGreaterThanOrEqual(115);
   const columns = await page.locator(".pp-auth-shell > section").evaluateAll((sections) =>
     sections.map((section) => section.getBoundingClientRect().width),
   );
@@ -106,8 +107,10 @@ test("登录页区分凭据错误、网络失败与账户锁定", async ({ page 
 
 test("登录页展示登录中和登录成功，且不向 Web Storage 暴露令牌", async ({ page }) => {
   const user = { id: "e2e-user", email: "learner@example.com", username: "learner", ui_experience: "minimal" };
+  let loggedIn = false;
   await page.route("**/api/v1/auth/login", async (route) => {
     await new Promise((resolve) => setTimeout(resolve, 250));
+    loggedIn = true;
     await route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -116,11 +119,13 @@ test("登录页展示登录中和登录成功，且不向 Web Storage 暴露令�
       }),
     });
   });
-  await page.route("**/api/v1/auth/me", (route) => route.fulfill({ json: user }));
+  await page.route("**/api/v1/auth/me", (route) => loggedIn
+    ? route.fulfill({ json: user })
+    : route.fulfill({ status: 401, json: { detail: "未登录" } }));
   await page.goto("/login");
   await page.getByLabel("用户名或邮箱").fill("learner");
   await page.getByLabel("密码", { exact: true }).fill("correct-password");
-  await page.getByRole("checkbox", { name: "记住登录状态（30 天）" }).check();
+  await page.getByRole("checkbox", { name: "记住登录状态（7 天）" }).check();
   await page.getByRole("button", { name: "登录", exact: true }).click();
 
   await expect(page.getByRole("button", { name: "登录中…" })).toBeDisabled();
@@ -133,7 +138,9 @@ test("登录页展示登录中和登录成功，且不向 Web Storage 暴露令�
 
 test("未勾选记住登录状态时仍不向 JavaScript 暴露令牌", async ({ page }) => {
   const user = { id: "session-user", email: "session@example.com", username: "session-user", ui_experience: "minimal" };
+  let loggedIn = false;
   await page.route("**/api/v1/auth/login", async (route) => {
+    loggedIn = true;
     await route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -142,7 +149,9 @@ test("未勾选记住登录状态时仍不向 JavaScript 暴露令牌", async ({
       }),
     });
   });
-  await page.route("**/api/v1/auth/me", (route) => route.fulfill({ json: user }));
+  await page.route("**/api/v1/auth/me", (route) => loggedIn
+    ? route.fulfill({ json: user })
+    : route.fulfill({ status: 401, json: { detail: "未登录" } }));
   await page.goto("/login");
   await page.getByLabel("用户名或邮箱").fill("session-user");
   await page.getByLabel("密码", { exact: true }).fill("correct-password");
@@ -158,8 +167,14 @@ test("未勾选记住登录状态时仍不向 JavaScript 暴露令牌", async ({
 
 test("统一登录提示会返回触发登录的原页面，并拒绝外部跳转", async ({ page }) => {
   const user = { id: "return-user", email: "return@example.com", username: "return-user" };
-  await page.route("**/api/v1/auth/login", (route) => route.fulfill({ status: 200, json: { user } }));
-  await page.route("**/api/v1/auth/me", (route) => route.fulfill({ json: user }));
+  let loggedIn = false;
+  await page.route("**/api/v1/auth/login", (route) => {
+    loggedIn = true;
+    return route.fulfill({ status: 200, json: { user } });
+  });
+  await page.route("**/api/v1/auth/me", (route) => loggedIn
+    ? route.fulfill({ json: user })
+    : route.fulfill({ status: 401, json: { detail: "未登录" } }));
 
   await page.goto("/login?next=%2Fstudio%2Fcoach%2Fmemory%3Fview%3Dhistory");
   await page.getByLabel("用户名或邮箱").fill("return-user");
@@ -167,9 +182,19 @@ test("统一登录提示会返回触发登录的原页面，并拒绝外部跳�
   await page.getByRole("button", { name: "登录", exact: true }).click();
   await expect(page).toHaveURL(/\/studio\/coach\/memory\?view=history/);
 
+  loggedIn = false;
   await page.goto("/login?next=https%3A%2F%2Fexample.com%2Fphishing");
   await page.getByLabel("用户名或邮箱").fill("return-user");
   await page.getByLabel("密码", { exact: true }).fill("correct-password");
   await page.getByRole("button", { name: "登录", exact: true }).click();
+  await expect(page).toHaveURL(/\/studio\/work$/);
+});
+
+test("已有有效会话时登录页直接返回工作台", async ({ page }) => {
+  const user = { id: "remembered-user", email: "remembered@example.com", username: "remembered-user" };
+  await page.route("**/api/v1/auth/me", (route) => route.fulfill({ json: user }));
+
+  await page.goto("/login");
+
   await expect(page).toHaveURL(/\/studio\/work$/);
 });
