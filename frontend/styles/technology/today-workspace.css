@@ -659,6 +659,12 @@
 /* On desktop the two work cards remain equal peers, but their row is sized by
  * content rather than stretched to consume the entire viewport. */
 @media (min-width: 761px) {
+  /* Keep the weekly rhythm sheet close to the workspace edge without
+   * changing the paired card's left alignment or internal column layout. */
+  [data-theme] .app-shell .dashboard-page > .workspace-grid > .rhythm-panel {
+    margin-right: -3px;
+  }
+
   .app-shell .page-content:has(> .dashboard-page) {
     display: block;
     min-height: 0;
