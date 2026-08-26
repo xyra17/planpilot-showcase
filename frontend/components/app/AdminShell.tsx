@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, BarChart3, Beaker, Blocks, Gauge, Menu, RadioTower, ScrollText, ShieldCheck, TestTube2, X } from "lucide-react";
+import { ArrowLeft, BarChart3, Beaker, Blocks, Database, Gauge, Menu, RadioTower, ScrollText, ShieldCheck, TestTube2, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -59,6 +59,13 @@ const ADMIN_NAV = [
     title: "Agent 调用审计",
     description: "查看全体账户的脱敏调用链、延迟、回退与运行版本。",
     icon: ScrollText,
+  },
+  {
+    href: "/admin/storage",
+    label: "存储维护",
+    title: "存储垃圾回收",
+    description: "预览并清理数据库已无引用的孤儿文件，避免误删正在处理的上传。",
+    icon: Database,
   },
 ];
 

@@ -4,16 +4,18 @@ from celery.utils.log import get_task_logger
 
 import src.database as database
 from src.celery_app import celery_app
+from datetime import timedelta
+
 from src.services.storage_gc_service import collect_orphaned_storage
 from src.tasks.runtime import run_async
 
 logger = get_task_logger(__name__)
 
 
-async def _collect_orphans() -> dict[str, int]:
+async def _collect_orphans(*, dry_run: bool = False, grace_hours: int = 48) -> dict[str, int]:
     try:
         async with database.AsyncSessionLocal() as db:
-            return await collect_orphaned_storage(db)
+            return await collect_orphaned_storage(db, dry_run=dry_run, grace_period=timedelta(hours=grace_hours))
     finally:
         await database.engine.dispose()
 
@@ -24,7 +26,7 @@ async def _collect_orphans() -> dict[str, int]:
     retry_backoff=True,
     max_retries=3,
 )
-def collect_orphaned_storage_task() -> dict[str, int]:
-    result = run_async(_collect_orphans())
+def collect_orphaned_storage_task(*, dry_run: bool = False, grace_hours: int = 48) -> dict[str, int]:
+    result = run_async(_collect_orphans(dry_run=dry_run, grace_hours=grace_hours))
     logger.info("storage_gc result=%s", result)
     return result

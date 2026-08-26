@@ -32,6 +32,7 @@ import src.api.plans as plans
 import src.api.privacy as privacy
 import src.api.product_evidence as product_evidence
 import src.api.schedule as schedule
+import src.api.storage_admin as storage_admin
 import src.api.tasks as tasks
 from src.config import settings
 from src.core.llm_router import get_llm_runtime_status
@@ -191,6 +192,7 @@ for domain_router in (
     notifications.router,
     model_settings.router,
     schedule.router,
+    storage_admin.router,
 ):
     for route in domain_router.routes:
         # ``routes.extend`` bypasses FastAPI.include_router(), which normally
