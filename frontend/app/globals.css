@@ -86,8 +86,8 @@ body { background: var(--pp-canvas); color: var(--pp-ink); }
 .pp-login-pilo-avatar .pilo-avatar__aura { position:absolute; z-index:0; inset:18% 8% 1%; border-radius:50%; background:radial-gradient(circle,rgba(122,113,255,.22),rgba(87,210,191,.07) 48%,transparent 72%); filter:blur(9px); opacity:.76; animation:pp-login-pilo-aura 1.7s ease-in-out infinite; }
 .pp-login-pilo-avatar .pilo-avatar__chest-glow,
 .pp-login-pilo-avatar .pilo-avatar__status { display:none; }
-.pp-login-pilo-bubble { position:absolute; z-index:2; top:2px; right:4px; display:flex; max-width:194px; flex-direction:column; align-items:flex-start; gap:4px; pointer-events:auto; padding:8px 11px 9px; color:#574ab9; border:1px solid rgba(108,92,211,.2); border-radius:10px 10px 3px 10px; background:rgba(248,247,255,.92); backdrop-filter:blur(10px); box-shadow:0 8px 20px rgba(73,60,160,.09); font-size:12px; font-weight:720; line-height:1.25; white-space:nowrap; }
-.pp-login-pilo-bubble strong { font-size:12px; font-weight:760; }
+.pp-login-pilo-bubble { position:absolute; z-index:2; top:2px; right:4px; display:flex; max-width:220px; flex-direction:row; align-items:center; gap:8px; pointer-events:auto; padding:8px 11px 9px; color:#574ab9; border:1px solid rgba(108,92,211,.2); border-radius:10px 10px 3px 10px; background:rgba(248,247,255,.92); backdrop-filter:blur(10px); box-shadow:0 8px 20px rgba(73,60,160,.09); font-size:12px; font-weight:720; line-height:1.25; white-space:nowrap; }
+.pp-login-pilo-bubble strong { flex:0 0 auto; font-size:12px; font-weight:760; }
 .pp-login-pilo-bubble a { position:relative; display:inline-flex; color:#4f42bd; font-size:12px; font-weight:720; text-decoration:none; transition:color .18s ease, transform .18s ease; }
 .pp-login-pilo-bubble a:hover { color:#30258f; text-decoration:underline; text-underline-offset:2px; transform:translateX(1px); }
 .pp-login-pilo-bubble a:focus-visible { outline:2px solid rgba(117,98,231,.36); outline-offset:3px; border-radius:3px; }
