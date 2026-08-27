@@ -129,14 +129,16 @@ export default function LoginPage() {
           </div>
           <div className="pp-login-pilo">
             <span className="pp-login-pilo-bubble">
-              <strong>我在这里</strong>
+              <strong>初次使用？</strong>
               {PLANPILOT_WEBSITE_URL && (
                 <a
                   href={PLANPILOT_WEBSITE_URL}
                   target="_blank"
                   rel="noreferrer"
+                  aria-label="了解 PlanPilot，将在浏览器中打开官网"
+                  data-tooltip="将在浏览器中打开官网"
                 >
-                  第一次来？先了解 PlanPilot →
+                  了解 PlanPilot →
                 </a>
               )}
             </span>

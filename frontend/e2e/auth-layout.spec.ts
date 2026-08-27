@@ -32,6 +32,13 @@ test("登录页保持等宽布局并可返回访客工作台", async ({ page }) 
   const pilo = page.getByRole("img", { name: "Pilo 戴着眼镜在小电脑前工作" });
   await expect(pilo).toBeVisible();
   await expect(pilo).toHaveAttribute("data-pilo-life-action", "work");
+  if (process.env.NEXT_PUBLIC_PLANPILOT_WEBSITE_URL) {
+    await expect(page.getByText("初次使用？", { exact: true })).toBeVisible();
+    const websiteLink = page.getByRole("link", { name: "了解 PlanPilot，将在浏览器中打开官网" });
+    await expect(websiteLink).toBeVisible();
+    await expect(websiteLink).toHaveAttribute("data-tooltip", "将在浏览器中打开官网");
+    await expect(websiteLink).toHaveCSS("font-size", "12px");
+  }
   const [headingBox, piloBox] = await Promise.all([
     page.locator(".pp-login-heading").boundingBox(),
     pilo.boundingBox(),
