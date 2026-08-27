@@ -98,6 +98,14 @@
 .app-shell .privacy-save-state.is-error { color: var(--workspace-danger, #b64a5b); border-color: color-mix(in srgb, var(--workspace-danger, #b64a5b) 28%, var(--workspace-border)); background: color-mix(in srgb, var(--workspace-danger, #b64a5b) 6%, var(--workspace-panel)); }
 .app-shell .privacy-save-state.is-error::before { background: var(--workspace-danger, #b64a5b); }
 .app-shell .privacy-purpose-list { border-bottom: 1px solid var(--workspace-border); }
+.app-shell .privacy-memory-management-link { display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; min-height: 68px; align-items: center; gap: 10px; color: var(--workspace-text); border-bottom: 1px solid var(--workspace-border); text-decoration: none; }
+.app-shell .privacy-memory-management-link > span:nth-child(2) { min-width: 0; }
+.app-shell .privacy-memory-management-link strong, .app-shell .privacy-memory-management-link small { display: block; }
+.app-shell .privacy-memory-management-link strong { font-size: 12px; font-weight: 740; }
+.app-shell .privacy-memory-management-link small { margin-top: 3px; color: var(--workspace-secondary); font-size: 10px; line-height: 1.5; }
+.app-shell .privacy-memory-management-link > svg { color: var(--workspace-tertiary); transition: transform 160ms ease, color 160ms ease; }
+.app-shell .privacy-memory-management-link:hover > svg { color: var(--workspace-accent); transform: translateX(2px); }
+.app-shell .privacy-memory-management-link:focus-visible { outline: 2px solid color-mix(in srgb, var(--workspace-accent) 62%, transparent); outline-offset: 2px; border-radius: 7px; }
 .app-shell .privacy-purpose-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 18px; padding: 13px 0; }
 .app-shell .privacy-purpose-row + .privacy-purpose-row { border-top: 1px solid var(--workspace-border); }
 .app-shell .privacy-purpose-copy { min-width: 0; }

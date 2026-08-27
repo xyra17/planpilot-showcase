@@ -2101,6 +2101,10 @@ export default function CoachPage() {
               </button>
               </div>}
             </section>
+            <Link className="companion-memory-management-link" href="/studio/coach/memory" onClick={() => setSettingsOpen(false)}>
+              <span><BrainCircuit size={16} /><span><strong>个性化与学习偏好</strong><small>查看、校正或暂停 Pilo 对你的长期理解</small></span></span>
+              <ArrowRight size={15} />
+            </Link>
             </div>
 
             <p className="companion-settings-saved"><CheckCircle2 size={13} /> 设置会自动保存，并从下一条回复开始生效</p>

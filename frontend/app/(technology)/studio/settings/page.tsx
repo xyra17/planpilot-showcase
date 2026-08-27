@@ -3,6 +3,7 @@
 import {
   AlertCircle,
   ArrowRight,
+  BrainCircuit,
   CalendarClock,
   Camera,
   Check,
@@ -674,6 +675,11 @@ export default function SettingsPage() {
                 </div>;
               })}
             </div>
+            <Link className="privacy-memory-management-link" href="/studio/coach/memory">
+              <span className="privacy-data-icon" aria-hidden="true"><BrainCircuit size={16} /></span>
+              <span><strong>查看个性化与学习偏好</strong><small>逐条核对观察依据，修正适用范围，或暂停、遗忘单条观察</small></span>
+              <ArrowRight size={15} aria-hidden="true" />
+            </Link>
             {showPersonalizationChoice && <div className="personalization-off-choice" role="group" aria-label="关闭个性化的方式"><div><strong>如何关闭个性化？</strong><p>两种方式都会停止新的个性化建议；你可以决定是否同时清除系统生成的派生数据。</p></div><div><button type="button" onClick={() => void updatePrivacyConsent({ personalization_enabled: false }, "个性化建议已关闭，现有派生数据已保留")}>仅关闭</button><button type="button" className="is-danger" onClick={() => void eraseDerivedData()}><Trash2 size={14} />关闭并清除派生数据</button><button type="button" className="is-quiet" onClick={() => setShowPersonalizationChoice(false)}>取消</button></div></div>}
             {privacyState === "error" && <div className="privacy-inline-error" role="alert"><span>{privacyError}</span><button type="button" onClick={() => failedConsentPatch ? void updatePrivacyConsent(failedConsentPatch) : setPrivacyLoadAttempt((value) => value + 1)}>重试</button></div>}
             <details className="privacy-data-actions"><summary><span className="privacy-data-icon" aria-hidden="true"><Database size={16} /></span><span><strong>数据导出与清除</strong><small>获取数据副本，或清除系统生成的派生数据</small></span><ChevronDown size={16} aria-hidden="true" /></summary><div className="privacy-data-list">
