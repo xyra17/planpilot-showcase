@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, ArrowRight, CheckCircle2, Eye, EyeOff, KeyRound, Loader2, UserRound } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle2, Eye, EyeOff, Globe2, KeyRound, Loader2, UserRound } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -22,6 +22,8 @@ type FieldErrors = {
   identifier?: string;
   password?: string;
 };
+
+const PLANPILOT_WEBSITE_URL = process.env.NEXT_PUBLIC_PLANPILOT_WEBSITE_URL?.trim();
 
 function messageForError(error: unknown): { state: LoginState; message: string } {
   if (error instanceof ApiError) {
@@ -109,10 +111,23 @@ export default function LoginPage() {
 
   return (
     <div className="pp-auth-page pp-login-page">
-      <Link href="/studio/work" className="pp-auth-guest-return">
-        <ArrowLeft size={15} aria-hidden="true" />
-        返回访客工作台
-      </Link>
+      <div className="pp-auth-top-links">
+        <Link href="/studio/work" className="pp-auth-guest-return">
+          <ArrowLeft size={15} aria-hidden="true" />
+          返回访客工作台
+        </Link>
+        {PLANPILOT_WEBSITE_URL && (
+          <a
+            href={PLANPILOT_WEBSITE_URL}
+            className="pp-auth-website-link"
+            target="_blank"
+            rel="noreferrer"
+          >
+            <Globe2 size={15} aria-hidden="true" />
+            访问官网
+          </a>
+        )}
+      </div>
       <div className="pp-auth-card pp-login-card">
         <div className="pp-login-intro">
           <div className="pp-login-heading">
