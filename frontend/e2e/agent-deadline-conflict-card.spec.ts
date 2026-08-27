@@ -202,4 +202,9 @@ test("逐条校正后的行动预览在桌面会话中完整显示且不产生�
   }
   await card.screenshot({ path: testInfo.outputPath("dense-action-card.png") });
   await page.screenshot({ path: testInfo.outputPath("dense-action-desktop.png"), fullPage: true });
+
+  await page.getByRole("button", { name: "打开 Pilo 设置" }).click();
+  await expect(page.getByRole("link", { name: /个性化与学习偏好/ })).toHaveAttribute("href", "/studio/coach/memory");
+  await page.goto("/studio/settings#settings-privacy");
+  await expect(page.getByRole("link", { name: /查看个性化与学习偏好/ })).toHaveAttribute("href", "/studio/coach/memory");
 });

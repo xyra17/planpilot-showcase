@@ -5,6 +5,9 @@ test("登录页在常见笔记本高度下一屏完整显示", async ({ page }) 
   await page.goto("/login");
 
   await expect(page.getByRole("heading", { name: "欢迎回来" })).toBeVisible();
+  await expect(page.getByText("YOUR LONG-TERM LEARNING PARTNER", { exact: true })).toBeVisible();
+  await expect(page.getByText("PlanPilot 根据你选择保留的学习记录", { exact: false })).toBeVisible();
+  await expect(page.getByText("持续理解", { exact: true })).toBeVisible();
   await expect(page.getByLabel("用户名或邮箱")).toBeVisible();
   await expect(page.getByLabel("密码", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "显示密码" })).toBeVisible();
