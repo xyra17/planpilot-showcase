@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, ArrowRight, CheckCircle2, Eye, EyeOff, Globe2, KeyRound, Loader2, UserRound } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle2, Eye, EyeOff, KeyRound, Loader2, UserRound } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -116,17 +116,6 @@ export default function LoginPage() {
           <ArrowLeft size={15} aria-hidden="true" />
           返回访客工作台
         </Link>
-        {PLANPILOT_WEBSITE_URL && (
-          <a
-            href={PLANPILOT_WEBSITE_URL}
-            className="pp-auth-website-link"
-            target="_blank"
-            rel="noreferrer"
-          >
-            <Globe2 size={15} aria-hidden="true" />
-            访问官网
-          </a>
-        )}
       </div>
       <div className="pp-auth-card pp-login-card">
         <div className="pp-login-intro">
@@ -139,7 +128,18 @@ export default function LoginPage() {
             <p>继续今天的学习旅程，Pilo 已经在等你了。</p>
           </div>
           <div className="pp-login-pilo">
-            <span className="pp-login-pilo-bubble">我在这里</span>
+            <span className="pp-login-pilo-bubble">
+              <strong>我在这里</strong>
+              {PLANPILOT_WEBSITE_URL && (
+                <a
+                  href={PLANPILOT_WEBSITE_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  第一次来？先了解 PlanPilot →
+                </a>
+              )}
+            </span>
             <PiloAvatar
               mood="working"
               lifeAction="work"
