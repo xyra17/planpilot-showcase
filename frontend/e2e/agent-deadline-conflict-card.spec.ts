@@ -99,11 +99,11 @@ test("期限冲突展示未写入边界和三条真实恢复路径", async ({ pa
   await expect(card.getByRole("button", { name: "重试" })).toHaveCount(0);
   await page.screenshot({ path: testInfo.outputPath("deadline-conflict-desktop.png"), fullPage: true });
 
-  await page.getByRole("button", { name: "拉灯切换到深色模式" }).click();
   await expect(page.locator(".companion-workspace")).toHaveClass(/is-dark/);
   await expect(card.locator(".companion-deadline-boundary")).toHaveCSS("color", "rgb(117, 205, 180)");
   await page.screenshot({ path: testInfo.outputPath("deadline-conflict-dark.png"), fullPage: true });
   await page.getByRole("button", { name: "拉灯切换到明亮模式" }).click();
+  await expect(page.locator(".companion-workspace")).toHaveClass(/is-light/);
 
   await page.setViewportSize({ width: 375, height: 812 });
   await card.scrollIntoViewIfNeeded();
