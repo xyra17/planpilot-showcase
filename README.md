@@ -2,6 +2,8 @@
 
 > AI 学习规划与执行工作台 · AI Learning Planning & Execution Workspace
 
+[🌐 访问 PlanPilot 产品官网](https://planpilot-website.planpilot-wxyra.workers.dev/)
+
 PlanPilot 不是一个普通待办工具。它把长期目标、每日任务、学习资料、实际投入、复盘证据和 AI 建议连接成一条可解释、可确认的执行闭环。
 
 本仓库是项目作品集说明页，重点展示产品设计、核心链路和工程实现。完整应用运行于本地原生桌面端；页面中的目标、任务和行为记录均为合成演示数据。
@@ -104,7 +106,7 @@ flowchart TB
 
 ## 当前体验方式
 
-当前公开仓库提供完整截图式产品演示；桌面应用和服务端源码暂保留在本地开发仓库。截图保留 macOS 原生窗口标题栏，没有使用全屏桌面截图。
+可以通过 [PlanPilot 产品官网](https://planpilot-website.planpilot-wxyra.workers.dev/) 了解项目定位，并在本仓库查看完整截图式产品演示。桌面应用和服务端源码暂保留在本地开发仓库；截图保留 macOS 原生窗口标题栏，没有使用全屏桌面截图。
 
 ## 简历表述
 
