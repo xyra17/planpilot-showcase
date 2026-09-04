@@ -1,6 +1,6 @@
 # PlanPilot｜AI 学习执行与陪伴产品
 
-[产品官网](https://planpilot-website.planpilot-wxyra.workers.dev/) · 本仓库提供桌面端完整产品走查
+[产品官网](https://planpilot-website.planpilot-wxyra.workers.dev/) 
 
 > 一款面向在职备考者和职业转型学习者的桌面学习工具，把长期目标拆成今天能完成的行动，并在计划被工作或生活打断后，帮助用户低成本恢复节奏。
 
