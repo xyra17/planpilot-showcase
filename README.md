@@ -45,7 +45,7 @@
 
 示例中包含 3 个任务：Python 核心练习、英语精读和晨间写作。完成状态与实际投入分开记录，避免把一次勾选当成学习效果。
 
-![PlanPilot 今日计划](assets/planpilot-today.png)
+![PlanPilot 今日计划](assets/planpilot-today-annotated.png)
 
 ### 2. 目标管理：把长期压力换算成近期节奏
 
@@ -77,7 +77,7 @@
 | 学习笔记 | 帮助整理理解、关联任务，并把讨论带回下一项行动 |
 | 学习伙伴 | 跨目标观察学习节奏，讨论建议，并发起受监督行动 |
 
-![Pilo 学习伙伴](assets/planpilot-coach.png)
+![Pilo 学习伙伴](assets/planpilot-coach-annotated.png)
 
 ### 建议有依据，行动有确认
 
