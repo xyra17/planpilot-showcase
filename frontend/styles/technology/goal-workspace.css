@@ -4407,10 +4407,12 @@
 }
 
 .app-shell .tech-goal-workspace-scope .goal-task-empty p {
-  max-width: none;
+  width: min(100%, 520px);
+  max-width: 520px;
   font-size: 13px;
   line-height: 1.55;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .app-shell .tech-goal-workspace-scope .goal-task-empty button {
@@ -7200,12 +7202,12 @@
   padding: 24px;
   border: 0;
   border-radius: 0;
-  background: color-mix(in srgb, #111827 42%, transparent);
+  background: rgba(17, 24, 39, .3);
   box-shadow: none;
   animation: goal-form-backdrop-in 180ms ease-out both;
 }
 
-.app-shell .tech-goal-form-page.is-dialog.is-creating .tech-goal-create-main {
+.app-shell .tech-goal-form-page.is-dialog .tech-goal-create-main {
   position: relative;
   width: min(720px, calc(100vw - 32px));
   height: min(540px, calc(100vh - 48px));
