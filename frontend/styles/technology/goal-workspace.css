@@ -7205,7 +7205,7 @@
   animation: goal-form-backdrop-in 180ms ease-out both;
 }
 
-.app-shell .tech-goal-form-page.is-dialog .tech-goal-create-main {
+.app-shell .tech-goal-form-page.is-dialog.is-creating .tech-goal-create-main {
   position: relative;
   width: min(720px, calc(100vw - 32px));
   height: min(540px, calc(100vh - 48px));
@@ -8014,6 +8014,124 @@
 .tech-goal-contract-grid textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 10%, transparent); }
 .tech-goal-contract-wide { grid-column: 1 / -1; }
 
+/* Goal dialog layout: the component uses dedicated contract/plan grids. Keep
+   them explicit so legacy preference-grid rules cannot collapse fieldsets. */
+.app-shell .tech-goal-form-page .tech-goal-contract-grid,
+.app-shell .tech-goal-form-page .tech-goal-plan-grid {
+  width: calc(100% - var(--goal-step-content-offset));
+  margin-left: var(--goal-step-content-offset);
+}
+
+.app-shell .tech-goal-form-page .tech-goal-plan-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 20px;
+  row-gap: 14px;
+  align-items: end;
+}
+
+.app-shell .tech-goal-form-page .tech-goal-plan-grid > * {
+  width: 100%;
+  min-width: 0;
+}
+
+.app-shell .tech-goal-form-page .tech-goal-plan-grid > .tech-goal-segment-section {
+  display: flex;
+  flex-direction: column;
+}
+
+.app-shell .tech-goal-form-page .tech-goal-plan-grid .tech-goal-segmented-control {
+  overflow: hidden;
+  border: 1px solid var(--goal-create-border-strong);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--goal-create-panel) 68%, var(--goal-create-subtle));
+}
+
+.app-shell .tech-goal-form-page .tech-goal-plan-grid .tech-goal-segmented-control button {
+  min-width: 0;
+  border: 0;
+  border-right: 1px solid var(--goal-create-border);
+  border-radius: 0;
+  box-shadow: none;
+  white-space: nowrap;
+}
+
+.app-shell .tech-goal-form-page .tech-goal-plan-grid .tech-goal-segmented-control button:last-child {
+  border-right: 0;
+}
+
+.app-shell .tech-goal-form-page .tech-goal-plan-grid .tech-goal-segmented-control button.is-selected {
+  color: var(--accent);
+  border-color: var(--goal-create-border);
+  background: color-mix(in srgb, var(--accent) 10%, var(--goal-create-panel));
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+.app-shell .tech-goal-form-page.is-dialog .tech-goal-create-main {
+  width: min(720px, calc(100vw - 48px));
+  height: min(580px, calc(100dvh - 48px));
+  max-height: min(760px, calc(100dvh - 48px));
+  padding: 0 20px;
+  scroll-padding-block: 76px 72px;
+}
+
+.app-shell .tech-goal-form-page.is-dialog.is-creating .tech-goal-create-main:focus {
+  outline: none;
+}
+
+.app-shell .tech-goal-form-page.is-dialog.is-creating .tech-goal-create-header {
+  position: sticky;
+  z-index: 2;
+  top: 0;
+  margin: 0 -20px;
+  padding: 18px 56px 15px 20px;
+  border-bottom: 1px solid var(--goal-create-border);
+  background: var(--goal-create-panel);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+}
+
+.app-shell .tech-goal-form-page.is-dialog.is-creating .tech-goal-form-dialog-close {
+  position: sticky;
+  z-index: 4;
+  top: 17px;
+  float: right;
+  margin-right: -7px;
+  margin-bottom: -34px;
+}
+
+.app-shell .tech-goal-form-page.is-dialog.is-creating .tech-goal-form-step {
+  padding-block: 15px 17px;
+}
+
+.app-shell .tech-goal-form-page.is-dialog.is-creating .tech-goal-contract-grid {
+  gap: 14px 16px;
+}
+
+.app-shell .tech-goal-form-page.is-dialog.is-creating .tech-goal-contract-grid textarea {
+  min-height: 76px;
+  padding: 11px 12px;
+  border-radius: 10px;
+  font-size: 12px;
+  resize: none;
+}
+
+.app-shell .tech-goal-form-page.is-dialog.is-creating .tech-goal-contract-wide textarea {
+  min-height: 64px;
+}
+
+.app-shell .tech-goal-form-page.is-dialog.is-creating .tech-goal-create-actions {
+  position: sticky;
+  z-index: 3;
+  bottom: 0;
+  margin: 0 -20px;
+  padding: 13px 20px 16px;
+  background: var(--goal-create-panel);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 -12px 24px color-mix(in srgb, var(--goal-create-text) 5%, transparent);
+}
+
 @media (max-width: 640px) {
   .goal-plan-draft-backdrop { align-items: end; padding: 0; }
   .goal-plan-draft-dialog { max-height: 94dvh; border-radius: 22px 22px 0 0; }
@@ -8035,4 +8153,23 @@
   .goal-plan-task-guide ol, .goal-plan-task-guide ul { padding-left: 86px; }
   .tech-goal-contract-grid { grid-template-columns: 1fr; }
   .tech-goal-contract-wide { grid-column: auto; }
+  .app-shell .tech-goal-form-page .tech-goal-plan-grid { grid-template-columns: 1fr; }
+  .app-shell .tech-goal-form-page.is-dialog .tech-goal-create-main {
+    width: 100%;
+    max-height: calc(100dvh - 20px);
+    padding-inline: 16px;
+  }
+  .app-shell .tech-goal-form-page.is-dialog .tech-goal-create-header {
+    margin-inline: -16px;
+    padding: 16px 48px 14px 16px;
+  }
+  .app-shell .tech-goal-form-page.is-dialog .tech-goal-create-actions {
+    margin-inline: -16px;
+    padding: 12px 16px 14px;
+  }
+  .app-shell .tech-goal-form-page .tech-goal-contract-grid,
+  .app-shell .tech-goal-form-page .tech-goal-plan-grid {
+    width: 100%;
+    margin-left: 0;
+  }
 }

@@ -473,6 +473,28 @@ test("新建目标页使用统一分步表单并完成创建", async ({ page }) 
   expect(linkedGoalIds).toContain(String(storedGoal?.id));
 });
 
+test("新建目标的学习计划控件在桌面与窄屏均不重叠", async ({ page }) => {
+  await page.goto("/studio/work/goals/new");
+  const planFields = page.locator(".tech-goal-plan-grid > .tech-goal-segment-section");
+  await expect(planFields).toHaveCount(2);
+
+  const desktop = await planFields.evaluateAll((fields) => fields.map((field) => {
+    const rect = field.getBoundingClientRect();
+    return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom };
+  }));
+  expect(desktop[0].right).toBeLessThanOrEqual(desktop[1].left);
+  expect(Math.abs(desktop[0].top - desktop[1].top)).toBeLessThanOrEqual(1);
+
+  await page.setViewportSize({ width: 375, height: 720 });
+  const narrow = await planFields.evaluateAll((fields) => fields.map((field) => {
+    const rect = field.getBoundingClientRect();
+    return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom };
+  }));
+  expect(narrow[0].bottom).toBeLessThanOrEqual(narrow[1].top);
+  expect(Math.abs(narrow[0].left - narrow[1].left)).toBeLessThanOrEqual(1);
+  await expect(page.getByRole("button", { name: "创建目标", exact: true })).toBeVisible();
+});
+
 test("新建目标页在窄屏保持完整统一表单", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
   await page.goto("/studio/work/goals/new");
@@ -521,8 +543,8 @@ test("新建目标页在短桌面视口首屏完整显示", async ({ page }) => 
       actionFontSize: actionButton ? Number.parseFloat(getComputedStyle(actionButton).fontSize) : 0,
     };
   });
-  expect(geometry.width).toBeGreaterThanOrEqual(1000);
-  expect(geometry.width).toBeLessThanOrEqual(1182);
+  expect(geometry.width).toBeGreaterThanOrEqual(756);
+  expect(geometry.width).toBeLessThanOrEqual(762);
   expect(geometry.height).toBeLessThanOrEqual(612);
   expect(geometry.bottom).toBeLessThanOrEqual(geometry.viewportHeight - 10);
   // Preserve the current polished visual baseline: the document includes a 4px shell allowance.

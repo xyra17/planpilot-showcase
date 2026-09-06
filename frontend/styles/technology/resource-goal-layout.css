@@ -93,8 +93,9 @@ body:has(.tech-goal-form-page.is-dialog) .pp-confirm-backdrop {
   width: min(760px, calc(100vw - 36px));
   height: min(624px, calc(100vh - 36px));
   max-height: calc(100vh - 36px);
-  padding: 26px 36px 20px;
+  padding: 0 28px;
   border-radius: 20px;
+  scroll-padding-block: 78px 76px;
 }
 
 @media (min-width: 981px) {
@@ -109,72 +110,82 @@ body:has(.tech-goal-form-page.is-dialog) .pp-confirm-backdrop {
 }
 
 .app-shell .tech-goal-form-page.is-dialog.is-creating .tech-goal-form-dialog-close {
-  top: 28px;
-  right: 30px;
-  width: 46px;
-  height: 46px;
-  border-radius: 12px;
+  position: sticky;
+  top: 18px;
+  right: auto;
+  float: right;
+  width: 38px;
+  height: 38px;
+  margin-right: -5px;
+  margin-bottom: -38px;
+  border-radius: 11px;
 }
 
 .app-shell .tech-goal-form-page.is-dialog.is-creating .tech-goal-form-dialog-close svg {
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
 }
 
 .app-shell .tech-goal-form-page.is-dialog.is-creating .tech-goal-create-header {
-  gap: 14px;
-  min-height: 68px;
-  padding: 0 76px 18px 0;
+  position: sticky;
+  z-index: 2;
+  top: 0;
+  gap: 12px;
+  min-height: 70px;
+  margin: 0 -28px;
+  padding: 17px 72px 14px 28px;
+  border-bottom: 1px solid var(--goal-create-border);
+  background: var(--goal-create-panel);
 }
 
 .app-shell .tech-goal-form-page.is-dialog.is-creating .tech-goal-create-heading-mark {
-  width: 56px;
-  height: 56px;
-  border-radius: 14px;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
   background: color-mix(in srgb, var(--accent) 10%, var(--goal-create-panel));
 }
 
 .app-shell .tech-goal-form-page.is-dialog.is-creating .tech-goal-create-heading-mark svg {
-  width: 29px;
-  height: 29px;
+  width: 22px;
+  height: 22px;
 }
 
 .app-shell .tech-goal-form-page.is-dialog.is-creating .tech-goal-create-header h1 {
-  font-size: 26px;
+  font-size: 22px;
   line-height: 1.2;
 }
 
 .app-shell .tech-goal-form-page.is-dialog.is-creating .tech-goal-create-header p {
-  margin-top: 4px;
-  font-size: 14px;
+  margin-top: 3px;
+  font-size: 12px;
 }
 
 .app-shell .tech-goal-form-page.is-dialog.is-creating .tech-goal-form-step {
-  --goal-step-content-offset: 60px;
-  padding: 15px 0 17px;
+  --goal-step-content-offset: 48px;
+  padding: 14px 0 16px;
 }
 
 .app-shell .tech-goal-form-page.is-dialog.is-creating .tech-goal-form-step-heading {
-  gap: 18px;
-  margin-bottom: 11px;
+  gap: 12px;
+  margin-bottom: 10px;
 }
 
 .app-shell .tech-goal-form-page.is-dialog.is-creating .tech-goal-form-step-heading > span {
-  width: 42px;
-  height: 42px;
-  font-size: 20px;
+  width: 34px;
+  height: 34px;
+  font-size: 16px;
 }
 
 .app-shell .tech-goal-form-page.is-dialog.is-creating .tech-goal-form-step-heading > div {
-  gap: 16px;
+  gap: 12px;
 }
 
 .app-shell .tech-goal-form-page.is-dialog.is-creating .tech-goal-form-step-heading h2 {
-  font-size: 20px;
+  font-size: 18px;
 }
 
 .app-shell .tech-goal-form-page.is-dialog.is-creating .tech-goal-form-step-heading p {
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .app-shell .tech-goal-form-page.is-dialog.is-creating .tech-goal-type-grid {
@@ -190,21 +201,21 @@ body:has(.tech-goal-form-page.is-dialog) .pp-confirm-backdrop {
 }
 
 .app-shell .tech-goal-form-page.is-dialog.is-creating .tech-goal-type-option {
-  min-height: 58px;
+  min-height: 48px;
   gap: 9px;
 }
 
 .app-shell .tech-goal-form-page.is-dialog.is-creating .tech-goal-type-option strong {
-  font-size: 15px;
+  font-size: 13px;
 }
 
 .app-shell .tech-goal-form-page.is-dialog.is-creating .tech-goal-type-option svg {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
 }
 
 .app-shell .tech-goal-form-page.is-dialog.is-creating .tech-goal-name-field > input {
-  height: 54px;
+  height: 46px;
   padding-inline: 16px;
   font-size: 15px;
 }
@@ -222,10 +233,8 @@ body:has(.tech-goal-form-page.is-dialog) .pp-confirm-backdrop {
   min-width: 0;
 }
 
-.app-shell .tech-goal-form-page.is-dialog.is-creating .tech-goal-plan-grid .tech-goal-segment-section {
-  grid-column: 1;
-  grid-row: 1;
-}
+.app-shell .tech-goal-form-page.is-dialog.is-creating .tech-goal-plan-grid.has-current-level > .tech-goal-segment-section:nth-child(1) { grid-column: 1; grid-row: 1; }
+.app-shell .tech-goal-form-page.is-dialog.is-creating .tech-goal-plan-grid.has-current-level > .tech-goal-segment-section:nth-child(2) { grid-column: 2; grid-row: 1; }
 
 .app-shell .tech-goal-form-page.is-dialog.is-creating .tech-goal-plan-grid .tech-goal-date-field {
   grid-column: 1;
@@ -242,29 +251,35 @@ body:has(.tech-goal-form-page.is-dialog) .pp-confirm-backdrop {
 .app-shell .tech-goal-form-page.is-dialog.is-creating .tech-goal-segmented-control,
 .app-shell .tech-goal-form-page.is-dialog.is-creating .tech-goal-date-trigger,
 .app-shell .tech-goal-form-page.is-dialog.is-creating .tech-goal-duration-stepper {
-  min-height: 52px;
-  height: 52px;
+  min-height: 46px;
+  height: 46px;
 }
 
 .app-shell .tech-goal-form-page.is-dialog.is-creating .tech-goal-segmented-control button {
-  min-height: 50px;
+  min-height: 44px;
   font-size: 14px;
 }
 
 .app-shell .tech-goal-form-page.is-dialog.is-creating .tech-goal-field > span,
 .app-shell .tech-goal-form-page.is-dialog.is-creating .tech-goal-create-section legend {
   margin-bottom: 6px;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .app-shell .tech-goal-form-page.is-dialog.is-creating .tech-goal-create-actions {
   gap: 14px;
-  padding-top: 14px;
+  position: sticky;
+  z-index: 3;
+  bottom: 0;
+  margin: 0 -28px;
+  padding: 13px 28px 17px;
+  background: var(--goal-create-panel);
+  box-shadow: 0 -12px 24px color-mix(in srgb, var(--goal-create-text) 5%, transparent);
 }
 
 .app-shell .tech-goal-form-page.is-dialog.is-creating :is(.tech-goal-secondary-action, .tech-goal-primary-action) {
-  min-height: 50px;
-  font-size: 15px;
+  min-height: 44px;
+  font-size: 14px;
 }
 
 .app-shell .tech-goal-form-page.is-dialog.is-creating .tech-goal-secondary-action {
@@ -290,20 +305,22 @@ body:has(.tech-goal-form-page.is-dialog) .pp-confirm-backdrop {
     width: 100%;
     height: calc(100dvh - 16px);
     max-height: calc(100dvh - 16px);
-    padding: 20px 16px 16px;
+    padding: 0 16px;
     border-radius: 16px;
   }
 
   .app-shell .tech-goal-form-page.is-dialog.is-creating .tech-goal-form-dialog-close {
-    top: 18px;
-    right: 16px;
-    width: 42px;
-    height: 42px;
+    top: 14px;
+    right: auto;
+    width: 38px;
+    height: 38px;
+    margin-right: 0;
   }
 
   .app-shell .tech-goal-form-page.is-dialog.is-creating .tech-goal-create-header {
     min-height: 58px;
-    padding: 0 54px 14px 0;
+    margin-inline: -16px;
+    padding: 14px 52px 13px 16px;
   }
 
   .app-shell .tech-goal-form-page.is-dialog.is-creating .tech-goal-create-heading-mark {
@@ -358,9 +375,21 @@ body:has(.tech-goal-form-page.is-dialog) .pp-confirm-backdrop {
     grid-row: auto;
   }
 
+  .app-shell .tech-goal-form-page.is-dialog.is-creating .tech-goal-plan-grid.has-current-level > .tech-goal-segment-section:nth-child(1),
+  .app-shell .tech-goal-form-page.is-dialog.is-creating .tech-goal-plan-grid.has-current-level > .tech-goal-segment-section:nth-child(2),
+  .app-shell .tech-goal-form-page.is-dialog.is-creating .tech-goal-plan-grid > .tech-goal-date-field,
+  .app-shell .tech-goal-form-page.is-dialog.is-creating .tech-goal-plan-grid > .tech-goal-duration-field {
+    width: 100%;
+    grid-column: 1;
+    grid-row: auto;
+    justify-self: stretch;
+  }
+
   .app-shell .tech-goal-form-page.is-dialog.is-creating .tech-goal-create-actions {
     display: grid;
     grid-template-columns: 1fr 1.35fr;
+    margin-inline: -16px;
+    padding: 12px 16px 14px;
   }
 
   .app-shell .tech-goal-form-page.is-dialog.is-creating :is(.tech-goal-secondary-action, .tech-goal-primary-action) {
@@ -377,33 +406,36 @@ body:has(.tech-goal-form-page.is-dialog) .pp-confirm-backdrop {
   .app-shell .tech-goal-form-page.is-dialog.is-creating .tech-goal-create-main {
     height: min(610px, calc(100vh - 24px));
     max-height: min(610px, calc(100vh - 24px));
-    padding: 16px 30px 12px;
+    padding: 0 26px;
   }
 
   .app-shell .tech-goal-form-page.is-dialog.is-creating .tech-goal-form-dialog-close {
-    top: 16px;
-    right: 24px;
-    width: 42px;
-    height: 42px;
+    top: 13px;
+    right: auto;
+    width: 36px;
+    height: 36px;
+    margin-right: -3px;
+    margin-bottom: -36px;
   }
 
   .app-shell .tech-goal-form-page.is-dialog.is-creating .tech-goal-create-header {
     min-height: 54px;
-    padding-bottom: 10px;
+    margin-inline: -26px;
+    padding: 12px 64px 11px 26px;
   }
 
   .app-shell .tech-goal-form-page.is-dialog.is-creating .tech-goal-create-heading-mark {
-    width: 48px;
-    height: 48px;
+    width: 40px;
+    height: 40px;
   }
 
   .app-shell .tech-goal-form-page.is-dialog.is-creating .tech-goal-create-heading-mark svg {
-    width: 25px;
-    height: 25px;
+    width: 21px;
+    height: 21px;
   }
 
-  .app-shell .tech-goal-form-page.is-dialog.is-creating .tech-goal-create-header h1 { font-size: 23px; }
-  .app-shell .tech-goal-form-page.is-dialog.is-creating .tech-goal-create-header p { font-size: 12px; }
+  .app-shell .tech-goal-form-page.is-dialog.is-creating .tech-goal-create-header h1 { font-size: 20px; }
+  .app-shell .tech-goal-form-page.is-dialog.is-creating .tech-goal-create-header p { font-size: 11px; }
 
   .app-shell .tech-goal-form-page.is-dialog.is-creating .tech-goal-form-step {
     --goal-step-content-offset: 46px;
@@ -458,7 +490,8 @@ body:has(.tech-goal-form-page.is-dialog) .pp-confirm-backdrop {
   }
 
   .app-shell .tech-goal-form-page.is-dialog.is-creating .tech-goal-create-actions {
-    padding-top: 10px;
+    margin-inline: -26px;
+    padding: 10px 26px 12px;
   }
 
   .app-shell .tech-goal-form-page.is-dialog.is-creating :is(.tech-goal-secondary-action, .tech-goal-primary-action) {
