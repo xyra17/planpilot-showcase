@@ -599,6 +599,8 @@ async def test_verify_start(client: AsyncClient, auth: dict, goal_id: str):
     data = r.json()
     assert "question" in data
     assert len(data["question"]) > 0
+    assert data["mode"] == "reflection_only"
+    assert data["can_record_mastery"] is False
 
 
 async def test_verify_task_not_found(client: AsyncClient, auth: dict, goal_id: str):
@@ -623,6 +625,12 @@ async def test_verify_answer_pass(client: AsyncClient, auth: dict, goal_id: str,
         headers=auth,
     )
     task_id = r_task.json()["id"]
+    task = await db.scalar(select(Task).where(Task.id == task_id))
+    task.execution_guide = {
+        "done_criteria": ["能准确解释类与对象的关系，并举出一个实例"],
+        "deliverable": "一段不依赖资料的概念解释",
+    }
+    await db.commit()
 
     # 先生成问题（存入缓存）
     q_mock = _mock_llm("请解释 Python 类的概念")
@@ -650,6 +658,8 @@ async def test_verify_answer_pass(client: AsyncClient, auth: dict, goal_id: str,
     assert r.status_code == 200
     data = r.json()
     assert data["passed"] is True
+    assert data["mode"] == "criteria_grounded"
+    assert data["can_record_mastery"] is True
     assert "feedback" in data
     evidence_events = list(
         (
@@ -677,6 +687,7 @@ async def test_verify_answer_pass(client: AsyncClient, auth: dict, goal_id: str,
     )
     assert evidence.payload["evidence_type"] == "explanation"
     assert evidence.payload["contains_user_content"] is False
+    assert evidence.payload["verification_mode"] == "criteria_grounded"
 
 
 async def test_verify_answer_fail_with_suggestion(

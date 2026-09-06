@@ -2434,6 +2434,10 @@ async def verify_answer(
         suggestion = None
         follow_up = None
 
+    if mode == "reflection_only":
+        passed = False
+        feedback = f"已记录这次反思。{feedback} 当前没有资料或验收标准依据，因此不会写入掌握证据。"
+
     assessment_key = hashlib.sha256(
         f"{current_user.id}:{task.id}:{question}:{body.answer}".encode("utf-8")
     ).hexdigest()
@@ -2525,9 +2529,6 @@ async def verify_answer(
             )
     await db.commit()
 
-    if mode == "reflection_only":
-        passed = False
-        feedback = f"已记录这次反思。{feedback} 当前没有资料或验收标准依据，因此不会写入掌握证据。"
     out: dict = {
         "passed": passed,
         "score": score if mode != "reflection_only" else None,

@@ -37,6 +37,7 @@ from src.services.proposal_service import (
     convert_insight_to_action_run,
     create_proposal,
 )
+from src.services.workspace_service import ensure_default_workspace
 
 SessionFactory = async_sessionmaker[AsyncSession]
 
@@ -68,6 +69,7 @@ async def _seed_account(db: AsyncSession, label: str) -> RuntimeSeed:
     )
     db.add(user)
     await db.flush()
+    await ensure_default_workspace(user, db)
     goal = Goal(
         user_id=user.id,
         type="skill",
