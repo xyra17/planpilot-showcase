@@ -46,7 +46,10 @@ from src.models import (
 logger = logging.getLogger(__name__)
 
 # 内存缓存：key = "{user_id}:{task_id}"，value = 生成的验证问题
-_verify_cache: dict[str, str] = {}
+# Short-lived per-process context for the answer turn.  The response also
+# carries the same provenance so the client can explain what is (and is not)
+# being assessed.  This is deliberately not a source of truth.
+_verify_cache: dict[str, dict] = {}
 
 router = APIRouter(prefix="/api/v1/agent", tags=["agent"])
 
@@ -2156,6 +2159,78 @@ class VerifyAnswerRequest(BaseModel):
     answer: str
 
 
+def _verification_source_allowed(item: KnowledgeItem) -> bool:
+    metadata = item.source_metadata or {}
+    if not metadata:
+        return True
+    return "verify_mastery" in set(metadata.get("learning_use") or [])
+
+
+async def _verification_grounding(
+    db: AsyncSession, task: Task, goal: Goal
+) -> tuple[str, list[dict], str | None]:
+    """Return (mode, auditable source refs, criterion).
+
+    A title alone is never considered source-grounded.  We only cite actual
+    stored content (or a previously generated, item-linked excerpt) and only
+    when the source contract permits mastery verification.
+    """
+    guide = dict(task.execution_guide or {})
+    requested_ids = {
+        str(value)
+        for value in (task.kb_refs or [])
+        if value
+    }
+    requested_ids.update(
+        str(ref.get("item_id"))
+        for ref in (guide.get("source_refs") or [])
+        if ref.get("item_id")
+    )
+    items = []
+    if requested_ids:
+        items = list(
+            (
+                await db.execute(
+                    select(KnowledgeItem).where(
+                        KnowledgeItem.user_id == goal.user_id,
+                        KnowledgeItem.id.in_(requested_ids),
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+    refs: list[dict] = []
+    for item in items:
+        if not _verification_source_allowed(item):
+            continue
+        text = _compact_plan_source_text(
+            item.normalized_content or item.content or item.summary, 900
+        )
+        if not text:
+            continue
+        refs.append(
+            {
+                "source_item_id": item.id,
+                "source_title": item.title,
+                "quote": text[:600],
+                "locator": f"《{item.title}》",
+                "content_version": int(getattr(item, "content_version", 1) or 1),
+            }
+        )
+    if refs:
+        return "source_grounded", refs[:3], None
+    criteria = [str(value).strip() for value in (guide.get("done_criteria") or []) if str(value).strip()]
+    criteria.extend(
+        str(value).strip()
+        for value in ((goal.contract or {}).get("success_criteria") or [])
+        if str(value).strip()
+    )
+    if criteria:
+        return "criteria_grounded", [], "；".join(dict.fromkeys(criteria))[:600]
+    return "reflection_only", [], None
+
+
 @router.post("/verify")
 async def verify_start(
     body: VerifyRequest,
@@ -2175,11 +2250,18 @@ async def verify_start(
     if not task:
         raise HTTPException(status_code=404, detail="任务不存在")
 
+    goal = (
+        await db.execute(select(Goal).where(Goal.id == task.goal_id, Goal.user_id == current_user.id))
+    ).scalar_one()
+    mode, grounding_refs, criterion = await _verification_grounding(db, task, goal)
+
     guide = dict(task.execution_guide or {})
     source_context = "\n".join(
         f"- {ref.get('locator', ref.get('item_title', '参考资料'))}：{ref.get('snippet', '')}"
         for ref in (guide.get("source_refs") or [])[:4]
     )
+    if grounding_refs:
+        source_context = "\n".join(f"- {ref['locator']}：{ref['quote']}" for ref in grounding_refs)
     task_notes = (
         (
             await db.execute(
@@ -2205,6 +2287,7 @@ async def verify_start(
         f"任务目标：{task.description or guide.get('deliverable', '')}\n"
         f"任务产出：{guide.get('deliverable', '')}\n"
         f"验收标准：{json.dumps(guide.get('done_criteria') or [], ensure_ascii=False)}\n"
+        + (f"目标成功标准：{criterion}\n" if criterion else "")
         + (f"引用资料：\n{source_context}\n" if source_context else "")
         + (f"学习者笔记：\n{note_context}\n" if note_context else "")
         + "\n"
@@ -2231,8 +2314,28 @@ async def verify_start(
         question = raw
         answer_hint = ""
 
-    _verify_cache[f"{current_user.id}:{body.task_id}"] = question
-    return {"question": question, "answer_hint": answer_hint}
+    if mode == "reflection_only":
+        question = f"回顾「{task.title}」：你实际做了什么，哪里仍不确定，下一步准备如何补齐？"
+        answer_hint = "这次只记录学习反思，不代表已根据资料掌握。"
+    _verify_cache[f"{current_user.id}:{body.task_id}"] = {
+        "question": question,
+        "mode": mode,
+        "grounding": grounding_refs,
+        "criterion": criterion,
+    }
+    return {
+        "question": question,
+        "answer_hint": answer_hint,
+        "mode": mode,
+        "grounding": grounding_refs,
+        "criterion": criterion,
+        "can_record_mastery": mode != "reflection_only",
+        "rationale": {
+            "source_grounded": "问题依据任务关联资料中的可引用正文。",
+            "criteria_grounded": "没有可引用资料，问题依据任务/目标的验收标准。",
+            "reflection_only": "没有可验证的资料或验收标准，只能记录反思。",
+        }[mode],
+    }
 
 
 @router.post("/verify/answer")
@@ -2254,16 +2357,19 @@ async def verify_answer(
     if not task:
         raise HTTPException(status_code=404, detail="任务不存在")
 
-    question = _verify_cache.get(
-        f"{current_user.id}:{body.task_id}",
-        f"谈谈你对「{task.title}」的理解",
-    )
+    cached = _verify_cache.get(f"{current_user.id}:{body.task_id}", {})
+    question = cached.get("question") or f"谈谈你对「{task.title}」的理解"
+    mode = cached.get("mode", "reflection_only")
+    grounding_refs = cached.get("grounding") or []
+    criterion = cached.get("criterion")
 
     guide = dict(task.execution_guide or {})
     source_context = "\n".join(
         f"- {ref.get('locator', ref.get('item_title', '参考资料'))}：{ref.get('snippet', '')}"
         for ref in (guide.get("source_refs") or [])[:4]
     )
+    if grounding_refs:
+        source_context = "\n".join(f"- {ref['locator']}：{ref['quote']}" for ref in grounding_refs)
     task_notes = (
         (
             await db.execute(
@@ -2290,6 +2396,7 @@ async def verify_answer(
         f"任务目标：{task.description or ''}\n"
         f"任务产出：{guide.get('deliverable', '')}\n"
         f"验收标准：{json.dumps(guide.get('done_criteria') or [], ensure_ascii=False)}\n"
+        + (f"目标成功标准：{criterion}\n" if criterion else "")
         + (f"引用资料：\n{source_context}\n" if source_context else "")
         + (f"学习者笔记：\n{note_context}\n" if note_context else "")
         + f"考查问题：{question}\n"
@@ -2307,6 +2414,8 @@ async def verify_answer(
         '"suggestion": "当score<60时：3条具体复习建议（如：重新阅读XX概念/尝试XX练习），否则为null", '
         '"follow_up": "当60<=score<80时：一个追问帮助深化理解，否则为null"}'
     )
+    if mode == "reflection_only":
+        eval_prompt += "\n注意：这是反思记录，不是资料掌握验收；不要声称用户已掌握教材内容。\n"
     result = await llm.ainvoke([HumanMessage(content=eval_prompt)])
     raw = result.content.strip()
 
@@ -2345,7 +2454,7 @@ async def verify_answer(
         idempotency_key=f"verification-assessment:{assessment_key}",
     )
 
-    if passed:
+    if passed and mode != "reflection_only":
         mastery_level = "L3" if score < 90 else "L4"
         evidence_key = assessment_key
         evidence_idempotency_key = f"verification-evidence:{evidence_key}"
@@ -2385,6 +2494,9 @@ async def verify_answer(
                     "quality": "model_scored",
                     "score": score,
                     "passed": True,
+                    "verification_mode": mode,
+                    "source_refs": grounding_refs,
+                    "criterion": criterion,
                     "mastery_level": mastery_level,
                     "contains_user_content": False,
                 },
@@ -2397,7 +2509,7 @@ async def verify_answer(
                     user_id=current_user.id,
                     mastery_level=mastery_level,
                     source="ai_assessment",
-                    notes=f"verification_score={score}",
+                    notes=f"verification_score={score}; mode={mode}; sources={','.join(ref.get('source_item_id', '') for ref in grounding_refs)}",
                 )
             )
             await KnowledgeGraphService.record_task_evidence(
@@ -2413,7 +2525,18 @@ async def verify_answer(
             )
     await db.commit()
 
-    out: dict = {"passed": passed, "score": score, "feedback": feedback}
+    if mode == "reflection_only":
+        passed = False
+        feedback = f"已记录这次反思。{feedback} 当前没有资料或验收标准依据，因此不会写入掌握证据。"
+    out: dict = {
+        "passed": passed,
+        "score": score if mode != "reflection_only" else None,
+        "feedback": feedback,
+        "mode": mode,
+        "can_record_mastery": mode != "reflection_only",
+        "grounding": grounding_refs,
+        "criterion": criterion,
+    }
     if suggestion:
         out["suggestion"] = suggestion
     if follow_up:

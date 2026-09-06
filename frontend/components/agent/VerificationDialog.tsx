@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { X, CheckCircle2, Loader2, Eye, EyeOff, BookOpen, AlertCircle } from "lucide-react";
+import { X, CheckCircle2, Loader2, Eye, EyeOff, BookOpen, AlertCircle, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { useKnowledge } from "@/lib/knowledge-context";
@@ -22,6 +22,9 @@ interface Message {
   suggestion?: string;
 }
 
+type VerificationMode = "source_grounded" | "criteria_grounded" | "reflection_only";
+interface GroundingRef { source_title: string; locator: string; quote: string; }
+
 function ScoreBadge({ score }: { score: number }) {
   const tone: StatusTone = score >= 90 ? "success" : score >= 70 ? "info" : score >= 60 ? "warning" : "danger";
   return (
@@ -40,6 +43,10 @@ export function VerificationDialog({ goalId, taskId, taskTitle, onClose, onPasse
   const [passed, setPassed] = useState(false);
   const [saved, setSaved] = useState(false);
   const [includeAnswer, setIncludeAnswer] = useState(true);
+  const [mode, setMode] = useState<VerificationMode>("reflection_only");
+  const [grounding, setGrounding] = useState<GroundingRef[]>([]);
+  const [criterion, setCriterion] = useState<string | null>(null);
+  const [rationale, setRationale] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
   const { addNote } = useKnowledge();
 
@@ -47,14 +54,19 @@ export function VerificationDialog({ goalId, taskId, taskTitle, onClose, onPasse
     (async () => {
       setIsLoading(true);
       try {
-        const res = await api.post<{ question: string; answer_hint: string }>(`/api/v1/agent/verify`, {
+        const res = await api.post<{ question: string; answer_hint: string; mode: VerificationMode; grounding?: GroundingRef[]; criterion?: string | null; rationale?: string }>(`/api/v1/agent/verify`, {
           goal_id: goalId,
           task_id: taskId,
         });
         setMessages([{ role: "ai", content: res.question }]);
         setAnswerHint(res.answer_hint ?? "");
+        setMode(res.mode ?? "reflection_only");
+        setGrounding(res.grounding ?? []);
+        setCriterion(res.criterion ?? null);
+        setRationale(res.rationale ?? "");
       } catch {
-        setMessages([{ role: "ai", content: `你刚完成了「${taskTitle}」，用自己的话说说，这个任务的核心要点是什么？` }]);
+        setMode("reflection_only");
+        setMessages([{ role: "ai", content: `当前无法取得资料或验收标准依据。这次只记录「${taskTitle}」的学习反思：你实际做了什么，哪里仍不确定？` }]);
       } finally {
         setIsLoading(false);
       }
@@ -79,6 +91,10 @@ export function VerificationDialog({ goalId, taskId, taskTitle, onClose, onPasse
         score: number;
         suggestion?: string;
         follow_up?: string;
+        mode?: VerificationMode;
+        grounding?: GroundingRef[];
+        criterion?: string | null;
+        can_record_mastery?: boolean;
       }>(`/api/v1/agent/verify/answer`, { goal_id: goalId, task_id: taskId, answer });
 
       setMessages((m) => [...m, {
@@ -108,8 +124,11 @@ export function VerificationDialog({ goalId, taskId, taskTitle, onClose, onPasse
     const score = evalMsg?.score;
     const lines = [
       `【验收任务】${taskTitle}`,
+      `【验收模式】${modeLabel}`,
       score !== undefined ? `【得分】${score}` : null,
       `【考查问题】${question}`,
+      grounding.length ? `【资料依据】${grounding.map((ref) => `${ref.source_title}：${ref.quote}`).join("\n")}` : null,
+      criterion ? `【验收标准】${criterion}` : null,
       includeAnswer && userAnswers ? `【我的回答】${userAnswers}` : null,
       answerHint ? `【参考答案要点】\n${answerHint}` : null,
     ].filter(Boolean).join("\n");
@@ -118,6 +137,7 @@ export function VerificationDialog({ goalId, taskId, taskTitle, onClose, onPasse
   };
 
   const hasAnswer = messages.some((m) => m.role === "user");
+  const modeLabel = mode === "source_grounded" ? "资料依据验收" : mode === "criteria_grounded" ? "标准依据验收" : "反思记录（无资料依据）";
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
@@ -127,6 +147,9 @@ export function VerificationDialog({ goalId, taskId, taskTitle, onClose, onPasse
           <div>
             <p className="text-sm font-semibold text-gray-800">学习验收</p>
             <p className="text-xs text-gray-400 truncate max-w-64">{taskTitle}</p>
+            <p className={cn("text-[11px] mt-1", mode === "reflection_only" ? "text-amber-600" : "text-emerald-600")}>
+              {mode === "source_grounded" ? <ShieldCheck size={11} className="inline mr-1" /> : null}{modeLabel}
+            </p>
           </div>
           <button onClick={onClose}
             className="w-8 h-8 rounded-xl flex items-center justify-center text-gray-400 hover:bg-gray-100 transition">
@@ -136,6 +159,15 @@ export function VerificationDialog({ goalId, taskId, taskTitle, onClose, onPasse
 
         {/* 对话区 */}
         <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3 min-h-0">
+          {!isLoading && (grounding.length > 0 || criterion || mode === "reflection_only") && (
+            <InlineNotice tone={mode === "reflection_only" ? "warning" : "info"} className="text-xs whitespace-pre-line">
+              <p className="font-medium mb-1">{rationale || modeLabel}</p>
+              {grounding.length > 0 && <div>依据：{grounding.map((ref) => `《${ref.source_title}》${ref.locator !== `《${ref.source_title}》` ? ` · ${ref.locator}` : ""}`).join("、")}</div>}
+              {grounding.length > 0 && <details className="mt-1"><summary className="cursor-pointer">查看引用片段</summary><p className="mt-1">{grounding.map((ref) => `“${ref.quote}”`).join("\n")}</p></details>}
+              {criterion && <div>验收标准：{criterion}</div>}
+              {mode === "reflection_only" && <div>本次回答不会写入资料掌握证据。</div>}
+            </InlineNotice>
+          )}
           {messages.map((msg, i) => (
             <div key={i} className="space-y-1.5">
               <div className={cn("flex", msg.role === "user" ? "justify-end" : "justify-start")}>
