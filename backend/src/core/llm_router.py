@@ -21,20 +21,30 @@ from src.services.runtime_model_config import RuntimeModelConfig, get_runtime_mo
 logger = logging.getLogger(__name__)
 
 
-class LocalModelCircuitBreaker:
-    """进程内熔断器：连续失败后暂时跳过本地模型。"""
+class ModelCircuitBreaker:
+    """进程内熔断器：连续失败后暂时跳过对应模型。"""
 
-    def __init__(self) -> None:
+    def __init__(self, *, failure_threshold_setting: str, cooldown_setting: str) -> None:
         self._lock = threading.Lock()
         self._consecutive_failures = 0
         self._opened_at: float | None = None
+        self._failure_threshold_setting = failure_threshold_setting
+        self._cooldown_setting = cooldown_setting
+
+    @property
+    def cooldown_seconds(self) -> float:
+        return float(getattr(settings, self._cooldown_setting))
+
+    @property
+    def failure_threshold(self) -> int:
+        return int(getattr(settings, self._failure_threshold_setting))
 
     def allow_request(self) -> bool:
         with self._lock:
             if self._opened_at is None:
                 return True
             elapsed = time.monotonic() - self._opened_at
-            if elapsed >= settings.local_model_circuit_cooldown_seconds:
+            if elapsed >= self.cooldown_seconds:
                 # 冷却结束后放行一次探测请求。
                 self._opened_at = None
                 self._consecutive_failures = 0
@@ -49,7 +59,7 @@ class LocalModelCircuitBreaker:
     def record_failure(self) -> None:
         with self._lock:
             self._consecutive_failures += 1
-            if self._consecutive_failures >= settings.local_model_failure_threshold:
+            if self._consecutive_failures >= self.failure_threshold:
                 self._opened_at = time.monotonic()
 
     def snapshot(self) -> dict[str, Any]:
@@ -58,8 +68,7 @@ class LocalModelCircuitBreaker:
             if self._opened_at is not None:
                 remaining = max(
                     0.0,
-                    settings.local_model_circuit_cooldown_seconds
-                    - (time.monotonic() - self._opened_at),
+                    self.cooldown_seconds - (time.monotonic() - self._opened_at),
                 )
             return {
                 "state": "open" if self._opened_at is not None else "closed",
@@ -114,7 +123,14 @@ class ModelMetrics:
             self._latency_total_ms.clear()
 
 
-local_circuit = LocalModelCircuitBreaker()
+local_circuit = ModelCircuitBreaker(
+    failure_threshold_setting="local_model_failure_threshold",
+    cooldown_setting="local_model_circuit_cooldown_seconds",
+)
+cloud_circuit = ModelCircuitBreaker(
+    failure_threshold_setting="cloud_model_failure_threshold",
+    cooldown_setting="cloud_model_circuit_cooldown_seconds",
+)
 model_metrics = ModelMetrics()
 _route_semaphores: dict[tuple[str, int], asyncio.Semaphore] = {}
 
@@ -129,10 +145,14 @@ def _route_semaphore(route: str, limit: int) -> asyncio.Semaphore:
     return semaphore
 
 
-def get_model_role_contracts(runtime: RuntimeModelConfig | None = None) -> dict[str, dict[str, Any]]:
+def get_model_role_contracts(
+    runtime: RuntimeModelConfig | None = None,
+) -> dict[str, dict[str, Any]]:
     """Build the admin-facing routing map from the hot runtime configuration."""
     runtime = runtime or get_runtime_model_config()
-    local_available = bool(runtime.local_enabled and runtime.local_base_url and runtime.local_model_name)
+    local_available = bool(
+        runtime.local_enabled and runtime.local_base_url and runtime.local_model_name
+    )
     cloud_available = bool(
         runtime.cloud_enabled
         and runtime.cloud_base_url
@@ -144,28 +164,44 @@ def get_model_role_contracts(runtime: RuntimeModelConfig | None = None) -> dict[
         runtime.embedding_enabled and runtime.embedding_base_url and runtime.embedding_model_name
     )
 
-    interactive_primary = "local" if local_available else "cloud" if cloud_available else "unavailable"
-    interactive_model = (
-        runtime.local_model_name if local_available else runtime.cloud_model_name if cloud_available else ""
+    interactive_primary = (
+        "cloud" if cloud_available else "local" if local_available else "unavailable"
     )
-    interactive_fallback = "cloud" if local_available and cloud_available else None
-    interactive_fallback_model = runtime.cloud_model_name if interactive_fallback else None
-    interactive_limit = (
-        runtime.local_max_concurrency
+    interactive_model = (
+        runtime.cloud_model_name
+        if cloud_available
+        else runtime.local_model_name
         if local_available
-        else runtime.cloud_routine_max_concurrency if cloud_available else 0
+        else ""
+    )
+    interactive_fallback = "local" if local_available and cloud_available else None
+    interactive_fallback_model = runtime.local_model_name if interactive_fallback else None
+    interactive_limit = (
+        runtime.cloud_routine_max_concurrency
+        if cloud_available
+        else runtime.local_max_concurrency
+        if local_available
+        else 0
     )
 
-    structured_primary = "cloud" if cloud_available else "local" if local_available else "unavailable"
+    structured_primary = (
+        "cloud" if cloud_available else "local" if local_available else "unavailable"
+    )
     structured_model = (
-        runtime.cloud_model_name if cloud_available else runtime.local_model_name if local_available else ""
+        runtime.cloud_model_name
+        if cloud_available
+        else runtime.local_model_name
+        if local_available
+        else ""
     )
     structured_fallback = "local" if cloud_available and local_available else None
     structured_fallback_model = runtime.local_model_name if structured_fallback else None
     structured_limit = (
         runtime.cloud_routine_max_concurrency
         if cloud_available
-        else runtime.local_max_concurrency if local_available else 0
+        else runtime.local_max_concurrency
+        if local_available
+        else 0
     )
 
     return {
@@ -175,7 +211,7 @@ def get_model_role_contracts(runtime: RuntimeModelConfig | None = None) -> dict[
             "primary_model": interactive_model,
             "fallback": interactive_fallback,
             "fallback_model": interactive_fallback_model,
-            "fallback_policy": "本地模型不可用、报错或队列超时后回退；不因主观回答质量自动切换",
+            "fallback_policy": "云端模型断网、超时、限流、余额或服务异常时回退到本地模型",
             "result": "简短中文自然语言，可流式返回",
             "max_concurrency": interactive_limit,
         },
@@ -210,6 +246,7 @@ def get_model_role_contracts(runtime: RuntimeModelConfig | None = None) -> dict[
             "max_concurrency": runtime.embedding_max_concurrency if embedding_available else 0,
         },
     }
+
 
 class _RouteMetricsCallback(BaseCallbackHandler):
     def __init__(self, route: str) -> None:
@@ -246,6 +283,11 @@ class _RouteMetricsCallback(BaseCallbackHandler):
                 local_circuit.record_success()
             else:
                 local_circuit.record_failure()
+        elif self.route in {"flash", "pro"}:
+            if outcome == "success":
+                cloud_circuit.record_success()
+            else:
+                cloud_circuit.record_failure()
         logger.info(
             "llm_call route=%s outcome=%s elapsed_ms=%.1f",
             self.route,
@@ -337,7 +379,9 @@ def _limit_flash_concurrency(runnable: Any, limit: int | None = None) -> Any:
         runnable,
         semaphore=_route_semaphore(
             "flash",
-            limit if limit is not None else get_runtime_model_config().cloud_routine_max_concurrency,
+            limit
+            if limit is not None
+            else get_runtime_model_config().cloud_routine_max_concurrency,
         ),
         queue_timeout_seconds=settings.cloud_model_queue_timeout_seconds,
         route="flash",
@@ -357,22 +401,25 @@ def _limit_pro_concurrency(runnable: Any, limit: int | None = None) -> Any:
 
 
 def create_interactive_llm(*, tools: Sequence[Any] | None = None, **kwargs: Any) -> Any:
-    """Local Qwen first for user-facing conversation; Flash is availability fallback."""
+    """DeepSeek Flash first for user-facing conversation; local Qwen is fallback."""
     candidates: list[Any] = []
     runtime = get_runtime_model_config()
-    local_added = (
-        runtime.local_enabled and runtime.local_base_url and local_circuit.allow_request()
-    )
+    if (
+        runtime.cloud_enabled
+        and runtime.cloud_api_key
+        and runtime.cloud_model_name
+        and cloud_circuit.allow_request()
+    ):
+        flash = _flash_llm(runtime, **kwargs)
+        if tools:
+            flash = flash.bind_tools(tools)
+        candidates.append(_limit_flash_concurrency(flash, runtime.cloud_routine_max_concurrency))
+    local_added = runtime.local_enabled and runtime.local_base_url and local_circuit.allow_request()
     if local_added:
         local = _local_llm(runtime, **kwargs)
         if tools:
             local = local.bind_tools(tools)
         candidates.append(_limit_local_concurrency(local, runtime.local_max_concurrency))
-    if runtime.cloud_enabled and runtime.cloud_api_key and runtime.cloud_model_name:
-        flash = _flash_llm(runtime, **kwargs)
-        if tools:
-            flash = flash.bind_tools(tools)
-        candidates.append(_limit_flash_concurrency(flash, runtime.cloud_routine_max_concurrency))
     if not candidates:
         raise RuntimeError("没有可用的日常模型：请配置本地模型或云端模型")
 
@@ -389,14 +436,17 @@ def create_structured_llm(*, tools: Sequence[Any] | None = None, **kwargs: Any) 
     """Flash first for contract-bound JSON; local Qwen is availability fallback."""
     candidates: list[Any] = []
     runtime = get_runtime_model_config()
-    if runtime.cloud_enabled and runtime.cloud_api_key and runtime.cloud_model_name:
+    if (
+        runtime.cloud_enabled
+        and runtime.cloud_api_key
+        and runtime.cloud_model_name
+        and cloud_circuit.allow_request()
+    ):
         flash = _flash_llm(runtime, **kwargs)
         if tools:
             flash = flash.bind_tools(tools)
         candidates.append(_limit_flash_concurrency(flash, runtime.cloud_routine_max_concurrency))
-    local_added = (
-        runtime.local_enabled and runtime.local_base_url and local_circuit.allow_request()
-    )
+    local_added = runtime.local_enabled and runtime.local_base_url and local_circuit.allow_request()
     if local_added:
         local = _local_llm(runtime, **kwargs)
         if tools:
@@ -461,6 +511,13 @@ def create_json_llm(**kwargs: Any) -> Any:
     return create_structured_routine_llm(**kwargs)
 
 
+def create_local_json_llm(**kwargs: Any) -> Any:
+    """Local-only JSON route for private sources; intentionally no cloud fallback."""
+    kwargs.setdefault("temperature", 0.1)
+    kwargs.setdefault("model_kwargs", {"response_format": {"type": "json_object"}})
+    return _local_llm(**kwargs)
+
+
 def _json_payload(content: str, opening: str, closing: str) -> Any:
     start = content.find(opening)
     end = content.rfind(closing) + 1
@@ -506,7 +563,11 @@ async def ainvoke_structured_checked(
             used_model or "unknown",
         )
         if used_local:
-            if not runtime.cloud_enabled or not runtime.cloud_api_key or not runtime.cloud_model_name:
+            if (
+                not runtime.cloud_enabled
+                or not runtime.cloud_api_key
+                or not runtime.cloud_model_name
+            ):
                 raise
             retry = _flash_llm(runtime, **kwargs)
             if tools:
@@ -545,6 +606,8 @@ def create_pro_llm(**kwargs: Any) -> Any:
     runtime = get_runtime_model_config()
     if not runtime.cloud_enabled or not runtime.cloud_api_key or not runtime.cloud_pro_model_name:
         raise RuntimeError("高质量云端模型未配置")
+    if not cloud_circuit.allow_request():
+        raise RuntimeError("高质量云端模型暂时不可用，请稍后重试")
     return _limit_pro_concurrency(
         ChatOpenAI(
             model=runtime.cloud_pro_model_name,
@@ -574,6 +637,8 @@ def get_llm_runtime_status() -> dict[str, Any]:
         "cloud_routine_model": runtime.cloud_model_name,
         "cloud_pro_model": runtime.cloud_pro_model_name,
         "circuit": local_circuit.snapshot(),
+        "local_circuit": local_circuit.snapshot(),
+        "cloud_circuit": cloud_circuit.snapshot(),
         "metrics": model_metrics.snapshot(),
         "gateway_circuits": gateway_status(),
         "roles": get_model_role_contracts(runtime),

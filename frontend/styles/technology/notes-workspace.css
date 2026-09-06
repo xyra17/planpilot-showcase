@@ -4520,9 +4520,118 @@
 }
 
 .app-shell .tech-notes-migrated .note-list-goal-label {
+  max-width: 100%;
   min-height: 18px;
+  gap: 3px;
+  padding: 2px 5px;
+  margin-left: -5px;
+  color: color-mix(in srgb, var(--notes-accent) 66%, var(--notes-muted));
   font-size: 10px;
+  font-weight: 630;
   line-height: 1;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease;
+}
+
+.app-shell .tech-notes-migrated .note-list-goal-label > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-shell .tech-notes-migrated .note-list-goal-label > svg {
+  flex: 0 0 auto;
+}
+
+.app-shell .tech-notes-migrated .note-list-goal-label > svg:last-child {
+  opacity: .58;
+  transition: transform 150ms ease, opacity 150ms ease;
+}
+
+.app-shell .tech-notes-migrated .note-list-goal-label.is-unlinked {
+  color: var(--notes-muted);
+  border-color: color-mix(in srgb, var(--notes-border) 74%, transparent);
+  border-style: dashed;
+}
+
+.app-shell .tech-notes-migrated .note-list-goal-label:hover,
+.app-shell .tech-notes-migrated .note-list-goal-label:focus-visible,
+.app-shell .tech-notes-migrated .note-list-goal-label[data-state="open"] {
+  color: var(--notes-accent);
+  background: color-mix(in srgb, var(--notes-accent) 8%, transparent);
+  border-color: color-mix(in srgb, var(--notes-accent) 30%, var(--notes-border));
+  outline: none;
+}
+
+.app-shell .tech-notes-migrated .note-list-goal-label:focus-visible {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--notes-accent) 16%, transparent);
+}
+
+.app-shell .tech-notes-migrated .note-list-goal-label[data-state="open"] > svg:last-child {
+  opacity: 1;
+  transform: rotate(180deg);
+}
+
+/* The menu is portalled outside the notes workspace, so it uses workspace tokens directly. */
+.note-goal-menu {
+  width: min(236px, calc(100vw - 24px));
+  max-height: min(320px, var(--radix-dropdown-menu-content-available-height));
+  padding: 5px !important;
+  overflow-y: auto !important;
+  color: var(--workspace-text, #1f2937) !important;
+  background: var(--workspace-panel, #fff) !important;
+  border-color: var(--workspace-border, #dfe3e8) !important;
+  border-radius: 9px !important;
+  box-shadow: 0 14px 34px rgb(15 23 42 / 14%) !important;
+}
+
+.note-goal-menu-label {
+  padding: 6px 8px 7px !important;
+  color: var(--workspace-secondary, #667085) !important;
+  font-size: 11px !important;
+  font-weight: 680 !important;
+  letter-spacing: .02em;
+}
+
+.note-goal-menu-item {
+  min-height: 34px;
+  gap: 8px !important;
+  padding: 7px 8px !important;
+  color: var(--workspace-text, #1f2937) !important;
+  font-size: 12px !important;
+  line-height: 1.35;
+  border-radius: 6px !important;
+  cursor: pointer !important;
+}
+
+.note-goal-menu-item > span {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.note-goal-menu-item[data-highlighted] {
+  background: color-mix(in srgb, var(--workspace-accent, #4f67d8) 9%, transparent) !important;
+}
+
+.note-goal-menu-item.is-selected {
+  color: var(--workspace-accent, #4f67d8) !important;
+  background: color-mix(in srgb, var(--workspace-accent, #4f67d8) 7%, transparent);
+  font-weight: 650;
+}
+
+.note-goal-menu-item.is-unlink {
+  color: var(--workspace-secondary, #667085) !important;
+}
+
+.note-goal-menu-separator {
+  margin: 4px 2px !important;
+  background: var(--workspace-border, #dfe3e8) !important;
 }
 
 .app-shell .tech-notes-migrated .note-card-download,

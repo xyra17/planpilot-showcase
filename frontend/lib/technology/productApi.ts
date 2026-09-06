@@ -13,6 +13,15 @@ export type ApiGoal = {
   work_schedule?: "weekday" | "weekend" | "all";
   kb_id?: string | null;
   version?: number;
+  description?: string | null;
+  contract?: {
+    baseline?: string | null;
+    success_criteria?: string[];
+    must_cover?: string[];
+    may_skip?: string[];
+    constraints?: Record<string, unknown>;
+  };
+  intent_version?: number;
 };
 
 export type GoalProgress = {
@@ -38,6 +47,14 @@ export type ApiTask = {
   date: string;
   priority: "high" | "medium" | "low";
   masteryLevel: string;
+  executionGuide: {
+    why_now?: string;
+    steps?: string[];
+    deliverable?: string;
+    done_criteria?: string[];
+    prerequisites?: string[];
+    source_refs?: Array<{ item_id: string; item_title: string; locator: string; snippet?: string }>;
+  };
 };
 
 export type ApiNote = {
@@ -63,6 +80,48 @@ export type ApiKnowledgeBase = {
   created_at: string;
 };
 
+export type ApiSourceMetadata = {
+  document_type: "syllabus" | "textbook" | "past_exam" | "course_material" | "reference" | "study_note" | "learning_evidence" | "other";
+  authority: "official" | "publisher" | "institution" | "teacher" | "community" | "personal" | "unknown";
+  difficulty: "introductory" | "intermediate" | "advanced" | "mixed" | "unknown";
+  language: string;
+  edition: string;
+  published_year?: number;
+  scope_topics: string[];
+  covered_chapters: string[];
+  learning_use: Array<"define_scope" | "plan_sequence" | "execute_task" | "answer_question" | "verify_mastery">;
+  exclusions: string[];
+  review_status: "confirmed";
+  provenance: "user" | "ai_reviewed" | "imported";
+  processing_policy: "local_only" | "cloud_allowed";
+  rationale: string;
+};
+
+export type ApiSourceMetadataProposal = {
+  id: string;
+  item_id: string;
+  proposed_role: ApiKnowledgeFile["sourceRole"];
+  proposed_metadata: ApiSourceMetadata;
+  confidence: number;
+  rationale: string;
+  status: "draft" | "accepted" | "rejected" | "superseded";
+  reviewed_at: string;
+  created_at: string;
+};
+
+export type ApiKnowledgeMapVersion = {
+  id: string;
+  goal_id: string;
+  version: number;
+  status: "draft" | "active" | "superseded";
+  change_summary: Record<string, { added: unknown[]; removed: unknown[]; changed: unknown[] }>;
+  reason: string;
+  generated_by: string;
+  parent_version_id: string | null;
+  activated_at: string | null;
+  created_at: string | null;
+};
+
 export type ApiKnowledgeFile = {
   id: string;
   name: string;
@@ -79,6 +138,8 @@ export type ApiKnowledgeFile = {
   contentLength: number;
   summary: string;
   sourceUrl: string | null;
+  sourceRole: "scope" | "reference" | "note" | "evidence";
+  sourceMetadata: Partial<ApiSourceMetadata>;
   content: string;
   contentFormat: "plain" | "markdown" | "html";
   mediaPreviewStatus: "none" | "queued" | "processing" | "ready" | "failed";
@@ -87,6 +148,52 @@ export type ApiKnowledgeFile = {
   mediaHasPlayback: boolean;
   mediaHasPoster: boolean;
   mediaHasWaveform: boolean;
+};
+
+export type ApiKnowledgeMap = {
+  goal_id: string;
+  status: "draft" | "confirmed";
+  generated_by: string;
+  map_version?: ApiKnowledgeMapVersion;
+  created_concepts: number;
+  created_edges: number;
+  sources: Array<{
+    item_id: string;
+    title: string;
+    source_role: string;
+    content_version: number;
+    concept_count: number;
+    extraction_method?: string;
+    degradation_reason?: string | null;
+  }>;
+  graph: {
+    concepts: Array<{
+      id: string;
+      name: string;
+      description: string;
+      mastery_score: number;
+      retention: number;
+      status: string;
+      provenance_type: string;
+      review_status: "draft" | "confirmed" | "rejected";
+      source_refs: Array<{ item_id: string; item_title: string; content_version: number; start_char: number; end_char: number; snippet: string }>;
+      aliases: string[];
+      merged_into_id: string | null;
+      lifecycle_status: string;
+    }>;
+    resources: Array<{ id: string; title: string; source_type: string; source_role: string; source_metadata: Partial<ApiSourceMetadata>; content_version: number }>;
+    edges: Array<{
+      id: string;
+      source_concept_id: string;
+      target_concept_id: string | null;
+      resource_item_id: string | null;
+      relation_type: string;
+      confidence: number;
+      evidence_count: number;
+      basis: string;
+      review_status: "draft" | "confirmed" | "rejected";
+    }>;
+  };
 };
 
 export type ApiMediaMetadata = {
@@ -357,7 +464,7 @@ export const productApi = {
   updateKnowledgeBase: (id: string, body: { name?: string; description?: string; goal_id?: string | null }) => api.patch<ApiKnowledgeBase>(`/api/v1/knowledge/kbs/${id}`, body),
   deleteKnowledgeBase: (id: string) => api.del(`/api/v1/knowledge/kbs/${id}`),
   listKnowledgeFiles: async () => (await api.get<{ items: ApiKnowledgeFile[] }>("/api/v1/knowledge/files")).items,
-  uploadKnowledgeFile: (file: File, body: { kbIds?: string[]; goalIds?: string[] }) => {
+  uploadKnowledgeFile: (file: File, body: { kbIds?: string[]; goalIds?: string[]; sourceRole?: ApiKnowledgeFile["sourceRole"] }) => {
     const form = new FormData();
     form.append("file", file);
     body.kbIds?.forEach((kbId) => {
@@ -366,10 +473,22 @@ export const productApi = {
     body.goalIds?.forEach((goalId) => {
       if (goalId) form.append("goal_ids", goalId);
     });
+    if (body.sourceRole) form.append("source_role", body.sourceRole);
     return apiFetch<ApiKnowledgeFile>("/api/v1/knowledge/upload", { method: "POST", body: form });
   },
-  importKnowledgeUrl: (body: { url: string; title?: string; kb_ids?: string[]; goal_ids?: string[] }) => api.post<ApiKnowledgeFile>("/api/v1/knowledge/url", body),
-  updateKnowledgeFile: (id: string, body: { title?: string; summary?: string; kb_ids?: string[]; goal_ids?: string[]; content?: string; content_format?: "plain" | "markdown" | "html" }) => api.patch<ApiKnowledgeFile>(`/api/v1/knowledge/files/${id}`, body),
+  importKnowledgeUrl: (body: { url: string; title?: string; kb_ids?: string[]; goal_ids?: string[]; source_role?: ApiKnowledgeFile["sourceRole"] }) => api.post<ApiKnowledgeFile>("/api/v1/knowledge/url", body),
+  updateKnowledgeFile: (id: string, body: { title?: string; summary?: string; kb_ids?: string[]; goal_ids?: string[]; content?: string; content_format?: "plain" | "markdown" | "html"; source_role?: ApiKnowledgeFile["sourceRole"]; source_metadata?: Partial<ApiSourceMetadata> }) => api.patch<ApiKnowledgeFile>(`/api/v1/knowledge/files/${id}`, body),
+  proposeSourceMetadata: (id: string) => api.post<ApiSourceMetadataProposal>(`/api/v1/knowledge/files/${id}/metadata-proposals`, {}),
+  listSourceMetadataProposals: async (id: string) => (await api.get<{ items: ApiSourceMetadataProposal[] }>(`/api/v1/knowledge/files/${id}/metadata-proposals`)).items,
+  reviewSourceMetadataProposal: (id: string, proposalId: string, body: { action: "accepted" | "rejected"; source_role?: ApiKnowledgeFile["sourceRole"]; source_metadata?: Partial<ApiSourceMetadata> }) => api.post<{ proposal: ApiSourceMetadataProposal; file: ApiKnowledgeFile }>(`/api/v1/knowledge/files/${id}/metadata-proposals/${proposalId}/review`, body),
+  buildKnowledgeMap: (goalId: string) => api.post<ApiKnowledgeMap>("/api/v1/intelligence/knowledge-map/build", { goal_id: goalId }),
+  reviewKnowledgeMap: (body: { goal_id: string; concept_ids?: string[]; edge_ids?: string[]; action: "confirmed" | "rejected" }) => api.post<ApiKnowledgeMap>("/api/v1/intelligence/knowledge-map/review", body),
+  updateKnowledgeConcept: (id: string, body: { name?: string; description?: string; review_status?: "draft" | "confirmed" | "rejected" }) => api.patch<ApiKnowledgeMap["graph"]["concepts"][number]>(`/api/v1/intelligence/concepts/${id}`, body),
+  listKnowledgeMapVersions: async (goalId: string) => (await api.get<{ items: ApiKnowledgeMapVersion[] }>(`/api/v1/intelligence/knowledge-map/${goalId}/versions`)).items,
+  activateKnowledgeMapVersion: (goalId: string, version: number) => api.post<{ restored_from: number; map_version: ApiKnowledgeMapVersion; graph: ApiKnowledgeMap["graph"] }>(`/api/v1/intelligence/knowledge-map/${goalId}/versions/${version}/activate`, { reason: "用户从资料空间恢复历史版本" }),
+  mergeKnowledgeConcepts: (body: { goal_id: string; source_concept_ids: string[]; target_concept_id: string; reason?: string }) => api.post<{ target: ApiKnowledgeMap["graph"]["concepts"][number]; merged_ids: string[]; map_version: ApiKnowledgeMapVersion; graph: ApiKnowledgeMap["graph"] }>("/api/v1/intelligence/concepts/merge", body),
+  splitKnowledgeConcept: (id: string, body: { goal_id: string; parts: Array<{ name: string; description?: string }>; reason?: string }) => api.post<{ source_id: string; parts: ApiKnowledgeMap["graph"]["concepts"]; map_version: ApiKnowledgeMapVersion; graph: ApiKnowledgeMap["graph"] }>(`/api/v1/intelligence/concepts/${id}/split`, body),
+  previewKnowledgeImpact: (body: { goal_id: string; source_item_id?: string; proposed_source_role?: ApiKnowledgeFile["sourceRole"]; proposed_source_metadata?: Partial<ApiSourceMetadata>; proposed_goal_contract?: Record<string, unknown> }) => api.post<{ affected_concepts: ApiKnowledgeMap["graph"]["concepts"]; affected_tasks: Array<{ id: string; title: string; scheduled_date: string }>; plan_requires_review: boolean; map_requires_review: boolean; reasons: string[]; safe_default: string }>("/api/v1/intelligence/knowledge-map/impact-preview", body),
   fetchKnowledgeFile: async (id: string) => {
     const response = await authFetch(`/api/v1/knowledge/files/${id}/serve`);
     if (!response.ok) throw new Error(`文件预览加载失败 (${response.status})`);

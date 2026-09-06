@@ -2,6 +2,7 @@
 
 import {
   ArrowLeft,
+  Check,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -12,6 +13,7 @@ import {
   Search,
   Target,
   Trash2,
+  Unlink2,
   X,
 } from "lucide-react";
 import dynamic from "next/dynamic";
@@ -22,6 +24,14 @@ import { useAuth } from "@/components/technology/AuthProvider";
 import { WorkspaceSkeleton } from "@/components/technology/WorkspaceSkeleton";
 import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { DataSyncNotice } from "@/components/ui/DataSyncNotice";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useToast } from "@/components/ui/Toast";
 import { productApi, type ApiGoal, type ApiNote } from "@/lib/technology/productApi";
 import {
@@ -644,6 +654,44 @@ export default function NotesPage() {
     });
   }
 
+  async function changeNoteGoal(note: Note, nextGoalId: string | null) {
+    const currentNote = note.id === selectedId ? draftRef.current : note;
+    const previousGoalId = currentNote.goalId ?? null;
+    const previousGoalTitle = currentNote.goal;
+    if (previousGoalId === nextGoalId) return;
+    const nextGoal = selectableGoals.find((goal) => goal.id === nextGoalId);
+    const nextGoalTitle = nextGoal?.title ?? "未关联";
+
+    if (note.id === selectedId) {
+      updateDraft({ goalId: nextGoalId, goal: nextGoalTitle });
+      if (!(await saveDraft())) {
+        const restoredDraft = { ...draftRef.current, goalId: previousGoalId, goal: previousGoalTitle };
+        draftRef.current = restoredDraft;
+        setDraft(restoredDraft);
+        return;
+      }
+    } else if (authStatus === "authenticated") {
+      try {
+        const saved = await productApi.updateNote(String(note.id), { goalId: nextGoalId ?? "" });
+        const nextNote = noteFromApi(saved);
+        setNotes((current) => current.map((item) => item.id === note.id ? nextNote : item));
+      } catch (reason) {
+        showToast(reason instanceof Error ? reason.message : "目标关联保存失败，请重试", "error");
+        return;
+      }
+    } else {
+      setNotes((current) => {
+        const nextNotes = current.map((item) => item.id === note.id
+          ? { ...item, goalId: nextGoalId, goal: nextGoalTitle, updatedAt: new Date().toISOString() }
+          : item);
+        writeProductArray(PRODUCT_STORAGE_KEYS.notes, nextNotes);
+        return nextNotes;
+      });
+    }
+
+    showToast(nextGoalId ? `已关联到「${nextGoalTitle}」` : `已取消与「${currentNote.goal || "当前目标"}」的关联`, "success");
+  }
+
   async function persistDraft(): Promise<boolean> {
     const currentDraft = draftRef.current;
     const currentIsNew = draftIsNewRef.current;
@@ -668,7 +716,7 @@ export default function NotesPage() {
       try {
         const saved = currentIsNew
           ? await productApi.createNote({ goalId: committed.goalId ?? null, title: committed.title, content: committed.content, noteType: "quick_note" })
-          : await productApi.updateNote(String(committed.id), { goalId: committed.goalId ?? null, title: committed.title, content: committed.content });
+          : await productApi.updateNote(String(committed.id), { goalId: committed.goalId ?? "", title: committed.title, content: committed.content });
         const nextNote = noteFromApi(saved as ApiNote);
         setNotes((current) => currentIsNew ? [nextNote, ...current] : current.map((note) => note.id === committed.id ? nextNote : note));
         draftRef.current = editableNote(nextNote);
@@ -903,7 +951,45 @@ export default function NotesPage() {
                       <span className={`note-list-preview ${preview ? "" : "is-empty"}`}>{preview || "还没有正文，写下第一句话吧"}</span>
                     </button>
                     <div className="note-list-footer">
-                      <span className="note-list-goal-label"><Target size={12} aria-hidden="true" />{linkedGoal}</span>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button
+                            type="button"
+                            className={`note-list-goal-label ${visibleNote.goalId ? "is-linked" : "is-unlinked"}`}
+                            aria-label={`${visibleNote.goalId ? "修改" : "选择"}笔记“${resolvedTitle}”的关联目标，当前${visibleNote.goalId ? `为${linkedGoal}` : "未关联"}`}
+                            title={visibleNote.goalId ? `关联到：${linkedGoal}` : "点击关联学习目标"}
+                          >
+                            <Target size={12} aria-hidden="true" />
+                            <span>{linkedGoal}</span>
+                            <ChevronDown size={11} aria-hidden="true" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent className="note-goal-menu" align="start" side="top" sideOffset={6} aria-label="选择关联目标">
+                          <DropdownMenuLabel className="note-goal-menu-label">选择关联目标</DropdownMenuLabel>
+                          {selectableGoals.filter((goal) => goal.id).map((goal) => {
+                            const selected = visibleNote.goalId === goal.id;
+                            return (
+                              <DropdownMenuItem
+                                key={goal.id}
+                                className={`note-goal-menu-item ${selected ? "is-selected" : ""}`}
+                                onSelect={() => void changeNoteGoal(visibleNote, goal.id)}
+                              >
+                                <Target size={14} aria-hidden="true" />
+                                <span>{goal.title}</span>
+                                {selected && <Check size={14} aria-hidden="true" />}
+                              </DropdownMenuItem>
+                            );
+                          })}
+                          {visibleNote.goalId && (
+                            <>
+                              <DropdownMenuSeparator className="note-goal-menu-separator" />
+                              <DropdownMenuItem className="note-goal-menu-item is-unlink" onSelect={() => void changeNoteGoal(visibleNote, null)}>
+                                <Unlink2 size={14} aria-hidden="true" /><span>取消目标关联</span>
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                       <button type="button" className="note-card-action note-card-delete" aria-label={`删除笔记“${resolvedTitle}”`} title="删除笔记" onClick={() => void deleteNote(note)}><Trash2 size={14} /></button>
                     </div>
                   </motion.article>

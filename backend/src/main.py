@@ -5,7 +5,7 @@ from pathlib import Path
 
 import httpx
 import sentry_sdk
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.routing import APIRoute, request_response
@@ -33,7 +33,9 @@ import src.api.privacy as privacy
 import src.api.product_evidence as product_evidence
 import src.api.schedule as schedule
 import src.api.storage_admin as storage_admin
+import src.api.sync as sync
 import src.api.tasks as tasks
+import src.api.workspaces as workspaces
 from src.config import settings
 from src.core.llm_router import get_llm_runtime_status
 from src.database import engine
@@ -60,6 +62,23 @@ limiter = Limiter(
 async def lifespan(app: FastAPI):
     # 数据库结构由 alembic upgrade head 管理，此处不自动建表
     from src.core.agent.graph import get_agent
+    from src.services.object_storage import initialize_object_storage
+
+    storage_status = await initialize_object_storage()
+    if storage_status.status == "degraded":
+        logger.warning(
+            "object_storage_fallback configured=%s active=%s reason=%s",
+            storage_status.configured_backend,
+            storage_status.active_backend,
+            storage_status.reason,
+        )
+    elif storage_status.status == "unavailable":
+        logger.error(
+            "object_storage_unavailable configured=%s reason=%s error_type=%s",
+            storage_status.configured_backend,
+            storage_status.reason,
+            storage_status.error_type,
+        )
 
     await get_agent()
 
@@ -193,6 +212,8 @@ for domain_router in (
     model_settings.router,
     schedule.router,
     storage_admin.router,
+    sync.router,
+    workspaces.router,
 ):
     for route in domain_router.routes:
         # ``routes.extend`` bypasses FastAPI.include_router(), which normally
@@ -218,14 +239,22 @@ async def readiness() -> dict[str, str]:
 
     from src.database import AsyncSessionLocal
     from src.redis_client import get_redis
-    from src.services.object_storage import get_object_storage
+    from src.services.object_storage import probe_object_storage
 
     async with AsyncSessionLocal() as db:
         await db.execute(text("SELECT 1"))
     redis = get_redis()
     await redis.ping()
-    await get_object_storage().healthcheck()
-    return {"status": "ready", "database": "ok", "redis": "ok", "storage": "ok"}
+    storage_status = await probe_object_storage(refresh=True)
+    if storage_status.status == "unavailable":
+        raise HTTPException(status_code=503, detail="object storage unavailable")
+    return {
+        "status": "ready",
+        "database": "ok",
+        "redis": "ok",
+        "storage": "fallback" if storage_status.fallback_active else "ok",
+        "storage_backend": storage_status.active_backend or "unavailable",
+    }
 
 
 @app.get("/health/ai")

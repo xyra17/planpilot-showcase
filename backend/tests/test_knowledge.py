@@ -8,8 +8,15 @@ from sqlalchemy import select
 from src.core.agent_v2.registry import build_registry
 from src.core.agent_v2.schemas import ToolContext
 from src.core.embedding import EmbeddingUnavailableError
-from src.models import KnowledgeChunk, KnowledgeItem, KnowledgeItemFileVersion
+from src.models import (
+    KnowledgeChunk,
+    KnowledgeItem,
+    KnowledgeItemContentVersion,
+    KnowledgeItemFileVersion,
+    LearningEvent,
+)
 from src.services.object_storage import get_object_storage
+from src.services.retrieval_service import retrieval_service
 
 
 async def test_upload_txt(client: AsyncClient, auth: dict):
@@ -385,9 +392,7 @@ async def test_chunk_search_returns_source_citation(client: AsyncClient, auth: d
     assert result["start_char"] == 11
 
 
-async def test_ui_and_agent_share_the_same_retrieval_contract(
-    client: AsyncClient, auth: dict, db
-):
+async def test_ui_and_agent_share_the_same_retrieval_contract(client: AsyncClient, auth: dict, db):
     uploaded = await client.post(
         "/api/v1/knowledge/upload",
         files={
@@ -652,3 +657,78 @@ async def test_search_no_results(client: AsyncClient, auth: dict):
     r = await client.get("/api/v1/knowledge/search?q=zzznomatch999", headers=auth)
     assert r.status_code == 200
     assert r.json() == []
+
+
+async def test_note_lifecycle_creates_indexable_versioned_evidence(
+    client: AsyncClient, auth: dict, db
+):
+    created = await client.post(
+        "/api/v1/knowledge/notes",
+        json={"title": "听力复盘", "content": "<p>15 分钟训练更稳定</p>", "noteType": "daily_log"},
+        headers=auth,
+    )
+    assert created.status_code == 201, created.text
+    note_id = created.json()["id"]
+    assert created.json()["contentVersion"] == 1
+    assert created.json()["scope"] == "cross_goal"
+
+    updated = await client.patch(
+        f"/api/v1/knowledge/notes/{note_id}",
+        json={"content": "<p>连续三次 15 分钟训练更稳定</p>"},
+        headers=auth,
+    )
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["contentVersion"] == 2
+
+    versions = list(
+        (
+            await db.execute(
+                select(KnowledgeItemContentVersion)
+                .where(KnowledgeItemContentVersion.item_id == note_id)
+                .order_by(KnowledgeItemContentVersion.version)
+            )
+        ).scalars()
+    )
+    assert [row.version for row in versions] == [1, 2]
+    assert versions[0].normalized_content_snapshot == "15 分钟训练更稳定"
+    events = list(
+        (
+            await db.execute(
+                select(LearningEvent)
+                .where(
+                    LearningEvent.aggregate_type == "note", LearningEvent.aggregate_id == note_id
+                )
+                .order_by(LearningEvent.created_at)
+            )
+        ).scalars()
+    )
+    assert [event.event_type for event in events] == ["NoteCreated", "NoteUpdated"]
+    assert all(event.payload["scope"] == "cross_goal" for event in events)
+
+
+async def test_retrieval_can_limit_automatic_context_to_notes(client: AsyncClient, auth: dict, db):
+    note_response = await client.post(
+        "/api/v1/knowledge/notes",
+        json={"title": "专注复盘", "content": "shared focus phrase", "noteType": "daily_log"},
+        headers=auth,
+    )
+    file_response = await client.post(
+        "/api/v1/knowledge/upload",
+        files={"file": ("focus.txt", io.BytesIO(b"shared focus phrase"), "text/plain")},
+        headers=auth,
+    )
+    note = await db.get(KnowledgeItem, note_response.json()["id"])
+    document = await db.get(KnowledgeItem, file_response.json()["id"])
+    note.processing_status = "ready"
+    document.content = "shared focus phrase"
+    document.processing_status = "ready"
+    await db.commit()
+
+    rows = await retrieval_service.search(
+        db,
+        user_id=note.user_id,
+        query="shared focus phrase",
+        source_types={"daily_log"},
+    )
+
+    assert [row.id for row in rows] == [note.id]

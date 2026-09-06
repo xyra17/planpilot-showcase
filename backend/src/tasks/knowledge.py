@@ -228,12 +228,12 @@ async def _process(item_id: str) -> None:
 
     from src.config import settings
     from src.models import KnowledgeChunk, KnowledgeItem
-    from src.services.runtime_model_config import get_runtime_model_config
     from src.services.object_storage import (
         ObjectStorageError,
         extension_for_reference,
         get_object_storage,
     )
+    from src.services.runtime_model_config import get_runtime_model_config
 
     engine = create_async_engine(settings.database_url)
     session_factory = async_sessionmaker(engine, expire_on_commit=False)
@@ -277,17 +277,41 @@ async def _process(item_id: str) -> None:
                 await db.commit()
                 return
 
+            # Notes may be authored as HTML by the editor.  Keep the original
+            # content for rendering, but index a clean snapshot for retrieval.
+            if item.source_type in {
+                "chat_note",
+                "daily_log",
+                "flash_card",
+                "task_note",
+                "quick_note",
+            }:
+                item.normalized_content = re.sub(r"<[^>]+>", " ", item.content or "").strip()
+                item.content_length = len(item.normalized_content)
+
             # Persist extracted text before the potentially slow/optional
             # embedding step. This keeps document previews usable even when
             # the local embedding service is unavailable or times out.
             await db.commit()
 
-            chunks = chunk_text(item.content)
+            chunks = chunk_text(item.normalized_content or item.content)
             if not chunks:
                 raise KnowledgeProcessingError("文档内容为空，无法分块")
 
             item.processing_status = "embedding"
             await db.execute(delete(KnowledgeChunk).where(KnowledgeChunk.item_id == item.id))
+            chunk_rows = []
+            for index, (chunk, start_char, end_char) in enumerate(chunks):
+                row = KnowledgeChunk(
+                    id=str(uuid.uuid4()),
+                    item_id=item.id,
+                    chunk_index=index,
+                    content=chunk,
+                    start_char=start_char,
+                    end_char=end_char,
+                )
+                db.add(row)
+                chunk_rows.append(row)
             await db.commit()
 
             runtime_models = get_runtime_model_config()
@@ -302,29 +326,45 @@ async def _process(item_id: str) -> None:
                     )
                 )
             if not clients:
+                if item.source_type in {
+                    "chat_note",
+                    "daily_log",
+                    "flash_card",
+                    "task_note",
+                    "quick_note",
+                }:
+                    # Keyword retrieval remains available even when optional
+                    # embedding infrastructure is offline.
+                    item.processing_status = "ready"
+                    item.processed_at = utc_now()
+                    await db.commit()
+                    return
                 raise KnowledgeProcessingError("未配置可用的 Embedding 服务")
 
-            embeddings = await _embed_chunks(
-                clients,
-                item.title,
-                chunks,
-                model=runtime_models.embedding_model_name,
-                dimensions=runtime_models.embedding_dimensions,
-            )
-            for index, ((chunk, start_char, end_char), embedding) in enumerate(
-                zip(chunks, embeddings, strict=True)
-            ):
-                db.add(
-                    KnowledgeChunk(
-                        id=str(uuid.uuid4()),
-                        item_id=item.id,
-                        chunk_index=index,
-                        content=chunk,
-                        start_char=start_char,
-                        end_char=end_char,
-                        embedding=embedding,
-                    )
+            try:
+                embeddings = await _embed_chunks(
+                    clients,
+                    item.title,
+                    chunks,
+                    model=runtime_models.embedding_model_name,
+                    dimensions=runtime_models.embedding_dimensions,
                 )
+            except KnowledgeProcessingError as exc:
+                if item.source_type not in {
+                    "chat_note",
+                    "daily_log",
+                    "flash_card",
+                    "task_note",
+                    "quick_note",
+                }:
+                    raise
+                item.processing_status = "ready"
+                item.processing_error = f"语义索引暂不可用，已启用关键词检索：{exc}"[:500]
+                item.processed_at = utc_now()
+                await db.commit()
+                return
+            for row, embedding in zip(chunk_rows, embeddings, strict=True):
+                row.embedding = embedding
 
             # Retain a document-level vector for backwards compatibility.
             item.embedding = embeddings[0]

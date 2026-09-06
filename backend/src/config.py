@@ -43,14 +43,16 @@ class Settings(BaseSettings):
     smart_base_url: str = ""
     smart_model_name: str = "deepseek-v4-flash"
     smart_pro_model_name: str = "deepseek-v4-pro"
-    cloud_routine_timeout_seconds: float = 60.0
-    cloud_pro_timeout_seconds: float = 300.0
+    cloud_routine_timeout_seconds: float = 20.0
+    cloud_pro_timeout_seconds: float = 45.0
     cloud_model_max_retries: int = 0
+    cloud_model_failure_threshold: int = 2
+    cloud_model_circuit_cooldown_seconds: float = 60.0
     cloud_routine_max_concurrency: int = 4
     cloud_pro_max_concurrency: int = 1
     cloud_model_queue_timeout_seconds: float = 5.0
     model_gateway_max_retries: int = 1
-    model_gateway_failure_threshold: int = 3
+    model_gateway_failure_threshold: int = 2
     model_gateway_circuit_cooldown_seconds: float = 60.0
     model_gateway_half_open_probe_seconds: float = 15.0
     model_gateway_redis_prefix: str = "model_gateway"
@@ -92,6 +94,8 @@ class Settings(BaseSettings):
     storage_s3_secret_key: str = ""
     storage_s3_secure: bool = True
     storage_s3_server_side_encryption: str = ""
+    storage_s3_fallback_to_local: bool = True
+    storage_probe_timeout_seconds: float = 3.0
     media_preview_timeout_seconds: int = 600
     media_preview_max_upload_bytes: int = 500 * 1024 * 1024
     otel_service_name: str = "planpilot-api"
@@ -159,6 +163,8 @@ class Settings(BaseSettings):
             raise ValueError("S3 存储必须配置 bucket、access key 和 secret key")
         if self.storage_s3_server_side_encryption not in {"", "AES256", "aws:kms"}:
             raise ValueError("S3 服务端加密只能为空、AES256 或 aws:kms")
+        if not 0.1 <= self.storage_probe_timeout_seconds <= 30.0:
+            raise ValueError("STORAGE_PROBE_TIMEOUT_SECONDS 必须在 0.1 到 30 秒之间")
         if self.media_preview_timeout_seconds < 30:
             raise ValueError("MEDIA_PREVIEW_TIMEOUT_SECONDS 不能小于 30 秒")
         if self.media_preview_max_upload_bytes < 20 * 1024 * 1024:

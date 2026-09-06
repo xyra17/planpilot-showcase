@@ -91,6 +91,7 @@ def _align_plan_tasks_to_baseline(tasks: list[Task], phases: list[dict]) -> list
 class GoalPatchValidationError(ValueError):
     """A request is syntactically valid but invalid for the current Goal state."""
 
+
 # ── API Schemas ────────────────────────────────────────────────────────────
 
 
@@ -109,6 +110,12 @@ class GoalCreate(BaseModel):
     kb_id: str | None = None
     pending_kb: PendingKb | None = None
     meta: dict = {}
+    description: str | None = None
+    baseline: str | None = None
+    success_criteria: list[str] = Field(default_factory=list)
+    must_cover: list[str] = Field(default_factory=list)
+    may_skip: list[str] = Field(default_factory=list)
+    constraints: dict = Field(default_factory=dict)
 
     @field_validator("type")
     @classmethod
@@ -141,8 +148,8 @@ class GoalCreate(BaseModel):
         validation_today = date.today()
         if info.context and info.context.get("validation_today") is not None:
             validation_today = info.context["validation_today"]
-        if d <= validation_today:
-            raise ValueError("截止日期必须在今天之后")
+        if d < validation_today:
+            raise ValueError("截止日期不能早于今天")
         return v
 
     @classmethod
@@ -170,6 +177,9 @@ class GoalOut(BaseModel):
     kb_id: str | None = None
     knowledge_base_id: str | None = Field(default=None, exclude=True)
     version: int
+    description: str | None = None
+    contract: dict = Field(default_factory=dict)
+    intent_version: int = 1
 
     model_config = {"from_attributes": True}
 
@@ -204,6 +214,12 @@ class GoalPatch(BaseModel):
     work_schedule: str | None = None
     kb_id: str | None = None
     expected_version: int | None = None
+    description: str | None = None
+    baseline: str | None = None
+    success_criteria: list[str] | None = None
+    must_cover: list[str] | None = None
+    may_skip: list[str] | None = None
+    constraints: dict | None = None
 
     @field_validator("status")
     @classmethod
@@ -263,8 +279,10 @@ class ProgressOut(BaseModel):
 class TaskBriefOut(BaseModel):
     id: str
     title: str
+    description: str | None = None
     date: str
     status: str
+    executionGuide: dict = Field(default_factory=dict)
 
 
 def _parse_deadline(value: str) -> date:
@@ -311,6 +329,19 @@ def _apply_goal_patch(goal: Goal, body: GoalPatch) -> set[str]:
     patch_data = body.model_dump(exclude_none=True)
     patch_data.pop("expected_version", None)
 
+    contract_fields = {"baseline", "success_criteria", "must_cover", "may_skip", "constraints"}
+    touched_contract_fields = contract_fields.intersection(patch_data)
+    if touched_contract_fields:
+        contract = dict(goal.contract or {})
+        original_contract = dict(contract)
+        for field in touched_contract_fields:
+            value = patch_data.pop(field)
+            if contract.get(field) != value:
+                contract[field] = value
+        if contract != original_contract:
+            goal.contract = contract
+            changed.add("contract")
+
     # 直接列映射（不通过 setattr 的通用路径）
     if "work_schedule" in patch_data:
         value = patch_data.pop("work_schedule")
@@ -327,6 +358,22 @@ def _apply_goal_patch(goal: Goal, body: GoalPatch) -> set[str]:
         if getattr(goal, field) != value:
             setattr(goal, field, value)
             changed.add(field)
+
+    intent_fields = {
+        "type",
+        "title",
+        "description",
+        "deadline",
+        "daily_hours",
+        "current_level",
+        "work_schedule",
+        "contract",
+    }
+    if changed.intersection(intent_fields):
+        current_intent_version = goal.intent_version
+        goal.intent_version = (
+            current_intent_version + 1 if isinstance(current_intent_version, int) else 2
+        )
 
     return changed
 
@@ -462,6 +509,15 @@ async def create_goal(user_id: str, body: GoalCreate, db: AsyncSession) -> Goal:
         knowledge_base_id=kb_id_to_use,
         work_schedule=body.work_schedule,
         meta=meta,
+        description=body.description,
+        contract={
+            "baseline": body.baseline,
+            "success_criteria": list(body.success_criteria),
+            "must_cover": list(body.must_cover),
+            "may_skip": list(body.may_skip),
+            "constraints": dict(body.constraints),
+        },
+        intent_version=1,
     )
     db.add(goal)
     await db.flush()  # 让 SQLAlchemy 执行 INSERT 并触发 default=new_uuid，使 goal.id 可用
@@ -480,6 +536,8 @@ async def create_goal(user_id: str, body: GoalCreate, db: AsyncSession) -> Goal:
             "current_level": body.current_level,
             "work_schedule": body.work_schedule,
             "knowledge_base_id": kb_id_to_use,
+            "contract": goal.contract,
+            "intent_version": goal.intent_version,
             "aggregate_version": 1,
         },
     )
@@ -494,6 +552,8 @@ async def create_goal(user_id: str, body: GoalCreate, db: AsyncSession) -> Goal:
                 "daily_hours": goal.daily_hours,
                 "work_schedule": goal.work_schedule,
             },
+            contract_snapshot=goal.contract,
+            intent_version=goal.intent_version,
             change_reason="created",
             created_by="user",
         )
@@ -540,8 +600,8 @@ async def update_goal(
     if body.deadline is not None:
         requested_deadline = _parse_deadline(body.deadline)
         current_deadline = _parse_deadline(goal.deadline)
-        if requested_deadline != current_deadline and requested_deadline <= date.today():
-            raise GoalPatchValidationError("变更后的截止日期必须在今天之后")
+        if requested_deadline != current_deadline and requested_deadline < date.today():
+            raise GoalPatchValidationError("变更后的截止日期不能早于今天")
 
     # 捕获旧值（用于 event payload）
     patch_data = body.model_dump(exclude_none=True)
@@ -553,6 +613,10 @@ async def update_goal(
             old_values["work_schedule"] = goal.work_schedule
         else:
             old_values[field] = getattr(goal, field, None)
+    if {"baseline", "success_criteria", "must_cover", "may_skip", "constraints"}.intersection(
+        patch_data
+    ):
+        old_values["contract"] = dict(goal.contract or {})
 
     changed_fields = _apply_goal_patch(goal, body)
     changed_fields.discard("expected_version")
@@ -586,6 +650,9 @@ async def update_goal(
                     after["work_schedule"] = goal.work_schedule
                 else:
                     after[field] = getattr(goal, field, None)
+            if "contract" in other_fields:
+                after["contract"] = goal.contract
+            after["intent_version"] = goal.intent_version
 
             await emit(
                 db,
@@ -616,6 +683,8 @@ async def update_goal(
                     "work_schedule": goal.work_schedule,
                     "status": goal.status,
                 },
+                contract_snapshot=goal.contract,
+                intent_version=goal.intent_version,
                 change_reason=",".join(sorted(changed_fields)),
                 created_by="user",
             )
@@ -744,9 +813,7 @@ async def delete_goal(
     # 画像，否则会与现有的用户级唯一记录冲突，也会混淆画像范围。
     await db.execute(sql_delete(LearnerProfile).where(LearnerProfile.goal_id == goal_id))
     await db.execute(
-        sql_delete(LearnerCognitiveProfile).where(
-            LearnerCognitiveProfile.goal_id == goal_id
-        )
+        sql_delete(LearnerCognitiveProfile).where(LearnerCognitiveProfile.goal_id == goal_id)
     )
 
     # 6. 按依赖顺序批量删除子表
@@ -776,7 +843,11 @@ async def get_progress(
         return None
 
     # 加载该目标所有任务
-    all_tasks = (await db.execute(select(Task).where(Task.goal_id == goal_id))).scalars().all()
+    all_tasks = (
+        (await db.execute(select(Task).where(Task.goal_id == goal_id, Task.status != "abandoned")))
+        .scalars()
+        .all()
+    )
 
     # 构建打卡日期集合：正式打卡 + 任务完成日期
     today = date.today()
@@ -831,7 +902,12 @@ async def get_progress_summaries(user_id: str, db: AsyncSession) -> list[Progres
     goal_ids = [goal.id for goal in goals]
     tasks = list(
         (
-            await db.execute(select(Task).where(Task.goal_id.in_(goal_ids)))
+            await db.execute(
+                select(Task).where(
+                    Task.goal_id.in_(goal_ids),
+                    Task.status != "abandoned",
+                )
+            )
         )
         .scalars()
         .all()
@@ -898,7 +974,7 @@ async def list_goal_tasks(
         (
             await db.execute(
                 select(Task)
-                .where(Task.goal_id == goal_id)
+                .where(Task.goal_id == goal_id, Task.status != "abandoned")
                 .order_by(Task.scheduled_date, Task.created_at)
             )
         )
@@ -907,7 +983,15 @@ async def list_goal_tasks(
     )
 
     return [
-        TaskBriefOut(id=t.id, title=t.title, date=t.scheduled_date, status=t.status) for t in tasks
+        TaskBriefOut(
+            id=t.id,
+            title=t.title,
+            description=t.description,
+            date=t.scheduled_date,
+            status=t.status,
+            executionGuide=dict(t.execution_guide or {}),
+        )
+        for t in tasks
     ]
 
 
@@ -961,9 +1045,6 @@ async def get_goal_plan(
     )
     plan_tasks = _align_plan_tasks_to_baseline(plan_tasks, phases)
 
-    # 目标下全部任务（用于整体进度）
-    all_goal_tasks = (await db.execute(select(Task).where(Task.goal_id == goal_id))).scalars().all()
-
     tasks_by_phase: list[dict] = []
     task_idx = 0
     for phase in phases:
@@ -984,10 +1065,12 @@ async def get_goal_plan(
                     {
                         "id": t.id,
                         "title": t.title,
+                        "objective": t.description or "",
                         "estimated_mins": t.estimated_mins,
                         "status": t.status,
                         "mastery_level": t.mastery_level,
                         "scheduled_date": t.scheduled_date,
+                        "execution_guide": dict(t.execution_guide or {}),
                     }
                     for t in phase_tasks
                 ],
@@ -1001,7 +1084,11 @@ async def get_goal_plan(
             "version": plan.version,
             "created_at": plan.created_at.isoformat() if plan.created_at else "",
             "phases": tasks_by_phase,
-            "total_tasks": len(all_goal_tasks),
-            "completed_tasks": sum(1 for t in all_goal_tasks if t.status == "completed"),
+            "total_tasks": len(plan_tasks),
+            "completed_tasks": sum(1 for t in plan_tasks if t.status == "completed"),
+            "can_undo": bool(
+                plan.is_current
+                and ((plan.content or {}).get("lifecycle") or {}).get("status") == "active"
+            ),
         }
     }

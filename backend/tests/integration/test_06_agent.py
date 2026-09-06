@@ -54,6 +54,13 @@ async def test_macro_plan_generate(client: AsyncClient, auth_headers: dict, shar
     assert "name" in phase
     assert "tasks" in phase
     assert len(phase["tasks"]) > 0
+    assert data["status"] == "draft"
+    confirm = await client.post(
+        f"/api/v1/agent/macro-plan/{goal_id}/{data['plan_id']}/confirm",
+        headers=auth_headers,
+    )
+    assert confirm.status_code == 200, confirm.text
+    assert confirm.json()["created_tasks"] == data["total_tasks"]
 
 
 async def test_daily_brief_after_checkin(client: AsyncClient, auth_headers: dict, shared: dict):

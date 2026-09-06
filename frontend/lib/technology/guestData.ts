@@ -3,7 +3,9 @@
 import type { ApiGoal } from "@/lib/technology/productApi";
 import { scopedStorageKey } from "@/lib/technology/scopedStorage";
 
-export const GUEST_DATASET_VERSION = 4;
+// Bump when the deterministic showcase fixtures change so stale localStorage
+// does not leave the current-day demo with an empty task list.
+export const GUEST_DATASET_VERSION = 7;
 export const GUEST_DATASET_VERSION_KEY = "planpilot:guest-dataset-version";
 
 const PRODUCT_KEYS = {
@@ -33,7 +35,7 @@ function deadlineLabel(iso: string) {
 const goalBlueprints = [
   { id: "guest-exam", apiType: "exam", type: "考试备考", title: "研究生英语二 80 分冲刺", days: 96, dailyHours: 1.25, level: "intermediate", progress: 42, completed: 8, total: 19, streakDays: 4, next: "阅读理解 · 主旨题训练", rhythm: "本周完成 4 次训练", status: "active", isRisk: false },
   { id: "guest-cert", apiType: "certification", type: "认证学习", title: "通过 PMP 项目管理认证", days: 128, dailyHours: 0.75, level: "beginner", progress: 28, completed: 5, total: 18, streakDays: 6, next: "整合管理 · 过程组梳理", rhythm: "连续学习 6 天", status: "active", isRisk: false },
-  { id: "guest-skill", apiType: "skill", type: "技能提升", title: "掌握 Python 数据分析", days: 72, dailyHours: 1, level: "intermediate", progress: 63, completed: 12, total: 19, streakDays: 5, next: "Pandas · 分组聚合实战", rhythm: "2 个项目里程碑已完成", status: "active", isRisk: false },
+  { id: "guest-skill", apiType: "skill", type: "技能提升", title: "掌握 Python 数据分析", days: 12, dailyHours: 1, level: "intermediate", progress: 63, completed: 12, total: 19, streakDays: 5, next: "Pandas · 分组聚合实战", rhythm: "2 个项目里程碑已完成", status: "active", isRisk: false },
   { id: "guest-reading", apiType: "reading", type: "阅读计划", title: "读完《设计心理学》并输出卡片", days: 45, dailyHours: 0.5, level: "beginner", progress: 55, completed: 6, total: 11, streakDays: 3, next: "第 4 章 · 约束与映射", rhythm: "已沉淀 18 张概念卡", status: "active", isRisk: false },
   { id: "guest-language", apiType: "language", type: "语言学习", title: "日语 N2 听读提升", days: 154, dailyHours: 0.75, level: "intermediate", progress: 36, completed: 7, total: 20, streakDays: 2, next: "新闻听力 · 影子跟读", rhythm: "听力正确率提升 9%", status: "active", isRisk: true },
   { id: "guest-habit", apiType: "habit", type: "习惯养成", title: "连续 30 天晨间写作", days: 30, dailyHours: 0.33, level: "beginner", progress: 70, completed: 21, total: 30, streakDays: 21, next: "第 22 天 · 描写一个微小观察", rhythm: "当前连续 21 天", status: "active", isRisk: false },
@@ -172,6 +174,12 @@ export function guestTasks(): GuestTask[] {
     task("guest-task-7", "guest-skill", "掌握 Python 数据分析", -1, "清洗缺失值与异常值", "比较删除、填补和标记三种处理策略。", 50, "19:00", true, "核心"),
     task("guest-task-8", "guest-exam", "研究生英语二 80 分冲刺", -2, "复盘阅读主旨题错因", "区分局部信息复述与全文主旨。", 30, "20:20", true, "普通优先级"),
     task("guest-task-9", "guest-reading", "读完《设计心理学》并输出卡片", -3, "完成第 3 章阅读", "记录可见性、反馈与概念模型三个关键词。", 35, "21:00", true, "普通优先级"),
+    task("guest-task-10", "guest-skill", "掌握 Python 数据分析", 1, "建立订单数据清洗规则", "处理重复订单、缺失城市和异常金额，并保留审计列。", 45, "19:00", false, "核心"),
+    task("guest-task-11", "guest-skill", "掌握 Python 数据分析", 2, "计算用户分群与复购率", "用 cohort 和 RFM 指标识别高价值与流失风险用户。", 60, "19:00", false, "核心"),
+    task("guest-task-12", "guest-skill", "掌握 Python 数据分析", 3, "绘制销售趋势与品类结构", "生成趋势、占比和城市对比图，并统一指标口径。", 50, "19:10", false, "普通优先级"),
+    task("guest-task-13", "guest-skill", "掌握 Python 数据分析", 4, "解释退款率异常波动", "回到订单明细验证异常品类、渠道和时间段。", 40, "19:20", false, "核心"),
+    task("guest-task-14", "guest-skill", "掌握 Python 数据分析", 5, "完成电商分析报告初稿", "串联业务问题、清洗过程、关键图表和行动建议。", 55, "10:00", false, "普通优先级"),
+    task("guest-task-15", "guest-skill", "掌握 Python 数据分析", 6, "复核指标并发布作品", "复跑分析脚本、核对数字并补充 README 复现步骤。", 45, "10:30", false, "核心"),
   ];
 }
 

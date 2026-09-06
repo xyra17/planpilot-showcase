@@ -13,7 +13,7 @@ import shutil
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import AsyncIterator, Protocol
+from typing import AsyncIterator, Literal, Protocol
 
 from src.config import settings
 
@@ -32,13 +32,45 @@ class StoredObject:
     modified_at: datetime
 
 
+@dataclass(frozen=True)
+class StorageRuntimeStatus:
+    """Non-secret process-local result of selecting an object storage backend."""
+
+    status: Literal["ready", "degraded", "unavailable"]
+    configured_backend: Literal["local", "s3"]
+    active_backend: Literal["local", "s3"] | None
+    configured_backend_reachable: bool
+    fallback_enabled: bool
+    fallback_active: bool
+    fallback_backend: Literal["local"] | None
+    reason: str | None
+    error_type: str | None
+    checked_at: datetime
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "status": self.status,
+            "configured_backend": self.configured_backend,
+            "active_backend": self.active_backend,
+            "configured_backend_reachable": self.configured_backend_reachable,
+            "fallback_enabled": self.fallback_enabled,
+            "fallback_active": self.fallback_active,
+            "fallback_backend": self.fallback_backend,
+            "reason": self.reason,
+            "error_type": self.error_type,
+            "checked_at": self.checked_at.isoformat(),
+        }
+
+
 class ObjectStorage(Protocol):
     async def put(self, key: str, data: bytes, content_type: str) -> str: ...
     async def put_file(self, key: str, path: str, content_type: str) -> str: ...
     async def read(self, reference: str) -> bytes: ...
     async def read_range(self, reference: str, start: int, end: int) -> bytes: ...
     async def download_to_file(self, reference: str, path: str) -> None: ...
-    def iter_chunks(self, reference: str, chunk_size: int = 1024 * 1024) -> AsyncIterator[bytes]: ...
+    def iter_chunks(
+        self, reference: str, chunk_size: int = 1024 * 1024
+    ) -> AsyncIterator[bytes]: ...
     async def exists(self, reference: str) -> bool: ...
     async def copy(self, source: str, target_key: str) -> str: ...
     async def delete(self, reference: str) -> None: ...
@@ -388,7 +420,298 @@ class S3ObjectStorage:
             raise ObjectStorageError("object storage healthcheck failed") from exc
 
 
+def _root_error_type(exc: Exception) -> str:
+    if isinstance(exc, TimeoutError):
+        return "TimeoutError"
+    current: BaseException = exc
+    seen: set[int] = set()
+    while current.__cause__ is not None and id(current) not in seen:
+        seen.add(id(current))
+        current = current.__cause__
+    return type(current).__name__
+
+
+class ProbedObjectStorage:
+    """Select S3 once, then conservatively fall back to local managed storage.
+
+    The initial selection is process-local.  A refresh may move from S3 to the
+    local fallback after an outage, but it deliberately does not move back to
+    S3 in the same process.  This avoids sending writes to two backends during
+    an unstable probe window.  On a later process start, local fallback objects
+    remain readable through the read-through lookup below.
+    """
+
+    def __init__(
+        self,
+        configured_backend: Literal["local", "s3"],
+        primary: ObjectStorage,
+        *,
+        local_fallback: ObjectStorage | None = None,
+        probe_timeout_seconds: float = 3.0,
+    ) -> None:
+        self.configured_backend = configured_backend
+        self.primary = primary
+        self.local_fallback = local_fallback
+        self.probe_timeout_seconds = probe_timeout_seconds
+        self._active: ObjectStorage | None = None
+        self._active_backend: Literal["local", "s3"] | None = None
+        self._status: StorageRuntimeStatus | None = None
+        self._selection_lock = asyncio.Lock()
+        self._fallback_locked = False
+
+    async def _probe_backend(self, backend: ObjectStorage) -> tuple[bool, str | None]:
+        try:
+            await asyncio.wait_for(
+                backend.healthcheck(),
+                timeout=self.probe_timeout_seconds,
+            )
+            return True, None
+        except Exception as exc:
+            return False, _root_error_type(exc)
+
+    def _result(
+        self,
+        *,
+        status: Literal["ready", "degraded", "unavailable"],
+        configured_reachable: bool,
+        reason: str | None,
+        error_type: str | None,
+    ) -> StorageRuntimeStatus:
+        result = StorageRuntimeStatus(
+            status=status,
+            configured_backend=self.configured_backend,
+            active_backend=self._active_backend,
+            configured_backend_reachable=configured_reachable,
+            fallback_enabled=self.local_fallback is not None,
+            fallback_active=self._active_backend == "local" and self.configured_backend == "s3",
+            fallback_backend="local" if self.local_fallback is not None else None,
+            reason=reason,
+            error_type=error_type,
+            checked_at=datetime.now(timezone.utc),
+        )
+        self._status = result
+        return result
+
+    async def probe(self, *, refresh: bool = False) -> StorageRuntimeStatus:
+        if self._status is not None and not refresh:
+            return self._status
+
+        async with self._selection_lock:
+            if self._status is not None and not refresh:
+                return self._status
+
+            primary_ok, primary_error = await self._probe_backend(self.primary)
+
+            # Do not automatically fail back in a running process.  Local
+            # fallback writes use the same opaque object references, so a
+            # stable selection is safer than oscillating after each probe.
+            if self._fallback_locked and self.local_fallback is not None:
+                fallback_ok, fallback_error = await self._probe_backend(self.local_fallback)
+                if fallback_ok:
+                    self._active = self.local_fallback
+                    self._active_backend = "local"
+                    return self._result(
+                        status="degraded",
+                        configured_reachable=primary_ok,
+                        reason=(
+                            "failback_deferred_until_restart"
+                            if primary_ok
+                            else "configured_backend_unreachable"
+                        ),
+                        error_type=None if primary_ok else primary_error,
+                    )
+                self._active = None
+                self._active_backend = None
+                return self._result(
+                    status="unavailable",
+                    configured_reachable=primary_ok,
+                    reason="locked_fallback_unavailable",
+                    error_type=fallback_error,
+                )
+
+            if primary_ok:
+                self._active = self.primary
+                self._active_backend = self.configured_backend
+                return self._result(
+                    status="ready",
+                    configured_reachable=True,
+                    reason=None,
+                    error_type=None,
+                )
+
+            if self.local_fallback is not None:
+                fallback_ok, fallback_error = await self._probe_backend(self.local_fallback)
+                if fallback_ok:
+                    self._active = self.local_fallback
+                    self._active_backend = "local"
+                    self._fallback_locked = True
+                    return self._result(
+                        status="degraded",
+                        configured_reachable=False,
+                        reason="configured_backend_unreachable",
+                        error_type=primary_error,
+                    )
+                primary_error = primary_error or fallback_error
+
+            self._active = None
+            self._active_backend = None
+            return self._result(
+                status="unavailable",
+                configured_reachable=False,
+                reason=(
+                    "no_available_backend"
+                    if self.local_fallback is not None
+                    else "configured_backend_unreachable"
+                ),
+                error_type=primary_error,
+            )
+
+    async def _active_storage(self) -> ObjectStorage:
+        status = await self.probe()
+        if self._active is None:
+            raise ObjectStorageError(
+                f"no available object storage backend ({status.reason or 'probe failed'})"
+            )
+        return self._active
+
+    async def _source_storage(self, reference: str) -> ObjectStorage:
+        active = await self._active_storage()
+        if (
+            self._active_backend == "s3"
+            and self.local_fallback is not None
+            and reference.startswith(OBJECT_PREFIX)
+            and not await active.exists(reference)
+            and await self.local_fallback.exists(reference)
+        ):
+            return self.local_fallback
+        return active
+
+    async def put(self, key: str, data: bytes, content_type: str) -> str:
+        return await (await self._active_storage()).put(key, data, content_type)
+
+    async def put_file(self, key: str, path: str, content_type: str) -> str:
+        return await (await self._active_storage()).put_file(key, path, content_type)
+
+    async def read(self, reference: str) -> bytes:
+        return await (await self._source_storage(reference)).read(reference)
+
+    async def read_range(self, reference: str, start: int, end: int) -> bytes:
+        return await (await self._source_storage(reference)).read_range(reference, start, end)
+
+    async def download_to_file(self, reference: str, path: str) -> None:
+        await (await self._source_storage(reference)).download_to_file(reference, path)
+
+    async def iter_chunks(
+        self, reference: str, chunk_size: int = 1024 * 1024
+    ) -> AsyncIterator[bytes]:
+        storage = await self._source_storage(reference)
+        async for chunk in storage.iter_chunks(reference, chunk_size):
+            yield chunk
+
+    async def exists(self, reference: str) -> bool:
+        active = await self._active_storage()
+        if await active.exists(reference):
+            return True
+        return bool(
+            self._active_backend == "s3"
+            and self.local_fallback is not None
+            and await self.local_fallback.exists(reference)
+        )
+
+    async def copy(self, source: str, target_key: str) -> str:
+        active = await self._active_storage()
+        source_storage = await self._source_storage(source)
+        if source_storage is active:
+            return await active.copy(source, target_key)
+        return await active.put(
+            target_key,
+            await source_storage.read(source),
+            "application/octet-stream",
+        )
+
+    async def delete(self, reference: str) -> None:
+        active = await self._active_storage()
+        await active.delete(reference)
+        if self._active_backend == "s3" and self.local_fallback is not None:
+            await self.local_fallback.delete(reference)
+
+    async def size(self, reference: str) -> int | None:
+        source = await self._source_storage(reference)
+        return await source.size(reference)
+
+    async def list_objects(self, prefix: str) -> list[StoredObject]:
+        active = await self._active_storage()
+        objects = await active.list_objects(prefix)
+        if self._active_backend != "s3" or self.local_fallback is None:
+            return objects
+        merged = {item.reference: item for item in await self.local_fallback.list_objects(prefix)}
+        merged.update({item.reference: item for item in objects})
+        return list(merged.values())
+
+    async def healthcheck(self) -> None:
+        status = await self.probe(refresh=True)
+        if status.status == "unavailable":
+            raise ObjectStorageError(
+                f"no available object storage backend ({status.reason or 'probe failed'})"
+            )
+
+
+_storage_runtime: ProbedObjectStorage | None = None
+_storage_runtime_signature: tuple[object, ...] | None = None
+
+
+def _runtime_signature() -> tuple[object, ...]:
+    return (
+        settings.storage_backend,
+        settings.storage_local_root,
+        settings.storage_s3_bucket,
+        settings.storage_s3_endpoint_url,
+        settings.storage_s3_region,
+        settings.storage_s3_access_key,
+        settings.storage_s3_secret_key,
+        settings.storage_s3_secure,
+        settings.storage_s3_server_side_encryption,
+        settings.storage_s3_fallback_to_local,
+        settings.storage_probe_timeout_seconds,
+    )
+
+
 def get_object_storage() -> ObjectStorage:
+    global _storage_runtime, _storage_runtime_signature
+
+    signature = _runtime_signature()
+    if _storage_runtime is not None and _storage_runtime_signature == signature:
+        return _storage_runtime
+
     if settings.storage_backend == "s3":
-        return S3ObjectStorage()
-    return LocalObjectStorage(settings.storage_local_root)
+        primary: ObjectStorage = S3ObjectStorage()
+        fallback: ObjectStorage | None = (
+            LocalObjectStorage(settings.storage_local_root)
+            if settings.storage_s3_fallback_to_local
+            else None
+        )
+    else:
+        primary = LocalObjectStorage(settings.storage_local_root)
+        fallback = None
+
+    _storage_runtime = ProbedObjectStorage(
+        settings.storage_backend,
+        primary,
+        local_fallback=fallback,
+        probe_timeout_seconds=settings.storage_probe_timeout_seconds,
+    )
+    _storage_runtime_signature = signature
+    return _storage_runtime
+
+
+async def probe_object_storage(*, refresh: bool = False) -> StorageRuntimeStatus:
+    storage = get_object_storage()
+    if not isinstance(storage, ProbedObjectStorage):  # pragma: no cover - defensive boundary
+        raise ObjectStorageError("storage runtime does not support availability probes")
+    return await storage.probe(refresh=refresh)
+
+
+async def initialize_object_storage() -> StorageRuntimeStatus:
+    """Probe and freeze the initial backend choice for the current process."""
+
+    return await probe_object_storage()

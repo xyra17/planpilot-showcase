@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta, timezone
+
 import pytest
 
 from src.services.object_storage import (
@@ -9,7 +11,6 @@ from src.services.object_storage import (
     reference_key,
 )
 from src.services.storage_gc_service import select_orphaned_objects
-from datetime import datetime, timedelta, timezone
 
 
 @pytest.mark.asyncio

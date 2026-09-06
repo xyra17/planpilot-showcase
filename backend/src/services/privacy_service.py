@@ -38,6 +38,7 @@ from src.models import (
     KnowledgeChunk,
     KnowledgeEdge,
     KnowledgeItem,
+    KnowledgeItemContentVersion,
     KnowledgeItemFileVersion,
     KnowledgeItemGoalLink,
     KnowledgeItemLibraryLink,
@@ -108,9 +109,7 @@ async def sensitive_inference_allowed(db: AsyncSession, user_id: str) -> bool:
     return bool(row and row.personalization_enabled and row.sensitive_inference_enabled)
 
 
-async def evidence_participation_status(
-    db: AsyncSession, *, user: User
-) -> dict[str, Any]:
+async def evidence_participation_status(db: AsyncSession, *, user: User) -> dict[str, Any]:
     consent = await db.get(UserDataConsent, user.id)
     quality = await db.scalar(
         select(DataQualitySnapshot)
@@ -193,7 +192,9 @@ async def update_consent(
         )
     )
     if not row.experiments_enabled:
-        await db.execute(delete(ExperimentAssignment).where(ExperimentAssignment.user_id == user_id))
+        await db.execute(
+            delete(ExperimentAssignment).where(ExperimentAssignment.user_id == user_id)
+        )
     if "sensitive_inference_enabled" in changes and not row.sensitive_inference_enabled:
         await erase_sensitive_inferences(db, user_id)
     erased = False
@@ -246,9 +247,7 @@ def _public_row(row: Any, *, omit: set[str] | None = None) -> dict[str, Any]:
         "lease_token",
     } | (omit or set())
     return {
-        column.key: _json_value(
-            getattr(row, row.__mapper__.get_property_by_column(column).key)
-        )
+        column.key: _json_value(getattr(row, row.__mapper__.get_property_by_column(column).key))
         for column in row.__table__.columns
         if column.key not in blocked
     }
@@ -257,12 +256,16 @@ def _public_row(row: Any, *, omit: set[str] | None = None) -> dict[str, Any]:
 async def build_user_export(db: AsyncSession, user: User) -> dict[str, Any]:
     goals = list((await db.execute(select(Goal).where(Goal.user_id == user.id))).scalars())
     goal_ids = [row.id for row in goals]
-    tasks = list(
-        (await db.execute(select(Task).where(Task.goal_id.in_(goal_ids)))).scalars()
-    ) if goal_ids else []
-    plans = list(
-        (await db.execute(select(Plan).where(Plan.goal_id.in_(goal_ids)))).scalars()
-    ) if goal_ids else []
+    tasks = (
+        list((await db.execute(select(Task).where(Task.goal_id.in_(goal_ids)))).scalars())
+        if goal_ids
+        else []
+    )
+    plans = (
+        list((await db.execute(select(Plan).where(Plan.goal_id.in_(goal_ids)))).scalars())
+        if goal_ids
+        else []
+    )
     item_rows = list(
         (await db.execute(select(KnowledgeItem).where(KnowledgeItem.user_id == user.id))).scalars()
     )
@@ -321,9 +324,7 @@ async def build_user_export(db: AsyncSession, user: User) -> dict[str, Any]:
         ],
     }
     for name, (model, omit) in owned_models.items():
-        rows = list(
-            (await db.execute(select(model).where(model.user_id == user.id))).scalars()
-        )
+        rows = list((await db.execute(select(model).where(model.user_id == user.id))).scalars())
         sections[name] = [_public_row(row, omit=omit) for row in rows]
 
     async def linked_rows(model: Any, column: Any, ids: list[str]) -> list[Any]:
@@ -360,13 +361,21 @@ async def build_user_export(db: AsyncSession, user: User) -> dict[str, Any]:
                     KnowledgeItemFileVersion, KnowledgeItemFileVersion.item_id, item_ids
                 )
             ],
+            "knowledge_item_content_versions": [
+                _public_row(row)
+                for row in await linked_rows(
+                    KnowledgeItemContentVersion, KnowledgeItemContentVersion.item_id, item_ids
+                )
+            ],
             "knowledge_chunks": [
                 _public_row(row, omit={"embedding"})
                 for row in await linked_rows(KnowledgeChunk, KnowledgeChunk.item_id, item_ids)
             ],
             "pattern_evidence": [
                 _public_row(row)
-                for row in await linked_rows(PatternEvidence, PatternEvidence.pattern_id, pattern_ids)
+                for row in await linked_rows(
+                    PatternEvidence, PatternEvidence.pattern_id, pattern_ids
+                )
             ],
             "agent_steps": [_public_row(row) for row in agent_steps],
             "agent_approvals": [
@@ -424,9 +433,11 @@ async def generate_quality_report(
     now = utc_now()
     window_start = now - timedelta(days=window_days)
     goals = list((await db.execute(select(Goal.id).where(Goal.user_id == user_id))).scalars())
-    tasks = list(
-        (await db.execute(select(Task).where(Task.goal_id.in_(goals)))).scalars()
-    ) if goals else []
+    tasks = (
+        list((await db.execute(select(Task).where(Task.goal_id.in_(goals)))).scalars())
+        if goals
+        else []
+    )
     events = list(
         (
             await db.execute(
@@ -438,9 +449,7 @@ async def generate_quality_report(
         ).scalars()
     )
     completed_ids = {row.id for row in tasks if row.status == "completed"}
-    completion_event_ids = {
-        row.aggregate_id for row in events if row.event_type == "TaskCompleted"
-    }
+    completion_event_ids = {row.aggregate_id for row in events if row.event_type == "TaskCompleted"}
     completion_coverage = (
         len(completed_ids & completion_event_ids) / len(completed_ids) if completed_ids else 1.0
     )
@@ -475,7 +484,9 @@ async def generate_quality_report(
             )
         ).scalars()
     )
-    delayed_keys = {row.dedupe_key for row in feedback_events if row.attribution_window != "immediate"}
+    delayed_keys = {
+        row.dedupe_key for row in feedback_events if row.attribution_window != "immediate"
+    }
     due_windows = 0
     captured_windows = 0
     for proposal in applied:
@@ -515,7 +526,8 @@ async def generate_quality_report(
         "quality_score": round(score, 4),
         "experiment_readiness": {
             "pattern": active_days >= 14 and len(events) >= 30,
-            "prediction_calibration": sum(row.actual_outcome is not None for row in predictions) >= 100,
+            "prediction_calibration": sum(row.actual_outcome is not None for row in predictions)
+            >= 100,
             "proposal_utility": captured_windows >= 50,
             "personalization_lift": active_days >= 14 and len(events) >= 30,
         },
@@ -534,15 +546,16 @@ async def generate_quality_report(
     return report
 
 
-async def apply_retention_policy(db: AsyncSession, *, now: datetime | None = None) -> dict[str, int]:
+async def apply_retention_policy(
+    db: AsyncSession, *, now: datetime | None = None
+) -> dict[str, int]:
     """Apply documented purpose-specific retention windows in one transaction."""
     now = now or utc_now()
     policies = (
         (
             "expired_auth_sessions",
             AuthSession,
-            AuthSession.expires_at
-            < now - timedelta(days=settings.expired_session_retention_days),
+            AuthSession.expires_at < now - timedelta(days=settings.expired_session_retention_days),
         ),
         (
             "agent_trace_spans",

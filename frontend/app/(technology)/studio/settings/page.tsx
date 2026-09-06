@@ -14,6 +14,7 @@ import {
   Database,
   Download,
   LayoutDashboard,
+  Laptop,
   LoaderCircle,
   LogOut,
   Mail,
@@ -36,6 +37,8 @@ import { useAuth } from "@/components/technology/AuthProvider";
 import { AvatarCropDialog } from "@/components/technology/AvatarCropDialog";
 import { ClockTimePicker } from "@/components/technology/ClockTimePicker";
 import { UserAvatar } from "@/components/technology/UserAvatar";
+import { DesktopStorageSettings } from "@/components/technology/DesktopStorageSettings";
+import { WorkspaceDeviceSettings } from "@/components/technology/WorkspaceDeviceSettings";
 import { DataSyncNotice } from "@/components/ui/DataSyncNotice";
 import { useConfirmDialog } from "@/components/ui/ConfirmDialog";
 import {
@@ -262,7 +265,7 @@ export default function SettingsPage() {
   }, [notice]);
 
   useEffect(() => {
-    const sectionIds = ["settings-appearance", "settings-preferences", "settings-reminders", "settings-privacy", "settings-account"];
+    const sectionIds = ["settings-appearance", "settings-preferences", "settings-reminders", "settings-desktop", "settings-spaces", "settings-privacy", "settings-account"];
     let frame = 0;
     const updateActiveSection = () => {
       window.cancelAnimationFrame(frame);
@@ -540,6 +543,8 @@ export default function SettingsPage() {
           <a href="#settings-appearance" className={activeSection === "settings-appearance" ? "is-active" : ""} aria-current={activeSection === "settings-appearance" ? "location" : undefined} onClick={() => setActiveSection("settings-appearance")}><Palette size={15} /><span>外观</span></a>
           <a href="#settings-preferences" className={activeSection === "settings-preferences" ? "is-active" : ""} aria-current={activeSection === "settings-preferences" ? "location" : undefined} onClick={() => setActiveSection("settings-preferences")}><CalendarClock size={15} /><span>可用时间</span></a>
           <a href="#settings-reminders" className={activeSection === "settings-reminders" ? "is-active" : ""} aria-current={activeSection === "settings-reminders" ? "location" : undefined} onClick={() => setActiveSection("settings-reminders")}><CalendarClock size={15} /><span>时间与提醒</span></a>
+          <a href="#settings-desktop" className={activeSection === "settings-desktop" ? "is-active" : ""} aria-current={activeSection === "settings-desktop" ? "location" : undefined} onClick={() => setActiveSection("settings-desktop")}><Laptop size={15} /><span>桌面与本机</span></a>
+          <a href="#settings-spaces" className={activeSection === "settings-spaces" ? "is-active" : ""} aria-current={activeSection === "settings-spaces" ? "location" : undefined} onClick={() => setActiveSection("settings-spaces")}><Database size={15} /><span>空间与设备</span></a>
           <a href="#settings-privacy" className={activeSection === "settings-privacy" ? "is-active" : ""} aria-current={activeSection === "settings-privacy" ? "location" : undefined} onClick={() => setActiveSection("settings-privacy")}><ShieldCheck size={15} /><span>AI 与隐私</span></a>
           <a href="#settings-account" className={activeSection === "settings-account" ? "is-active" : ""} aria-current={activeSection === "settings-account" ? "location" : undefined} onClick={() => setActiveSection("settings-account")}><UserRound size={15} /><span>账户</span></a>
         </nav>
@@ -653,6 +658,10 @@ export default function SettingsPage() {
             </> : <span className="reminder-disabled-copy"><CircleHelp size={14} aria-hidden="true" />开启后设置提醒时间与邮件收件地址</span>}</div>
           </div>
         </article>
+
+        <DesktopStorageSettings />
+
+        <WorkspaceDeviceSettings />
 
         <article id="settings-privacy" className="settings-card settings-task-card settings-privacy-card">
           <header className="settings-compact-section-header privacy-section-header">

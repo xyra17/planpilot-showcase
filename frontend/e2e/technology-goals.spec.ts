@@ -312,6 +312,9 @@ test("新建目标页使用统一分步表单并完成创建", async ({ page }) 
   await expect(page).toHaveURL(/\/studio\/work\/goals\/new$/);
   await expect(page.getByRole("dialog", { name: "创建新目标" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "创建新目标", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "目标定义", exact: true })).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "当前基础", exact: true })).toBeVisible();
+  await expect(page.getByRole("textbox", { name: /成功标准/ })).toBeVisible();
   await expect(page.getByRole("heading", { name: "目标类型", exact: true })).toBeVisible();
   await expect(page.getByText("如何完成目标", { exact: true })).toHaveCount(0);
   await expect(page.getByText("设置时间与计划，帮助你持续推进", { exact: true })).toHaveCount(0);
@@ -336,7 +339,7 @@ test("新建目标页使用统一分步表单并完成创建", async ({ page }) 
   await expect(page.getByRole("button", { name: /备考/ })).toBeVisible();
   await expect(page.getByRole("button", { name: /语言学习/ })).toBeVisible();
   await expect(page.getByText("学习安排", { exact: true })).toBeVisible();
-  await expect(page.getByText("当前水平", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("当前水平", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "备考", exact: true })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("button", { name: "仅工作日", exact: true })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("textbox", { name: "目标名称" })).not.toBeFocused();
@@ -474,6 +477,7 @@ test("新建目标页在窄屏保持完整统一表单", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
   await page.goto("/studio/work/goals/new");
   await expect(page.getByRole("heading", { name: "创建新目标", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "目标定义", exact: true })).toBeVisible();
   await expect(page.getByText("如何完成目标", { exact: true })).toHaveCount(0);
   await expect(page.locator(".tech-goal-create-main").getByRole("group", { name: "每日投入时长" }).first()).toBeVisible();
   const geometry = await page.evaluate(() => ({
@@ -485,6 +489,7 @@ test("新建目标页在窄屏保持完整统一表单", async ({ page }) => {
   expect(geometry.documentOverflow).toBeLessThanOrEqual(1);
   expect(geometry.pageWidth).toBeLessThanOrEqual(375);
   expect(Math.abs(geometry.headingLeft - geometry.fieldLeft)).toBeLessThanOrEqual(1);
+  await page.screenshot({ path: "test-results/goal-contract-mobile.png", fullPage: true });
 });
 
 test("新建目标页在短桌面视口首屏完整显示", async ({ page }) => {
@@ -1352,6 +1357,104 @@ test("执行节奏与左侧指标互补并在不同高度内保持单屏", async
   await expect(page.locator(".goal-execution-capacity-track > i")).toHaveCSS("animation-name", "none");
   await expect(page.locator(".goal-execution-capacity-track > em")).toHaveCSS("animation-name", "none");
 
+});
+
+test("宏观计划先预览可执行草案再确认写入", async ({ page }) => {
+  let confirmed = false;
+  const draft = {
+    plan_id: "plan-draft-1",
+    status: "draft",
+    goal_intent_version: 1,
+    total_tasks: 2,
+    start_date: "2026-08-04",
+    estimated_completion_date: "2026-08-08",
+    source_summary: { mode: "no_kb", items_read: 0, excerpts_read: 0, excerpts_cited: 0 },
+    replacement_summary: { current_plan_id: null, pending_tasks_to_replace: 0, completed_tasks_preserved: true },
+    phases: [{
+      name: "建立理解并输出证据",
+      focus: "从解释概念进入独立应用",
+      days: 5,
+      start_date: "2026-08-04",
+      end_date: "2026-08-08",
+      tasks: [
+        {
+          title: "复述 Agent 工具调用链",
+          objective: "能不看资料画出1张调用链并解释3个关键节点",
+          estimated_mins: 35,
+          type: "study",
+          scheduled_date: "2026-08-04",
+          execution_guide: {
+            why_now: "先建立调用链模型，后续实现时才能定位职责边界。",
+            steps: ["阅读现有调用入口", "手绘请求到执行的链路", "对照代码补齐遗漏"],
+            deliverable: "一张标注3个职责节点的调用链图",
+            done_criteria: ["不看代码能复述完整流程", "能解释3个节点为什么存在"],
+            prerequisites: [],
+            source_refs: [],
+          },
+        },
+        {
+          title: "实现最小工具调用",
+          objective: "能独立完成1次工具注册、调用和结果验证",
+          estimated_mins: 50,
+          type: "practice",
+          scheduled_date: "2026-08-08",
+          execution_guide: {
+            why_now: "概念链路已建立，现在用最小实现验证理解。",
+            steps: ["注册一个只读工具", "发起调用并记录输入输出", "补充失败分支测试"],
+            deliverable: "一个可运行示例和一条失败分支测试",
+            done_criteria: ["示例可以重复运行", "测试能验证错误返回"],
+            prerequisites: ["完成调用链复述"],
+            source_refs: [],
+          },
+        },
+      ],
+    }],
+  };
+  await page.route("**/api/v1/auth/me", (route) => route.fulfill({ json: { id: "user-draft", email: "learner@example.com", username: "学习者", email_verified: true, onboarding_completed: true } }));
+  await page.route("**/api/v1/goals/goal-tech-1/progress", (route) => route.fulfill({ json: { goal_id: goal.id, total_tasks: 0, completed_tasks: 0, avg_completion_rate: 0, streak_days: 0, debt_count: 0, days_ahead_or_behind: 0 } }));
+  await page.route("**/api/v1/goals/goal-tech-1/plan", (route) => route.fulfill({ json: { plan: null } }));
+  await page.route("**/api/v1/goals/goal-tech-1", (route) => route.fulfill({ json: goal }));
+  await page.route("**/api/v1/tasks", (route) => route.fulfill({ json: [] }));
+  await page.route("**/api/v1/debts/goal-tech-1", (route) => route.fulfill({ json: [] }));
+  await page.route("**/api/v1/knowledge/files", (route) => route.fulfill({ json: { items: [] } }));
+  await page.route("**/api/v1/agent/plan-context/goal-tech-1", (route) => route.fulfill({ json: { kb_overview: [], initial_understanding: "目标是形成可独立实现并解释的能力。" } }));
+  await page.route("**/api/v1/agent/intent-placeholder/goal-tech-1", (route) => route.fulfill({ json: { placeholder: "补充重点" } }));
+  await page.route("**/api/v1/agent/macro-plan/goal-tech-1", (route) => route.fulfill({ json: draft }));
+  await page.route("**/api/v1/agent/macro-plan/goal-tech-1/plan-draft-1/confirm", (route) => {
+    confirmed = true;
+    return route.fulfill({ json: { plan_id: "plan-draft-1", status: "active", created_tasks: 2, created_task_ids: ["task-1", "task-2"], replaced_tasks: 0, can_undo: true } });
+  });
+
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto("/studio/work/goals/goal-tech-1?tab=plan");
+  await page.getByRole("button", { name: "学习计划", exact: true }).click();
+  await page.getByRole("button", { name: "设置资料并生成计划", exact: true }).click();
+  const modeDialog = page.getByRole("dialog", { name: "选择计划生成方式" });
+  await modeDialog.getByRole("button", { name: /暂不使用参考资料/ }).click();
+  await modeDialog.getByRole("button", { name: "开始生成", exact: true }).click();
+  const preview = page.getByRole("dialog", { name: /确认.*的行动计划/ });
+  await expect(preview).toBeVisible();
+  await expect(preview.getByText("为什么现在做", { exact: true })).toBeVisible();
+  await expect(preview.getByText("一张标注3个职责节点的调用链图", { exact: true })).toBeVisible();
+  await page.screenshot({ path: "test-results/plan-draft-desktop.png", fullPage: true });
+
+  await page.setViewportSize({ width: 375, height: 812 });
+  await expect(preview).toBeVisible();
+  const bounds = await preview.evaluate((element) => ({
+    left: element.getBoundingClientRect().left,
+    right: element.getBoundingClientRect().right,
+    width: element.getBoundingClientRect().width,
+    viewport: window.innerWidth,
+    overflow: element.scrollWidth - element.clientWidth,
+  }));
+  expect(bounds.left).toBeGreaterThanOrEqual(0);
+  expect(bounds.right).toBeLessThanOrEqual(bounds.viewport);
+  expect(bounds.overflow).toBeLessThanOrEqual(0);
+  await page.screenshot({ path: "test-results/plan-draft-mobile.png", fullPage: true });
+
+  await preview.getByRole("button", { name: "采用并写入任务", exact: true }).click();
+  await expect(preview).toHaveCount(0);
+  expect(confirmed).toBe(true);
 });
 
 test("管理员目标接口失败时不回退到演示目标", async ({ page }) => {

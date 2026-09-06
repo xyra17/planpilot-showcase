@@ -5,9 +5,12 @@ test("登录页在常见笔记本高度下一屏完整显示", async ({ page }) 
   await page.goto("/login");
 
   await expect(page.getByRole("heading", { name: "欢迎回来" })).toBeVisible();
-  await expect(page.getByText("YOUR LONG-TERM LEARNING PARTNER", { exact: true })).toBeVisible();
-  await expect(page.getByText("PlanPilot 根据你选择保留的学习记录", { exact: false })).toBeVisible();
-  await expect(page.getByText("持续理解", { exact: true })).toBeVisible();
+  await expect(page.getByText("ACTION · RECOVERY · MASTERY", { exact: true })).toBeVisible();
+  await expect(page.getByText("把每一天的学习，", { exact: true })).toBeVisible();
+  await expect(page.getByText("连成长期成长。", { exact: true })).toBeVisible();
+  await expect(page.getByText("今日行动", { exact: true })).toBeVisible();
+  await expect(page.getByText("偏差恢复", { exact: true })).toBeVisible();
+  await expect(page.getByText("验证掌握", { exact: true })).toBeVisible();
   await expect(page.getByLabel("用户名或邮箱")).toBeVisible();
   await expect(page.getByLabel("密码", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "显示密码" })).toBeVisible();
@@ -32,13 +35,15 @@ test("登录页保持等宽布局并可返回访客工作台", async ({ page }) 
   const pilo = page.getByRole("img", { name: "Pilo 戴着眼镜在小电脑前工作" });
   await expect(pilo).toBeVisible();
   await expect(pilo).toHaveAttribute("data-pilo-life-action", "work");
-  if (process.env.NEXT_PUBLIC_PLANPILOT_WEBSITE_URL) {
-    await expect(page.getByText("初次使用？", { exact: true })).toBeVisible();
-    const websiteLink = page.getByRole("link", { name: "了解 PlanPilot，将在浏览器中打开官网" });
-    await expect(websiteLink).toBeVisible();
-    await expect(websiteLink).toHaveAttribute("data-tooltip", "将在浏览器中打开官网");
-    await expect(websiteLink).toHaveCSS("font-size", "12px");
-  }
+  await expect(page.getByText("初次使用？", { exact: true })).toBeVisible();
+  const websiteLink = page.getByRole("link", { name: "了解 PlanPilot，将在浏览器中打开官网" });
+  await expect(websiteLink).toBeVisible();
+  await expect(websiteLink).toHaveAttribute(
+    "href",
+    process.env.NEXT_PUBLIC_PLANPILOT_WEBSITE_URL || "https://planpilot-website.planpilot-wxyra.workers.dev/",
+  );
+  await expect(websiteLink).toHaveAttribute("data-tooltip", "将在浏览器中打开官网");
+  await expect(websiteLink).toHaveCSS("font-size", "12px");
   const [headingBox, piloBox] = await Promise.all([
     page.locator(".pp-login-heading").boundingBox(),
     pilo.boundingBox(),

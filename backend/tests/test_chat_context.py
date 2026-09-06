@@ -77,11 +77,14 @@ def test_actual_context_trace_records_selection_without_raw_evidence():
     assert "容易延期" not in str(trace)
 
 
-@pytest.mark.parametrize("message", [
-    "别把猜测说成事实，解释你为什么这样判断。",
-    "按我真实能坚持的节奏，给明天三步建议。",
-    "两个目标同一天撞车，按优先级给取舍方案。",
-])
+@pytest.mark.parametrize(
+    "message",
+    [
+        "别把猜测说成事实，解释你为什么这样判断。",
+        "按我真实能坚持的节奏，给明天三步建议。",
+        "两个目标同一天撞车，按优先级给取舍方案。",
+    ],
+)
 def test_semantic_review_expressions_inject_profile_evidence(message):
     from src.core.agent.nodes.chat import select_relevant_context
 
@@ -289,3 +292,27 @@ async def test_context_failures_degrade_without_blocking_chat():
 
     assert context["knowledge_sources"] == []
     assert meta["quality"] == "low"
+
+
+async def test_explicit_note_context_is_loaded_without_resource_cue():
+    note_source = [{"id": "note-1", "title": "听力复盘", "source_type": "note"}]
+    with (
+        patch(
+            "src.services.chat_context._load_decision_context",
+            new=AsyncMock(return_value={}),
+        ),
+        patch(
+            "src.services.chat_context._load_knowledge",
+            new=AsyncMock(return_value=note_source),
+        ) as load_knowledge,
+    ):
+        context, _ = await build_chat_context(
+            user_id="user-1",
+            goal_id="goal-1",
+            message="帮我分析一下",
+            source_id="note-1",
+            source_version=3,
+        )
+
+    assert context["knowledge_sources"] == note_source
+    load_knowledge.assert_awaited_once_with("user-1", "goal-1", "帮我分析一下", "note-1", 3)

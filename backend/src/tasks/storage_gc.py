@@ -1,11 +1,11 @@
 """Scheduled cleanup of storage objects no longer referenced by the database."""
 
+from datetime import timedelta
+
 from celery.utils.log import get_task_logger
 
 import src.database as database
 from src.celery_app import celery_app
-from datetime import timedelta
-
 from src.services.storage_gc_service import collect_orphaned_storage
 from src.tasks.runtime import run_async
 

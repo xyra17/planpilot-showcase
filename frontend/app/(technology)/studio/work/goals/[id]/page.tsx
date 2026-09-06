@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 import { VerificationDialog } from "@/components/agent/VerificationDialog";
 import { ProgressOverview, type ProgressData } from "@/components/goal/ProgressOverview";
 import PlanModeSelector, { type KbMode, type PacingMode } from "@/components/goal/PlanModeSelector";
+import PlanDraftPreview, { type MacroPlanDraft, type PlanExecutionGuide } from "@/components/goal/PlanDraftPreview";
 import { DebtCard } from "@/components/agent/DebtCard";
 import { DataSyncNotice } from "@/components/ui/DataSyncNotice";
 import { api, ApiError } from "@/lib/api";
@@ -856,6 +857,15 @@ function GoalTasksWorkspace({
                   <div className="min-w-0 flex-1">
                     <p className={cn("text-[13px] font-medium leading-snug", task.done ? "text-gray-400 line-through" : "text-gray-700")}>{task.title}</p>
                     {task.description && <p className="goal-task-description mt-1 text-[11px] leading-relaxed">{task.description}</p>}
+                    {task.executionGuide && (
+                      <details className="goal-today-task-guide">
+                        <summary>执行方法</summary>
+                        {task.executionGuide.why_now && <p><strong>为什么现在做</strong>{task.executionGuide.why_now}</p>}
+                        {(task.executionGuide.steps?.length ?? 0) > 0 && <ol>{task.executionGuide.steps?.map((step) => <li key={step}>{step}</li>)}</ol>}
+                        {task.executionGuide.deliverable && <p><strong>产出</strong>{task.executionGuide.deliverable}</p>}
+                        {(task.executionGuide.done_criteria?.length ?? 0) > 0 && <ul>{task.executionGuide.done_criteria?.map((criterion) => <li key={criterion}>{criterion}</li>)}</ul>}
+                      </details>
+                    )}
                     <span className="goal-task-meta mt-1.5 flex w-fit items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] text-gray-400">
                       <span className={cn("h-1.5 w-1.5 rounded-full", PRIORITY_DOT[task.priority ?? "medium"])} />
                       <Clock size={10} />{task.estimatedMinutes} 分钟
@@ -901,6 +911,8 @@ interface PlanTask {
   status: string;
   mastery_level: string;
   scheduled_date: string;
+  objective: string;
+  execution_guide: PlanExecutionGuide;
 }
 
 interface MacroPlan {
@@ -910,6 +922,7 @@ interface MacroPlan {
   phases: { name: string; focus: string; days: number; start_date?: string; end_date?: string; total: number; done: number; tasks: PlanTask[] }[];
   total_tasks: number;
   completed_tasks: number;
+  can_undo?: boolean;
 }
 
 function fmtDate(iso: string) {
@@ -928,10 +941,12 @@ function buildDayMapFromPlan(phases: MacroPlan["phases"]): Map<string, number> {
 function dayLabel(n: number) { return `day${String(n).padStart(2, "0")}`; }
 
 function PlanOverview({ goalId, goalType, goalTitle, refreshKey, onPlanLoad }: { goalId: string; deadline: string; goalType: Goal["type"]; goalTitle: string; refreshKey?: number; onPlanLoad?: (totalDays: number) => void }) {
+  const { status: authStatus } = useAuth();
   const [plan, setPlan] = useState<MacroPlan | null>(null);
   const [loading, setLoading] = useState(true);
   const [regenerating, setRegenerating] = useState(false);
   const [showPlanMode, setShowPlanMode] = useState(false);
+  const [draft, setDraft] = useState<MacroPlanDraft | null>(null);
   const [expandedPhases, setExpandedPhases] = useState<Set<number>>(new Set());
   const [taskOverrides, setTaskOverrides] = useState<Record<string, Partial<PlanTask>>>({});
   const [planError, setPlanError] = useState<string | null>(null);
@@ -957,18 +972,64 @@ function PlanOverview({ goalId, goalType, goalTitle, refreshKey, onPlanLoad }: {
   useEffect(() => { fetchPlan(); }, [fetchPlan, refreshKey]);
 
   async function handleRegenerate(mode: KbMode = "no_kb", intentSupplement = "", pacingMode: PacingMode = "fixed") {
+    if (authStatus !== "authenticated") {
+      setPlanError("当前为本地目标，请登录后生成学习计划。");
+      return;
+    }
     setRegenerating(true);
     setPlanError(null);
     try {
-      await api.post(`/api/v1/agent/macro-plan/${goalId}`, {
+      const nextDraft = await api.post<MacroPlanDraft>(`/api/v1/agent/macro-plan/${goalId}`, {
         kb_mode: mode,
         user_intent_supplement: intentSupplement,
         pacing_mode: pacingMode,
       });
       setShowPlanMode(false);
-      await fetchPlan();
+      setDraft(nextDraft);
     } catch (error) {
       setPlanError(planErrorMessage(error, "学习计划生成失败，请检查服务后重试。"));
+    } finally {
+      setRegenerating(false);
+    }
+  }
+
+  async function handleConfirmDraft() {
+    if (!draft) return;
+    setRegenerating(true);
+    setPlanError(null);
+    try {
+      await api.post(`/api/v1/agent/macro-plan/${goalId}/${draft.plan_id}/confirm`, {});
+      setDraft(null);
+      localStorage.setItem("tasksNeedRefresh", "1");
+      await fetchPlan();
+    } catch (error) {
+      setPlanError(planErrorMessage(error, "计划写入失败，请重试。"));
+    } finally {
+      setRegenerating(false);
+    }
+  }
+
+  async function handleCancelDraft() {
+    if (!draft || regenerating) return;
+    const planId = draft.plan_id;
+    setDraft(null);
+    try {
+      await api.post(`/api/v1/agent/macro-plan/${goalId}/${planId}/cancel`, {});
+    } catch {
+      // The draft remains inactive even if the lifecycle audit update cannot be synced.
+    }
+  }
+
+  async function handleUndoPlan() {
+    if (!plan?.can_undo || regenerating) return;
+    setRegenerating(true);
+    setPlanError(null);
+    try {
+      await api.post(`/api/v1/agent/macro-plan/${goalId}/${plan.id}/undo`, {});
+      localStorage.setItem("tasksNeedRefresh", "1");
+      await fetchPlan();
+    } catch (error) {
+      setPlanError(planErrorMessage(error, "无法撤销这次计划替换。"));
     } finally {
       setRegenerating(false);
     }
@@ -984,7 +1045,7 @@ function PlanOverview({ goalId, goalType, goalTitle, refreshKey, onPlanLoad }: {
 
   if (loading) return <div className="py-3 text-xs text-gray-400 text-center">加载中…</div>;
 
-  if (planError) {
+  if (planError && !draft && !showPlanMode) {
     return (
       <>
         <DataSyncNotice
@@ -1018,7 +1079,8 @@ function PlanOverview({ goalId, goalType, goalTitle, refreshKey, onPlanLoad }: {
             {regenerating ? <><Loader2 size={10} className="animate-spin" /> 生成中…</> : "设置资料并生成计划"}
           </button>
         </div>
-        <PlanModeSelector open={showPlanMode} hasKb={false} goalId={goalId} goalType={goalType} goalTitle={goalTitle} onClose={() => setShowPlanMode(false)} onConfirm={(mode, intent, pacing) => void handleRegenerate(mode, intent, pacing)} />
+        <PlanModeSelector open={showPlanMode} busy={regenerating} error={planError ?? undefined} guestMode={authStatus === "unauthenticated"} hasKb={false} goalId={goalId} goalType={goalType} goalTitle={goalTitle} onClose={() => setShowPlanMode(false)} onConfirm={(mode, intent, pacing) => void handleRegenerate(mode, intent, pacing)} />
+        {draft && <PlanDraftPreview draft={draft} goalTitle={goalTitle} busy={regenerating} error={planError ?? undefined} onCancel={() => void handleCancelDraft()} onConfirm={() => void handleConfirmDraft()} />}
       </>
     );
   }
@@ -1110,7 +1172,8 @@ function PlanOverview({ goalId, goalType, goalTitle, refreshKey, onPlanLoad }: {
                     const isMastered = ["L3", "L4"].includes(mastery);
                     const dn = task.scheduled_date ? dayMap.get(task.scheduled_date) : undefined;
                     return (
-                      <div key={task.id} className="goal-plan-task flex items-center gap-2 px-3 py-2 border-t border-gray-50 hover:bg-gray-50 transition group">
+                      <article key={task.id} className="goal-plan-task border-t border-gray-50 transition group">
+                        <div className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50">
                         {/* 任务序号仅用于定位，不承担完成或掌握状态 */}
                         <span
                           title={isDone ? "任务已完成" : "任务序号"}
@@ -1155,7 +1218,22 @@ function PlanOverview({ goalId, goalType, goalTitle, refreshKey, onPlanLoad }: {
                             {["L3", "L4"].includes(mastery) ? "已掌握" : "了解"}
                           </span>
                         )}
-                      </div>
+                        </div>
+                        {task.execution_guide && (task.execution_guide.steps?.length ?? 0) > 0 && (
+                          <details className="goal-plan-task-guide">
+                            <summary>查看执行方法与验收标准</summary>
+                            <div>
+                              <p><strong>为什么现在做</strong>{task.execution_guide.why_now}</p>
+                              <p><strong>怎么执行</strong></p>
+                              <ol>{task.execution_guide.steps?.map((step) => <li key={step}>{step}</li>)}</ol>
+                              <p><strong>本次产出</strong>{task.execution_guide.deliverable}</p>
+                              <p><strong>完成标准</strong></p>
+                              <ul>{task.execution_guide.done_criteria?.map((criterion) => <li key={criterion}>{criterion}</li>)}</ul>
+                              {(task.execution_guide.source_refs?.length ?? 0) > 0 && <p><strong>依据资料</strong>{task.execution_guide.source_refs?.map((source) => source.locator).join("、")}</p>}
+                            </div>
+                          </details>
+                        )}
+                      </article>
                     );
                   })}
                 </div>
@@ -1165,7 +1243,14 @@ function PlanOverview({ goalId, goalType, goalTitle, refreshKey, onPlanLoad }: {
         })}
       </div>
 
+      <div className="goal-plan-overview-actions">
+        {plan.can_undo && <button type="button" disabled={regenerating} onClick={() => void handleUndoPlan()}>撤销本次替换</button>}
+        <button type="button" disabled={regenerating} onClick={() => setShowPlanMode(true)}>重新生成草案</button>
+      </div>
+
     </div>
+    <PlanModeSelector open={showPlanMode} busy={regenerating} error={planError ?? undefined} guestMode={authStatus === "unauthenticated"} hasKb={false} goalId={goalId} goalType={goalType} goalTitle={goalTitle} onClose={() => setShowPlanMode(false)} onConfirm={(mode, intent, pacing) => void handleRegenerate(mode, intent, pacing)} />
+    {draft && <PlanDraftPreview draft={draft} goalTitle={goalTitle} busy={regenerating} error={planError ?? undefined} onCancel={() => void handleCancelDraft()} onConfirm={() => void handleConfirmDraft()} />}
     </>
   );
 }

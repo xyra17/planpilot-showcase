@@ -24,6 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.replan_policy import should_suggest_replan
 from src.core.time import local_date_for_timezone, utc_now
 from src.events.publisher import emit
+from src.intelligence.knowledge_graph import KnowledgeGraphService
 from src.models import CheckinRecord, Goal, LearningDebt, Task, TaskMasteryRecord
 from src.services.learning_lifecycle_service import (
     emit_deviation_detected,
@@ -359,6 +360,13 @@ class CheckinStats(BaseModel):
     actual_mins: int = 0
 
 
+class RecoveryOption(BaseModel):
+    strategy: str
+    title: str
+    description: str
+    tradeoff: str
+
+
 class CheckinResult(BaseModel):
     """打卡结果（API 输出）"""
 
@@ -371,6 +379,32 @@ class CheckinResult(BaseModel):
     date: str | None = None
     mode: str | None = None
     natural_text: str | None = None
+    recovery_options: list[RecoveryOption] = Field(default_factory=list)
+
+
+def _recovery_options(replan_triggered: bool) -> list[RecoveryOption]:
+    if not replan_triggered:
+        return []
+    return [
+        RecoveryOption(
+            strategy="minimum",
+            title="最小恢复",
+            description="只保留当前阶段的关键前置与验收任务，先恢复连续行动。",
+            tradeoff="压力最低，但完成日期可能后移。",
+        ),
+        RecoveryOption(
+            strategy="standard",
+            title="均衡重排",
+            description="把未完成任务按剩余可用日重新均摊，并保留原有依赖顺序。",
+            tradeoff="节奏较稳，部分非关键内容会延后。",
+        ),
+        RecoveryOption(
+            strategy="sprint",
+            title="截止冲刺",
+            description="优先保住截止日期，提高近期负荷并压缩低价值任务。",
+            tradeoff="如期概率更高，但短期投入明显增加。",
+        ),
+    ]
 
 
 # ── DB Write Operations (no commit allowed) ────────────────────────────────
@@ -554,16 +588,16 @@ async def _upsert_checkin_record(
             await db.delete(duplicate)
     else:
         record = CheckinRecord(
-                goal_id=goal_id,
-                user_id=user_id,
-                date=today,
-                mode=body.mode,
-                quick_status=body.quick_status,
-                natural_text=body.text,
-                completion_rate=completion_rate,
-                stats=stats_data,
-                # feedback / replan_triggered: deprecated, not written to new records
-            )
+            goal_id=goal_id,
+            user_id=user_id,
+            date=today,
+            mode=body.mode,
+            quick_status=body.quick_status,
+            natural_text=body.text,
+            completion_rate=completion_rate,
+            stats=stats_data,
+            # feedback / replan_triggered: deprecated, not written to new records
+        )
         db.add(record)
         await db.flush()
     return record
@@ -637,6 +671,7 @@ async def get_today(
         date=record.date,
         mode=record.mode,
         natural_text=record.natural_text,
+        recovery_options=_recovery_options(record.replan_triggered),
     )
 
 
@@ -792,8 +827,7 @@ async def submit(
                     "aggregate_version": event_version,
                 },
                 idempotency_key=(
-                    f"checkin:{checkin_record.id}:task:{task_obj.id}:"
-                    f"started:v{before['version']}"
+                    f"checkin:{checkin_record.id}:task:{task_obj.id}:started:v{before['version']}"
                 ),
             )
             await emit_recovery_completed_if_applicable(
@@ -838,8 +872,7 @@ async def submit(
                     "aggregate_version": event_version,
                 },
                 idempotency_key=(
-                    f"checkin:{checkin_record.id}:task:{task_obj.id}:"
-                    f"completed:v{before['version']}"
+                    f"checkin:{checkin_record.id}:task:{task_obj.id}:completed:v{before['version']}"
                 ),
             )
             await emit_recovery_completed_if_applicable(
@@ -898,6 +931,19 @@ async def submit(
                     source="checkin_submission",
                 )
             )
+            await KnowledgeGraphService.record_task_evidence(
+                db,
+                user_id,
+                goal_id=goal.id,
+                task_id=task_obj.id,
+                execution_guide=dict(task_obj.execution_guide or {}),
+                score={"L1": 0.2, "L2": 0.5, "L3": 0.75, "L4": 0.9}.get(
+                    item.mastery, 0.0
+                ),
+                evidence_source="self_assessment",
+                evidence_type="self_reported_mastery",
+                summary=f"每日打卡自评为 {item.mastery}",
+            )
 
         if item.status == "skipped" and before["status"] != "skipped":
             debt_created = body.mode == "task_list"
@@ -917,8 +963,7 @@ async def submit(
                     "submission_mode": "checkin",
                 },
                 idempotency_key=(
-                    f"checkin:{checkin_record.id}:task:{task_obj.id}:"
-                    f"skipped:v{before['version']}"
+                    f"checkin:{checkin_record.id}:task:{task_obj.id}:skipped:v{before['version']}"
                 ),
             )
             await emit_deviation_detected(
@@ -983,4 +1028,5 @@ async def submit(
         date=checkin_record.date,
         mode=checkin_record.mode,
         natural_text=checkin_record.natural_text,
+        recovery_options=_recovery_options(replan_triggered),
     )

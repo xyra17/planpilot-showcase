@@ -55,6 +55,11 @@ export function GoalEditDialog({
   const [currentLevel, setCurrentLevel] = useState<GoalLevel>("beginner");
   const [workSchedule, setWorkSchedule] = useState<WorkSchedule>("all");
   const [status, setStatus] = useState<GoalStatus>("active");
+  const [baseline, setBaseline] = useState("");
+  const [successCriteria, setSuccessCriteria] = useState("");
+  const [mustCover, setMustCover] = useState("");
+  const [maySkip, setMaySkip] = useState("");
+  const [constraintsText, setConstraintsText] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -64,6 +69,8 @@ export function GoalEditDialog({
   const [planCheckFailed, setPlanCheckFailed] = useState(false);
   const [planReviewRequired, setPlanReviewRequired] = useState(false);
   const [initialBasis, setInitialBasis] = useState("");
+  const [impactConfirmedBasis, setImpactConfirmedBasis] = useState("");
+  const [goalImpact, setGoalImpact] = useState<{ reasons: string[]; planRequiresReview: boolean; mapRequiresReview: boolean } | null>(null);
 
   useEffect(() => {
     if (authStatus === "loading") return;
@@ -114,7 +121,17 @@ export function GoalEditDialog({
       setCurrentLevel(nextLevel);
       setWorkSchedule(nextSchedule);
       setStatus(goal.status);
-      setInitialBasis(JSON.stringify({ type: goal.type, deadline: goal.deadline, dailyHours: goal.daily_hours, workSchedule: nextSchedule, currentLevel: nextLevel }));
+      const nextBaseline = goal.contract?.baseline ?? "";
+      const nextSuccessCriteria = (goal.contract?.success_criteria ?? []).join("\n");
+      const nextMustCover = (goal.contract?.must_cover ?? []).join("\n");
+      const nextMaySkip = (goal.contract?.may_skip ?? []).join("\n");
+      const nextConstraintsText = typeof goal.contract?.constraints?.notes === "string" ? goal.contract.constraints.notes : "";
+      setBaseline(nextBaseline);
+      setSuccessCriteria(nextSuccessCriteria);
+      setMustCover(nextMustCover);
+      setMaySkip(nextMaySkip);
+      setConstraintsText(nextConstraintsText);
+      setInitialBasis(JSON.stringify({ type: goal.type, deadline: goal.deadline, dailyHours: goal.daily_hours, workSchedule: nextSchedule, currentLevel: nextLevel, baseline: nextBaseline, successCriteria: nextSuccessCriteria, mustCover: nextMustCover, maySkip: nextMaySkip, constraintsText: nextConstraintsText }));
       setHasPlan(Boolean(planResult.result.plan));
       setPlanCheckFailed(planResult.failed);
       setLoaded(true);
@@ -128,10 +145,30 @@ export function GoalEditDialog({
     event.preventDefault();
     if (!title.trim()) { setError("请先填写目标名称。"); return; }
     if (!deadline) { setError("请设置目标截止日期。"); return; }
+    const nextContract = {
+      baseline: baseline.trim() || "",
+      success_criteria: successCriteria.split("\n").map((value) => value.trim()).filter(Boolean),
+      must_cover: mustCover.split("\n").map((value) => value.trim()).filter(Boolean),
+      may_skip: maySkip.split("\n").map((value) => value.trim()).filter(Boolean),
+      constraints: constraintsText.trim() ? { notes: constraintsText.trim() } : {},
+    };
+    const basisChanged = initialBasis !== JSON.stringify({ type, deadline, dailyHours, workSchedule, currentLevel, baseline, successCriteria, mustCover, maySkip, constraintsText });
+    const nextBasis = JSON.stringify({ type, deadline, dailyHours, workSchedule, currentLevel, baseline, successCriteria, mustCover, maySkip, constraintsText });
     setIsSubmitting(true);
     setError(null);
     try {
-      const basisChanged = initialBasis !== JSON.stringify({ type, deadline, dailyHours, workSchedule, currentLevel });
+      if (authStatus === "authenticated" && basisChanged && impactConfirmedBasis !== nextBasis) {
+        const impact = await productApi.previewKnowledgeImpact({
+          goal_id: goalId,
+          proposed_goal_contract: nextContract,
+        });
+        setGoalImpact({
+          reasons: impact.reasons,
+          planRequiresReview: impact.plan_requires_review,
+          mapRequiresReview: impact.map_requires_review,
+        });
+        return;
+      }
       if (authStatus === "authenticated") {
         await updateGoal(goalId, {
           type,
@@ -141,6 +178,12 @@ export function GoalEditDialog({
           current_level: currentLevel,
           work_schedule: workSchedule,
           status,
+          description: successCriteria.trim() || null,
+          baseline: nextContract.baseline || null,
+          success_criteria: nextContract.success_criteria,
+          must_cover: nextContract.must_cover,
+          may_skip: nextContract.may_skip,
+          constraints: nextContract.constraints,
         });
       } else {
         const stored = readProductArray<Record<string, unknown>>(PRODUCT_STORAGE_KEYS.goals, []);
@@ -169,6 +212,23 @@ export function GoalEditDialog({
     } finally {
       setIsSubmitting(false);
     }
+  }
+
+  if (goalImpact) {
+    return (
+      <div className="tech-goal-form-page is-dialog">
+        <div className="tech-goal-form-state" role="status">
+          <Target size={20} />
+          <strong>保存前先确认影响</strong>
+          <span>{goalImpact.reasons.length ? goalImpact.reasons.join("；") : "目标依据发生变化。系统会保留现有计划与知识地图，保存后由你决定是否生成新草案。"}</span>
+          <span>{goalImpact.planRequiresReview ? "现有宏观计划需要复核。" : "现有计划无需复核。"}{goalImpact.mapRequiresReview ? "资料知识地图也需要复核。" : "资料知识地图无需重建。"}</span>
+          <div>
+            <button type="button" onClick={() => setGoalImpact(null)}>继续修改</button>
+            <button type="button" onClick={() => { setImpactConfirmedBasis(JSON.stringify({ type, deadline, dailyHours, workSchedule, currentLevel, baseline, successCriteria, mustCover, maySkip, constraintsText })); setGoalImpact(null); }}>确认影响，返回保存</button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (planReviewRequired) {
@@ -210,6 +270,11 @@ export function GoalEditDialog({
       dailyHours={dailyHours}
       workSchedule={workSchedule}
       currentLevel={currentLevel}
+      baseline={baseline}
+      successCriteria={successCriteria}
+      mustCover={mustCover}
+      maySkip={maySkip}
+      constraintsText={constraintsText}
       status={status}
       isSubmitting={isSubmitting}
       authPending={authStatus === "loading"}
@@ -222,6 +287,11 @@ export function GoalEditDialog({
       onDailyHoursChange={setDailyHours}
       onWorkScheduleChange={setWorkSchedule}
       onCurrentLevelChange={setCurrentLevel}
+      onBaselineChange={setBaseline}
+      onSuccessCriteriaChange={setSuccessCriteria}
+      onMustCoverChange={setMustCover}
+      onMaySkipChange={setMaySkip}
+      onConstraintsTextChange={setConstraintsText}
       onStatusChange={setStatus}
       onSubmit={handleSubmit}
     />

@@ -8,9 +8,9 @@ from sqlalchemy import func, select
 
 from src.core.agent_v2.orchestrator import approve_run, change_hash, review_hash
 from src.core.time import utc_now
-from tests.integration.database import IntegrationSessionLocal as AsyncSessionLocal
 from src.models import AgentApproval, AgentAuditEvent, AgentRun, AgentStep, User
 from src.tasks import agent_runs
+from tests.integration.database import IntegrationSessionLocal as AsyncSessionLocal
 
 pytestmark = [pytest.mark.integration, pytest.mark.soak]
 

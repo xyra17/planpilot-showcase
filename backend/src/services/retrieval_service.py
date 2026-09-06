@@ -29,6 +29,8 @@ class RetrievalResult:
     goal_id: str | None
     kb_id: str | None
     source_type: str
+    source_role: str
+    source_metadata: dict[str, object]
     source_url: str | None
     citation: str
     chunk_index: int | None = None
@@ -58,12 +60,15 @@ def _keyword_score(title: str, content: str, query: str) -> float:
     return min(1.0, token_recall * 0.65 + phrase_bonus + title_bonus)
 
 
-def _base_item_filters(user_id: str):
-    return (
+def _base_item_filters(user_id: str, source_types: set[str] | None = None):
+    filters = [
         KnowledgeItem.user_id == user_id,
         KnowledgeItem.note_id.is_(None),
         KnowledgeItem.processing_status == "ready",
-    )
+    ]
+    if source_types:
+        filters.append(KnowledgeItem.source_type.in_(source_types))
+    return tuple(filters)
 
 
 class RetrievalService:
@@ -75,6 +80,7 @@ class RetrievalService:
         query: str,
         goal_id: str | None = None,
         limit: int = 5,
+        source_types: set[str] | None = None,
     ) -> list[RetrievalResult]:
         normalized_query = " ".join(query.strip().split())[:MAX_QUERY_LENGTH]
         if not normalized_query:
@@ -98,6 +104,7 @@ class RetrievalService:
                 query_vector=query_vector,
                 goal_id=goal_id,
                 limit=bounded_limit,
+                source_types=source_types,
             )
             if vector_results:
                 logger.info(
@@ -113,6 +120,7 @@ class RetrievalService:
             query=normalized_query,
             goal_id=goal_id,
             limit=bounded_limit,
+            source_types=source_types,
         )
         logger.info(
             "retrieval_completed method=keyword user_id=%s result_count=%d",
@@ -130,6 +138,7 @@ class RetrievalService:
         query_vector: list[float],
         goal_id: str | None,
         limit: int,
+        source_types: set[str] | None,
     ) -> list[RetrievalResult]:
         score = (
             1 - KnowledgeChunk.embedding.cosine_distance(cast(query_vector, Vector(1024)))
@@ -138,16 +147,14 @@ class RetrievalService:
             select(KnowledgeChunk, KnowledgeItem, score)
             .join(KnowledgeItem, KnowledgeItem.id == KnowledgeChunk.item_id)
             .where(
-                *_base_item_filters(user_id),
+                *_base_item_filters(user_id, source_types),
                 KnowledgeChunk.embedding.is_not(None),
             )
         )
         if goal_id:
             statement = statement.where(_goal_scope(goal_id))
         rows = (
-            await db.execute(
-                statement.order_by(score.desc()).limit(limit * CANDIDATE_MULTIPLIER)
-            )
+            await db.execute(statement.order_by(score.desc()).limit(limit * CANDIDATE_MULTIPLIER))
         ).all()
         results = [
             RetrievalResult(
@@ -158,6 +165,8 @@ class RetrievalService:
                 goal_id=item.goal_id,
                 kb_id=item.kb_id,
                 source_type=item.source_type,
+                source_role=item.source_role or "reference",
+                source_metadata=item.source_metadata or {},
                 source_url=item.source_url,
                 chunk_index=chunk.chunk_index,
                 start_char=chunk.start_char,
@@ -175,7 +184,7 @@ class RetrievalService:
             1 - KnowledgeItem.embedding.cosine_distance(cast(query_vector, Vector(1024)))
         ).label("score")
         legacy = select(KnowledgeItem, legacy_score).where(
-            *_base_item_filters(user_id),
+            *_base_item_filters(user_id, source_types),
             KnowledgeItem.embedding.is_not(None),
         )
         if goal_id:
@@ -195,6 +204,7 @@ class RetrievalService:
         query: str,
         goal_id: str | None,
         limit: int,
+        source_types: set[str] | None,
     ) -> list[RetrievalResult]:
         escaped = query.replace("\\", "\\\\").replace("%", r"\%").replace("_", r"\_")
         pattern = f"%{escaped}%"
@@ -202,15 +212,13 @@ class RetrievalService:
             select(KnowledgeChunk, KnowledgeItem)
             .join(KnowledgeItem, KnowledgeItem.id == KnowledgeChunk.item_id)
             .where(
-                *_base_item_filters(user_id),
+                *_base_item_filters(user_id, source_types),
                 KnowledgeChunk.content.ilike(pattern, escape="\\"),
             )
         )
         if goal_id:
             chunk_statement = chunk_statement.where(_goal_scope(goal_id))
-        chunk_rows = (
-            await db.execute(chunk_statement.limit(limit * CANDIDATE_MULTIPLIER))
-        ).all()
+        chunk_rows = (await db.execute(chunk_statement.limit(limit * CANDIDATE_MULTIPLIER))).all()
         chunk_results = [
             RetrievalResult(
                 id=item.id,
@@ -220,6 +228,8 @@ class RetrievalService:
                 goal_id=item.goal_id,
                 kb_id=item.kb_id,
                 source_type=item.source_type,
+                source_role=item.source_role or "reference",
+                source_metadata=item.source_metadata or {},
                 source_url=item.source_url,
                 chunk_index=chunk.chunk_index,
                 start_char=chunk.start_char,
@@ -233,7 +243,7 @@ class RetrievalService:
             return sorted(chunk_results, key=lambda result: (-result.score, result.id))[:limit]
 
         item_statement = select(KnowledgeItem).where(
-            *_base_item_filters(user_id),
+            *_base_item_filters(user_id, source_types),
             or_(
                 KnowledgeItem.title.ilike(pattern, escape="\\"),
                 KnowledgeItem.content.ilike(pattern, escape="\\"),
@@ -242,8 +252,8 @@ class RetrievalService:
         if goal_id:
             item_statement = item_statement.where(_goal_scope(goal_id))
         items = (
-            await db.execute(item_statement.limit(limit * CANDIDATE_MULTIPLIER))
-        ).scalars().all()
+            (await db.execute(item_statement.limit(limit * CANDIDATE_MULTIPLIER))).scalars().all()
+        )
         results = [
             self._item_result(
                 item,
@@ -256,9 +266,7 @@ class RetrievalService:
         return sorted(results, key=lambda result: (-result.score, result.id))[:limit]
 
     @staticmethod
-    def _item_result(
-        item: KnowledgeItem, query: str, score: float, method: str
-    ) -> RetrievalResult:
+    def _item_result(item: KnowledgeItem, query: str, score: float, method: str) -> RetrievalResult:
         first_token = query.casefold().split()[0]
         index = item.content.casefold().find(first_token)
         start = max(0, index - 50) if index >= 0 else 0
@@ -270,6 +278,8 @@ class RetrievalService:
             goal_id=item.goal_id,
             kb_id=item.kb_id,
             source_type=item.source_type,
+            source_role=item.source_role or "reference",
+            source_metadata=item.source_metadata or {},
             source_url=item.source_url,
             citation=item.title,
             retrieval_method=method,

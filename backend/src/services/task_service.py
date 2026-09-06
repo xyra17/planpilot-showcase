@@ -48,6 +48,7 @@ class TaskOut(BaseModel):
     date: str
     priority: str
     masteryLevel: str
+    executionGuide: dict = Field(default_factory=dict)
     version: int
 
 
@@ -59,6 +60,7 @@ class TaskCreate(BaseModel):
     estimatedMinutes: int = 30
     date: str
     priority: str = "medium"
+    executionGuide: dict = Field(default_factory=dict)
 
 
 class TaskPatch(BaseModel):
@@ -70,9 +72,12 @@ class TaskPatch(BaseModel):
     priority: str | None = None
     mastery_level: str | None = None
     date: str | None = None
-    rescheduleTrigger: Literal["user_manual", "overload_recovery", "deviation_recovery"] | None = None
+    rescheduleTrigger: Literal["user_manual", "overload_recovery", "deviation_recovery"] | None = (
+        None
+    )
     recoveryStrategy: Literal["minimum", "standard", "sprint"] | None = None
     expectedVersion: int | None = None
+    executionGuide: dict | None = None
 
 
 # ── Internal Domain Helpers ────────────────────────────────────────────────
@@ -93,6 +98,7 @@ def _to_out(task: Task, goal_title: str) -> TaskOut:
         date=task.scheduled_date,
         priority=task.priority,
         masteryLevel=task.mastery_level,
+        executionGuide=dict(task.execution_guide or {}),
         version=task.version,
     )
 
@@ -119,6 +125,7 @@ def _new_task(body: TaskCreate) -> Task:
         completed_at=utc_now() if body.done else None,
         scheduled_date=body.date,
         priority=body.priority,
+        execution_guide=dict(body.executionGuide or {}),
     )
 
 
@@ -175,6 +182,9 @@ def _apply_patch_fields(task: Task, body: TaskPatch) -> set[str]:
     if body.date is not None and body.date != task.scheduled_date:
         task.scheduled_date = body.date
         changed.add("date")
+    if body.executionGuide is not None and body.executionGuide != (task.execution_guide or {}):
+        task.execution_guide = dict(body.executionGuide)
+        changed.add("executionGuide")
 
     return changed
 
@@ -214,7 +224,9 @@ async def list_tasks(
         按 scheduled_date desc, created_at asc 排序的任务列表
     """
     stmt = (
-        select(Task, Goal.title).join(Goal, Task.goal_id == Goal.id).where(Goal.user_id == user_id)
+        select(Task, Goal.title)
+        .join(Goal, Task.goal_id == Goal.id)
+        .where(Goal.user_id == user_id, Task.status != "abandoned")
     )
     if filter_date:
         stmt = stmt.where(Task.scheduled_date == filter_date)
@@ -367,11 +379,7 @@ async def update_task(
 
     changed_fields = _apply_patch_fields(task, body)
     changed_fields.discard("expectedVersion")
-    if (
-        "actual_mins" in changed_fields
-        and (task.actual_mins or 0) > 0
-        and task.status == "pending"
-    ):
+    if "actual_mins" in changed_fields and (task.actual_mins or 0) > 0 and task.status == "pending":
         task.status = "in_progress"
     next_version = task.version + 1 if changed_fields else task.version
 
@@ -615,9 +623,9 @@ async def observe_scheduled_task_start(
             block
             for block in (schedule.blocks if schedule else [])
             if str(block.get("taskId") or "") == task.id
-            and float(block.get("startHour", -1)) * 60 <= current_minute
-            < float(block.get("startHour", -1)) * 60
-            + float(block.get("durationMinutes", 0))
+            and float(block.get("startHour", -1)) * 60
+            <= current_minute
+            < float(block.get("startHour", -1)) * 60 + float(block.get("durationMinutes", 0))
         ),
         None,
     )

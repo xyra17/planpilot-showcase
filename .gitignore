@@ -38,6 +38,8 @@ output/
 backups/
 uploads/
 planpilot project/
+PlanPilot_archives/
+evaluations/
 
 # ==== 独立站点仓库（单独维护 Git 历史）====
 website/

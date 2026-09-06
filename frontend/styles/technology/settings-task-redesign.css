@@ -14,6 +14,115 @@ html[data-theme][data-theme][data-theme] .app-shell .settings-task-redesign {
   padding-bottom: 16px;
 }
 
+/* Desktop-only storage and local-model controls. */
+.app-shell .settings-task-redesign .desktop-storage-card { display: grid; gap: 18px; }
+.app-shell .settings-task-redesign .desktop-only-callout,
+.app-shell .settings-task-redesign .desktop-setting-group { display: grid; gap: 12px; padding: 16px 0 0; border-top: 1px solid var(--workspace-border); }
+.app-shell .settings-task-redesign .desktop-only-callout strong,
+.app-shell .settings-task-redesign .desktop-setting-heading strong { color: var(--workspace-text); font-size: 14px; }
+.app-shell .settings-task-redesign .desktop-only-callout p,
+.app-shell .settings-task-redesign .desktop-setting-heading p,
+.app-shell .settings-task-redesign .desktop-empty,
+.app-shell .settings-task-redesign .desktop-boundary { margin: 3px 0 0; color: var(--settings-muted); font-size: 12px; line-height: 1.55; }
+.app-shell .settings-task-redesign .desktop-setting-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.app-shell .settings-task-redesign .desktop-setting-heading > div:last-child { display: flex; gap: 6px; }
+.app-shell .settings-task-redesign .desktop-setting-heading button,
+.app-shell .settings-task-redesign .desktop-download-row button,
+.app-shell .settings-task-redesign .desktop-private-row button { display: inline-flex; min-height: 38px; align-items: center; justify-content: center; gap: 6px; padding: 0 12px; color: var(--workspace-text); background: var(--workspace-panel-subtle); border: 1px solid var(--workspace-border); border-radius: 9px; cursor: pointer; }
+.app-shell .settings-task-redesign .desktop-setting-heading button:hover,
+.app-shell .settings-task-redesign .desktop-download-row button:hover,
+.app-shell .settings-task-redesign .desktop-private-row button:hover { border-color: color-mix(in srgb, var(--workspace-accent) 48%, var(--workspace-border)); }
+.app-shell .settings-task-redesign .desktop-setting-heading button:disabled,
+.app-shell .settings-task-redesign .desktop-download-row button:disabled,
+.app-shell .settings-task-redesign .desktop-private-row button:disabled { cursor: not-allowed; opacity: .52; }
+.app-shell .settings-task-redesign .desktop-path { display: block; overflow: hidden; padding: 9px 11px; color: var(--workspace-secondary); background: var(--workspace-panel-subtle); border-radius: 8px; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.app-shell .settings-task-redesign .desktop-model-list { display: grid; gap: 6px; }
+.app-shell .settings-task-redesign .desktop-model-list button { display: flex; min-height: 52px; align-items: center; justify-content: space-between; padding: 8px 11px; text-align: left; color: var(--workspace-text); background: transparent; border: 1px solid var(--workspace-border); border-radius: 9px; cursor: pointer; }
+.app-shell .settings-task-redesign .desktop-model-list button.is-selected { border-color: var(--workspace-accent); background: var(--workspace-accent-soft); }
+.app-shell .settings-task-redesign .desktop-model-list button span { display: grid; gap: 2px; min-width: 0; }
+.app-shell .settings-task-redesign .desktop-model-list button strong { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.app-shell .settings-task-redesign .desktop-model-list button small { color: var(--settings-muted); font-size: 11px; }
+.app-shell .settings-task-redesign .desktop-download-row,
+.app-shell .settings-task-redesign .desktop-private-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+.app-shell .settings-task-redesign .desktop-download-row input,
+.app-shell .settings-task-redesign .desktop-private-row input { min-width: 0; height: 40px; padding: 0 11px; color: var(--workspace-text); background: var(--workspace-panel); border: 1px solid var(--workspace-border); border-radius: 9px; }
+.app-shell .settings-task-redesign .desktop-progress { color: var(--workspace-accent); }
+.app-shell .settings-task-redesign .desktop-boundary { padding-left: 10px; border-left: 2px solid var(--workspace-accent); }
+.app-shell .settings-task-redesign .desktop-boundary.is-warning { border-left-color: #c58a32; }
+.app-shell .settings-task-redesign .desktop-settings-message { margin: 0; color: var(--workspace-accent); font-size: 12px; }
+
+@media (max-width: 620px) {
+  .app-shell .settings-task-redesign .desktop-setting-heading { display: grid; }
+  .app-shell .settings-task-redesign .desktop-download-row,
+  .app-shell .settings-task-redesign .desktop-private-row { grid-template-columns: 1fr; }
+  .app-shell .settings-task-redesign .desktop-download-row button,
+  .app-shell .settings-task-redesign .desktop-private-row button { width: 100%; }
+}
+
+/* Account workspaces, registered devices, and conservative offline conflict review. */
+.app-shell .settings-task-redesign .workspace-device-card { display: grid; gap: 18px; }
+.app-shell .settings-task-redesign .workspace-device-card > .settings-section-head { grid-template-columns: auto minmax(0, 1fr) auto; }
+.app-shell .settings-task-redesign .workspace-device-refresh { display: inline-flex; width: 36px; height: 36px; align-items: center; justify-content: center; color: var(--workspace-secondary); background: var(--workspace-panel-subtle); border: 1px solid var(--workspace-border); border-radius: 9px; cursor: pointer; }
+.app-shell .settings-task-redesign .workspace-device-refresh:disabled { cursor: not-allowed; opacity: .52; }
+.app-shell .settings-task-redesign .workspace-device-login-note,
+.app-shell .settings-task-redesign .workspace-device-group { display: grid; gap: 12px; padding-top: 16px; border-top: 1px solid var(--workspace-border); }
+.app-shell .settings-task-redesign .workspace-device-login-note strong { color: var(--workspace-text); font-size: 14px; }
+.app-shell .settings-task-redesign .workspace-device-login-note p,
+.app-shell .settings-task-redesign .workspace-device-empty { margin: 0; color: var(--settings-muted); font-size: 12px; line-height: 1.55; }
+.app-shell .settings-task-redesign .workspace-device-group-heading { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.app-shell .settings-task-redesign .workspace-device-group-heading > div { display: flex; min-width: 0; align-items: center; gap: 9px; color: var(--workspace-secondary); }
+.app-shell .settings-task-redesign .workspace-device-group-heading > div > span { display: grid; gap: 2px; }
+.app-shell .settings-task-redesign .workspace-device-group-heading strong { color: var(--workspace-text); font-size: 13px; }
+.app-shell .settings-task-redesign .workspace-device-group-heading small { color: var(--settings-muted); font-size: 11px; }
+.app-shell .settings-task-redesign .workspace-device-group-heading > em { flex: 0 0 auto; padding: 4px 7px; color: var(--settings-muted); background: var(--workspace-panel-subtle); border-radius: 999px; font-size: 10px; font-style: normal; }
+.app-shell .settings-task-redesign .workspace-device-group-heading > em.is-alert { color: #a66b18; background: color-mix(in srgb, #d99a3c 14%, transparent); }
+.app-shell .settings-task-redesign :is(.workspace-cloud-list, .workspace-device-list, .workspace-conflict-list) { display: grid; gap: 7px; }
+.app-shell .settings-task-redesign :is(.workspace-cloud-row, .workspace-device-row) { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; min-height: 58px; align-items: center; gap: 10px; padding: 9px 11px; background: var(--workspace-panel-subtle); border: 1px solid var(--workspace-border); border-radius: 10px; }
+.app-shell .settings-task-redesign :is(.workspace-cloud-icon, .workspace-device-icon) { display: inline-flex; width: 30px; height: 30px; align-items: center; justify-content: center; color: var(--workspace-accent); background: var(--workspace-accent-soft); border-radius: 8px; }
+.app-shell .settings-task-redesign .workspace-device-copy > span,
+.app-shell .settings-task-redesign .workspace-cloud-row > span:nth-child(2) { display: grid; gap: 2px; min-width: 0; }
+.app-shell .settings-task-redesign :is(.workspace-cloud-row, .workspace-device-row) strong { overflow: hidden; color: var(--workspace-text); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.app-shell .settings-task-redesign :is(.workspace-cloud-row, .workspace-device-row) small { color: var(--settings-muted); font-size: 10px; }
+.app-shell .settings-task-redesign .workspace-cloud-row > em,
+.app-shell .settings-task-redesign .workspace-device-copy em { display: inline-flex; align-items: center; gap: 3px; width: max-content; color: var(--workspace-accent); font-size: 10px; font-style: normal; }
+.app-shell .settings-task-redesign .workspace-device-copy > span { display: flex; align-items: center; gap: 7px; }
+.app-shell .settings-task-redesign .workspace-device-copy em.is-revoked { color: var(--settings-muted); }
+.app-shell .settings-task-redesign .workspace-device-row.is-revoked { opacity: .62; }
+.app-shell .settings-task-redesign .workspace-device-row > button { display: inline-flex; min-height: 32px; align-items: center; gap: 5px; padding: 0 9px; color: var(--workspace-secondary); background: transparent; border: 1px solid var(--workspace-border); border-radius: 8px; cursor: pointer; font-size: 11px; }
+.app-shell .settings-task-redesign .workspace-device-row > button:disabled { cursor: not-allowed; opacity: .52; }
+.app-shell .settings-task-redesign .workspace-conflict-item { display: grid; gap: 10px; padding: 12px; border: 1px solid color-mix(in srgb, #d99a3c 36%, var(--workspace-border)); border-radius: 11px; }
+.app-shell .settings-task-redesign .workspace-conflict-item > header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.app-shell .settings-task-redesign .workspace-conflict-item > header > span { display: flex; align-items: center; gap: 6px; color: #b47822; }
+.app-shell .settings-task-redesign .workspace-conflict-item > header strong { color: var(--workspace-text); font-size: 12px; }
+.app-shell .settings-task-redesign .workspace-conflict-item > header small { color: var(--settings-muted); font-size: 10px; text-align: right; }
+.app-shell .settings-task-redesign .workspace-conflict-compare { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.app-shell .settings-task-redesign .workspace-conflict-compare > section { min-width: 0; padding: 9px; background: var(--workspace-panel-subtle); border-radius: 8px; }
+.app-shell .settings-task-redesign .workspace-conflict-compare strong { color: var(--workspace-secondary); font-size: 10px; }
+.app-shell .settings-task-redesign .workspace-conflict-compare pre { max-height: 150px; overflow: auto; margin: 7px 0 0; color: var(--workspace-text); font: 10px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; word-break: break-word; }
+.app-shell .settings-task-redesign .workspace-conflict-item > footer { display: flex; justify-content: flex-end; gap: 7px; }
+.app-shell .settings-task-redesign .workspace-conflict-item > footer button { display: inline-flex; min-height: 34px; align-items: center; justify-content: center; gap: 5px; padding: 0 10px; border: 1px solid var(--workspace-border); border-radius: 8px; cursor: pointer; font-size: 11px; }
+.app-shell .settings-task-redesign .workspace-conflict-item > footer button.is-secondary { color: var(--workspace-secondary); background: transparent; }
+.app-shell .settings-task-redesign .workspace-conflict-item > footer button.is-primary { color: var(--workspace-accent-contrast); background: var(--workspace-accent); border-color: var(--workspace-accent); }
+.app-shell .settings-task-redesign .workspace-conflict-item > footer button:disabled { cursor: not-allowed; opacity: .52; }
+.app-shell .settings-task-redesign .workspace-conflict-empty { display: flex; align-items: center; gap: 9px; padding: 11px; color: var(--workspace-accent); background: var(--workspace-accent-soft); border-radius: 9px; }
+.app-shell .settings-task-redesign .workspace-conflict-empty > span { display: grid; gap: 2px; }
+.app-shell .settings-task-redesign .workspace-conflict-empty strong { color: var(--workspace-text); font-size: 12px; }
+.app-shell .settings-task-redesign .workspace-conflict-empty small { color: var(--settings-muted); font-size: 10px; }
+.app-shell .settings-task-redesign :is(.workspace-device-loading, .workspace-device-error, .workspace-device-message) { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 11px; }
+.app-shell .settings-task-redesign .workspace-device-loading { color: var(--settings-muted); }
+.app-shell .settings-task-redesign .workspace-device-error { color: #b45151; }
+.app-shell .settings-task-redesign .workspace-device-message { color: var(--workspace-accent); }
+
+@media (max-width: 620px) {
+  .app-shell .settings-task-redesign .workspace-device-group-heading,
+  .app-shell .settings-task-redesign .workspace-conflict-item > header { align-items: flex-start; flex-direction: column; }
+  .app-shell .settings-task-redesign .workspace-conflict-compare { grid-template-columns: 1fr; }
+  .app-shell .settings-task-redesign .workspace-conflict-item > footer { display: grid; grid-template-columns: 1fr; }
+  .app-shell .settings-task-redesign .workspace-conflict-item > footer button { width: 100%; }
+  .app-shell .settings-task-redesign .workspace-device-row { grid-template-columns: auto minmax(0, 1fr); }
+  .app-shell .settings-task-redesign .workspace-device-row > button { grid-column: 1 / -1; width: 100%; justify-content: center; }
+}
+
 /* Keep the settings interaction layer on a predictable utility-page plane. */
 .app-shell .settings-task-redesign :is(
   .goals-redesign-heading,

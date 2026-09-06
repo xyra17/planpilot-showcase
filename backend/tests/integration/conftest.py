@@ -25,6 +25,11 @@ os.environ.setdefault("SECRET_KEY", "integration-test-secret-32chars!!")
 os.environ.setdefault("SENTRY_DSN", "")
 # SMART_API_KEY / OPENAI_API_KEY 从真实 .env 继承
 
+# The project-wide unit-test conftest installs an in-memory SQLite factory on
+# src.database during collection. Integration tests must restore the isolated
+# PostgreSQL factory so production services that open their own sessions test
+# the same database as the integration fixtures.
+import src.database as database  # noqa: E402
 from src.api.auth import limiter as auth_limiter  # noqa: E402
 from src.config import settings  # noqa: E402
 from src.database import Base, get_db  # noqa: E402
@@ -33,12 +38,6 @@ from tests.integration.database import (  # noqa: E402
     IntegrationSessionLocal,
     integration_engine,
 )
-
-# The project-wide unit-test conftest installs an in-memory SQLite factory on
-# src.database during collection. Integration tests must restore the isolated
-# PostgreSQL factory so production services that open their own sessions test
-# the same database as the integration fixtures.
-import src.database as database  # noqa: E402
 
 database.engine = integration_engine
 database.AsyncSessionLocal = IntegrationSessionLocal

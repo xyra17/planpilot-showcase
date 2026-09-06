@@ -297,8 +297,14 @@ class DecisionContextBuilder:
 
             for evidence, event in evidence_rows:
                 meta = evidence.meta or {}
-                is_delay_observation = pattern.pattern_type == "delay_pattern" and "days_overdue" in meta
-                attribution = latest_attribution.get(evidence.learning_event_id) if is_delay_observation else None
+                is_delay_observation = (
+                    pattern.pattern_type == "delay_pattern" and "days_overdue" in meta
+                )
+                attribution = (
+                    latest_attribution.get(evidence.learning_event_id)
+                    if is_delay_observation
+                    else None
+                )
                 if attribution and attribution.get("attribution") == "external_interruption":
                     direction = "excluded"
                     bucket["excluded_count"] += 1
@@ -334,8 +340,11 @@ class DecisionContextBuilder:
                             "source": meta.get("source"),
                             "aggregate_type": event.aggregate_type if event else None,
                             "aggregate_id": event.aggregate_id if event else None,
-                            "task_title": meta.get("task_title") or ((event.payload or {}).get("title") if event else None),
-                            "days_overdue": meta.get("days_overdue") if "days_overdue" in meta else ((event.payload or {}).get("days_overdue") if event else None),
+                            "task_title": meta.get("task_title")
+                            or ((event.payload or {}).get("title") if event else None),
+                            "days_overdue": meta.get("days_overdue")
+                            if "days_overdue" in meta
+                            else ((event.payload or {}).get("days_overdue") if event else None),
                             "attribution": attribution.get("attribution") if attribution else None,
                             "reason_code": attribution.get("reason_code") if attribution else None,
                             "note": attribution.get("note") if attribution else None,
@@ -358,7 +367,9 @@ class DecisionContextBuilder:
         tasks = list(
             (
                 await db.execute(
-                    select(Task).where(Task.goal_id == goal.id).order_by(Task.scheduled_date)
+                    select(Task)
+                    .where(Task.goal_id == goal.id, Task.status != "abandoned")
+                    .order_by(Task.scheduled_date)
                 )
             )
             .scalars()
@@ -379,6 +390,7 @@ class DecisionContextBuilder:
             and task.status not in {"completed", "skipped", "abandoned"}
         ]
         completed = sum(task.status == "completed" for task in tasks)
+        graph = await KnowledgeGraphService.get_graph(db, goal.user_id, goal_id=goal.id)
         return {
             "goal": {
                 "id": goal.id,
@@ -387,6 +399,9 @@ class DecisionContextBuilder:
                 "deadline": goal.deadline,
                 "daily_hours": goal.daily_hours,
                 "status": goal.status,
+                "description": goal.description,
+                "contract": goal.contract or {},
+                "intent_version": goal.intent_version or 1,
             },
             "current_plan": (
                 {
@@ -408,6 +423,11 @@ class DecisionContextBuilder:
             "upcoming_tasks": [
                 DecisionContextBuilder._task_to_dict(task) for task in upcoming[:10]
             ],
+            "knowledge_map": {
+                "concepts": graph["concepts"][:24],
+                "edges": graph["edges"][:48],
+                "resources": graph["resources"][:24],
+            },
         }
 
     @staticmethod
@@ -418,6 +438,8 @@ class DecisionContextBuilder:
             "scheduled_date": task.scheduled_date,
             "estimated_mins": task.estimated_mins,
             "status": task.status,
+            "objective": task.description,
+            "execution_guide": task.execution_guide or {},
         }
 
     @staticmethod

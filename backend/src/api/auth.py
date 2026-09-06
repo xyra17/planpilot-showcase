@@ -109,6 +109,9 @@ async def register(
     )
     db.add(user)
     await db.flush()
+    from src.services.workspace_service import ensure_default_workspace
+
+    await ensure_default_workspace(user, db)
 
     verification_token = secrets.token_urlsafe(32)
     db.add(

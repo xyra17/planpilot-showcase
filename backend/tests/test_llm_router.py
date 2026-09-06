@@ -1,10 +1,13 @@
 from dataclasses import replace
 from unittest.mock import AsyncMock, MagicMock, patch
+from uuid import uuid4
 
 import pytest
 
 from src.core.llm_router import (
+    _RouteMetricsCallback,
     ainvoke_structured_checked,
+    cloud_circuit,
     create_critical_llm,
     create_interactive_llm,
     create_json_llm,
@@ -17,33 +20,34 @@ from src.core.llm_router import (
 
 def setup_function():
     local_circuit.reset()
+    cloud_circuit.reset()
     model_metrics.reset()
 
 
-def test_routine_route_prefers_local_and_falls_back_to_flash():
+def test_routine_route_prefers_flash_and_falls_back_to_local():
     local = MagicMock()
     limited = MagicMock()
     routed = MagicMock()
-    limited.with_fallbacks.return_value = routed
     flash = MagicMock()
     flash_limited = MagicMock()
+    flash_limited.with_fallbacks.return_value = routed
 
     with (
-        patch("src.core.llm_router.ChatOpenAI", side_effect=[local, flash]) as factory,
+        patch("src.core.llm_router.ChatOpenAI", side_effect=[flash, local]) as factory,
         patch("src.core.llm_router._limit_local_concurrency", return_value=limited),
         patch("src.core.llm_router._limit_flash_concurrency", return_value=flash_limited),
     ):
         result = create_interactive_llm(max_tokens=123)
 
     assert result is routed
-    assert factory.call_args_list[0].kwargs["model"].endswith("Qwen3.5-9B-MLX-4bit")
+    assert factory.call_args_list[0].kwargs["model"] == "deepseek-v4-flash"
     assert factory.call_args_list[0].kwargs["max_retries"] == 0
-    assert factory.call_args_list[0].kwargs["extra_body"] == {
+    assert factory.call_args_list[1].kwargs["model"].endswith("Qwen3.5-9B-MLX-4bit")
+    assert factory.call_args_list[1].kwargs["max_retries"] == 0
+    assert factory.call_args_list[1].kwargs["extra_body"] == {
         "chat_template_kwargs": {"enable_thinking": False}
     }
-    assert factory.call_args_list[1].kwargs["model"] == "deepseek-v4-flash"
-    assert factory.call_args_list[1].kwargs["max_retries"] == 0
-    limited.with_fallbacks.assert_called_once_with([flash_limited])
+    flash_limited.with_fallbacks.assert_called_once_with([limited])
 
 
 def test_routine_route_binds_tools_before_adding_fallback():
@@ -58,7 +62,7 @@ def test_routine_route_binds_tools_before_adding_fallback():
     tools = [MagicMock()]
 
     with (
-        patch("src.core.llm_router.ChatOpenAI", side_effect=[local, flash]),
+        patch("src.core.llm_router.ChatOpenAI", side_effect=[flash, local]),
         patch("src.core.llm_router._limit_local_concurrency", return_value=limited),
         patch("src.core.llm_router._limit_flash_concurrency", return_value=flash_limited),
     ):
@@ -66,8 +70,8 @@ def test_routine_route_binds_tools_before_adding_fallback():
 
     local.bind_tools.assert_called_once_with(tools)
     flash.bind_tools.assert_called_once_with(tools)
-    flash_limited.assert_not_called()
-    limited.with_fallbacks.assert_called_once_with([flash_limited])
+    limited.assert_not_called()
+    flash_limited.with_fallbacks.assert_called_once_with([limited])
 
 
 def test_pro_route_never_uses_local_model():
@@ -100,6 +104,42 @@ def test_open_circuit_skips_local_model():
     assert factory.call_count == 1
     assert factory.call_args.kwargs["model"] == "deepseek-v4-flash"
     assert local_circuit.snapshot()["state"] == "open"
+
+
+def test_open_cloud_circuit_skips_flash_and_uses_local_model():
+    cloud_circuit.record_failure()
+    cloud_circuit.record_failure()
+    local = MagicMock()
+    local_limited = MagicMock()
+
+    with (
+        patch("src.core.llm_router.ChatOpenAI", return_value=local) as factory,
+        patch("src.core.llm_router._limit_local_concurrency", return_value=local_limited),
+    ):
+        result = create_interactive_llm(max_tokens=20)
+
+    assert result is local_limited
+    assert factory.call_count == 1
+    assert factory.call_args.kwargs["model"].endswith("Qwen3.5-9B-MLX-4bit")
+    assert cloud_circuit.snapshot()["state"] == "open"
+
+
+def test_two_cloud_call_failures_open_the_shared_circuit():
+    callback = _RouteMetricsCallback("flash")
+
+    callback.on_llm_error(RuntimeError("first"), run_id=uuid4())
+    assert cloud_circuit.snapshot()["state"] == "closed"
+    callback.on_llm_error(RuntimeError("second"), run_id=uuid4())
+
+    assert cloud_circuit.snapshot()["state"] == "open"
+
+
+def test_critical_route_reports_error_when_cloud_circuit_is_open():
+    cloud_circuit.record_failure()
+    cloud_circuit.record_failure()
+
+    with pytest.raises(RuntimeError, match="高质量云端模型暂时不可用"):
+        create_critical_llm(max_tokens=700)
 
 
 def test_metrics_do_not_contain_prompt_or_response_content():
@@ -190,7 +230,7 @@ def test_model_roles_are_explicit_and_non_overlapping():
         embedding_base_url="http://localhost:1234/v1",
     )
     roles = get_model_role_contracts(runtime)
-    assert roles["interactive"]["primary"] == "local"
+    assert roles["interactive"]["primary"] == "cloud"
     assert roles["structured"]["primary"] == "cloud"
     assert roles["critical"]["primary"] == "cloud-pro"
     assert roles["embedding"]["primary"] == "embedding-local"
@@ -219,11 +259,11 @@ def test_model_role_overview_tracks_hot_models_and_concurrency():
     )
     roles = get_model_role_contracts(runtime)
 
-    assert roles["interactive"]["primary_model"] == "local-next"
+    assert roles["interactive"]["primary_model"] == "glm-5.3"
     assert roles["structured"]["primary_model"] == "glm-5.3"
     assert roles["critical"]["primary_model"] == "glm-5.3-pro"
     assert roles["embedding"]["primary_model"] == "embedding-next"
-    assert [roles[key]["max_concurrency"] for key in roles] == [2, 7, 3, 4]
+    assert [roles[key]["max_concurrency"] for key in roles] == [7, 7, 3, 4]
 
 
 def test_model_role_overview_shows_the_actual_local_fallback_when_cloud_is_off():

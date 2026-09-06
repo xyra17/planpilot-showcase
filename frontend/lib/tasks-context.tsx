@@ -20,6 +20,13 @@ export type Task = {
   date: string; // YYYY-MM-DD
   priority: Priority;
   masteryLevel?: string;
+  executionGuide?: {
+    why_now?: string;
+    steps?: string[];
+    deliverable?: string;
+    done_criteria?: string[];
+    source_refs?: Array<{ item_id: string; item_title: string; locator: string; snippet?: string }>;
+  };
 };
 
 interface TasksCtx {

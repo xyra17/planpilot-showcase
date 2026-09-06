@@ -13,8 +13,19 @@ from src.core.agent_v2.orchestrator import advance_run
 from src.core.time import utc_now
 from src.intelligence.cognitive_model import knowledge_retention, retention_curve
 from src.intelligence.evaluation import evaluate_benchmark, persist_report
+from src.intelligence.knowledge_graph import KnowledgeGraphService
 from src.intelligence.memory_system import MemoryBuilder
-from src.models import AgentRun, Goal, LearningEvent, Task, TaskMasteryRecord
+from src.models import (
+    AgentRun,
+    Goal,
+    KnowledgeItem,
+    KnowledgeMapVersion,
+    LearningConcept,
+    LearningEvent,
+    MasteryEvidence,
+    Task,
+    TaskMasteryRecord,
+)
 
 
 def test_forgetting_curve_is_monotonic_and_bounded():
@@ -147,6 +158,126 @@ async def test_knowledge_graph_gap_and_next_concept(client, auth, goal_id):
 
 
 @pytest.mark.asyncio
+async def test_build_knowledge_map_is_source_linked_and_reviewable(client, auth, goal_id, db):
+    goal = await db.scalar(select(Goal).where(Goal.id == goal_id))
+    assert goal is not None
+    item = KnowledgeItem(
+        id=str(uuid.uuid4()),
+        user_id=goal.user_id,
+        goal_id=goal_id,
+        title="Python 学习路径.md",
+        content="# 条件判断\n## 循环结构\n写出两个可运行示例。",
+        normalized_content="# 条件判断\n## 循环结构\n写出两个可运行示例。",
+        content_length=36,
+        processing_status="ready",
+        source_role="scope",
+    )
+    reference_item = KnowledgeItem(
+        id=str(uuid.uuid4()),
+        user_id=goal.user_id,
+        goal_id=goal_id,
+        title="练习参考.md",
+        content="# 不应扩大范围的参考章节",
+        normalized_content="# 不应扩大范围的参考章节",
+        content_length=16,
+        processing_status="ready",
+        source_role="reference",
+    )
+    db.add_all([item, reference_item])
+    await db.commit()
+
+    response = await client.post(
+        "/api/v1/intelligence/knowledge-map/build",
+        headers=auth,
+        json={"goal_id": goal_id},
+    )
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["status"] == "draft"
+    assert payload["generated_by"] == "structured_extraction"
+    assert any(row["title"] == item.title for row in payload["sources"])
+    assert any(
+        row["item_id"] == reference_item.id and row["concept_count"] == 0
+        for row in payload["sources"]
+    )
+    concepts = payload["graph"]["concepts"]
+    edges = payload["graph"]["edges"]
+    assert all(row["review_status"] == "draft" for row in concepts)
+    assert all(row["source_refs"] for row in concepts)
+    assert all(
+        reference_item.id not in {ref["item_id"] for ref in row["source_refs"]} for row in concepts
+    )
+    assert any(
+        row["relation_type"] == "explained_by"
+        and row["basis"] == "source_backed"
+        and row["review_status"] == "confirmed"
+        for row in edges
+    )
+    assert any(
+        row["relation_type"] == "prerequisite"
+        and row["basis"] == "inferred"
+        and row["review_status"] == "draft"
+        for row in edges
+    )
+
+    reviewed = await client.post(
+        "/api/v1/intelligence/knowledge-map/review",
+        headers=auth,
+        json={
+            "goal_id": goal_id,
+            "concept_ids": [row["id"] for row in concepts],
+            "edge_ids": [row["id"] for row in edges if row["review_status"] == "draft"],
+            "action": "confirmed",
+        },
+    )
+    assert reviewed.status_code == 200, reviewed.text
+    assert reviewed.json()["status"] == "confirmed"
+    assert all(row["review_status"] == "confirmed" for row in reviewed.json()["graph"]["concepts"])
+
+
+@pytest.mark.asyncio
+async def test_mastery_evidence_only_updates_confirmed_task_concepts(goal_id, db):
+    goal = await db.scalar(select(Goal).where(Goal.id == goal_id))
+    assert goal is not None
+    confirmed = LearningConcept(
+        user_id=goal.user_id,
+        goal_id=goal_id,
+        name="已确认知识点",
+        normalized_name="已确认知识点",
+        review_status="confirmed",
+        mastery_score=0.2,
+    )
+    draft = LearningConcept(
+        user_id=goal.user_id,
+        goal_id=goal_id,
+        name="待确认知识点",
+        normalized_name="待确认知识点",
+        review_status="draft",
+        provenance_type="structured_extraction",
+        mastery_score=0.2,
+    )
+    db.add_all([confirmed, draft])
+    await db.commit()
+
+    updated = await KnowledgeGraphService.record_task_evidence(
+        db,
+        goal.user_id,
+        goal_id=goal_id,
+        execution_guide={"concept_refs": [{"id": confirmed.id}, {"id": draft.id}]},
+        score=0.9,
+        evidence_source="ai_assessment",
+    )
+    await db.commit()
+    await db.refresh(confirmed)
+    await db.refresh(draft)
+    assert updated == [confirmed.id]
+    assert confirmed.evidence_count == 1
+    assert confirmed.mastery_score == 0.9
+    assert draft.evidence_count == 0
+    assert draft.mastery_score == 0.2
+
+
+@pytest.mark.asyncio
 async def test_adaptive_task_split_still_requires_review_and_apply(client, auth, goal_id, db):
     response = await client.post(
         "/api/v1/tasks",
@@ -232,3 +363,143 @@ async def test_phase4_benchmark_has_twenty_cases_and_persists(client, auth, db):
     assert summary.status_code == 200
     assert summary.json()["total"] >= 20
     assert summary.json()["pass_rate"] == 1.0
+
+
+@pytest.mark.asyncio
+async def test_knowledge_map_versions_merge_split_and_typed_evidence(client, auth, goal_id, db):
+    goal = await db.scalar(select(Goal).where(Goal.id == goal_id))
+    item = KnowledgeItem(
+        user_id=goal.user_id,
+        goal_id=goal_id,
+        title="线性代数范围.md",
+        content="# 行列式\n## 矩阵运算\n## 向量组线性相关",
+        normalized_content="# 行列式\n## 矩阵运算\n## 向量组线性相关",
+        content_length=32,
+        processing_status="ready",
+        source_role="scope",
+        source_metadata={"learning_use": ["define_scope", "plan_sequence"]},
+    )
+    db.add(item)
+    await db.commit()
+
+    built = await client.post(
+        "/api/v1/intelligence/knowledge-map/build",
+        headers=auth,
+        json={"goal_id": goal_id, "extraction_mode": "structural"},
+    )
+    assert built.status_code == 200, built.text
+    payload = built.json()
+    assert payload["map_version"]["version"] == 1
+    concept_ids = [row["id"] for row in payload["graph"]["concepts"]]
+    edge_ids = [row["id"] for row in payload["graph"]["edges"] if row["review_status"] == "draft"]
+    reviewed = await client.post(
+        "/api/v1/intelligence/knowledge-map/review",
+        headers=auth,
+        json={
+            "goal_id": goal_id,
+            "concept_ids": concept_ids,
+            "edge_ids": edge_ids,
+            "action": "confirmed",
+        },
+    )
+    assert reviewed.status_code == 200, reviewed.text
+    assert reviewed.json()["map_version"]["status"] == "active"
+
+    merged = await client.post(
+        "/api/v1/intelligence/concepts/merge",
+        headers=auth,
+        json={
+            "goal_id": goal_id,
+            "target_concept_id": concept_ids[0],
+            "source_concept_ids": [concept_ids[1]],
+        },
+    )
+    assert merged.status_code == 200, merged.text
+    assert merged.json()["target"]["aliases"]
+
+    split = await client.post(
+        f"/api/v1/intelligence/concepts/{concept_ids[0]}/split",
+        headers=auth,
+        json={
+            "goal_id": goal_id,
+            "parts": [{"name": "二阶行列式"}, {"name": "高阶行列式"}],
+        },
+    )
+    assert split.status_code == 200, split.text
+    versions = await client.get(
+        f"/api/v1/intelligence/knowledge-map/{goal_id}/versions", headers=auth
+    )
+    assert versions.status_code == 200
+    assert len(versions.json()["items"]) == 4
+    assert await db.scalar(
+        select(KnowledgeMapVersion).where(KnowledgeMapVersion.goal_id == goal_id)
+    )
+
+    active_concept = split.json()["parts"][0]
+    task = Task(
+        goal_id=goal_id,
+        title="解释二阶行列式",
+        scheduled_date=date.today().isoformat(),
+        execution_guide={"concept_refs": [{"id": active_concept["id"]}]},
+    )
+    db.add(task)
+    await db.commit()
+    await KnowledgeGraphService.record_task_evidence(
+        db,
+        goal.user_id,
+        goal_id=goal_id,
+        task_id=task.id,
+        execution_guide=task.execution_guide,
+        score=0.82,
+        evidence_source="verification",
+        evidence_type="explanation_assessment",
+        summary="能解释计算步骤",
+    )
+    await db.commit()
+    evidence = await db.scalar(select(MasteryEvidence).where(MasteryEvidence.task_id == task.id))
+    assert evidence is not None
+    assert evidence.reliability == 1.0
+
+
+@pytest.mark.asyncio
+async def test_source_metadata_proposal_review_and_impact_preview(client, auth, goal_id, db):
+    goal = await db.scalar(select(Goal).where(Goal.id == goal_id))
+    item = KnowledgeItem(
+        user_id=goal.user_id,
+        goal_id=goal_id,
+        title="2027 全国硕士研究生招生考试数学（一）考试大纲",
+        content="考试内容包括高等数学、线性代数与概率论。",
+        normalized_content="考试内容包括高等数学、线性代数与概率论。",
+        content_length=24,
+        processing_status="ready",
+        source_role="reference",
+    )
+    db.add(item)
+    await db.commit()
+    proposed = await client.post(
+        f"/api/v1/knowledge/files/{item.id}/metadata-proposals", headers=auth
+    )
+    assert proposed.status_code == 201, proposed.text
+    proposal = proposed.json()
+    assert proposal["proposed_role"] == "scope"
+    accepted = await client.post(
+        f"/api/v1/knowledge/files/{item.id}/metadata-proposals/{proposal['id']}/review",
+        headers=auth,
+        json={"action": "accepted"},
+    )
+    assert accepted.status_code == 200, accepted.text
+    assert accepted.json()["file"]["sourceRole"] == "scope"
+    assert accepted.json()["file"]["sourceMetadata"]["authority"] == "official"
+
+    impact = await client.post(
+        "/api/v1/intelligence/knowledge-map/impact-preview",
+        headers=auth,
+        json={
+            "goal_id": goal_id,
+            "source_item_id": item.id,
+            "proposed_source_role": "reference",
+            "proposed_source_metadata": {"learning_use": ["answer_question"]},
+        },
+    )
+    assert impact.status_code == 200, impact.text
+    assert impact.json()["map_requires_review"] is True

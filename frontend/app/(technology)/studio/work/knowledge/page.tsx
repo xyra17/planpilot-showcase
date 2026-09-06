@@ -58,8 +58,12 @@ import {
   productApi,
   type ApiGoal,
   type ApiKnowledgeFile,
+  type ApiKnowledgeMap,
   type ApiKnowledgeFileVersion,
   type ApiMediaPreview,
+  type ApiSourceMetadata,
+  type ApiSourceMetadataProposal,
+  type ApiKnowledgeMapVersion,
 } from "@/lib/technology/productApi";
 import { readScopedJson, writeScopedJson } from "@/lib/technology/scopedStorage";
 import { GUEST_RESOURCES, guestApiGoals } from "@/lib/technology/guestData";
@@ -102,7 +106,7 @@ const MediaDocumentPreview = dynamic(
   { ssr: false },
 );
 
-type Resource = {
+  type Resource = {
   id: number | string;
   name: string;
   type: string;
@@ -131,6 +135,8 @@ type Resource = {
   goalTitles: string[];
   processingStatus?: string;
   processingError?: string | null;
+  sourceRole: ApiKnowledgeFile["sourceRole"];
+  sourceMetadata: Partial<ApiSourceMetadata>;
 };
 
 type UploadQueueItem = {
@@ -147,11 +153,33 @@ const INITIAL_FILES: Resource[] = GUEST_RESOURCES.map((resource) => ({
   goalIds: [...resource.goalIds],
   goalTitles: [...resource.goalTitles],
   kbIds: [],
+  sourceRole: "reference",
+  sourceMetadata: {},
   contentFormat: "contentFormat" in resource ? resource.contentFormat as Resource["contentFormat"] : undefined,
 }));
 
 const INITIAL_GOAL_OPTIONS: ApiGoal[] = guestApiGoals();
 const GUEST_LIBRARIES: string[] = Array.from(new Set(GUEST_RESOURCES.flatMap((resource) => [...resource.libraries])));
+
+const DEFAULT_SOURCE_METADATA: ApiSourceMetadata = {
+  document_type: "reference",
+  authority: "unknown",
+  difficulty: "unknown",
+  language: "zh-CN",
+  edition: "",
+  scope_topics: [],
+  covered_chapters: [],
+  learning_use: ["execute_task", "answer_question"],
+  exclusions: [],
+  review_status: "confirmed",
+  provenance: "user",
+  processing_policy: "local_only",
+  rationale: "",
+};
+
+function completeSourceMetadata(value: Partial<ApiSourceMetadata>): ApiSourceMetadata {
+  return { ...DEFAULT_SOURCE_METADATA, ...value };
+}
 
 function isUnlinkedResource(resource: Resource) {
   return resource.goalIds.length === 0
@@ -190,6 +218,10 @@ function apiFileType(type: string) {
   return type.toUpperCase();
 }
 
+function sourceRoleLabel(role: Resource["sourceRole"]) {
+  return ({ scope: "学习范围", reference: "执行参考", note: "个人笔记", evidence: "掌握证据" } as const)[role] ?? "执行参考";
+}
+
 function resourceFromApi(
   file: ApiKnowledgeFile,
   librariesById: Map<string, string>,
@@ -224,6 +256,8 @@ function resourceFromApi(
       : "资料正在解析与建立索引，完成后即可用于学习伙伴。"),
     processingStatus: file.status,
     processingError: file.error,
+    sourceRole: file.sourceRole ?? "reference",
+    sourceMetadata: file.sourceMetadata ?? {},
     content: file.content,
     contentFormat: file.contentFormat ?? (file.type.toLowerCase() === "md" ? "markdown" : "plain"),
     mediaPreviewStatus: file.mediaPreviewStatus,
@@ -355,6 +389,19 @@ export default function KnowledgePage() {
     if (linkedQuery) setQuery(linkedQuery);
   }, []);
   const [importGoalIds, setImportGoalIds] = useState<string[]>([]);
+  const [importSourceRole, setImportSourceRole] = useState<ApiKnowledgeFile["sourceRole"]>("reference");
+  const [knowledgeMap, setKnowledgeMap] = useState<ApiKnowledgeMap | null>(null);
+  const [knowledgeMapLoading, setKnowledgeMapLoading] = useState(false);
+  const [knowledgeMapError, setKnowledgeMapError] = useState("");
+  const [knowledgeMapReviewing, setKnowledgeMapReviewing] = useState(false);
+  const [mapVersions, setMapVersions] = useState<ApiKnowledgeMapVersion[]>([]);
+  const [mapVersionsOpen, setMapVersionsOpen] = useState(false);
+  const [mapVersionBusy, setMapVersionBusy] = useState(false);
+  const [editingConceptId, setEditingConceptId] = useState<string | null>(null);
+  const [conceptNameDraft, setConceptNameDraft] = useState("");
+  const [selectedConceptIds, setSelectedConceptIds] = useState<Set<string>>(new Set());
+  const [splitConceptId, setSplitConceptId] = useState<string | null>(null);
+  const [splitConceptDraft, setSplitConceptDraft] = useState("");
   const [libraryDialogOpen, setLibraryDialogOpen] = useState(false);
   const [newLibraryName, setNewLibraryName] = useState("");
   const [newLibraryDescription, setNewLibraryDescription] = useState("");
@@ -369,6 +416,11 @@ export default function KnowledgePage() {
   const [draftDirty, setDraftDirty] = useState(false);
   const [resourceSaving, setResourceSaving] = useState(false);
   const [metadataSaving, setMetadataSaving] = useState(false);
+  const [metadataEditorOpen, setMetadataEditorOpen] = useState(false);
+  const [metadataDraft, setMetadataDraft] = useState<ApiSourceMetadata>(DEFAULT_SOURCE_METADATA);
+  const [metadataProposal, setMetadataProposal] = useState<ApiSourceMetadataProposal | null>(null);
+  const [metadataProposalBusy, setMetadataProposalBusy] = useState(false);
+  const [metadataImpact, setMetadataImpact] = useState<{ reasons: string[]; planRequiresReview: boolean; mapRequiresReview: boolean } | null>(null);
   const [archiveExpanded, setArchiveExpanded] = useState(true);
   const [archiveGoalsExpanded, setArchiveGoalsExpanded] = useState(true);
   const [archiveLibrariesExpanded, setArchiveLibrariesExpanded] = useState(false);
@@ -550,6 +602,174 @@ export default function KnowledgePage() {
     () => goalOptions.find((goal) => goal.id === goalFilter) ?? null,
     [goalFilter, goalOptions],
   );
+
+  useEffect(() => {
+    setKnowledgeMap(null);
+    setMapVersions([]);
+    setKnowledgeMapError("");
+    setEditingConceptId(null);
+    setConceptNameDraft("");
+    setSelectedConceptIds(new Set());
+    setSplitConceptId(null);
+  }, [goalFilter]);
+
+  async function loadMapVersions(goalId = selectedGoal?.id) {
+    if (!goalId || authStatus !== "authenticated") return;
+    try {
+      setMapVersions(await productApi.listKnowledgeMapVersions(goalId));
+    } catch (reason) {
+      setKnowledgeMapError(reason instanceof Error ? reason.message : "地图版本读取失败");
+    }
+  }
+
+  async function buildKnowledgeMap() {
+    if (!selectedGoal || authStatus !== "authenticated" || knowledgeMapLoading) return;
+    setKnowledgeMapLoading(true);
+    setKnowledgeMapError("");
+    try {
+      const nextMap = await productApi.buildKnowledgeMap(selectedGoal.id);
+      setKnowledgeMap(nextMap);
+      await loadMapVersions(selectedGoal.id);
+      setToast(`已生成 ${nextMap.graph.concepts.length} 个资料知识点草案`);
+    } catch (reason) {
+      setKnowledgeMapError(reason instanceof Error ? reason.message : "资料知识地图生成失败");
+    } finally {
+      setKnowledgeMapLoading(false);
+    }
+  }
+
+  async function reviewKnowledgeMap(
+    action: "confirmed" | "rejected",
+    conceptIds: string[],
+    edgeIds: string[],
+    successMessage: string,
+  ) {
+    if (!selectedGoal || knowledgeMapReviewing || (!conceptIds.length && !edgeIds.length)) return;
+    setKnowledgeMapReviewing(true);
+    setKnowledgeMapError("");
+    try {
+      const reviewed = await productApi.reviewKnowledgeMap({
+        goal_id: selectedGoal.id,
+        concept_ids: conceptIds,
+        edge_ids: edgeIds,
+        action,
+      });
+      setKnowledgeMap((current) => ({
+        ...reviewed,
+        sources: reviewed.sources.length ? reviewed.sources : current?.sources ?? [],
+      }));
+      await loadMapVersions(selectedGoal.id);
+      setToast(successMessage);
+    } catch (reason) {
+      setKnowledgeMapError(reason instanceof Error ? reason.message : "资料地图审核失败");
+    } finally {
+      setKnowledgeMapReviewing(false);
+    }
+  }
+
+  async function restoreMapVersion(version: ApiKnowledgeMapVersion) {
+    if (!selectedGoal || mapVersionBusy || version.status === "active") return;
+    const confirmed = await confirmAction({
+      title: `恢复资料地图 v${version.version}？`,
+      description: "系统会先保留当前版本，再恢复该版本中的知识点、关系与审核状态；已有任务引用会保持稳定 ID。",
+      confirmLabel: "恢复此版本",
+      tone: "primary",
+    });
+    if (!confirmed) return;
+    setMapVersionBusy(true);
+    try {
+      const restored = await productApi.activateKnowledgeMapVersion(selectedGoal.id, version.version);
+      setKnowledgeMap((current) => current ? { ...current, status: "confirmed", generated_by: "version_restore", graph: restored.graph, map_version: restored.map_version } : current);
+      await loadMapVersions(selectedGoal.id);
+      setToast(`已恢复资料地图 v${version.version}，并保留恢复前版本`);
+    } catch (reason) {
+      setKnowledgeMapError(reason instanceof Error ? reason.message : "地图版本恢复失败");
+    } finally {
+      setMapVersionBusy(false);
+    }
+  }
+
+  async function mergeSelectedConcepts() {
+    if (!selectedGoal || !knowledgeMap || selectedConceptIds.size < 2 || knowledgeMapReviewing) return;
+    const ordered = knowledgeMap.graph.concepts.filter((concept) => selectedConceptIds.has(concept.id));
+    const target = ordered[0];
+    const sources = ordered.slice(1);
+    const confirmed = await confirmAction({
+      title: `合并为“${target.name}”？`,
+      description: `将 ${sources.map((item) => `“${item.name}”`).join("、")} 作为别名合并；原 ID 会保留重定向，已有任务引用会同步。`,
+      confirmLabel: "确认合并",
+      tone: "primary",
+    });
+    if (!confirmed) return;
+    setKnowledgeMapReviewing(true);
+    try {
+      const result = await productApi.mergeKnowledgeConcepts({
+        goal_id: selectedGoal.id,
+        target_concept_id: target.id,
+        source_concept_ids: sources.map((item) => item.id),
+      });
+      setKnowledgeMap({ ...knowledgeMap, status: "confirmed", generated_by: "user_merge", graph: result.graph, map_version: result.map_version });
+      setSelectedConceptIds(new Set());
+      await loadMapVersions(selectedGoal.id);
+      setToast("知识点已合并，原名称保留为别名");
+    } catch (reason) {
+      setKnowledgeMapError(reason instanceof Error ? reason.message : "知识点合并失败");
+    } finally {
+      setKnowledgeMapReviewing(false);
+    }
+  }
+
+  async function splitSelectedConcept(conceptId: string) {
+    if (!selectedGoal || !knowledgeMap || knowledgeMapReviewing) return;
+    const parts = splitConceptDraft.split("\n").map((name) => name.trim()).filter(Boolean);
+    if (parts.length < 2) {
+      setKnowledgeMapError("拆分时请至少填写两个知识点，每行一个");
+      return;
+    }
+    setKnowledgeMapReviewing(true);
+    try {
+      const result = await productApi.splitKnowledgeConcept(conceptId, {
+        goal_id: selectedGoal.id,
+        parts: parts.map((name) => ({ name })),
+      });
+      setKnowledgeMap({ ...knowledgeMap, status: "confirmed", generated_by: "user_split", graph: result.graph, map_version: result.map_version });
+      setSplitConceptId(null);
+      setSplitConceptDraft("");
+      await loadMapVersions(selectedGoal.id);
+      setToast("复合知识点已拆分，相关任务引用已同步");
+    } catch (reason) {
+      setKnowledgeMapError(reason instanceof Error ? reason.message : "知识点拆分失败");
+    } finally {
+      setKnowledgeMapReviewing(false);
+    }
+  }
+
+  async function saveConceptName(conceptId: string) {
+    const name = conceptNameDraft.trim();
+    if (!name || knowledgeMapReviewing) return;
+    setKnowledgeMapReviewing(true);
+    setKnowledgeMapError("");
+    try {
+      const updated = await productApi.updateKnowledgeConcept(conceptId, {
+        name,
+        review_status: "confirmed",
+      });
+      setKnowledgeMap((current) => current ? {
+        ...current,
+        graph: {
+          ...current.graph,
+          concepts: current.graph.concepts.map((concept) => concept.id === updated.id ? updated : concept),
+        },
+      } : current);
+      setEditingConceptId(null);
+      setConceptNameDraft("");
+      setToast("已纠正并确认知识点");
+    } catch (reason) {
+      setKnowledgeMapError(reason instanceof Error ? reason.message : "知识点修改失败");
+    } finally {
+      setKnowledgeMapReviewing(false);
+    }
+  }
   const visibleFiles = useMemo(
     () => {
       const matched = files.filter((file) => {
@@ -903,6 +1123,7 @@ export default function KnowledgePage() {
     setImportLibraryIds(destination && libraryIds[destination] ? [libraryIds[destination]] : []);
     const scopedGoalIds = goalFilter !== "all" && goalFilter !== "unlinked" ? [goalFilter] : [];
     setImportGoalIds(scopedGoalIds);
+    setImportSourceRole("reference");
     setUploadQueue([]);
     setUploadAnnouncement("");
     setImportGoalsExpanded(false);
@@ -918,6 +1139,7 @@ export default function KnowledgePage() {
     setUploadAnnouncement("");
     setImportLibraryIds([]);
     setImportGoalIds([]);
+    setImportSourceRole("reference");
     setDragActive(false);
   }
 
@@ -933,6 +1155,16 @@ export default function KnowledgePage() {
           <span>{selectedDestinations.length ? `已选 ${selectedDestinations.length} 项` : "未关联资料"}</span>
         </div>
         <div className="resource-import-destination-choices">
+          <section className="resource-import-destination-section knowledge-source-role-section" aria-label="资料角色">
+            <label className="knowledge-source-role-select">
+              <span><strong>资料角色</strong><small>决定它如何参与计划与回答</small></span>
+              <select value={importSourceRole} onChange={(event) => setImportSourceRole(event.target.value as ApiKnowledgeFile["sourceRole"])}>
+                <option value="scope">学习范围</option>
+                <option value="reference">执行参考</option>
+                <option value="evidence">掌握证据</option>
+              </select>
+            </label>
+          </section>
           <section className="resource-import-destination-section">
             <button type="button" aria-expanded={importGoalsExpanded} aria-controls="resource-import-goals" onClick={() => setImportGoalsExpanded((current) => !current)}>
               <span><Target size={16} /><strong>关联学习目标</strong><small>可选</small></span>
@@ -1053,6 +1285,8 @@ export default function KnowledgePage() {
         const updated = await productApi.updateKnowledgeFile(nextResource.id, {
           kb_ids: nextResource.kbIds,
           goal_ids: nextResource.goalIds,
+          source_role: nextResource.sourceRole,
+          source_metadata: nextResource.sourceMetadata,
         });
         saved = {
           ...nextResource,
@@ -1073,6 +1307,103 @@ export default function KnowledgePage() {
     } catch (reason) {
       signalPiloState("failure", { source: "knowledge:metadata", duration: 4_200 });
       setDataError(reason instanceof Error ? reason.message : "资料信息保存失败");
+    } finally {
+      setMetadataSaving(false);
+    }
+  }
+
+  function openMetadataEditorForSelected() {
+    if (!draft || !requirePersistentAccount("编辑资料的 AI 使用边界")) return;
+    setMetadataDraft(completeSourceMetadata(draft.sourceMetadata));
+    setMetadataImpact(null);
+    setMetadataEditorOpen(true);
+    setMetadataProposal(null);
+    if (typeof draft.id === "string") {
+      void productApi.listSourceMetadataProposals(draft.id).then((rows) => {
+        setMetadataProposal(rows.find((row) => row.status === "draft") ?? null);
+      }).catch(() => undefined);
+    }
+  }
+
+  async function proposeMetadataForSelected() {
+    if (!draft || typeof draft.id !== "string" || metadataProposalBusy) return;
+    setMetadataProposalBusy(true);
+    setMetadataImpact(null);
+    try {
+      const proposal = await productApi.proposeSourceMetadata(draft.id);
+      setMetadataProposal(proposal);
+      setMetadataDraft(completeSourceMetadata(proposal.proposed_metadata));
+      setToast("AI 已给出资料边界草案，请核对后再接受");
+    } catch (reason) {
+      setDataError(reason instanceof Error ? reason.message : "资料边界建议生成失败");
+    } finally {
+      setMetadataProposalBusy(false);
+    }
+  }
+
+  async function rejectMetadataProposal() {
+    if (!draft || typeof draft.id !== "string" || !metadataProposal) return;
+    setMetadataProposalBusy(true);
+    try {
+      await productApi.reviewSourceMetadataProposal(draft.id, metadataProposal.id, { action: "rejected" });
+      setMetadataProposal(null);
+      setToast("已忽略这条 AI 建议，当前资料边界未改变");
+    } catch (reason) {
+      setDataError(reason instanceof Error ? reason.message : "建议审核失败");
+    } finally {
+      setMetadataProposalBusy(false);
+    }
+  }
+
+  async function saveMetadataBoundary(acceptProposal = false) {
+    if (!draft || typeof draft.id !== "string" || metadataSaving) return;
+    const goalId = draft.goalIds[0];
+    if (goalId && !metadataImpact) {
+      try {
+        const impact = await productApi.previewKnowledgeImpact({
+          goal_id: goalId,
+          source_item_id: draft.id,
+          proposed_source_role: metadataProposal?.proposed_role ?? draft.sourceRole,
+          proposed_source_metadata: metadataDraft,
+        });
+        if (impact.reasons.length || impact.plan_requires_review || impact.map_requires_review) {
+          setMetadataImpact({
+            reasons: impact.reasons,
+            planRequiresReview: impact.plan_requires_review,
+            mapRequiresReview: impact.map_requires_review,
+          });
+          return;
+        }
+      } catch (reason) {
+        setDataError(reason instanceof Error ? reason.message : "变更影响检查失败");
+        return;
+      }
+    }
+    setMetadataSaving(true);
+    try {
+      let updated: ApiKnowledgeFile;
+      if (acceptProposal && metadataProposal) {
+        const result = await productApi.reviewSourceMetadataProposal(draft.id, metadataProposal.id, {
+          action: "accepted",
+          source_role: metadataProposal.proposed_role,
+          source_metadata: metadataDraft,
+        });
+        updated = result.file;
+      } else {
+        updated = await productApi.updateKnowledgeFile(draft.id, {
+          source_role: draft.sourceRole,
+          source_metadata: { ...metadataDraft, provenance: "user", review_status: "confirmed" },
+        });
+      }
+      const next = { ...draft, sourceRole: updated.sourceRole, sourceMetadata: updated.sourceMetadata, updated: "刚刚" };
+      setFiles((current) => current.map((file) => file.id === next.id ? next : file));
+      setDraft(next);
+      setMetadataProposal(null);
+      setMetadataImpact(null);
+      setMetadataEditorOpen(false);
+      setToast("资料的 AI 使用边界已确认");
+    } catch (reason) {
+      setDataError(reason instanceof Error ? reason.message : "资料边界保存失败");
     } finally {
       setMetadataSaving(false);
     }
@@ -1254,6 +1585,7 @@ export default function KnowledgePage() {
         const uploaded = await productApi.uploadKnowledgeFile(item.file, {
           kbIds: importLibraryIds.filter((id) => Object.values(libraryIds).includes(id)),
           goalIds,
+          sourceRole: importSourceRole,
         });
         const resource = resourceFromApi(uploaded, namesById, goalsById, goalIdsByKbIdMap);
         uploadedResources.push(resource);
@@ -1307,6 +1639,7 @@ export default function KnowledgePage() {
         title: resourceName.trim() || fallbackName,
         kb_ids: importLibraryIds.filter((id) => Object.values(libraryIds).includes(id)),
         goal_ids: goalIds,
+        source_role: importSourceRole,
       });
       resource = resourceFromApi(
         imported,
@@ -1771,8 +2104,118 @@ export default function KnowledgePage() {
                     ? <Link href={selectedGoal ? `/studio/coach?goal=${encodeURIComponent(selectedGoal.id)}` : "/studio/coach"}><Sparkles size={14} /> 资料问答</Link>
                     : <button type="button" onClick={() => requirePersistentAccount("使用真实资料向学习伙伴提问")}><Sparkles size={14} /> 资料问答</button>}
                   <button type="button" onClick={() => setInsightMode(insightMode === "citations" ? "summary" : "citations")}>{insightMode === "citations" ? "收起引用" : "查看引用"}</button>
+                  {selectedGoal && authStatus === "authenticated" && <button type="button" onClick={() => void buildKnowledgeMap()} disabled={knowledgeMapLoading || !readyCount} title={!readyCount ? "先等待资料完成索引" : "从当前目标的已就绪资料提取知识点和候选前置关系"}>{knowledgeMapLoading ? "正在整理地图…" : "生成资料地图"}</button>}
                 </div>
                 {insightMode === "citations" && <div className="knowledge-citation-list">{scopeFiles.filter((file) => file.status === "可用于 AI").slice(0, 4).map((file) => <button type="button" key={file.id} onClick={() => openResource(file)}><FileText size={13} /><span>{file.name}</span></button>)}{!readyCount && <p>当前没有已完成索引的资料。</p>}</div>}
+                {selectedGoal && knowledgeMapError && <p className="knowledge-map-error" role="alert">{knowledgeMapError}</p>}
+                {selectedGoal && knowledgeMap && (
+                  <section className="knowledge-map-summary" aria-label="资料知识地图草案">
+                    <div className="knowledge-map-summary-heading">
+                      <strong>资料知识地图</strong>
+                      <span>{knowledgeMap.status === "confirmed" ? "已确认" : "系统草案 · 待你确认"}</span>
+                    </div>
+                    <p>
+                      已关联 {knowledgeMap.sources.length} 份资料，共 {knowledgeMap.graph.concepts.filter((concept) => concept.review_status !== "rejected").length} 个知识点；
+                      {knowledgeMap.generated_by === "semantic_distillation" ? "系统已结合正文语义去重并绑定原文依据。" : "模型不可用或未选择语义模式，本版使用结构抽取。"}
+                      只有你确认的知识点与关系才会进入计划和掌握反馈。
+                    </p>
+                    <div className="knowledge-map-version-actions">
+                      <button type="button" onClick={() => { setMapVersionsOpen((current) => !current); if (!mapVersions.length) void loadMapVersions(); }} aria-expanded={mapVersionsOpen}>
+                        <Clock3 size={12} />{knowledgeMap.map_version ? `当前 v${knowledgeMap.map_version.version}` : "版本历史"}
+                      </button>
+                      {knowledgeMap.sources.some((source) => source.degradation_reason) && <small>本次有资料降级为结构抽取，原文引用仍保留。</small>}
+                    </div>
+                    {mapVersionsOpen && (
+                      <div className="knowledge-map-version-list" aria-label="知识地图版本历史">
+                        {mapVersions.map((version) => (
+                          <div key={version.id}>
+                            <span><strong>v{version.version}</strong><small>{version.reason}</small></span>
+                            <em>{version.status === "active" ? "当前激活" : version.status === "draft" ? "草案" : "历史"}</em>
+                            {version.status !== "active" && <button type="button" disabled={mapVersionBusy} onClick={() => void restoreMapVersion(version)}>恢复</button>}
+                          </div>
+                        ))}
+                        {!mapVersions.length && <p>还没有可恢复的地图版本。</p>}
+                      </div>
+                    )}
+                    {(knowledgeMap.graph.concepts.some((concept) => concept.review_status === "draft")
+                      || knowledgeMap.graph.edges.some((edge) => edge.review_status === "draft")) && (
+                      <button
+                        type="button"
+                        className="knowledge-map-confirm-all"
+                        disabled={knowledgeMapReviewing}
+                        onClick={() => void reviewKnowledgeMap(
+                          "confirmed",
+                          knowledgeMap.graph.concepts.filter((concept) => concept.review_status === "draft").map((concept) => concept.id),
+                          knowledgeMap.graph.edges.filter((edge) => edge.review_status === "draft").map((edge) => edge.id),
+                          "已确认资料知识点与候选顺序",
+                        )}
+                      >
+                        <Check size={13} />确认全部草案
+                      </button>
+                    )}
+                    {selectedConceptIds.size >= 2 && <button type="button" className="knowledge-map-confirm-all" disabled={knowledgeMapReviewing} onClick={() => void mergeSelectedConcepts()}>合并选中的 {selectedConceptIds.size} 项</button>}
+                    <div className="knowledge-map-concepts">
+                      {knowledgeMap.graph.concepts
+                        .filter((concept) => concept.review_status !== "rejected")
+                        .map((concept) => (
+                          <div key={concept.id} className="knowledge-map-concept-group">
+                          <div className={`knowledge-map-concept is-${concept.review_status}`}>
+                            <label className="knowledge-map-concept-select"><input type="checkbox" aria-label={`选择知识点 ${concept.name}`} checked={selectedConceptIds.has(concept.id)} onChange={() => setSelectedConceptIds((current) => { const next = new Set(current); if (next.has(concept.id)) next.delete(concept.id); else next.add(concept.id); return next; })} /><span /></label>
+                            {editingConceptId === concept.id ? (
+                              <form onSubmit={(event) => { event.preventDefault(); void saveConceptName(concept.id); }}>
+                                <input
+                                  value={conceptNameDraft}
+                                  onChange={(event) => setConceptNameDraft(event.target.value)}
+                                  aria-label="修正知识点名称"
+                                  autoFocus
+                                />
+                                <button type="submit" aria-label="保存并确认" disabled={knowledgeMapReviewing || !conceptNameDraft.trim()}><Check size={12} /></button>
+                                <button type="button" aria-label="取消修改" onClick={() => setEditingConceptId(null)}><X size={12} /></button>
+                              </form>
+                            ) : (
+                              <>
+                                <span title={concept.source_refs[0]?.item_title}>{concept.name}</span>
+                                <small>{concept.review_status === "confirmed" ? "已确认" : "待确认"}</small>
+                                <div>
+                                  {concept.review_status === "draft" && <button type="button" aria-label={`确认知识点 ${concept.name}`} disabled={knowledgeMapReviewing} onClick={() => void reviewKnowledgeMap("confirmed", [concept.id], [], `已确认知识点：${concept.name}`)}><Check size={11} /></button>}
+                                  <button type="button" aria-label={`修正知识点 ${concept.name}`} disabled={knowledgeMapReviewing} onClick={() => { setEditingConceptId(concept.id); setConceptNameDraft(concept.name); }}><Pencil size={11} /></button>
+                                  <button type="button" aria-label={`拆分知识点 ${concept.name}`} disabled={knowledgeMapReviewing} onClick={() => { setSplitConceptId(concept.id); setSplitConceptDraft(""); }}>拆分</button>
+                                  <button type="button" aria-label={`忽略知识点 ${concept.name}`} disabled={knowledgeMapReviewing} onClick={() => void reviewKnowledgeMap("rejected", [concept.id], [], `已忽略知识点：${concept.name}`)}><X size={11} /></button>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                          {splitConceptId === concept.id && <form className="knowledge-map-split-form" onSubmit={(event) => { event.preventDefault(); void splitSelectedConcept(concept.id); }}><label><span>拆分后的知识点（每行一个）</span><textarea autoFocus value={splitConceptDraft} onChange={(event) => setSplitConceptDraft(event.target.value)} placeholder={`例如：\n${concept.name} · 基础\n${concept.name} · 应用`} /></label><div><button type="button" onClick={() => setSplitConceptId(null)}>取消</button><button type="submit" disabled={knowledgeMapReviewing}>确认拆分</button></div></form>}
+                          </div>
+                        ))}
+                    </div>
+                    <div className="knowledge-map-relation-summary">
+                      <span>候选前置关系</span>
+                      <strong>{knowledgeMap.graph.edges.filter((edge) => edge.relation_type === "prerequisite" && edge.review_status !== "rejected").length} 条</strong>
+                      <small>{knowledgeMap.graph.edges.some((edge) => edge.relation_type === "prerequisite" && edge.review_status === "draft") ? "仍有待确认关系" : "无待确认关系"}</small>
+                    </div>
+                    <div className="knowledge-map-relations">
+                      {knowledgeMap.graph.edges
+                        .filter((edge) => edge.relation_type === "prerequisite" && edge.review_status !== "rejected")
+                        .map((edge) => {
+                          const source = knowledgeMap.graph.concepts.find((concept) => concept.id === edge.source_concept_id);
+                          const target = knowledgeMap.graph.concepts.find((concept) => concept.id === edge.target_concept_id);
+                          return (
+                            <div key={edge.id} className={`knowledge-map-relation is-${edge.review_status}`}>
+                              <span title={`${source?.name ?? "未知知识点"} → ${target?.name ?? "未知知识点"}`}>{source?.name ?? "未知知识点"} → {target?.name ?? "未知知识点"}</span>
+                              <small>{edge.review_status === "confirmed" ? "已确认" : "系统推断"}</small>
+                              {edge.review_status === "draft" && (
+                                <div>
+                                  <button type="button" aria-label={`确认前置关系 ${source?.name ?? ""} 到 ${target?.name ?? ""}`} disabled={knowledgeMapReviewing} onClick={() => void reviewKnowledgeMap("confirmed", [], [edge.id], "已确认前置关系")}><Check size={11} /></button>
+                                  <button type="button" aria-label={`忽略前置关系 ${source?.name ?? ""} 到 ${target?.name ?? ""}`} disabled={knowledgeMapReviewing} onClick={() => void reviewKnowledgeMap("rejected", [], [edge.id], "已忽略前置关系")}><X size={11} /></button>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </section>
+                )}
               </div>
             </div>
           </section>
@@ -1918,7 +2361,7 @@ export default function KnowledgePage() {
                   <span><input type="checkbox" aria-label={`选择 ${file.name}`} checked={isSelected} onChange={() => setSelectedRows((current) => { const next = new Set(current); if (next.has(file.id)) next.delete(file.id); else next.add(file.id); return next; })} /></span>
                   <button type="button" className="knowledge-resource-identity" onClick={() => openResource(file)}>
                     <span className={`knowledge-file-glyph is-${file.type.toLowerCase()}`}><ResourceGlyph type={file.type} /></span>
-                    <span className="knowledge-resource-copy"><strong>{file.name}</strong><small>{file.type} · {file.libraries.length ? file.libraries.join("、") : "未归档"}{file.size ? ` · ${file.size}` : ""}</small></span>
+                    <span className="knowledge-resource-copy"><strong>{file.name}</strong><small>{sourceRoleLabel(file.sourceRole)} · {file.type} · {file.libraries.length ? file.libraries.join("、") : "未归档"}{file.size ? ` · ${file.size}` : ""}</small></span>
                   </button>
                   <span className="knowledge-resource-goals">
                     {file.goalTitles.length
@@ -2209,7 +2652,7 @@ export default function KnowledgePage() {
                 >
                   {fullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
                 </button>
-                {!editing && isTextResource(selected) && <button type="button" className="drawer-edit-action" onClick={startEditingResource}><Pencil size={15} /> 编辑</button>}
+                {!editing && isTextResource(selected) && <button type="button" className="drawer-edit-action" aria-label="编辑资料正文" onClick={startEditingResource}><Pencil size={15} /> 编辑</button>}
                 {!editing && !isTextResource(selected) && authStatus === "authenticated" && selected.source === "upload" && (
                   <button type="button" className="document-local-edit-action" onClick={openLocalEditFlow} disabled={(!selected.url && !isMediaResource(selected)) || previewLoading}><FolderInput size={15} /> 本地编辑</button>
                 )}
@@ -2359,10 +2802,40 @@ export default function KnowledgePage() {
                     </div>}
                   </section>
                   <dl className="document-meta">
+                    <div><dt>资料角色</dt><dd>{sourceRoleLabel(selected.sourceRole)}</dd></div>
                     <div><dt>文件类型</dt><dd>{selected.type}</dd></div>
                     <div><dt>最近更新</dt><dd>{selected.updated}</dd></div>
                     <div><dt>AI 引用状态</dt><dd className={selected.status === "可用于 AI" ? "is-ready" : "is-pending"}>{selected.status === "可用于 AI" ? "已就绪" : "处理中"}</dd></div>
                   </dl>
+                  <section className="document-source-boundary" aria-label="资料的 AI 使用边界">
+                    <div>
+                      <span><strong>AI 使用边界</strong><small>{Object.keys(selected.sourceMetadata).length ? "已确认元数据" : "尚未补充"}</small></span>
+                      <button type="button" aria-label="编辑 AI 使用边界" onClick={openMetadataEditorForSelected}><Settings2 size={13} />编辑</button>
+                    </div>
+                    <p>{selected.sourceRole === "scope" ? "可定义要学什么；仍只有确认后的知识地图会进入计划。" : selected.sourceRole === "evidence" ? "只用于验证掌握，不会扩大目标范围。" : "用于执行与回答，不会自动扩大目标范围。"}</p>
+                    {!!selected.sourceMetadata.scope_topics?.length && <small>覆盖：{selected.sourceMetadata.scope_topics.slice(0, 4).join("、")}</small>}
+                  </section>
+                  {metadataEditorOpen && draft && (
+                    <section className="document-source-boundary-editor" aria-label="编辑资料边界">
+                      <header><div><strong>编辑 AI 使用边界</strong><small>AI 可以建议，最终由你确认</small></div><button type="button" aria-label="关闭边界编辑" onClick={() => { setMetadataEditorOpen(false); setMetadataImpact(null); }}><X size={14} /></button></header>
+                      <button type="button" className="source-metadata-suggest" disabled={metadataProposalBusy} onClick={() => void proposeMetadataForSelected()}><Sparkles size={13} />{metadataProposalBusy ? "正在阅读资料…" : "让 AI 生成候选"}</button>
+                      {metadataProposal && <div className="source-metadata-proposal"><strong>AI 候选 · 置信度 {Math.round(metadataProposal.confidence * 100)}%</strong><p>{metadataProposal.rationale}</p><button type="button" disabled={metadataProposalBusy} onClick={() => void rejectMetadataProposal()}>忽略建议</button></div>}
+                      <label><span>资料角色</span><select value={draft.sourceRole} onChange={(event) => setDraft({ ...draft, sourceRole: event.target.value as ApiKnowledgeFile["sourceRole"] })}><option value="scope">学习范围</option><option value="reference">执行参考</option><option value="note">个人笔记</option><option value="evidence">掌握证据</option></select></label>
+                      <label><span>语义处理位置</span><select value={metadataDraft.processing_policy} onChange={(event) => setMetadataDraft({ ...metadataDraft, processing_policy: event.target.value as ApiSourceMetadata["processing_policy"] })}><option value="local_only">仅本地模型（资料不离开设备）</option><option value="cloud_allowed">允许云端模型（质量优先）</option></select><small>选择“仅本地”时，本地模型不可用会降级为结构抽取，不会静默上传正文。</small></label>
+                      <div className="source-metadata-grid">
+                        <label><span>资料类型</span><select value={metadataDraft.document_type} onChange={(event) => setMetadataDraft({ ...metadataDraft, document_type: event.target.value as ApiSourceMetadata["document_type"] })}><option value="syllabus">考纲/范围</option><option value="textbook">教材</option><option value="past_exam">真题</option><option value="course_material">课程资料</option><option value="reference">参考资料</option><option value="study_note">学习笔记</option><option value="learning_evidence">学习证据</option><option value="other">其他</option></select></label>
+                        <label><span>权威来源</span><select value={metadataDraft.authority} onChange={(event) => setMetadataDraft({ ...metadataDraft, authority: event.target.value as ApiSourceMetadata["authority"] })}><option value="official">官方</option><option value="publisher">出版社</option><option value="institution">机构</option><option value="teacher">教师</option><option value="community">社区</option><option value="personal">个人</option><option value="unknown">待确认</option></select></label>
+                        <label><span>难度</span><select value={metadataDraft.difficulty} onChange={(event) => setMetadataDraft({ ...metadataDraft, difficulty: event.target.value as ApiSourceMetadata["difficulty"] })}><option value="introductory">入门</option><option value="intermediate">中等</option><option value="advanced">进阶</option><option value="mixed">混合</option><option value="unknown">待确认</option></select></label>
+                        <label><span>版本/版次</span><input value={metadataDraft.edition} onChange={(event) => setMetadataDraft({ ...metadataDraft, edition: event.target.value })} placeholder="如：2027 考试版" /></label>
+                      </div>
+                      <label><span>覆盖主题（每行一项）</span><textarea value={metadataDraft.scope_topics.join("\n")} onChange={(event) => setMetadataDraft({ ...metadataDraft, scope_topics: event.target.value.split("\n").map((value) => value.trim()).filter(Boolean) })} /></label>
+                      <label><span>章节定位（每行一项）</span><textarea value={metadataDraft.covered_chapters.join("\n")} onChange={(event) => setMetadataDraft({ ...metadataDraft, covered_chapters: event.target.value.split("\n").map((value) => value.trim()).filter(Boolean) })} /></label>
+                      <fieldset><legend>允许 AI 如何使用</legend>{([ ["define_scope", "定义学习范围"], ["plan_sequence", "安排学习顺序"], ["execute_task", "支持任务执行"], ["answer_question", "回答时引用"], ["verify_mastery", "验证掌握"] ] as const).map(([value, label]) => <label key={value}><input type="checkbox" checked={metadataDraft.learning_use.includes(value)} onChange={() => setMetadataDraft({ ...metadataDraft, learning_use: metadataDraft.learning_use.includes(value) ? metadataDraft.learning_use.filter((item) => item !== value) : [...metadataDraft.learning_use, value] })} /><span>{label}</span></label>)}</fieldset>
+                      <label><span>明确排除（每行一项）</span><textarea value={metadataDraft.exclusions.join("\n")} onChange={(event) => setMetadataDraft({ ...metadataDraft, exclusions: event.target.value.split("\n").map((value) => value.trim()).filter(Boolean) })} placeholder="如：不覆盖概率统计" /></label>
+                      {metadataImpact && <div className="source-metadata-impact" role="status"><strong>保存前影响检查</strong>{metadataImpact.reasons.map((reason) => <p key={reason}>{reason}</p>)}<small>{metadataImpact.planRequiresReview ? "当前计划会标记为需要复核。" : "当前计划无需复核。"}{metadataImpact.mapRequiresReview ? "知识地图需重新生成草案。" : "知识地图无需重建。"}</small></div>}
+                      <footer><button type="button" onClick={() => { setMetadataEditorOpen(false); setMetadataImpact(null); }}>取消</button><button type="button" className="is-primary" disabled={metadataSaving} onClick={() => void saveMetadataBoundary(Boolean(metadataProposal))}>{metadataSaving ? "正在保存…" : metadataImpact ? "确认影响并保存" : metadataProposal ? "接受建议并保存" : "保存边界"}</button></footer>
+                    </section>
+                  )}
                   <div className="document-ai-card">
                     <span><Sparkles size={12} /> {selected.status === "可用于 AI" ? "AI 已完成索引" : "AI 正在建立索引"}</span>
                     <strong>{selected.status === "可用于 AI" ? "学习伙伴可以在回答中引用这份资料" : "完成索引后，学习伙伴就能引用这份资料"}</strong>

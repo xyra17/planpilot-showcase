@@ -35,6 +35,26 @@ test("访客笔记目标筛选显示实际关联篇数", async ({ page }) => {
   await expect(page.locator(".notes-list-row").first()).toContainText("Pandas 分组聚合");
 });
 
+test("左侧笔记卡片可关联和取消关联目标", async ({ page }) => {
+  await page.goto("/studio/work/notes");
+
+  const noteRow = page.locator(".notes-list-row").filter({ hasText: "Pandas 分组聚合" }).first();
+  const relationTag = noteRow.locator(".note-list-goal-label");
+  await expect(relationTag).toContainText("掌握 Python 数据分析");
+
+  await relationTag.click();
+  const relationMenu = page.getByRole("menu");
+  await expect(relationMenu.getByText("选择关联目标", { exact: true })).toBeVisible();
+  await relationMenu.getByRole("menuitem", { name: "取消目标关联", exact: true }).click();
+  await expect(relationTag).toContainText("未关联");
+  await expect(page.getByText("已取消与「掌握 Python 数据分析」的关联", { exact: true })).toBeVisible();
+
+  await relationTag.click();
+  await page.getByRole("menu").getByRole("menuitem", { name: "通过 PMP 项目管理认证", exact: true }).click();
+  await expect(relationTag).toContainText("通过 PMP 项目管理认证");
+  await expect(page.getByText("已关联到「通过 PMP 项目管理认证」", { exact: true })).toBeVisible();
+});
+
 test("删除笔记使用项目确认弹窗且取消后保留笔记", async ({ page }) => {
   await page.goto("/studio/work/notes");
 

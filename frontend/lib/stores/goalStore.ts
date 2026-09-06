@@ -16,6 +16,15 @@ export interface Goal {
   created_at: string;
   work_schedule: string;
   kb_id: string | null;
+  description?: string | null;
+  contract?: {
+    baseline?: string | null;
+    success_criteria?: string[];
+    must_cover?: string[];
+    may_skip?: string[];
+    constraints?: Record<string, unknown>;
+  };
+  intent_version?: number;
 }
 
 export interface TodayTask {
@@ -26,6 +35,14 @@ export interface TodayTask {
   type: "study" | "review" | "practice" | "rest";
   kb_refs: string[];
   mastery_level: string;
+  description?: string | null;
+  execution_guide?: {
+    why_now?: string;
+    steps?: string[];
+    deliverable?: string;
+    done_criteria?: string[];
+    source_refs?: Array<{ item_id: string; item_title: string; locator: string }>;
+  };
 }
 
 interface GoalStore {
@@ -37,8 +54,21 @@ interface GoalStore {
   fetchGoals: () => Promise<void>;
   fetchGoal: (id: string) => Promise<Goal>;
   setCurrentGoal: (id: string | null) => void;
-  createGoal: (data: Omit<Goal, "id" | "status" | "created_at"> & { pending_kb?: { name: string; description: string } }) => Promise<Goal>;
-  updateGoal: (id: string, data: Partial<Omit<Goal, "id" | "created_at">>) => Promise<Goal>;
+  createGoal: (data: Omit<Goal, "id" | "status" | "created_at"> & {
+    pending_kb?: { name: string; description: string };
+    baseline?: string | null;
+    success_criteria?: string[];
+    must_cover?: string[];
+    may_skip?: string[];
+    constraints?: Record<string, unknown>;
+  }) => Promise<Goal>;
+  updateGoal: (id: string, data: Partial<Omit<Goal, "id" | "created_at">> & {
+    baseline?: string | null;
+    success_criteria?: string[];
+    must_cover?: string[];
+    may_skip?: string[];
+    constraints?: Record<string, unknown>;
+  }) => Promise<Goal>;
   deleteGoal: (id: string, deleteKb?: boolean) => Promise<void>;
   fetchTodayTasks: (goalId: string) => Promise<void>;
 }

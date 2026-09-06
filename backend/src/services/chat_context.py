@@ -7,6 +7,8 @@ import logging
 import time
 from typing import Any
 
+from sqlalchemy import select
+
 from src.database import AsyncSessionLocal
 from src.intelligence.decision_context import DecisionContextBuilder
 from src.services.retrieval_service import retrieval_service
@@ -24,6 +26,7 @@ KNOWLEDGE_QUERY_CUES = (
     "原文",
     "我上传",
 )
+NOTE_SOURCE_TYPES = {"chat_note", "daily_log", "flash_card", "task_note", "quick_note"}
 PROFILE_FIELDS = (
     "consistency_score",
     "weekly_active_days",
@@ -53,8 +56,24 @@ COGNITIVE_FIELDS = (
     "confidence",
     "sample_count",
 )
-GOAL_FIELDS = ("title", "type", "daily_hours", "deadline", "status")
-TASK_FIELDS = ("title", "scheduled_date", "estimated_mins", "status")
+GOAL_FIELDS = (
+    "title",
+    "type",
+    "daily_hours",
+    "deadline",
+    "status",
+    "description",
+    "contract",
+    "intent_version",
+)
+TASK_FIELDS = (
+    "title",
+    "scheduled_date",
+    "estimated_mins",
+    "status",
+    "objective",
+    "execution_guide",
+)
 
 
 def _present_fields(value: Any, fields: tuple[str, ...]) -> dict[str, Any] | None:
@@ -153,17 +172,73 @@ async def _load_decision_context(user_id: str, goal_id: str | None) -> dict[str,
         return await DecisionContextBuilder.build(session, user_id, goal_id=goal_id)
 
 
-async def _load_knowledge(user_id: str, goal_id: str | None, message: str) -> list[dict[str, Any]]:
-    if not should_retrieve_knowledge(message):
+async def _load_knowledge(
+    user_id: str,
+    goal_id: str | None,
+    message: str,
+    source_id: str | None = None,
+    source_version: int | None = None,
+) -> list[dict[str, Any]]:
+    explicit_resource_query = should_retrieve_knowledge(message)
+    if not explicit_resource_query and not source_id and not goal_id:
         return []
     async with AsyncSessionLocal() as session:
-        rows = await retrieval_service.search(
-            session,
-            user_id=user_id,
-            query=message,
-            goal_id=goal_id,
-            limit=4,
-        )
+        if source_id:
+            from src.models import KnowledgeItem, KnowledgeItemContentVersion
+
+            item = await session.scalar(
+                select(KnowledgeItem).where(
+                    KnowledgeItem.id == source_id,
+                    KnowledgeItem.user_id == user_id,
+                    KnowledgeItem.source_type.in_(NOTE_SOURCE_TYPES),
+                )
+            )
+            rows = []
+            if item:
+                rows = [item]
+            version_row = None
+            if rows and source_version is not None:
+                version_row = await session.scalar(
+                    select(KnowledgeItemContentVersion).where(
+                        KnowledgeItemContentVersion.item_id == item.id,
+                        KnowledgeItemContentVersion.version == source_version,
+                    )
+                )
+                if version_row is None and source_version != item.content_version:
+                    rows = []
+        else:
+            rows = await retrieval_service.search(
+                session,
+                user_id=user_id,
+                query=message,
+                goal_id=goal_id,
+                limit=5,
+                source_types=None if explicit_resource_query else NOTE_SOURCE_TYPES,
+            )
+        if source_id:
+            return (
+                [
+                    {
+                        "id": rows[0].id,
+                        "title": version_row.title_snapshot if version_row else rows[0].title,
+                        "snippet": (
+                            (version_row.normalized_content_snapshot if version_row else None)
+                            or rows[0].normalized_content
+                            or rows[0].content
+                        )[:800],
+                        "citation": version_row.title_snapshot if version_row else rows[0].title,
+                        "source_url": None,
+                        "score": 1.0,
+                        "source_type": "note",
+                        "source_role": "user_note_evidence",
+                        "content_version": version_row.version
+                        if version_row
+                        else rows[0].content_version,
+                    }
+                ]
+                if rows
+                else []
+            )
     return [
         {
             "title": row.title,
@@ -171,20 +246,39 @@ async def _load_knowledge(user_id: str, goal_id: str | None, message: str) -> li
             "citation": row.citation,
             "source_url": row.source_url,
             "score": row.score,
+            "id": row.id,
+            "source_type": row.source_type,
+            "source_role": (
+                "user_note_evidence"
+                if row.source_type in NOTE_SOURCE_TYPES or row.source_role in {"note", "evidence"}
+                else "scope_material"
+                if row.source_role == "scope"
+                else "reference_material"
+            ),
+            "source_metadata": row.source_metadata,
+            "chunk_index": row.chunk_index,
         }
         for row in rows
+        if not row.source_metadata
+        or "answer_question" in (row.source_metadata.get("learning_use") or [])
+        or row.source_role in {"note", "evidence"}
     ]
 
 
 async def build_chat_context(
-    *, user_id: str, goal_id: str | None, message: str
+    *,
+    user_id: str,
+    goal_id: str | None,
+    message: str,
+    source_id: str | None = None,
+    source_version: int | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Build context in independent sessions so retrieval and profile reads can overlap."""
 
     started = time.monotonic()
     decision_result, knowledge_result = await asyncio.gather(
         _load_decision_context(user_id, goal_id),
-        _load_knowledge(user_id, goal_id, message),
+        _load_knowledge(user_id, goal_id, message, source_id, source_version),
         return_exceptions=True,
     )
     if isinstance(decision_result, Exception):

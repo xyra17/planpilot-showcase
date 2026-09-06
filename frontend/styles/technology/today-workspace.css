@@ -990,3 +990,23 @@
     transition-duration: 0.01ms !important;
   }
 }
+.app-shell .dashboard-page .task-item .today-task-objective {
+  display: block;
+  overflow: hidden;
+  max-width: 52ch;
+  margin-top: 3px;
+  color: var(--workspace-text-muted);
+  font-size: 10px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.app-shell .week-action-notice > span { flex: 1; }
+.app-shell .week-action-notice > button {
+  min-height: 28px;
+  padding: 3px 8px;
+  color: var(--workspace-accent);
+  border: 1px solid color-mix(in srgb, var(--workspace-accent) 28%, var(--workspace-border));
+  border-radius: 7px;
+  cursor: pointer;
+}

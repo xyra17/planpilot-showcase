@@ -198,6 +198,22 @@ const conversationToArchive = (conversation: PiloConversation): CoachArchiveConv
   updated_at: conversation.updatedAt,
 });
 
+/** Keep the transcript chronological: older turns first, newest turn at the bottom. */
+const sortChatMessages = (items: ChatMessage[]) => {
+  if (items.length < 2) return items;
+  return items
+    .map((message, index) => ({ message, index, time: message.createdAt ? Date.parse(message.createdAt) : Number.NaN }))
+    .sort((left, right) => {
+      const leftValid = Number.isFinite(left.time);
+      const rightValid = Number.isFinite(right.time);
+      if (leftValid && rightValid) return left.time - right.time || left.index - right.index;
+      if (leftValid) return -1;
+      if (rightValid) return 1;
+      return left.index - right.index;
+    })
+    .map(({ message }) => message);
+};
+
 const conversationFromArchive = (conversation: CoachArchiveConversation): PiloConversation => ({
   id: conversation.id,
   sessionId: conversation.session_id,
@@ -206,12 +222,12 @@ const conversationFromArchive = (conversation: CoachArchiveConversation): PiloCo
   title: conversation.title,
   summary: conversation.summary,
   piloFeedback: conversation.pilo_feedback,
-  messages: conversation.messages.map((message) => ({
+  messages: sortChatMessages(conversation.messages.map((message) => ({
     id: message.id,
     role: message.role,
     content: message.content,
     createdAt: message.created_at,
-  })),
+  }))),
   association: conversation.association,
   isFavorite: Boolean(conversation.is_favorite),
   createdAt: conversation.created_at,
@@ -230,8 +246,9 @@ const restoreMessageTimes = (conversation: PiloConversation) => {
   const end = new Date(conversation.updatedAt).getTime();
   const validStart = Number.isNaN(start) ? Date.now() : start;
   const validEnd = Number.isNaN(end) ? validStart : Math.max(validStart, end);
-  const interval = conversation.messages.length > 1 ? (validEnd - validStart) / (conversation.messages.length - 1) : 0;
-  return conversation.messages.map((message, index) => ({
+  const messages = sortChatMessages(conversation.messages);
+  const interval = messages.length > 1 ? (validEnd - validStart) / (messages.length - 1) : 0;
+  return messages.map((message, index) => ({
     ...message,
     createdAt: message.createdAt ?? new Date(validStart + interval * index).toISOString(),
   }));
@@ -550,6 +567,7 @@ export default function CoachPage() {
   const routedObservation = coachEntry?.entryMode === "observation" ? coachEntry : null;
   const openingObservationTitle = routedObservation?.observationTitle ?? primaryPattern?.explanation ?? "今天想从哪里开始？";
   const openingObservationGuidance = routedObservation?.reason ?? openingPatternGuidance(primaryPattern);
+  const orderedMessages = useMemo(() => sortChatMessages(messages), [messages]);
 
   const scrollConversation = useCallback((edge: "start" | "end", behavior: ScrollBehavior = "auto") => {
     window.requestAnimationFrame(() => {
@@ -849,17 +867,17 @@ export default function CoachPage() {
   }, [authStatus, piloPreferences, preferencesStorageKey]);
 
   useEffect(() => {
-    if (!messages.length || authStatus === "loading") return;
+    if (!orderedMessages.length || authStatus === "loading") return;
     if (restoringConversationRef.current) {
       restoringConversationRef.current = false;
       return;
     }
     const timer = window.setTimeout(() => {
       const conversationId = activeConversationId || sessionIdRef.current;
-      const firstUserMessage = messages.find((message) => message.role === "user" && message.content.trim());
+      const firstUserMessage = orderedMessages.find((message) => message.role === "user" && message.content.trim());
       if (!firstUserMessage) return;
-      const latestUserMessage = [...messages].reverse().find((message) => message.role === "user" && message.content.trim());
-      const latestPiloMessage = [...messages].reverse().find((message) => message.role === "assistant" && message.content.trim());
+      const latestUserMessage = [...orderedMessages].reverse().find((message) => message.role === "user" && message.content.trim());
+      const latestPiloMessage = [...orderedMessages].reverse().find((message) => message.role === "assistant" && message.content.trim());
       const timestamp = new Date().toISOString();
       setConversations((current) => {
         const existing = current.find((conversation) => conversation.id === conversationId);
@@ -872,10 +890,10 @@ export default function CoachPage() {
           title: existing?.title ?? compactConversationText(firstUserMessage.content, 22),
           summary: compactConversationText(latestUserMessage?.content ?? firstUserMessage.content, 58),
           piloFeedback: compactConversationText(latestPiloMessage?.content ?? "Pilo 正在整理回应", 68),
-          messages,
+          messages: orderedMessages,
           createdAt: existing?.createdAt ?? timestamp,
           updatedAt: timestamp,
-          association: `${goalId ? "关联当前目标" : "跨目标"} · ${messages.length} 条消息`,
+          association: `${goalId ? "关联当前目标" : "跨目标"} · ${orderedMessages.length} 条消息`,
           isFavorite: existing?.isFavorite ?? false,
         };
         return [nextConversation, ...current.filter((conversation) => conversation.id !== conversationId)];
@@ -883,7 +901,7 @@ export default function CoachPage() {
       setActiveConversationId(conversationId);
     }, streaming ? 420 : 120);
     return () => window.clearTimeout(timer);
-  }, [activeConversationId, activeGoal?.title, authStatus, goalId, messages, streaming]);
+  }, [activeConversationId, activeGoal?.title, authStatus, goalId, orderedMessages, streaming]);
 
   useEffect(() => {
     void loadContext();
@@ -1744,7 +1762,7 @@ export default function CoachPage() {
             </motion.article>
 
             <AnimatePresence initial={false}>
-              {messages.map((message) => (
+              {orderedMessages.map((message) => (
                 <motion.article
                   layout
                   className={`companion-message is-${message.role}`}

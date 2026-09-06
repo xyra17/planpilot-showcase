@@ -9,12 +9,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.config import settings
 from src.core.model_gateway import distributed_gateway_status
 from src.database import get_db
 from src.deps import get_current_admin, get_current_user
 from src.models import User
-from src.services.runtime_model_config import get_runtime_model_config
 from src.services import (
     agent_control_service,
     beta_evidence_service,
@@ -28,6 +26,7 @@ from src.services import (
     product_validation_service,
     trace_service,
 )
+from src.services.runtime_model_config import get_runtime_model_config
 
 router = APIRouter(prefix="/api/v1/agent-control", tags=["agent-control"])
 

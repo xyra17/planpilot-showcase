@@ -67,6 +67,8 @@ type DashboardTask = {
   status?: ApiTask["status"];
   actualMinutes?: number | null;
   priority: string;
+  description?: string | null;
+  executionGuide?: ApiTask["executionGuide"];
 };
 
 type WeekDayAggregate = {
@@ -441,6 +443,11 @@ export default function WorkPage() {
     from: WeekDayAggregate;
     to: WeekDayAggregate;
   } | null>(null);
+  const [weekAdjustmentUndo, setWeekAdjustmentUndo] = useState<{
+    task: DashboardTask;
+    fromDate: string;
+    toDate: string;
+  } | null>(null);
   const [taskSubmitState, setTaskSubmitState] = useState<"idle" | "submitting" | "success" | "error">("idle");
   const [taskSubmitError, setTaskSubmitError] = useState("");
   const [taskSuccessNotice, setTaskSuccessNotice] = useState("");
@@ -574,7 +581,7 @@ export default function WorkPage() {
 
   function taskFromApi(task: ApiTask): DashboardTask {
     const priority = task.priority === "high" ? "核心" : task.priority === "low" ? "低优先级" : "普通优先级";
-    return { id: task.id, goalId: task.goalId, date: task.date, title: task.title, goal: task.goalTitle, duration: `${task.estimatedMinutes} 分钟`, time: "待安排", done: task.done, status: task.status, priority, actualMinutes: task.actualMinutes };
+    return { id: task.id, goalId: task.goalId, date: task.date, title: task.title, goal: task.goalTitle, duration: `${task.estimatedMinutes} 分钟`, time: "待安排", done: task.done, status: task.status, priority, actualMinutes: task.actualMinutes, description: task.description, executionGuide: task.executionGuide };
   }
 
   function resolveTaskGoalId(task: DashboardTask) {
@@ -1468,6 +1475,7 @@ export default function WorkPage() {
           rescheduleTrigger: "overload_recovery",
           recoveryStrategy: "standard",
         });
+        setWeekAdjustmentUndo({ task, fromDate: from.isoDate, toDate: to.isoDate });
       } catch (reason) {
         setWeekTasks(previousWeekTasks);
         setTasks(previousWeekTasks.filter((item) => item.date === pageDate));
@@ -1488,6 +1496,29 @@ export default function WorkPage() {
     }
     setWeekActionPending(false);
     setWeekAdjustmentPreview(null);
+  }
+
+  async function undoWeekAdjustment() {
+    if (!weekAdjustmentUndo || weekActionPending) return;
+    const { task, fromDate, toDate } = weekAdjustmentUndo;
+    setWeekActionPending(true);
+    try {
+      if (authStatus === "authenticated" && typeof task.id === "string") {
+        await productApi.updateTask(task.id, { date: fromDate, rescheduleTrigger: "user_manual" });
+      }
+      setWeekTasks((current) => current.map((item) => item.id === task.id ? { ...item, date: fromDate, time: "待安排" } : item));
+      setTasks((current) => {
+        const without = current.filter((item) => item.id !== task.id);
+        return fromDate === pageDate ? [...without, { ...task, date: fromDate, time: "待安排" }] : without;
+      });
+      setSelectedWeekDay(fromDate);
+      setWeekActionNotice(`已撤销“${task.title}”从 ${toDate} 的恢复调整。`);
+      setWeekAdjustmentUndo(null);
+    } catch (reason) {
+      setWeekActionError(reason instanceof Error ? reason.message : "撤销本周调整失败");
+    } finally {
+      setWeekActionPending(false);
+    }
   }
 
   function updateTaskPriority(id: string | number, nextPriority: string) {
@@ -1778,6 +1809,7 @@ export default function WorkPage() {
                     <div>
                       <strong>{task.title}</strong>
                       <span>{task.goal} · {task.duration}</span>
+                      {task.description && <small className="today-task-objective">{task.description}</small>}
                     </div>
                     {isEditingActual && actualEntryTask ? (
                       <form
@@ -2251,7 +2283,7 @@ export default function WorkPage() {
             </div>
           </header>
 
-          {weekActionNotice && <div className="week-action-notice" role="status"><Check size={14} />{weekActionNotice}</div>}
+          {weekActionNotice && <div className="week-action-notice" role="status"><Check size={14} /><span>{weekActionNotice}</span>{weekAdjustmentUndo && <button type="button" disabled={weekActionPending} onClick={() => void undoWeekAdjustment()}>撤销调整</button>}</div>}
 
           <div className="week-command-center">
             <section className="week-load-card">

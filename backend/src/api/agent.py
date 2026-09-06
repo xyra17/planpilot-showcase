@@ -10,7 +10,7 @@ from typing import Literal
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from langchain_core.messages import HumanMessage
 from pydantic import BaseModel
-from sqlalchemy import or_, select, update
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sse_starlette.sse import EventSourceResponse
 
@@ -28,10 +28,12 @@ from src.database import get_db
 from src.deps import get_current_user
 from src.events.publisher import emit
 from src.intelligence.decision_context import DecisionContextBuilder
+from src.intelligence.knowledge_graph import KnowledgeGraphService
 from src.models import (
     CheckinRecord,
     DailyBriefCache,
     Goal,
+    KnowledgeChunk,
     KnowledgeItem,
     KnowledgeItemGoalLink,
     LearningEvent,
@@ -65,6 +67,9 @@ class StreamRequest(BaseModel):
     goal_id: str | None = None
     session_id: str
     pilo_preferences: PiloPreferencesRequest | None = None
+    source_type: str | None = None
+    source_id: str | None = None
+    source_version: int | None = None
 
 
 class ConfirmRequest(BaseModel):
@@ -383,12 +388,50 @@ async def stream(
                     user_id=current_user.id,
                     goal_id=body.goal_id,
                     message=body.message,
+                    source_id=body.source_id if body.source_type == "note" else None,
+                    source_version=body.source_version,
                 )
             state_input["chat_context"] = chat_context
             yield {
                 "event": "context_ready",
                 "data": json.dumps(context_meta, ensure_ascii=False),
             }
+            source_refs = []
+            goal_source = chat_context.get("goal")
+            if body.goal_id and isinstance(goal_source, dict) and goal_source.get("title"):
+                source_refs.append(
+                    {
+                        "id": body.goal_id,
+                        "title": goal_source["title"],
+                        "citation": f"目标：《{goal_source['title']}》",
+                        "source_type": "goal",
+                        "source_role": "user_intent_contract",
+                        "intent_version": goal_source.get("intent_version"),
+                    }
+                )
+            source_refs.extend(
+                [
+                    {
+                        key: source.get(key)
+                        for key in (
+                            "id",
+                            "title",
+                            "citation",
+                            "source_type",
+                            "source_role",
+                            "chunk_index",
+                            "content_version",
+                        )
+                        if source.get(key) is not None
+                    }
+                    for source in (chat_context.get("knowledge_sources") or [])
+                ]
+            )
+            if source_refs:
+                yield {
+                    "event": "sources",
+                    "data": json.dumps({"sources": source_refs}, ensure_ascii=False),
+                }
 
             from src.core.agent.nodes.chat import sanitize_user_visible_text
 
@@ -433,8 +476,7 @@ async def stream(
                 (
                     str(getattr(message, "content", ""))
                     for message in reversed(final_messages)
-                    if getattr(message, "type", "") == "ai"
-                    and getattr(message, "content", "")
+                    if getattr(message, "type", "") == "ai" and getattr(message, "content", "")
                 ),
                 "",
             )
@@ -711,6 +753,11 @@ async def get_plan_context(
         .scalars()
         .all()
     )
+    _source_registry, source_context = await _build_plan_sources(
+        db,
+        [item for item in kb_items if item.processing_status == "ready"],
+        max_chars=6000,
+    )
     for it in kb_items:
         char_count = len(it.content) if it.content else 0
         kb_overview.append(
@@ -738,7 +785,9 @@ async def get_plan_context(
         f"用户的{type_label}目标是「{goal.title}」，截止日期 {goal.deadline}，"
         f"每日学习 {goal.daily_hours} 小时，当前水平：{goal.current_level}。"
         + (kb_summary_line if kb_summary_line else "未关联参考资料。")
+        + (f"\n资料正文片段：\n{source_context}\n" if source_context else "")
         + "\n请用 2-3 句话描述：你对这个学习目标的理解是什么？关键学习重点是什么？有什么需要特别注意的？"
+        "如果有多份资料，请根据正文内容给出建议阅读顺序，并说明依赖关系；不要只按文件名猜测。"
         "直接输出理解内容，不要加任何前缀。"
     )
 
@@ -800,6 +849,233 @@ async def get_intent_placeholder(
     return {"placeholder": placeholder}
 
 
+def _compact_plan_source_text(value: str, limit: int = 1200) -> str:
+    return " ".join((value or "").split())[:limit]
+
+
+def _source_can_influence_plan(item: KnowledgeItem) -> bool:
+    metadata = item.source_metadata or {}
+    if not metadata:
+        return True
+    uses = set(metadata.get("learning_use") or [])
+    if item.source_role == "scope":
+        return bool(uses & {"define_scope", "plan_sequence"})
+    return bool(uses & {"plan_sequence", "execute_task"})
+
+
+async def _build_plan_sources(
+    db: AsyncSession,
+    items: list[KnowledgeItem],
+    *,
+    max_chars: int = 18000,
+) -> tuple[list[dict], str]:
+    """Build a bounded, auditable source pack from actual knowledge content."""
+    if not items:
+        return [], ""
+    item_ids = [item.id for item in items]
+    chunks = (
+        (
+            await db.execute(
+                select(KnowledgeChunk)
+                .where(KnowledgeChunk.item_id.in_(item_ids))
+                .order_by(KnowledgeChunk.item_id, KnowledgeChunk.chunk_index)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    chunks_by_item: dict[str, list[KnowledgeChunk]] = {}
+    for chunk in chunks:
+        chunks_by_item.setdefault(chunk.item_id, []).append(chunk)
+
+    registry: list[dict] = []
+    prompt_blocks: list[str] = []
+    used_chars = 0
+    rows_by_item: list[tuple[int, KnowledgeItem, list[dict]]] = []
+    for item_index, item in enumerate(items, start=1):
+        candidates = chunks_by_item.get(item.id) or []
+        if candidates:
+            source_rows = [
+                {
+                    "chunk_id": chunk.id,
+                    "chunk_index": chunk.chunk_index,
+                    "start_char": chunk.start_char,
+                    "end_char": chunk.end_char,
+                    "text": chunk.content,
+                }
+                for chunk in candidates
+            ]
+        elif item.content:
+            # Older items may predate chunking. They are still real source text,
+            # and the character range makes the fallback citation reviewable.
+            source_rows = []
+            for chunk_index, start_char in enumerate(range(0, len(item.content), 1200)):
+                source_rows.append(
+                    {
+                        "chunk_id": None,
+                        "chunk_index": chunk_index,
+                        "start_char": start_char,
+                        "end_char": min(len(item.content), start_char + 1200),
+                        "text": item.content[start_char : start_char + 1200],
+                    }
+                )
+        else:
+            continue
+        rows_by_item.append((item_index, item, source_rows))
+
+    # Round-robin excerpts so every selected document contributes its opening
+    # structure before any single long document consumes the context budget.
+    max_depth = max((len(rows) for _, _, rows in rows_by_item), default=0)
+    for depth in range(max_depth):
+        for item_index, item, source_rows in rows_by_item:
+            if depth >= len(source_rows):
+                continue
+            row = source_rows[depth]
+            text = _compact_plan_source_text(row["text"])
+            if not text:
+                continue
+            source_key = f"S{item_index}-C{row['chunk_index'] + 1}"
+            role_label = "学习范围" if item.source_role == "scope" else "执行参考"
+            metadata_label = json.dumps(item.source_metadata or {}, ensure_ascii=False)
+            block = (
+                f"[{source_key}] [{role_label}] 《{item.title}》"
+                f"元数据：{metadata_label}\n第 {row['chunk_index'] + 1} 段：{text}"
+            )
+            if used_chars + len(block) > max_chars and registry:
+                continue
+            used_chars += len(block)
+            citation = f"{item.title} · 第 {row['chunk_index'] + 1} 段"
+            registry.append(
+                {
+                    "source_key": source_key,
+                    "item_id": item.id,
+                    "item_title": item.title,
+                    "source_role": item.source_role or "reference",
+                    "source_metadata": item.source_metadata or {},
+                    "content_version": int(getattr(item, "content_version", 1) or 1),
+                    "chunk_id": row["chunk_id"],
+                    "chunk_index": row["chunk_index"],
+                    "start_char": row["start_char"],
+                    "end_char": row["end_char"],
+                    "locator": citation,
+                    "snippet": text[:240],
+                }
+            )
+            prompt_blocks.append(block)
+        if used_chars >= max_chars:
+            break
+    return registry, "\n".join(prompt_blocks)
+
+
+def _normalize_plan_task(
+    task: dict, source_map: dict[str, dict], concept_map: dict[str, dict], kb_mode: str
+) -> dict:
+    title = compact_text(str(task.get("title") or "学习任务"), 40)
+    objective = compact_text(
+        str(task.get("objective") or task.get("deliverable") or "完成并记录学习结果"), 100
+    )
+    steps = [
+        compact_text(str(step), 120) for step in (task.get("steps") or []) if str(step).strip()
+    ]
+    if not steps:
+        steps = [f"围绕「{title}」学习对应内容", "独立完成练习或复述", "记录结果与仍不确定的部分"]
+    done_criteria = [
+        compact_text(str(value), 120)
+        for value in (task.get("done_criteria") or [objective])
+        if str(value).strip()
+    ]
+    requested_keys = [str(value) for value in (task.get("source_keys") or [])]
+    source_refs = [dict(source_map[key]) for key in requested_keys if key in source_map]
+    requested_concepts = [str(value) for value in (task.get("concept_ids") or [])]
+    concept_refs = [
+        {
+            "id": concept_map[concept_id]["id"],
+            "name": concept_map[concept_id]["name"],
+            "review_status": concept_map[concept_id]["review_status"],
+        }
+        for concept_id in requested_concepts
+        if concept_id in concept_map and concept_map[concept_id]["review_status"] == "confirmed"
+    ]
+    if kb_mode == "kb_only" and source_map and not source_refs:
+        # Do not let a model formatting omission silently produce an ungrounded
+        # task in strict mode. The first real excerpt remains fully auditable.
+        source_refs = [dict(next(iter(source_map.values())))]
+    execution_guide = {
+        "why_now": compact_text(str(task.get("why_now") or "这是当前阶段的前置行动。"), 160),
+        "steps": steps[:6],
+        "deliverable": compact_text(str(task.get("deliverable") or objective), 160),
+        "done_criteria": done_criteria[:5],
+        "prerequisites": [
+            compact_text(str(value), 100)
+            for value in (task.get("prerequisites") or [])
+            if str(value).strip()
+        ][:4],
+        "source_refs": source_refs[:5],
+        "concept_refs": concept_refs[:6],
+    }
+    return {
+        "title": title,
+        "objective": objective,
+        "estimated_mins": max(10, min(180, int(task.get("estimated_mins") or 30))),
+        "type": task.get("type")
+        if task.get("type") in {"study", "review", "practice"}
+        else "study",
+        "execution_guide": execution_guide,
+    }
+
+
+def _validate_macro_plan_output(content: str, *, kb_mode: str, source_keys: set[str]) -> None:
+    require_json_object(content)
+    start, end = content.find("{"), content.rfind("}") + 1
+    payload = json.loads(content[start:end])
+    phases = payload.get("phases")
+    if not isinstance(phases, list) or not phases:
+        raise ValueError("计划必须包含阶段")
+    task_count = 0
+    for phase in phases:
+        tasks = phase.get("tasks") if isinstance(phase, dict) else None
+        if not isinstance(tasks, list) or not tasks:
+            raise ValueError("每个阶段必须包含任务")
+        for task in tasks:
+            task_count += 1
+            if not isinstance(task, dict) or not str(task.get("title") or "").strip():
+                raise ValueError("任务必须有具体标题")
+            if not str(task.get("why_now") or "").strip():
+                raise ValueError("任务缺少 why_now")
+            if len([step for step in (task.get("steps") or []) if str(step).strip()]) < 2:
+                raise ValueError("任务至少需要两个执行步骤")
+            if not str(task.get("deliverable") or "").strip():
+                raise ValueError("任务缺少可检查产出")
+            if not [value for value in (task.get("done_criteria") or []) if str(value).strip()]:
+                raise ValueError("任务缺少完成标准")
+            if kb_mode == "kb_only":
+                refs = {str(value) for value in (task.get("source_keys") or [])}
+                if not refs.intersection(source_keys):
+                    raise ValueError("严格资料模式下每个任务必须引用真实原文片段")
+    if task_count == 0:
+        raise ValueError("计划没有任务")
+
+
+def _plan_lifecycle(plan: Plan) -> dict:
+    return dict((plan.content or {}).get("lifecycle") or {})
+
+
+def _draft_response(plan: Plan) -> dict:
+    baseline = dict(plan.baseline or {})
+    lifecycle = _plan_lifecycle(plan)
+    return {
+        "plan_id": plan.id,
+        "status": lifecycle.get("status", "draft"),
+        "goal_intent_version": plan.goal_intent_version,
+        "phases": baseline.get("phases") or [],
+        "total_tasks": sum(len(phase.get("tasks") or []) for phase in baseline.get("phases") or []),
+        "start_date": lifecycle.get("start_date", ""),
+        "estimated_completion_date": lifecycle.get("estimated_completion_date", ""),
+        "source_summary": lifecycle.get("source_summary") or {},
+        "replacement_summary": lifecycle.get("replacement_summary") or {},
+    }
+
+
 @router.post("/macro-plan/{goal_id}")
 async def generate_macro_plan(
     goal_id: str,
@@ -810,21 +1086,16 @@ async def generate_macro_plan(
     kb_mode: str = body.get("kb_mode", "kb_reference")  # kb_only | kb_reference | no_kb
     user_intent_supplement: str = (body.get("user_intent_supplement") or "").strip()
     pacing_mode: str = body.get("pacing_mode", "fixed")  # auto | fixed
+    if kb_mode not in {"kb_only", "kb_reference", "no_kb"}:
+        raise HTTPException(status_code=422, detail="无效的参考资料使用方式")
+    if pacing_mode not in {"auto", "fixed"}:
+        raise HTTPException(status_code=422, detail="无效的学习节奏设置")
 
     goal = (
         await db.execute(select(Goal).where(Goal.id == goal_id, Goal.user_id == current_user.id))
     ).scalar_one_or_none()
     if not goal:
         raise HTTPException(status_code=404, detail="目标不存在")
-
-    # 取消旧的 is_current 计划
-    old_plans = (
-        (await db.execute(select(Plan).where(Plan.goal_id == goal_id, Plan.is_current.is_(True))))
-        .scalars()
-        .all()
-    )
-    for p in old_plans:
-        p.is_current = False
 
     # 计算可学天数
     today = local_date_for_timezone(current_user.timezone)
@@ -835,9 +1106,11 @@ async def generate_macro_plan(
 
     # 读取与目标关联的参考资料（兼容旧 knowledge_base_id）。
     kb_items_for_prompt: list[dict] = []
+    kb_items_raw: list[KnowledgeItem] = []
     total_kb_chars = 0
     if kb_mode in ("kb_only", "kb_reference"):
         reference_filters = [
+            KnowledgeItem.goal_id == goal_id,
             KnowledgeItem.goal_links.any(KnowledgeItemGoalLink.goal_id == goal_id),
         ]
         if kb_id:
@@ -847,6 +1120,8 @@ async def generate_macro_plan(
                 await db.execute(
                     select(KnowledgeItem).where(
                         KnowledgeItem.user_id == current_user.id,
+                        KnowledgeItem.processing_status == "ready",
+                        KnowledgeItem.source_role.in_(["scope", "reference"]),
                         or_(*reference_filters),
                     )
                 )
@@ -854,6 +1129,7 @@ async def generate_macro_plan(
             .scalars()
             .all()
         )
+        kb_items_raw = [item for item in kb_items_raw if _source_can_influence_plan(item)]
         for it in kb_items_raw:
             char_count = len(it.content) if it.content else 0
             total_kb_chars += char_count
@@ -862,32 +1138,77 @@ async def generate_macro_plan(
                     "title": it.title,
                     "char_count": char_count,
                     "estimated_pages": max(1, char_count // 600),
+                    "source_role": it.source_role or "reference",
                 }
             )
 
+    source_registry, source_context = await _build_plan_sources(db, kb_items_raw)
+    source_map = {source["source_key"]: source for source in source_registry}
+    has_kb_content = bool(source_registry)
+
+    knowledge_map_context = ""
+    concept_map: dict[str, dict] = {}
+    if kb_mode != "no_kb" and has_kb_content:
+        try:
+            graph = await KnowledgeGraphService.get_graph(
+                db, current_user.id, goal_id=goal_id
+            )
+            concepts = graph.get("concepts") or []
+            edges = graph.get("edges") or []
+            if concepts:
+                concept_map = {
+                    str(item["id"]): item
+                    for item in concepts[:48]
+                    if item.get("review_status") == "confirmed"
+                }
+                concept_lines = "\n".join(
+                    f"- {item['id']} | {item['name']} | {item.get('review_status', 'draft')}"
+                    for item in concept_map.values()
+                )
+                prerequisite_count = sum(
+                    item.get("relation_type") == "prerequisite"
+                    and item.get("review_status") != "rejected"
+                    for item in edges
+                )
+                knowledge_map_context = (
+                    "【用户已确认的资料知识地图】\n"
+                    f"知识点（ID | 名称 | 审核状态）：\n{concept_lines}\n"
+                    f"已确认前置关系：{prerequisite_count} 条。"
+                    "必须结合下方原文片段；地图是可更新的派生认知资产，不替代原文。"
+                    "任务仅可在 concept_ids 中绑定 confirmed 知识点。\n"
+                )
+        except Exception as exc:
+            logger.warning("load confirmed resource knowledge map failed: %s", type(exc).__name__)
+
     kb_doc_list = "\n".join(
-        f"  - 《{item['title']}》约 {item['estimated_pages']} 页（{item['char_count']} 字）"
+        f"  - [{'学习范围' if item['source_role'] == 'scope' else '执行参考'}] "
+        f"《{item['title']}》约 {item['estimated_pages']} 页（{item['char_count']} 字）"
         for item in kb_items_for_prompt
     )
 
     # 按目标类型 × 资料使用方式决定生成边界。
-    has_kb_content = bool(kb_items_for_prompt)
     is_exam_type = goal_type in ("exam", "certification")
+
+    if kb_mode == "kb_only" and not has_kb_content:
+        raise HTTPException(
+            status_code=422,
+            detail="仅从参考资料生成需要至少一份已处理完成且包含正文的关联资料",
+        )
 
     if kb_mode == "kb_only" and has_kb_content:
         kb_instruction = (
-            f"【重要约束】请严格基于以下参考资料制定计划，不要引入资料外知识点：\n{kb_doc_list}\n"
-            "每个阶段的任务必须能在以上文档中找到对应内容，覆盖率是首要指标。\n"
+            f"【严格资料边界】只能使用下方带 source_key 的原文片段生成任务，不得引入片段之外的知识点。\n{kb_doc_list}\n"
+            "每个任务必须返回至少一个真实 source_key。资料证据不足时减少范围，不要补写常识。\n"
         )
     elif kb_mode == "kb_reference" and has_kb_content:
         if is_exam_type:
             kb_instruction = (
-                f"【参考资料】（请以此为核心结构划分阶段，确保每份资料都有对应任务）：\n{kb_doc_list}\n"
+                f"【参考资料】（优先依据下方原文片段划分阶段）：\n{kb_doc_list}\n"
                 "备考要求：按文档/模块分阶段，覆盖全部考试重点，后期安排复习和冲刺。\n"
             )
         elif goal_type == "skill":
             kb_instruction = (
-                f"【参考资料】（作为主要学习教材，结合实战练习）：\n{kb_doc_list}\n"
+                f"【参考资料】（以原文片段为主要教材，结合实战练习）：\n{kb_doc_list}\n"
                 "技能要求：学习理论后立即配套实战练习，以项目驱动为主。\n"
             )
         elif goal_type == "reading":
@@ -948,6 +1269,14 @@ async def generate_macro_plan(
         intent_note = (
             f"【用户特别说明】（请将以下要求作为高优先级约束融入计划）：{user_intent_supplement}\n"
         )
+    contract_note = ""
+    if goal.contract:
+        contract_note = (
+            "【目标契约】以下内容是用户明确设定的结果、基线、成功标准和范围约束，"
+            "优先级高于系统建议，不得自行改写：\n"
+            + json.dumps(goal.contract, ensure_ascii=False, separators=(",", ":"))
+            + "\n"
+        )
 
     try:
         decision_context = await DecisionContextBuilder.build(
@@ -964,8 +1293,8 @@ async def generate_macro_plan(
     total_study_hours = round(available_days * goal.daily_hours, 1)
     total_study_mins = int(total_study_hours * 60)
     # 每日时长是容量上限，不应强迫模型用碎任务填满所有分钟。
-    suggested_tasks_min = max(4, min(available_days, 24))
-    suggested_tasks_max = max(suggested_tasks_min, min(36, available_days * 2))
+    suggested_tasks_min = max(1, min(12, math.ceil(available_days / 2)))
+    suggested_tasks_max = max(suggested_tasks_min, min(24, available_days))
 
     rest_note = {"weekday": "（已排除周末）", "weekend": "（已排除工作日）", "all": ""}.get(
         work_schedule, ""
@@ -981,24 +1310,33 @@ async def generate_macro_plan(
         f"总可用学习时长：{total_study_hours} 小时（约 {total_study_mins} 分钟）\n"
         f"当前水平：{goal.current_level}\n"
         + intent_note
+        + contract_note
         + personalization_note
+        + knowledge_map_context
         + kb_instruction
         + pacing_note
+        + (f"\n【可引用资料原文】\n{source_context}\n" if source_context else "")
         + f"\n请生成一份完整的学习计划，时间范围覆盖全部 {available_days} 个可学习日，划分成 2-4 个连续阶段。\n"
         f"【容量边界】每日 {goal.daily_hours} 小时和总计 {total_study_mins} 分钟均为上限，不是必须填满的配额；"
         "按完成目标真正需要的工作量估算，不要为了填满时间制造重复任务。\n"
         f"【任务数量】建议生成 {suggested_tasks_min}~{suggested_tasks_max} 个有明确产出的任务，每项通常 15~60 分钟。\n"
         f"【阶段划分】days 表示连续阶段所占的可学习日，所有阶段 days 之和必须等于 {available_days}；"
         "阶段不得重叠，任务必须按前置依赖和实际执行顺序排列。不要输出日期，系统会在阶段时间窗内确定性排期。\n"
-        "【成功标准要求】每个任务的 objective 字段必须包含可观测的行为动词（如：能独立写出/能解释/能完成）"
-        "+ 具体数量或时长指标。\n"
+        "【行动任务要求】任务不是目录标题。每个任务必须说明 why_now、2-5个可直接执行的steps、"
+        "可保存或检查的deliverable，以及1-3条done_criteria。objective必须包含可观测行为动词"
+        "（如：能独立写出/能解释/能完成）+具体数量或时长指标。\n"
         "  ❌ 模糊示例：「熟练掌握循环语法」\n"
         "  ✅ 量化示例：「能独立写出3种循环结构各2个正确示例，不查文档」\n"
         "严格按以下JSON格式输出，不加任何解释：\n"
         "{\n"
         '  "phases": [\n'
         '    {"name": "阶段名", "days": 整数, "focus": "核心重点（30字内）",\n'
-        '     "tasks": [{"title": "任务名称（15字内，具体到章节或知识点）", "objective": "成功标准：含行为动词+数量指标（35字内）", "estimated_mins": 整数, "type": "study|review|practice"}]}\n'
+        '     "tasks": [{"title": "具体行动名称", "objective": "可观测学习目标", '
+        '"why_now": "为什么当前阶段先做它", "steps": ["步骤1", "步骤2"], '
+        '"deliverable": "本次产出物", "done_criteria": ["验收标准1"], '
+        '"prerequisites": ["可选前置条件"], "source_keys": ["S1-C1"], '
+        '"concept_ids": ["仅填写上方 confirmed 知识点ID"], '
+        '"estimated_mins": 整数, "type": "study|review|practice"}]}\n'
         "  ],\n"
         '  "total_tasks": 整数\n'
         "}"
@@ -1006,8 +1344,12 @@ async def generate_macro_plan(
 
     result = await ainvoke_structured_checked(
         [HumanMessage(content=prompt)],
-        validator=require_json_object,
-        max_tokens=4096,
+        validator=lambda content: _validate_macro_plan_output(
+            content,
+            kb_mode=kb_mode,
+            source_keys=set(source_map),
+        ),
+        max_tokens=8192,
         temperature=0.3,
         model_kwargs={"response_format": {"type": "json_object"}},
     )
@@ -1031,74 +1373,29 @@ async def generate_macro_plan(
     for phase, phase_days in zip(phases, _allocate_phase_days(weights, available_days)):
         phase["days"] = phase_days
 
-    # 创建 Plan 记录
-    plan = Plan(
-        id=str(uuid.uuid4()),
-        goal_id=goal_id,
-        version=len(old_plans) + 1,
-        is_current=True,
-        baseline=plan_data,
-        content=plan_data,
-    )
-    db.add(plan)
-    await db.flush()
-
-    # 按 work_schedule 分配日期，批量创建 Task
-    # 任务引用只能来自本次计划允许使用的资料，不能跨目标检索用户全部资料。
-    kb_items_all: list[KnowledgeItem] = []
-    if kb_mode in ("kb_only", "kb_reference"):
-        reference_filters = [
-            KnowledgeItem.goal_links.any(KnowledgeItemGoalLink.goal_id == goal_id),
-        ]
-        if kb_id:
-            reference_filters.append(KnowledgeItem.kb_id == kb_id)
-        kb_items_all = (
-            (
-                await db.execute(
-                    select(KnowledgeItem).where(
-                        KnowledgeItem.user_id == current_user.id,
-                        or_(*reference_filters),
-                    )
-                )
-            )
-            .scalars()
-            .all()
+    # Normalize the model output into the user-visible execution contract and
+    # assign deterministic dates before anything can become an active task.
+    normalized_phases: list[dict] = []
+    for phase in phases:
+        normalized_phases.append(
+            {
+                "name": compact_text(str(phase.get("name") or "学习阶段"), 40),
+                "focus": compact_text(str(phase.get("focus") or ""), 120),
+                "days": int(phase.get("days") or 1),
+                "tasks": [
+                    _normalize_plan_task(task, source_map, concept_map, kb_mode)
+                    for task in (phase.get("tasks") or [])
+                    if isinstance(task, dict)
+                ],
+            }
         )
+    if not any(phase["tasks"] for phase in normalized_phases):
+        raise HTTPException(status_code=502, detail="AI 未生成可执行任务，请重试")
 
-    task_rows = [
-        (phase.get("name", ""), task) for phase in phases for task in (phase.get("tasks") or [])
-    ]
-    all_tasks_flat = [task for _, task in task_rows]
-    scheduled = _schedule_plan_phases(phases, available_dates, goal.daily_hours)
-
-    for i, ((stage_label, td), sched_date) in enumerate(zip(task_rows, scheduled)):
-        task_title = td.get("title", f"任务 {i + 1}")
-        task_obj = td.get("objective") or None
-        task = Task(
-            id=str(uuid.uuid4()),
-            goal_id=goal_id,
-            plan_id=plan.id,
-            title=task_title,
-            description=task_obj,
-            estimated_mins=int(td.get("estimated_mins") or 30),
-            type=td.get("type", "study"),
-            scheduled_date=sched_date.isoformat(),
-            stage_label=stage_label or None,
-            sequence_in_plan=i,
-            status="pending",
-            kb_refs=await _match_kb_refs(kb_items_all, task_title),
-        )
-        db.add(task)
-
-    await db.commit()
-
-    # 计算预计完成日期
-    estimated_completion_date = scheduled[-1].isoformat() if scheduled else goal.deadline
-
-    # 构建含 scheduled_date 的阶段返回（与 scheduled 列表对齐）
+    scheduled = _schedule_plan_phases(normalized_phases, available_dates, goal.daily_hours)
     task_ret_idx = 0
     phases_out = []
-    for p in phases:
+    for p in normalized_phases:
         phase_task_list = p.get("tasks") or []
         phase_dates: list[date] = []
         tasks_out = []
@@ -1106,15 +1403,7 @@ async def generate_macro_plan(
             sched = scheduled[task_ret_idx] if task_ret_idx < len(scheduled) else None
             if sched:
                 phase_dates.append(sched)
-            tasks_out.append(
-                {
-                    "title": t.get("title", ""),
-                    "objective": t.get("objective", ""),
-                    "estimated_mins": int(t.get("estimated_mins") or 30),
-                    "type": t.get("type", "study"),
-                    "scheduled_date": sched.isoformat() if sched else "",
-                }
-            )
+            tasks_out.append({**t, "scheduled_date": sched.isoformat() if sched else ""})
             task_ret_idx += 1
         phases_out.append(
             {
@@ -1127,12 +1416,329 @@ async def generate_macro_plan(
             }
         )
 
+    current_plan = (
+        await db.execute(
+            select(Plan)
+            .where(Plan.goal_id == goal_id, Plan.is_current.is_(True))
+            .order_by(Plan.created_at.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    replacement_count = 0
+    if current_plan:
+        replacement_count = int(
+            await db.scalar(
+                select(func.count(Task.id)).where(
+                    Task.plan_id == current_plan.id,
+                    Task.status.in_(["pending", "in_progress"]),
+                )
+            )
+            or 0
+        )
+    next_version = (
+        int(await db.scalar(select(func.max(Plan.version)).where(Plan.goal_id == goal_id)) or 0) + 1
+    )
+    estimated_completion_date = scheduled[-1].isoformat() if scheduled else goal.deadline
+    source_item_ids = {source["item_id"] for source in source_registry}
+    cited_keys = {
+        ref["source_key"]
+        for phase in phases_out
+        for task in phase["tasks"]
+        for ref in task["execution_guide"].get("source_refs", [])
+    }
+    draft_data = {"phases": phases_out, "total_tasks": sum(len(p["tasks"]) for p in phases_out)}
+    plan = Plan(
+        id=str(uuid.uuid4()),
+        goal_id=goal_id,
+        version=next_version,
+        is_current=False,
+        baseline=draft_data,
+        content={
+            "lifecycle": {
+                "status": "draft",
+                "kb_mode": kb_mode,
+                "pacing_mode": pacing_mode,
+                "start_date": available_dates[0].isoformat()
+                if available_dates
+                else today.isoformat(),
+                "estimated_completion_date": estimated_completion_date,
+                "source_summary": {
+                    "mode": kb_mode,
+                    "items_read": len(source_item_ids),
+                    "excerpts_read": len(source_registry),
+                    "excerpts_cited": len(cited_keys),
+                },
+                "replacement_summary": {
+                    "current_plan_id": current_plan.id if current_plan else None,
+                    "pending_tasks_to_replace": replacement_count,
+                    "completed_tasks_preserved": True,
+                },
+            }
+        },
+        goal_intent_version=goal.intent_version or 1,
+        goal_contract_snapshot=dict(goal.contract or {}),
+    )
+    db.add(plan)
+    await emit(
+        db,
+        user_id=current_user.id,
+        goal_id=goal_id,
+        aggregate_type="plan",
+        aggregate_id=plan.id,
+        event_type="MacroPlanDraftGenerated",
+        payload={
+            "plan_version": plan.version,
+            "goal_intent_version": plan.goal_intent_version,
+            "task_count": draft_data["total_tasks"],
+            "kb_mode": kb_mode,
+            "source_items": len(source_item_ids),
+            "source_excerpts": len(source_registry),
+        },
+    )
+    await db.commit()
+    return _draft_response(plan)
+
+
+@router.post("/macro-plan/{goal_id}/{plan_id}/confirm")
+async def confirm_macro_plan(
+    goal_id: str,
+    plan_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    goal = (
+        await db.execute(select(Goal).where(Goal.id == goal_id, Goal.user_id == current_user.id))
+    ).scalar_one_or_none()
+    if not goal:
+        raise HTTPException(status_code=404, detail="目标不存在")
+    plan = (
+        await db.execute(select(Plan).where(Plan.id == plan_id, Plan.goal_id == goal_id))
+    ).scalar_one_or_none()
+    if not plan:
+        raise HTTPException(status_code=404, detail="计划草案不存在")
+    lifecycle = _plan_lifecycle(plan)
+    if lifecycle.get("status") != "draft":
+        raise HTTPException(status_code=409, detail="该草案已处理，无法重复采用")
+    if (plan.goal_intent_version or 1) != (goal.intent_version or 1):
+        raise HTTPException(status_code=409, detail="目标定义已更新，请重新生成计划草案")
+
+    old_plans = (
+        (
+            await db.execute(
+                select(Plan)
+                .where(Plan.goal_id == goal_id, Plan.is_current.is_(True))
+                .order_by(Plan.created_at.desc())
+            )
+        )
+        .scalars()
+        .all()
+    )
+    expected_current_plan_id = (lifecycle.get("replacement_summary") or {}).get("current_plan_id")
+    actual_current_plan_id = old_plans[0].id if old_plans else None
+    if expected_current_plan_id != actual_current_plan_id:
+        raise HTTPException(status_code=409, detail="当前计划已变化，请重新生成草案后再采用")
+    previous_task_states: list[dict] = []
+    for old_plan in old_plans:
+        old_plan.is_current = False
+        old_tasks = (
+            (
+                await db.execute(
+                    select(Task).where(
+                        Task.plan_id == old_plan.id,
+                        Task.status.in_(["pending", "in_progress"]),
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        for old_task in old_tasks:
+            previous_task_states.append({"task_id": old_task.id, "status": old_task.status})
+            old_task.status = "abandoned"
+
+    task_count = 0
+    created_task_ids: list[str] = []
+    for phase in (plan.baseline or {}).get("phases") or []:
+        for task_data in phase.get("tasks") or []:
+            guide = dict(task_data.get("execution_guide") or {})
+            refs = guide.get("source_refs") or []
+            task = Task(
+                id=str(uuid.uuid4()),
+                goal_id=goal_id,
+                plan_id=plan.id,
+                title=task_data.get("title") or f"任务 {task_count + 1}",
+                description=task_data.get("objective") or None,
+                estimated_mins=int(task_data.get("estimated_mins") or 30),
+                type=task_data.get("type") or "study",
+                scheduled_date=task_data.get("scheduled_date") or goal.deadline,
+                stage_label=phase.get("name") or None,
+                sequence_in_plan=task_count,
+                status="pending",
+                kb_refs=list(
+                    dict.fromkeys(ref.get("item_id") for ref in refs if ref.get("item_id"))
+                ),
+                execution_guide=guide,
+            )
+            db.add(task)
+            created_task_ids.append(task.id)
+            task_count += 1
+
+    plan.is_current = True
+    plan.content = {
+        **(plan.content or {}),
+        "lifecycle": {
+            **lifecycle,
+            "status": "active",
+            "previous_plan_ids": [old_plan.id for old_plan in old_plans],
+            "previous_task_states": previous_task_states,
+            "activated_at": utc_now().isoformat(),
+        },
+    }
+    await emit(
+        db,
+        user_id=current_user.id,
+        goal_id=goal_id,
+        aggregate_type="plan",
+        aggregate_id=plan.id,
+        event_type="MacroPlanActivated",
+        payload={
+            "plan_version": plan.version,
+            "created_task_ids": created_task_ids,
+            "replaced_task_ids": [row["task_id"] for row in previous_task_states],
+            "goal_intent_version": plan.goal_intent_version,
+        },
+    )
+    await db.commit()
+    # Return the persisted state, not the proposed payload.
+    persisted = (
+        (
+            await db.execute(
+                select(Task).where(Task.plan_id == plan.id).order_by(Task.sequence_in_plan)
+            )
+        )
+        .scalars()
+        .all()
+    )
     return {
         "plan_id": plan.id,
-        "phases": phases_out,
-        "total_tasks": len(all_tasks_flat),
-        "start_date": available_dates[0].isoformat() if available_dates else today.isoformat(),
-        "estimated_completion_date": estimated_completion_date,
+        "status": "active",
+        "created_task_ids": [task.id for task in persisted],
+        "created_tasks": len(persisted),
+        "replaced_tasks": len(previous_task_states),
+        "can_undo": True,
+    }
+
+
+@router.post("/macro-plan/{goal_id}/{plan_id}/cancel")
+async def cancel_macro_plan_draft(
+    goal_id: str,
+    plan_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    plan = (
+        await db.execute(
+            select(Plan)
+            .join(Goal, Goal.id == Plan.goal_id)
+            .where(
+                Plan.id == plan_id,
+                Plan.goal_id == goal_id,
+                Goal.user_id == current_user.id,
+            )
+        )
+    ).scalar_one_or_none()
+    if not plan:
+        raise HTTPException(status_code=404, detail="计划草案不存在")
+    lifecycle = _plan_lifecycle(plan)
+    if lifecycle.get("status") != "draft":
+        raise HTTPException(status_code=409, detail="只有未采用的草案可以放弃")
+    plan.content = {**(plan.content or {}), "lifecycle": {**lifecycle, "status": "cancelled"}}
+    await emit(
+        db,
+        user_id=current_user.id,
+        goal_id=goal_id,
+        aggregate_type="plan",
+        aggregate_id=plan.id,
+        event_type="MacroPlanDraftCancelled",
+        payload={"plan_version": plan.version},
+    )
+    await db.commit()
+    return {"plan_id": plan.id, "status": "cancelled"}
+
+
+@router.post("/macro-plan/{goal_id}/{plan_id}/undo")
+async def undo_macro_plan_activation(
+    goal_id: str,
+    plan_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    plan = (
+        await db.execute(
+            select(Plan)
+            .join(Goal, Goal.id == Plan.goal_id)
+            .where(
+                Plan.id == plan_id,
+                Plan.goal_id == goal_id,
+                Goal.user_id == current_user.id,
+                Plan.is_current.is_(True),
+            )
+        )
+    ).scalar_one_or_none()
+    if not plan:
+        raise HTTPException(status_code=404, detail="当前计划不存在")
+    lifecycle = _plan_lifecycle(plan)
+    if lifecycle.get("status") != "active":
+        raise HTTPException(status_code=409, detail="该计划无法撤销")
+
+    new_tasks = (await db.execute(select(Task).where(Task.plan_id == plan.id))).scalars().all()
+    for task in new_tasks:
+        if task.status != "completed":
+            task.status = "abandoned"
+    previous_ids = lifecycle.get("previous_plan_ids") or []
+    if previous_ids:
+        previous_plan = (
+            await db.execute(
+                select(Plan)
+                .where(Plan.id.in_(previous_ids))
+                .order_by(Plan.created_at.desc())
+                .limit(1)
+            )
+        ).scalar_one_or_none()
+        if previous_plan:
+            previous_plan.is_current = True
+    previous_states = {
+        row["task_id"]: row["status"] for row in lifecycle.get("previous_task_states") or []
+    }
+    if previous_states:
+        previous_tasks = (
+            (await db.execute(select(Task).where(Task.id.in_(previous_states)))).scalars().all()
+        )
+        for task in previous_tasks:
+            task.status = previous_states[task.id]
+    plan.is_current = False
+    plan.content = {
+        **(plan.content or {}),
+        "lifecycle": {**lifecycle, "status": "undone", "undone_at": utc_now().isoformat()},
+    }
+    await emit(
+        db,
+        user_id=current_user.id,
+        goal_id=goal_id,
+        aggregate_type="plan",
+        aggregate_id=plan.id,
+        event_type="MacroPlanActivationUndone",
+        payload={
+            "restored_plan_ids": previous_ids,
+            "restored_task_ids": list(previous_states),
+        },
+    )
+    await db.commit()
+    return {
+        "plan_id": plan.id,
+        "status": "undone",
+        "restored_plan_id": previous_ids[-1] if previous_ids else None,
+        "restored_tasks": len(previous_states),
     }
 
 
@@ -1569,8 +2175,39 @@ async def verify_start(
     if not task:
         raise HTTPException(status_code=404, detail="任务不存在")
 
+    guide = dict(task.execution_guide or {})
+    source_context = "\n".join(
+        f"- {ref.get('locator', ref.get('item_title', '参考资料'))}：{ref.get('snippet', '')}"
+        for ref in (guide.get("source_refs") or [])[:4]
+    )
+    task_notes = (
+        (
+            await db.execute(
+                select(KnowledgeItem)
+                .where(
+                    KnowledgeItem.user_id == current_user.id,
+                    KnowledgeItem.task_id == task.id,
+                )
+                .order_by(KnowledgeItem.updated_at.desc())
+                .limit(3)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    note_context = "\n".join(
+        f"- {note.title}：{_compact_plan_source_text(note.normalized_content or note.content, 500)}"
+        for note in task_notes
+    )
+
     prompt = (
         f"学习者刚完成了任务「{task.title}」。\n\n"
+        f"任务目标：{task.description or guide.get('deliverable', '')}\n"
+        f"任务产出：{guide.get('deliverable', '')}\n"
+        f"验收标准：{json.dumps(guide.get('done_criteria') or [], ensure_ascii=False)}\n"
+        + (f"引用资料：\n{source_context}\n" if source_context else "")
+        + (f"学习者笔记：\n{note_context}\n" if note_context else "")
+        + "\n"
         "请生成一道深度检验理解的题目，以及该题目的参考答案要点。\n"
         "要求：\n"
         "- 问题聚焦原理理解、应用场景或知识间的联系，而非可以直接搜索到的事实\n"
@@ -1622,10 +2259,40 @@ async def verify_answer(
         f"谈谈你对「{task.title}」的理解",
     )
 
+    guide = dict(task.execution_guide or {})
+    source_context = "\n".join(
+        f"- {ref.get('locator', ref.get('item_title', '参考资料'))}：{ref.get('snippet', '')}"
+        for ref in (guide.get("source_refs") or [])[:4]
+    )
+    task_notes = (
+        (
+            await db.execute(
+                select(KnowledgeItem)
+                .where(
+                    KnowledgeItem.user_id == current_user.id,
+                    KnowledgeItem.task_id == task.id,
+                )
+                .order_by(KnowledgeItem.updated_at.desc())
+                .limit(3)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    note_context = "\n".join(
+        f"- {note.title}：{_compact_plan_source_text(note.normalized_content or note.content, 500)}"
+        for note in task_notes
+    )
+
     llm = create_critical_llm(max_tokens=700)
     eval_prompt = (
         f"任务：「{task.title}」\n"
-        f"考查问题：{question}\n"
+        f"任务目标：{task.description or ''}\n"
+        f"任务产出：{guide.get('deliverable', '')}\n"
+        f"验收标准：{json.dumps(guide.get('done_criteria') or [], ensure_ascii=False)}\n"
+        + (f"引用资料：\n{source_context}\n" if source_context else "")
+        + (f"学习者笔记：\n{note_context}\n" if note_context else "")
+        + f"考查问题：{question}\n"
         f"学习者回答：{body.answer}\n\n"
         "你是一位严格但友善的学习导师，请对学习者的回答进行全面评估。\n"
         "评分标准：\n"
@@ -1683,9 +2350,7 @@ async def verify_answer(
         evidence_key = assessment_key
         evidence_idempotency_key = f"verification-evidence:{evidence_key}"
         existing_evidence = await db.scalar(
-            select(LearningEvent).where(
-                LearningEvent.idempotency_key == evidence_idempotency_key
-            )
+            select(LearningEvent).where(LearningEvent.idempotency_key == evidence_idempotency_key)
         )
         previous_level = task.mastery_level
         task.mastery_level = mastery_level
@@ -1734,6 +2399,17 @@ async def verify_answer(
                     source="ai_assessment",
                     notes=f"verification_score={score}",
                 )
+            )
+            await KnowledgeGraphService.record_task_evidence(
+                db,
+                current_user.id,
+                goal_id=task.goal_id,
+                task_id=task.id,
+                execution_guide=guide,
+                score=score / 100,
+                evidence_source="verification",
+                evidence_type="explanation_assessment",
+                summary=f"回答掌握检验题，评分 {score}/100",
             )
     await db.commit()
 

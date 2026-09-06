@@ -43,12 +43,34 @@ const ACTION_STATUS_LABEL: Record<AgentActionRun["status"], string> = {
 
 const ACTION_FIELD_LABEL: Record<string, string> = {
   deadline: "目标截止日期",
-  scheduled_date: "日期",
+  scheduled_date: "排期调整",
   status: "状态",
   daily_hours: "每日计划投入",
   __create__: "新建任务",
   __delete__: "删除任务",
   __upsert__: "记录打卡",
+};
+
+const formatActionDate = (value: unknown) => {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
+  const [, month, day] = value.split("-").map(Number);
+  return `${month}月${day}日`;
+};
+
+const formatOperationValue = (operation: AgentActionOperation) => {
+  if (operation.field === "scheduled_date") {
+    const before = formatActionDate(operation.before);
+    const after = formatActionDate(operation.after);
+    if (before && after) return `原定 ${before} → 调整至 ${after}`;
+    if (after) return `安排在 ${after}`;
+  }
+  if (operation.field === "deadline") {
+    const before = formatActionDate(operation.before);
+    const after = formatActionDate(operation.after);
+    if (before && after) return `原截止 ${before} → 调整至 ${after}`;
+    if (after) return `截止 ${after}`;
+  }
+  return null;
 };
 
 const actionValue = (value: unknown) => {
@@ -70,6 +92,7 @@ function ActionOperationRow({ operation }: { operation: AgentActionOperation }) 
   const fieldLabel = operation.field === "__create__" && operation.entity === "goal"
     ? "新建目标"
     : ACTION_FIELD_LABEL[operation.field] ?? operation.field;
+  const formattedValue = formatOperationValue(operation);
   return (
     <li>
       <span>{operation.label}</span>
@@ -79,7 +102,7 @@ function ActionOperationRow({ operation }: { operation: AgentActionOperation }) 
           ? `将创建：${actionValue(operation.after)}`
           : isDelete
             ? "将删除这项内容"
-            : `${actionValue(operation.before)} → ${actionValue(operation.after)}`}
+            : formattedValue || `${actionValue(operation.before)} → ${actionValue(operation.after)}`}
       </p>
     </li>
   );

@@ -174,6 +174,11 @@ type GoalFormSurfaceProps = {
   dailyHours: number;
   workSchedule: WorkSchedule;
   currentLevel: GoalLevel;
+  baseline?: string;
+  successCriteria?: string;
+  mustCover?: string;
+  maySkip?: string;
+  constraintsText?: string;
   status?: GoalStatus;
   isSubmitting: boolean;
   authPending?: boolean;
@@ -187,6 +192,11 @@ type GoalFormSurfaceProps = {
   onDailyHoursChange: (value: number) => void;
   onWorkScheduleChange: (value: WorkSchedule) => void;
   onCurrentLevelChange: (value: GoalLevel) => void;
+  onBaselineChange?: (value: string) => void;
+  onSuccessCriteriaChange?: (value: string) => void;
+  onMustCoverChange?: (value: string) => void;
+  onMaySkipChange?: (value: string) => void;
+  onConstraintsTextChange?: (value: string) => void;
   onStatusChange?: (value: GoalStatus) => void;
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
 };
@@ -199,6 +209,11 @@ export function GoalFormSurface({
   dailyHours,
   workSchedule,
   currentLevel,
+  baseline = "",
+  successCriteria = "",
+  mustCover = "",
+  maySkip = "",
+  constraintsText = "",
   status,
   isSubmitting,
   authPending = false,
@@ -212,6 +227,11 @@ export function GoalFormSurface({
   onDailyHoursChange,
   onWorkScheduleChange,
   onCurrentLevelChange,
+  onBaselineChange,
+  onSuccessCriteriaChange,
+  onMustCoverChange,
+  onMaySkipChange,
+  onConstraintsTextChange,
   onStatusChange,
   onSubmit,
 }: GoalFormSurfaceProps) {
@@ -223,8 +243,8 @@ export function GoalFormSurface({
   const selectedTypeIndex = Math.max(0, GOAL_TYPES.findIndex((item) => item.value === type));
   const dialogRef = useRef<HTMLElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
-  const initialValueRef = useRef(JSON.stringify({ type, title, deadline, dailyHours, workSchedule, currentLevel, status }));
-  const isDirty = initialValueRef.current !== JSON.stringify({ type, title, deadline, dailyHours, workSchedule, currentLevel, status });
+  const initialValueRef = useRef(JSON.stringify({ type, title, deadline, dailyHours, workSchedule, currentLevel, status, baseline, successCriteria, mustCover, maySkip, constraintsText }));
+  const isDirty = initialValueRef.current !== JSON.stringify({ type, title, deadline, dailyHours, workSchedule, currentLevel, status, baseline, successCriteria, mustCover, maySkip, constraintsText });
   const isDirtyRef = useRef(isDirty);
   const popstateConfirmingRef = useRef(false);
   const allowNextPopstateRef = useRef(false);
@@ -386,9 +406,40 @@ export function GoalFormSurface({
             </label>
           </section>
 
+          {onBaselineChange && onSuccessCriteriaChange && onMustCoverChange && onMaySkipChange && onConstraintsTextChange && (
+            <section className="tech-goal-form-step tech-goal-contract-step" aria-labelledby="goal-form-contract">
+              <header className="tech-goal-form-step-heading">
+                <span aria-hidden="true">3</span>
+                <div><h2 id="goal-form-contract">目标定义</h2><p>让 AI 知道从哪里出发、什么算真正完成</p></div>
+              </header>
+              <div className="tech-goal-contract-grid">
+                <label className="tech-goal-field">
+                  <span>当前基础</span>
+                  <textarea value={baseline} onChange={(event) => onBaselineChange(event.target.value)} placeholder="例如：学过基础语法，但还不能独立完成项目" rows={2} />
+                </label>
+                <label className="tech-goal-field">
+                  <span>成功标准 <small>每行一条</small></span>
+                  <textarea value={successCriteria} onChange={(event) => onSuccessCriteriaChange(event.target.value)} placeholder={"例如：能独立完成一个可运行项目\n能解释关键设计选择"} rows={2} />
+                </label>
+                <label className="tech-goal-field">
+                  <span>必须覆盖 <small>每行一条</small></span>
+                  <textarea value={mustCover} onChange={(event) => onMustCoverChange(event.target.value)} placeholder="不能遗漏的章节、能力或题型" rows={2} />
+                </label>
+                <label className="tech-goal-field">
+                  <span>可以跳过 <small>每行一条</small></span>
+                  <textarea value={maySkip} onChange={(event) => onMaySkipChange(event.target.value)} placeholder="已经掌握或当前不需要的内容" rows={2} />
+                </label>
+                <label className="tech-goal-field tech-goal-contract-wide">
+                  <span>其他约束</span>
+                  <textarea value={constraintsText} onChange={(event) => onConstraintsTextChange(event.target.value)} placeholder="例如：周三不安排重任务；优先使用官方资料" rows={2} />
+                </label>
+              </div>
+            </section>
+          )}
+
           <section className="tech-goal-form-step" aria-labelledby="goal-form-step-three">
             <header className="tech-goal-form-step-heading">
-              <span aria-hidden="true">3</span>
+              <span aria-hidden="true">{onBaselineChange ? 4 : 3}</span>
               <div><h2 id="goal-form-step-three">学习计划</h2><p>设定节奏、周期与每日投入</p></div>
             </header>
 
@@ -413,7 +464,7 @@ export function GoalFormSurface({
                 </div>
               </fieldset>
 
-              {usesCurrentLevel && isEdit && (
+              {usesCurrentLevel && (
                 <fieldset className="tech-goal-create-section tech-goal-segment-section">
                   <legend><BarChart3 size={17} />当前水平</legend>
                   <div className="tech-goal-segmented-control">

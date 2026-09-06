@@ -6,7 +6,7 @@ from typing import Literal
 from urllib.parse import urlsplit
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field, model_validator
 
 from src.deps import get_current_admin

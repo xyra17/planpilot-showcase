@@ -29,6 +29,38 @@ async def test_create_goal(client: AsyncClient, auth: dict):
     assert data["status"] == "active"
 
 
+async def test_goal_contract_is_versioned_as_user_intent(client: AsyncClient, auth: dict):
+    created = await client.post(
+        "/api/v1/goals",
+        json={
+            "type": "language",
+            "title": "三个月提升 N2 听力",
+            "deadline": _future(),
+            "baseline": "模拟题 22/60",
+            "success_criteria": ["模拟题稳定达到 35/60"],
+            "must_cover": ["即时应答", "概要理解"],
+            "may_skip": ["N1 内容"],
+        },
+        headers=auth,
+    )
+    assert created.status_code == 201, created.text
+    goal = created.json()
+    assert goal["intent_version"] == 1
+    assert goal["contract"]["baseline"] == "模拟题 22/60"
+
+    updated = await client.patch(
+        f"/api/v1/goals/{goal['id']}",
+        json={
+            "success_criteria": ["模拟题稳定达到 40/60"],
+            "expected_version": goal["version"],
+        },
+        headers=auth,
+    )
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["intent_version"] == 2
+    assert updated.json()["contract"]["success_criteria"] == ["模拟题稳定达到 40/60"]
+
+
 async def test_list_goals(client: AsyncClient, auth: dict, goal_id: str):
     r = await client.get("/api/v1/goals", headers=auth)
     assert r.status_code == 200
@@ -262,9 +294,7 @@ async def test_delete_goal_removes_goal_profiles_but_keeps_user_profiles(
     remaining_cognitive = list(
         (
             await db.execute(
-                select(LearnerCognitiveProfile).where(
-                    LearnerCognitiveProfile.user_id == user_id
-                )
+                select(LearnerCognitiveProfile).where(LearnerCognitiveProfile.user_id == user_id)
             )
         ).scalars()
     )
@@ -357,9 +387,7 @@ async def test_goal_versions_are_append_only_and_stale_patch_is_rejected(
 
     events = list(
         (
-            await db.execute(
-                select(LearningEvent).where(LearningEvent.aggregate_id == goal["id"])
-            )
+            await db.execute(select(LearningEvent).where(LearningEvent.aggregate_id == goal["id"]))
         ).scalars()
     )
     assert [event.payload["aggregate_version"] for event in events] == [1, 2]

@@ -1,10 +1,11 @@
 "use client";
 
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, Clock3 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 
 import PlanModeSelector, { type KbMode, type PacingMode } from "@/components/goal/PlanModeSelector";
+import PlanDraftPreview, { type MacroPlanDraft } from "@/components/goal/PlanDraftPreview";
 import { useAuth } from "@/components/technology/AuthProvider";
 import {
   GoalFormSurface,
@@ -45,6 +46,11 @@ export function GoalCreateDialog({ onClose, onGoalChanged }: { onClose: () => vo
   const [dailyHours, setDailyHours] = useState(2);
   const [workSchedule, setWorkSchedule] = useState<WorkSchedule>("weekday");
   const [currentLevel, setCurrentLevel] = useState<GoalLevel>("beginner");
+  const [baseline, setBaseline] = useState("");
+  const [successCriteria, setSuccessCriteria] = useState("");
+  const [mustCover, setMustCover] = useState("");
+  const [maySkip, setMaySkip] = useState("");
+  const [constraintsText, setConstraintsText] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
   const [createdGoalId, setCreatedGoalId] = useState<string | null>(null);
@@ -52,6 +58,7 @@ export function GoalCreateDialog({ onClose, onGoalChanged }: { onClose: () => vo
   const [showPlanMode, setShowPlanMode] = useState(false);
   const [planGenerating, setPlanGenerating] = useState(false);
   const [planError, setPlanError] = useState("");
+  const [planDraft, setPlanDraft] = useState<MacroPlanDraft | null>(null);
 
   function createLocalGoal() {
     const id = `local-goal-${Date.now()}`;
@@ -99,6 +106,12 @@ export function GoalCreateDialog({ onClose, onGoalChanged }: { onClose: () => vo
             work_schedule: workSchedule,
             kb_id: null,
             meta: {},
+            description: successCriteria.trim() || null,
+            baseline: baseline.trim() || null,
+            success_criteria: successCriteria.split("\n").map((value) => value.trim()).filter(Boolean),
+            must_cover: mustCover.split("\n").map((value) => value.trim()).filter(Boolean),
+            may_skip: maySkip.split("\n").map((value) => value.trim()).filter(Boolean),
+            constraints: constraintsText.trim() ? { notes: constraintsText.trim() } : {},
           })).id
         : authStatus === "unauthenticated" ? createLocalGoal() : null;
       if (!goalId) throw new Error("正在确认登录状态，请稍后再试。");
@@ -116,23 +129,50 @@ export function GoalCreateDialog({ onClose, onGoalChanged }: { onClose: () => vo
     if (!createdGoalId) return;
     setPlanError("");
     if (authStatus !== "authenticated") {
-      router.replace(`/studio/work/goals/${createdGoalId}`);
+      router.replace(`/studio/work/goals/${createdGoalId}?tab=plan`);
       return;
     }
     setPlanGenerating(true);
     try {
-      await api.post(`/api/v1/agent/macro-plan/${createdGoalId}`, {
+      const draft = await api.post<MacroPlanDraft>(`/api/v1/agent/macro-plan/${createdGoalId}`, {
         kb_mode: mode,
         user_intent_supplement: intentSupplement,
         pacing_mode: pacingMode,
       });
-      localStorage.setItem("tasksNeedRefresh", "1");
-      router.replace(`/studio/work/goals/${createdGoalId}`);
+      setShowPlanMode(false);
+      setPlanDraft(draft);
     } catch (error) {
       setPlanError(error instanceof Error ? error.message : "学习计划生成失败，请重试。");
     } finally {
       setPlanGenerating(false);
     }
+  }
+
+  async function handleConfirmPlanDraft() {
+    if (!createdGoalId || !planDraft) return;
+    setPlanGenerating(true);
+    setPlanError("");
+    try {
+      await api.post(`/api/v1/agent/macro-plan/${createdGoalId}/${planDraft.plan_id}/confirm`, {});
+      localStorage.setItem("tasksNeedRefresh", "1");
+      router.replace(`/studio/work/goals/${createdGoalId}?tab=plan`);
+    } catch (error) {
+      setPlanError(error instanceof Error ? error.message : "计划写入失败，请重试。");
+    } finally {
+      setPlanGenerating(false);
+    }
+  }
+
+  async function handleCancelPlanDraft() {
+    if (!createdGoalId || !planDraft || planGenerating) return;
+    const planId = planDraft.plan_id;
+    setPlanDraft(null);
+    try {
+      await api.post(`/api/v1/agent/macro-plan/${createdGoalId}/${planId}/cancel`, {});
+    } catch {
+      // Drafts never affect active tasks; cancellation syncing is audit-only.
+    }
+    setShowCreatedDialog(true);
   }
 
   return (
@@ -147,6 +187,11 @@ export function GoalCreateDialog({ onClose, onGoalChanged }: { onClose: () => vo
           dailyHours={dailyHours}
           workSchedule={workSchedule}
           currentLevel={currentLevel}
+          baseline={baseline}
+          successCriteria={successCriteria}
+          mustCover={mustCover}
+          maySkip={maySkip}
+          constraintsText={constraintsText}
           isSubmitting={isSubmitting || planGenerating}
           authPending={authStatus === "loading"}
           error={formError}
@@ -158,6 +203,11 @@ export function GoalCreateDialog({ onClose, onGoalChanged }: { onClose: () => vo
           onDailyHoursChange={setDailyHours}
           onWorkScheduleChange={setWorkSchedule}
           onCurrentLevelChange={setCurrentLevel}
+          onBaselineChange={setBaseline}
+          onSuccessCriteriaChange={setSuccessCriteria}
+          onMustCoverChange={setMustCover}
+          onMaySkipChange={setMaySkip}
+          onConstraintsTextChange={setConstraintsText}
           onSubmit={handleSubmit}
         />
       )}
@@ -168,7 +218,7 @@ export function GoalCreateDialog({ onClose, onGoalChanged }: { onClose: () => vo
             <div className="tech-goal-success-icon"><CheckCircle2 size={19} /></div>
             <div><small>GOAL CREATED</small><h2>目标已创建</h2><p>目标已经保存。接下来可以关联参考资料、选择资料使用边界，再生成阶段计划。</p></div>
             <footer>
-              <button type="button" onClick={() => router.replace(`/studio/work/goals/${createdGoalId}`)}>稍后规划</button>
+              <button className="tech-goal-plan-later" type="button" onClick={() => router.replace(`/studio/work/goals/${createdGoalId}?tab=plan`)}><Clock3 size={15} />稍后规划<span>先查看目标，之后随时生成计划</span></button>
               <button type="button" onClick={() => { setShowCreatedDialog(false); setShowPlanMode(true); }}>设置资料并生成</button>
             </footer>
           </section>
@@ -177,6 +227,8 @@ export function GoalCreateDialog({ onClose, onGoalChanged }: { onClose: () => vo
 
       <PlanModeSelector
         open={showPlanMode}
+        busy={planGenerating}
+        guestMode={authStatus === "unauthenticated"}
         hasKb={false}
         goalId={createdGoalId ?? ""}
         goalType={type}
@@ -185,6 +237,16 @@ export function GoalCreateDialog({ onClose, onGoalChanged }: { onClose: () => vo
         error={planError}
         onConfirm={(mode, intent, pacing) => void handleGeneratePlan(mode, intent, pacing)}
       />
+      {planDraft && (
+        <PlanDraftPreview
+          draft={planDraft}
+          goalTitle={title}
+          busy={planGenerating}
+          error={planError}
+          onCancel={() => void handleCancelPlanDraft()}
+          onConfirm={() => void handleConfirmPlanDraft()}
+        />
+      )}
     </>
   );
 }

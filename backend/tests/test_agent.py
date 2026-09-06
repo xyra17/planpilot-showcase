@@ -9,13 +9,108 @@ from httpx import AsyncClient
 from sqlalchemy import func, select
 
 from src.config import settings
-from src.models import AgentRun, CheckinRecord, LearningEvent, PendingActionIntent, Task
+from src.models import AgentRun, CheckinRecord, LearningEvent, PendingActionIntent, Plan, Task
 
 
 def _mock_llm(content: str):
     m = MagicMock()
     m.ainvoke = AsyncMock(return_value=MagicMock(content=content))
     return m
+
+
+async def test_macro_plan_is_draft_until_confirmed(
+    client: AsyncClient, auth: dict, goal_id: str, db
+):
+    generated = {
+        "phases": [
+            {
+                "name": "理解与练习",
+                "days": 1,
+                "focus": "建立可验证的理解",
+                "tasks": [
+                    {
+                        "title": "完成核心概念复述",
+                        "objective": "能独立解释3个核心概念",
+                        "why_now": "先建立概念模型，后续练习才有判断依据",
+                        "steps": ["阅读核心概念", "合上资料复述", "标记遗漏"],
+                        "deliverable": "一份3点概念复述",
+                        "done_criteria": ["不看资料能准确说出3点"],
+                        "source_keys": [],
+                        "estimated_mins": 30,
+                        "type": "study",
+                    }
+                ],
+            }
+        ],
+        "total_tasks": 1,
+    }
+    with patch(
+        "src.api.agent.ainvoke_structured_checked",
+        new=AsyncMock(return_value=MagicMock(content=json.dumps(generated, ensure_ascii=False))),
+    ):
+        draft_response = await client.post(
+            f"/api/v1/agent/macro-plan/{goal_id}",
+            json={"kb_mode": "no_kb"},
+            headers=auth,
+        )
+
+    assert draft_response.status_code == 200
+    draft = draft_response.json()
+    assert draft["status"] == "draft"
+    assert draft["phases"][0]["tasks"][0]["execution_guide"]["steps"]
+    assert await db.scalar(select(func.count(Task.id)).where(Task.plan_id == draft["plan_id"])) == 0
+    plan = await db.scalar(select(Plan).where(Plan.id == draft["plan_id"]))
+    assert plan is not None and plan.is_current is False
+
+    confirmed_response = await client.post(
+        f"/api/v1/agent/macro-plan/{goal_id}/{draft['plan_id']}/confirm",
+        headers=auth,
+    )
+    assert confirmed_response.status_code == 200
+    confirmed = confirmed_response.json()
+    assert confirmed["created_tasks"] == 1
+    persisted_task = await db.scalar(select(Task).where(Task.plan_id == draft["plan_id"]))
+    assert persisted_task is not None
+    assert persisted_task.execution_guide["deliverable"] == "一份3点概念复述"
+
+    with patch(
+        "src.api.agent.ainvoke_structured_checked",
+        new=AsyncMock(return_value=MagicMock(content=json.dumps(generated, ensure_ascii=False))),
+    ):
+        replacement_response = await client.post(
+            f"/api/v1/agent/macro-plan/{goal_id}",
+            json={"kb_mode": "no_kb"},
+            headers=auth,
+        )
+    replacement = replacement_response.json()
+    assert replacement["replacement_summary"]["pending_tasks_to_replace"] == 1
+    accepted_replacement = await client.post(
+        f"/api/v1/agent/macro-plan/{goal_id}/{replacement['plan_id']}/confirm",
+        headers=auth,
+    )
+    assert accepted_replacement.status_code == 200
+    await db.refresh(persisted_task)
+    assert persisted_task.status == "abandoned"
+
+    undo = await client.post(
+        f"/api/v1/agent/macro-plan/{goal_id}/{replacement['plan_id']}/undo",
+        headers=auth,
+    )
+    assert undo.status_code == 200
+    await db.refresh(persisted_task)
+    assert persisted_task.status == "pending"
+
+
+async def test_macro_plan_kb_only_rejects_missing_source_content(
+    client: AsyncClient, auth: dict, goal_id: str
+):
+    response = await client.post(
+        f"/api/v1/agent/macro-plan/{goal_id}",
+        json={"kb_mode": "kb_only"},
+        headers=auth,
+    )
+    assert response.status_code == 422
+    assert "包含正文" in response.json()["detail"]
 
 
 async def test_stream_uses_cookie_and_csrf_contract(client: AsyncClient):
@@ -220,7 +315,9 @@ async def test_new_oral_action_categories_create_durable_sse_preview(
         "events": [],
     }
     with (
-        patch("src.core.agent_v2.orchestrator.create_run", new=AsyncMock(return_value=run)) as create,
+        patch(
+            "src.core.agent_v2.orchestrator.create_run", new=AsyncMock(return_value=run)
+        ) as create,
         patch("src.core.agent_v2.orchestrator.run_detail", new=AsyncMock(return_value=detail)),
         patch("src.tasks.agent_runs.dispatch_agent_run") as dispatch,
     ):
@@ -278,9 +375,12 @@ async def test_analysis_and_hypothetical_guards_use_conversation_sse_without_wri
     assert "event: action_start" not in response.text
     assert "event: action_run" not in response.text
     create.assert_not_awaited()
-    assert await db.scalar(
-        select(PendingActionIntent).where(PendingActionIntent.session_id == session_id)
-    ) is None
+    assert (
+        await db.scalar(
+            select(PendingActionIntent).where(PendingActionIntent.session_id == session_id)
+        )
+        is None
+    )
     after = {
         "runs": int(await db.scalar(select(func.count(AgentRun.id))) or 0),
         "tasks": int(await db.scalar(select(func.count(Task.id))) or 0),
@@ -325,7 +425,9 @@ async def test_explicit_delete_preview_guard_enters_action_sse_without_business_
     }
     session_id = f"speech-preview-session-{uuid.uuid4().hex}"
     with (
-        patch("src.core.agent_v2.orchestrator.create_run", new=AsyncMock(return_value=run)) as create,
+        patch(
+            "src.core.agent_v2.orchestrator.create_run", new=AsyncMock(return_value=run)
+        ) as create,
         patch("src.core.agent_v2.orchestrator.run_detail", new=AsyncMock(return_value=detail)),
         patch("src.tasks.agent_runs.dispatch_agent_run") as dispatch,
     ):
@@ -348,9 +450,12 @@ async def test_explicit_delete_preview_guard_enters_action_sse_without_business_
         "version": task.version,
         "checkins": int(await db.scalar(select(func.count(CheckinRecord.id))) or 0),
     } == before
-    assert await db.scalar(
-        select(PendingActionIntent).where(PendingActionIntent.session_id == session_id)
-    ) is None
+    assert (
+        await db.scalar(
+            select(PendingActionIntent).where(PendingActionIntent.session_id == session_id)
+        )
+        is None
+    )
 
 
 async def test_incomplete_action_clarifies_without_creating_run(

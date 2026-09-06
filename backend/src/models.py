@@ -29,6 +29,128 @@ def new_uuid() -> str:
     return str(uuid.uuid4())
 
 
+def personal_workspace_id(user_id: str) -> str:
+    """Return the stable id of a user's default cloud workspace."""
+    return str(uuid.uuid5(uuid.NAMESPACE_URL, f"planpilot:personal:{user_id}"))
+
+
+def default_workspace_id(context) -> str:
+    return personal_workspace_id(str(context.get_current_parameters()["user_id"]))
+
+
+class Workspace(Base):
+    """Cloud learning-space boundary shared by the web and desktop clients."""
+
+    __tablename__ = "workspaces"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=new_uuid)
+    owner_user_id: Mapped[str] = mapped_column(
+        String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    kind: Mapped[str] = mapped_column(String(24), default="cloud", nullable=False)
+    is_default: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now()
+    )
+
+    __table_args__ = (
+        CheckConstraint("kind = 'cloud'", name="ck_workspaces_cloud_only"),
+        Index("ix_workspaces_owner_default", "owner_user_id", "is_default"),
+    )
+
+
+class WorkspaceMember(Base):
+    __tablename__ = "workspace_members"
+
+    workspace_id: Mapped[str] = mapped_column(
+        String, ForeignKey("workspaces.id", ondelete="CASCADE"), primary_key=True
+    )
+    user_id: Mapped[str] = mapped_column(
+        String, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    role: Mapped[str] = mapped_column(String(24), default="owner", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class Device(Base):
+    """A revocable client registration; never stores local file contents."""
+
+    __tablename__ = "devices"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=new_uuid)
+    user_id: Mapped[str] = mapped_column(
+        String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    installation_id: Mapped[str] = mapped_column(String(120), nullable=False)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    platform: Mapped[str] = mapped_column(String(40), nullable=False)
+    app_version: Mapped[str] = mapped_column(String(40), nullable=False)
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "installation_id", name="uq_device_user_installation"),
+    )
+
+
+class OfflineOperation(Base):
+    """A staged desktop write or preserved conflict; never applies a generic blind write."""
+
+    __tablename__ = "offline_operations"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=new_uuid)
+    user_id: Mapped[str] = mapped_column(
+        String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    workspace_id: Mapped[str] = mapped_column(
+        String, ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    device_id: Mapped[str] = mapped_column(
+        String, ForeignKey("devices.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    operation_id: Mapped[str] = mapped_column(String(120), nullable=False)
+    operation_type: Mapped[str] = mapped_column(String(16), nullable=False)
+    entity_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    entity_id: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    base_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    server_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    request_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    local_snapshot: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, nullable=False)
+    server_snapshot: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, nullable=False)
+    status: Mapped[str] = mapped_column(String(24), default="queued", nullable=False, index=True)
+    resolution: Mapped[str | None] = mapped_column(String(24), nullable=True)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now()
+    )
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "operation_id", name="uq_offline_operation_user_id"),
+        CheckConstraint(
+            "operation_type IN ('create', 'update', 'delete')",
+            name="ck_offline_operation_type",
+        ),
+        CheckConstraint(
+            "entity_type IN ('goal', 'task', 'note', 'knowledge_item')",
+            name="ck_offline_entity_type",
+        ),
+        CheckConstraint(
+            "status IN ('queued', 'conflict', 'ready_copy', 'resolved')",
+            name="ck_offline_operation_status",
+        ),
+        CheckConstraint(
+            "resolution IS NULL OR resolution IN ('keep_server', 'keep_both')",
+            name="ck_offline_operation_resolution",
+        ),
+        Index("ix_offline_operations_user_status", "user_id", "status"),
+    )
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -231,6 +353,10 @@ class CoachConversation(Base):
     user_id: Mapped[str] = mapped_column(
         String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
+    workspace_id: Mapped[str] = mapped_column(
+        String, ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False,
+        index=True, default=default_workspace_id,
+    )
     session_id: Mapped[str] = mapped_column(String, nullable=False)
     goal_id: Mapped[str | None] = mapped_column(
         String, ForeignKey("goals.id", ondelete="SET NULL"), nullable=True, index=True
@@ -267,12 +393,22 @@ class Goal(Base):
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=new_uuid)
     user_id: Mapped[str] = mapped_column(String, ForeignKey("users.id"), nullable=False, index=True)
+    workspace_id: Mapped[str] = mapped_column(
+        String, ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False,
+        index=True, default=default_workspace_id,
+    )
     type: Mapped[str] = mapped_column(String, nullable=False)
     title: Mapped[str] = mapped_column(String, nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     deadline: Mapped[str] = mapped_column(String, nullable=False)
     daily_hours: Mapped[float] = mapped_column(Float, default=2.0)
     current_level: Mapped[str] = mapped_column(String, default="beginner")
+    # Stable user-authored learning contract.  This is direction/constraint data,
+    # not an AI inference.  Plans snapshot the version they were generated from.
+    contract: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, server_default="{}")
+    intent_version: Mapped[int] = mapped_column(
+        Integer, default=1, server_default="1", nullable=False
+    )
     status: Mapped[str] = mapped_column(String, default="active")
     # 直接列（从 meta JSON 提升）
     knowledge_base_id: Mapped[str | None] = mapped_column(
@@ -315,6 +451,8 @@ class Plan(Base):
     is_current: Mapped[bool] = mapped_column(Boolean, default=True)
     baseline: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     content: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    goal_intent_version: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    goal_contract_snapshot: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     replan_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_by: Mapped[str] = mapped_column(String, default="ai")  # user | ai | import
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
@@ -341,6 +479,9 @@ class Task(Base):
     # status values: pending | in_progress | completed | skipped | abandoned
     type: Mapped[str] = mapped_column(String, default="study")
     kb_refs: Mapped[list[str]] = mapped_column(JSON, default=list)
+    # A structured, user-visible execution contract generated with the plan.
+    # Keep description as the short objective for backwards compatibility.
+    execution_guide: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     mastery_level: Mapped[str] = mapped_column(String, default="unknown")
     # mastery audit trail → task_mastery_records
     priority: Mapped[str] = mapped_column(String, default="medium")
@@ -395,6 +536,10 @@ class KnowledgeBase(Base):
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=new_uuid)
     user_id: Mapped[str] = mapped_column(String, ForeignKey("users.id"), nullable=False, index=True)
+    workspace_id: Mapped[str] = mapped_column(
+        String, ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False,
+        index=True, default=default_workspace_id,
+    )
     goal_id: Mapped[str | None] = mapped_column(
         String,
         ForeignKey(
@@ -423,6 +568,10 @@ class KnowledgeItem(Base):
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=new_uuid)
     user_id: Mapped[str] = mapped_column(String, ForeignKey("users.id"), nullable=False, index=True)
+    workspace_id: Mapped[str] = mapped_column(
+        String, ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False,
+        index=True, default=default_workspace_id,
+    )
     goal_id: Mapped[str | None] = mapped_column(
         String, ForeignKey("goals.id", ondelete="SET NULL"), nullable=True, index=True
     )
@@ -432,10 +581,22 @@ class KnowledgeItem(Base):
     title: Mapped[str] = mapped_column(Text, nullable=False)
     summary: Mapped[str] = mapped_column(Text, default="")
     content: Mapped[str] = mapped_column(Text, nullable=False)
+    # Notes retain their editor representation in ``content`` while indexing a
+    # clean-text snapshot.  The version makes direct assistant citations stable.
+    normalized_content: Mapped[str] = mapped_column(Text, default="", server_default="")
+    content_version: Mapped[int] = mapped_column(
+        Integer, default=1, server_default="1", nullable=False
+    )
+    note_scope: Mapped[str | None] = mapped_column(String(24), nullable=True)
+    note_structure: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, server_default="{}")
     content_format: Mapped[str] = mapped_column(String, default="plain", server_default="plain")
     source_type: Mapped[str] = mapped_column(
         String, default="upload"
     )  # upload | url | search | system
+    source_role: Mapped[str] = mapped_column(
+        String(24), default="reference", server_default="reference", index=True
+    )  # scope | reference | note | evidence
+    source_metadata: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, server_default="{}")
     source_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     file_path: Mapped[str | None] = mapped_column(Text, nullable=True)
     file_size_bytes: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
@@ -502,6 +663,35 @@ class KnowledgeItem(Base):
             postgresql_using="hnsw",
             postgresql_ops={"embedding": "vector_cosine_ops"},
             postgresql_with={"m": 16, "ef_construction": 64},
+        ),
+    )
+
+
+class KnowledgeSourceMetadataProposal(Base):
+    """Reviewable AI suggestion for a source's learning contract metadata."""
+
+    __tablename__ = "knowledge_source_metadata_proposals"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=new_uuid)
+    user_id: Mapped[str] = mapped_column(
+        String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    item_id: Mapped[str] = mapped_column(
+        String, ForeignKey("knowledge_items.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    proposed_role: Mapped[str] = mapped_column(String(24), nullable=False)
+    proposed_metadata: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    confidence: Mapped[float] = mapped_column(Float, default=0.5)
+    rationale: Mapped[str] = mapped_column(Text, default="")
+    status: Mapped[str] = mapped_column(
+        String(24), default="draft", server_default="draft", nullable=False, index=True
+    )  # draft | accepted | rejected | superseded
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    __table_args__ = (
+        CheckConstraint(
+            "confidence >= 0.0 AND confidence <= 1.0", name="ck_source_metadata_confidence"
         ),
     )
 
@@ -597,6 +787,24 @@ class KnowledgeChunk(Base):
             postgresql_with={"m": 16, "ef_construction": 64},
         ),
     )
+
+
+class KnowledgeItemContentVersion(Base):
+    """Immutable text snapshot used by note citations and audit/replay."""
+
+    __tablename__ = "knowledge_item_content_versions"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=new_uuid)
+    item_id: Mapped[str] = mapped_column(
+        String, ForeignKey("knowledge_items.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    title_snapshot: Mapped[str] = mapped_column(Text, default="")
+    content_snapshot: Mapped[str] = mapped_column(Text, default="")
+    normalized_content_snapshot: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    __table_args__ = (UniqueConstraint("item_id", "version", name="uq_knowledge_content_version"),)
 
 
 class DailyBriefCache(Base):
@@ -790,6 +998,10 @@ class GoalVersion(Base):
     title_snapshot: Mapped[str | None] = mapped_column(Text, nullable=True)
     objective_snapshot: Mapped[str | None] = mapped_column(Text, nullable=True)
     constraints_snapshot: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    contract_snapshot: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    intent_version: Mapped[int] = mapped_column(
+        Integer, default=1, server_default="1", nullable=False
+    )
     change_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_by: Mapped[str] = mapped_column(String, default="user")  # user | ai | system
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
@@ -1411,6 +1623,22 @@ class LearningConcept(Base):
     forgetting_rate: Mapped[float] = mapped_column(Float, default=0.05)
     evidence_count: Mapped[int] = mapped_column(Integer, default=0)
     status: Mapped[str] = mapped_column(String, default="learning", index=True)
+    # Keep extraction provenance separate from learning/mastery status. A draft
+    # concept must not silently become learner truth just because it was parsed.
+    provenance_type: Mapped[str] = mapped_column(
+        String(32), default="user_created", server_default="user_created", nullable=False
+    )
+    review_status: Mapped[str] = mapped_column(
+        String(24), default="confirmed", server_default="confirmed", nullable=False, index=True
+    )
+    source_refs: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
+    aliases: Mapped[list[str]] = mapped_column(JSON, default=list, server_default="[]")
+    merged_into_id: Mapped[str | None] = mapped_column(
+        String, ForeignKey("learning_concepts.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    lifecycle_status: Mapped[str] = mapped_column(
+        String(24), default="active", server_default="active", nullable=False, index=True
+    )  # active | merged | archived
     last_reviewed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     next_review_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
@@ -1465,6 +1693,12 @@ class KnowledgeEdge(Base):
     weight: Mapped[float] = mapped_column(Float, default=1.0)
     confidence: Mapped[float] = mapped_column(Float, default=0.5)
     evidence_count: Mapped[int] = mapped_column(Integer, default=1)
+    basis: Mapped[str] = mapped_column(
+        String(24), default="user_defined", server_default="user_defined", nullable=False
+    )
+    review_status: Mapped[str] = mapped_column(
+        String(24), default="confirmed", server_default="confirmed", nullable=False, index=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), onupdate=func.now()
@@ -1494,6 +1728,76 @@ class KnowledgeEdge(Base):
             unique=True,
             postgresql_where=resource_item_id.isnot(None),
             sqlite_where=resource_item_id.isnot(None),
+        ),
+    )
+
+
+class KnowledgeMapVersion(Base):
+    """Immutable whole-map snapshot used for review, diff, activation and undo."""
+
+    __tablename__ = "knowledge_map_versions"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=new_uuid)
+    user_id: Mapped[str] = mapped_column(
+        String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    goal_id: Mapped[str] = mapped_column(
+        String, ForeignKey("goals.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(24), default="draft", server_default="draft", nullable=False, index=True
+    )  # draft | active | superseded
+    snapshot: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    change_summary: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    reason: Mapped[str] = mapped_column(Text, default="")
+    generated_by: Mapped[str] = mapped_column(String(40), default="system")
+    parent_version_id: Mapped[str | None] = mapped_column(
+        String, ForeignKey("knowledge_map_versions.id", ondelete="SET NULL"), nullable=True
+    )
+    activated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    __table_args__ = (UniqueConstraint("goal_id", "version", name="uq_knowledge_map_goal_version"),)
+
+
+class MasteryEvidence(Base):
+    """Typed, source-linked evidence behind mastery updates."""
+
+    __tablename__ = "mastery_evidence"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=new_uuid)
+    user_id: Mapped[str] = mapped_column(
+        String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    workspace_id: Mapped[str] = mapped_column(
+        String, ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False,
+        index=True, default=default_workspace_id,
+    )
+    goal_id: Mapped[str] = mapped_column(
+        String, ForeignKey("goals.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    task_id: Mapped[str | None] = mapped_column(
+        String, ForeignKey("tasks.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    concept_id: Mapped[str] = mapped_column(
+        String, ForeignKey("learning_concepts.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    evidence_type: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    score: Mapped[float] = mapped_column(Float, nullable=False)
+    reliability: Mapped[float] = mapped_column(Float, nullable=False)
+    source_item_id: Mapped[str | None] = mapped_column(
+        String, ForeignKey("knowledge_items.id", ondelete="SET NULL"), nullable=True
+    )
+    summary: Mapped[str] = mapped_column(Text, default="")
+    detail: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), index=True)
+
+    __table_args__ = (
+        CheckConstraint("score >= 0.0 AND score <= 1.0", name="ck_mastery_evidence_score"),
+        CheckConstraint(
+            "reliability >= 0.0 AND reliability <= 1.0",
+            name="ck_mastery_evidence_reliability",
         ),
     )
 
@@ -2247,9 +2551,7 @@ class AgentBetaControl(Base):
     )
 
     __table_args__ = (
-        CheckConstraint(
-            "traffic_percent IN (0, 5, 20, 50)", name="ck_agent_beta_traffic_stage"
-        ),
+        CheckConstraint("traffic_percent IN (0, 5, 20, 50)", name="ck_agent_beta_traffic_stage"),
         CheckConstraint(
             "cohort_mode IN ('allowlist', 'percentage')", name="ck_agent_beta_cohort_mode"
         ),

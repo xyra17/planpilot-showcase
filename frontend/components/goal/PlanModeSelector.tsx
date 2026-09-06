@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
 import {
   X, ChevronLeft, Loader2, BookText, BookOpen, BookMarked, Brain,
@@ -32,6 +32,8 @@ interface PlanModeSelectorProps {
   onClose: () => void;
   error?: string;
   onConfirm: (mode: KbMode, intentSupplement: string, pacingMode: PacingMode) => void;
+  busy?: boolean;
+  guestMode?: boolean;
 }
 
 const MODES: { value: KbMode; label: string; desc: string; requiresKb: boolean; icon: typeof BookOpen }[] = [
@@ -107,7 +109,7 @@ const INTENT_PLACEHOLDER: Record<string, string> = {
 };
 
 export default function PlanModeSelector({
-  open, hasKb, goalId, goalType, goalTitle, onClose, error, onConfirm,
+  open, hasKb, goalId, goalType, goalTitle, onClose, error, onConfirm, busy = false, guestMode = false,
 }: PlanModeSelectorProps) {
   const [step, setStep] = useState<1 | 2>(1);
   const [selectedMode, setSelectedMode] = useState<KbMode | null>(null);
@@ -123,6 +125,20 @@ export default function PlanModeSelector({
   const [referencesError, setReferencesError] = useState("");
   const [savingReferences, setSavingReferences] = useState(false);
   const [referenceQuery, setReferenceQuery] = useState("");
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !busy) {
+        event.preventDefault();
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    window.requestAnimationFrame(() => dialogRef.current?.focus({ preventScroll: true }));
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [busy, onClose, open]);
 
   useEffect(() => {
     if (!open) {
@@ -238,11 +254,11 @@ export default function PlanModeSelector({
   const displayPlaceholder = intentPlaceholder || (INTENT_PLACEHOLDER[goalType] ?? INTENT_PLACEHOLDER.skill);
   const hasKbOverview = (contextData?.kb_overview?.length ?? 0) > 0;
   const hasSelectedReferences = selectedReferenceIds.size > 0 || hasKb;
-  const canConfirm = Boolean(selectedMode) && !savingReferences;
+  const canConfirm = Boolean(selectedMode) && !savingReferences && !busy;
 
   return (
     <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4">
-      <div role="dialog" aria-modal="true" aria-label="选择计划生成方式" className="journal-dialog plan-mode-dialog bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+      <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-busy={busy || savingReferences} aria-label="选择计划生成方式" className="journal-dialog plan-mode-dialog bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
           <div className="plan-mode-dialog-title flex items-center gap-2">
             {step === 2 && (
@@ -265,7 +281,7 @@ export default function PlanModeSelector({
             <section className="plan-mode-reference-section">
               <header className="plan-mode-section-heading">
                 <span className="plan-mode-section-icon"><Link2 size={15} /></span>
-                <div><strong>关联参考资料</strong><small>为「{goalTitle || "当前目标"}」选择本次计划可使用的资料</small></div>
+                <div><strong>关联参考资料</strong><small>为「{goalTitle || "当前目标"}」选择本次计划可使用的资料（将同步关联到目标）</small></div>
                 <span>{selectedReferenceIds.size ? `已选 ${selectedReferenceIds.size} 份` : "可选"}</span>
               </header>
               {referenceFiles.length > 4 && (
@@ -281,7 +297,7 @@ export default function PlanModeSelector({
                   })}
                   {!visibleReferenceFiles.length && <p className="plan-mode-reference-no-result">没有匹配的资料</p>}
                 </div>
-              ) : (
+              ) : referencesError ? null : (
                 <p className="plan-mode-reference-empty">暂无可选资料。<Link href="/studio/work/knowledge">前往知识库添加</Link></p>
               )}
               {referencesError && <p className="plan-mode-reference-error" role="alert">{referencesError}</p>}
@@ -295,7 +311,7 @@ export default function PlanModeSelector({
                   <li key={m.value}>
                     <button
                       type="button"
-                      disabled={disabled}
+                      disabled={disabled || busy}
                       onClick={() => handleNextStep(m.value)}
                       className={`plan-mode-option w-full text-left transition ${disabled ? "opacity-40 cursor-not-allowed" : ""}`}
                     >
@@ -409,7 +425,7 @@ export default function PlanModeSelector({
               onClick={() => void handleConfirm()}
               className="w-full py-2.5 rounded-xl text-sm font-medium bg-accent text-white hover:bg-accent-dark disabled:opacity-40 disabled:cursor-not-allowed transition"
             >
-              {savingReferences ? <><Loader2 size={14} className="animate-spin inline mr-1" />正在保存资料关联…</> : "开始生成"}
+              {savingReferences ? <><Loader2 size={14} className="animate-spin inline mr-1" />正在保存资料关联…</> : busy ? <><Loader2 size={14} className="animate-spin inline mr-1" />正在生成学习计划…</> : guestMode ? "查看目标（登录后生成计划）" : "开始生成"}
             </button>
           </div>
         )}

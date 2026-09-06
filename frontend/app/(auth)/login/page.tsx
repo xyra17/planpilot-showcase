@@ -23,7 +23,9 @@ type FieldErrors = {
   password?: string;
 };
 
-const PLANPILOT_WEBSITE_URL = process.env.NEXT_PUBLIC_PLANPILOT_WEBSITE_URL?.trim();
+const DEFAULT_PLANPILOT_WEBSITE_URL = "https://planpilot-website.planpilot-wxyra.workers.dev/";
+const PLANPILOT_WEBSITE_URL =
+  process.env.NEXT_PUBLIC_PLANPILOT_WEBSITE_URL?.trim() || DEFAULT_PLANPILOT_WEBSITE_URL;
 
 function messageForError(error: unknown): { state: LoginState; message: string } {
   if (error instanceof ApiError) {
@@ -125,22 +127,20 @@ export default function LoginPage() {
             </div>
             <span className="pp-login-kicker">CONTINUE YOUR JOURNEY</span>
             <h1>欢迎回来</h1>
-            <p>继续今天的学习旅程，Pilo 已经在等你了。</p>
+            <p>继续今天能完成的一步，让每次完成都留下掌握证据。</p>
           </div>
           <div className="pp-login-pilo">
             <span className="pp-login-pilo-bubble">
               <strong>初次使用？</strong>
-              {PLANPILOT_WEBSITE_URL && (
-                <a
-                  href={PLANPILOT_WEBSITE_URL}
-                  target="_blank"
-                  rel="noreferrer"
-                  aria-label="了解 PlanPilot，将在浏览器中打开官网"
-                  data-tooltip="将在浏览器中打开官网"
-                >
-                  了解 PlanPilot →
-                </a>
-              )}
+              <a
+                href={PLANPILOT_WEBSITE_URL}
+                target="_blank"
+                rel="noreferrer"
+                aria-label="了解 PlanPilot，将在浏览器中打开官网"
+                data-tooltip="将在浏览器中打开官网"
+              >
+                了解 PlanPilot →
+              </a>
             </span>
             <PiloAvatar
               mood="working"

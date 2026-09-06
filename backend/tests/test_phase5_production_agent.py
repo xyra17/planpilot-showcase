@@ -266,7 +266,7 @@ async def test_runtime_overview_only_returns_current_users_invocations(db):
         "requires_user_confirmation": True,
         "direct_mutation_allowed": False,
     }
-    assert overview["model_roles"]["interactive"]["primary_model"] == runtime_models.local_model_name
+    assert overview["model_roles"]["interactive"]["primary_model"] == runtime_models.cloud_model_name
     assert overview["model_roles"]["structured"]["primary_model"] == runtime_models.cloud_model_name
     assert overview["model_roles"]["critical"]["fallback"] is None
     assert overview["model_roles"]["embedding"]["primary_model"] == runtime_models.embedding_model_name

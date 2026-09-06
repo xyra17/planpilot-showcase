@@ -11,7 +11,7 @@
 
 from datetime import date
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -28,6 +28,8 @@ class TodayTaskOut(BaseModel):
     type: str
     kb_refs: list[str]
     mastery_level: str
+    description: str | None = None
+    execution_guide: dict = Field(default_factory=dict)
 
     model_config = {"from_attributes": True}
 
@@ -65,7 +67,11 @@ async def get_today_tasks(
         (
             await db.execute(
                 select(Task)
-                .where(Task.goal_id == goal_id, Task.scheduled_date == today)
+                .where(
+                    Task.goal_id == goal_id,
+                    Task.scheduled_date == today,
+                    Task.status != "abandoned",
+                )
                 .order_by(Task.created_at)
             )
         )

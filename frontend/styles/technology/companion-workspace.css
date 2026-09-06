@@ -5368,11 +5368,29 @@
 .app-shell .companion-workspace.is-dark .companion-recovered-actions > header > span {
   color: #aab6c9;
 }
-.app-shell .companion-recovered-actions { width: min(700px, calc(100% - 61px)); margin: 24px 0 0 61px; }
+.app-shell .companion-recovered-actions {
+  box-sizing: border-box;
+  width: min(620px, calc(100% - 40px));
+  max-width: 100%;
+  margin: 24px 0 0 40px;
+}
+.app-shell .companion-recovered-actions > .companion-action-run {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 620px;
+  overflow: hidden;
+}
 .app-shell .companion-recovered-actions > header { display: flex; align-items: end; justify-content: space-between; gap: 12px; padding-bottom: 2px; }
 .app-shell .companion-recovered-actions > header small { color: var(--comp-violet); font-size: 9px; font-weight: 760; }
 .app-shell .companion-recovered-actions > header h2 { margin: 4px 0 0; color: var(--comp-text); font-size: 14px; }
 .app-shell .companion-recovered-actions > header > span { color: var(--comp-subtle); font-size: 10px; }
+
+@media (max-width: 900px) {
+  .app-shell .companion-recovered-actions {
+    width: min(620px, calc(100% - 24px));
+    margin-left: 24px;
+  }
+}
 
 @media (max-width: 560px) {
   .app-shell .companion-action-run { padding-left: 12px; }
@@ -6106,14 +6124,20 @@
   border-top: 1px solid rgba(255, 255, 255, .065);
 }
 .app-shell .companion-proposal-in-chat {
-  width: min(680px, 88%);
+  width: min(760px, calc(100% - 54px));
+  max-width: 760px;
   padding: 0;
-  margin-top: 16px;
+  margin: 18px 0 0 54px;
 }
 .app-shell .companion-proposal-in-chat > header {
   padding: 0 4px;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
   border: 0;
+}
+.app-shell .companion-proposal-in-chat .companion-proposal {
+  width: 100%;
+  max-width: 100%;
+  margin-left: 0;
 }
 
 .app-shell .companion-message {
@@ -7271,6 +7295,11 @@
 }
 
 @media (max-width: 620px) {
+  .app-shell .companion-proposal-in-chat {
+    width: 100%;
+    max-width: 100%;
+    margin-left: 0;
+  }
   .app-shell .companion-workspace.is-light .companion-proposal-details > div + div {
     border-top: 1px solid #dce2ec;
     border-left: 0;
@@ -10104,7 +10133,7 @@
 
 .app-shell .companion-action-operations {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 8px;
   margin-top: 13px;
 }
