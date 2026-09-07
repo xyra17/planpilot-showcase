@@ -13,7 +13,11 @@ Run inside the API container::
 from __future__ import annotations
 
 import asyncio
+import html
 import json
+import os
+import re
+import tempfile
 import uuid
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
@@ -23,7 +27,7 @@ import httpx
 from sqlalchemy import select, text
 
 from src.database import AsyncSessionLocal
-from src.models import LearningConcept, MasteryEvidence, Plan, User
+from src.models import KnowledgeItem, LearningConcept, MasteryEvidence, Plan, Task, User
 from src.services.auth_session_service import issue_session
 
 DATASET = "admin-junior-student-journey-20260906"
@@ -294,17 +298,39 @@ SOURCES = {
             "key": "english_scope",
             "title": "研招网：英语一考试范围与能力要求（学习边界摘编）",
             "url": "https://yz.chsi.com.cn/kyzx/bkzn/202506/20250618/2293390155.html",
+            "download_url": "https://yz.chsi.com.cn/kyzx/bkzn/202506/20250618/2293390155.html",
+            "filename": "kaoyan-english1-scope-2026.txt",
             "role": "scope",
             "content": "# 英语一学习范围\n## 英语知识运用\n在语篇中理解词汇、语法和衔接。\n## 阅读理解\n识别主旨、事实、推断、作者态度与篇章结构。\n## 翻译\n理解结构较复杂的英语句子并准确表达为汉语。\n## 写作\n完成应用文和议论文表达，做到内容完整、结构清楚、语言可读。\n",
             "topics": ["英语知识运用", "阅读理解", "翻译", "写作"],
+            "published_year": 2025,
+            "edition": "2025 年公开说明（2026-09 下载快照）",
         },
         {
             "key": "english_reference",
-            "title": "英语一真题执行清单（自建合法摘要）",
-            "url": "https://yz.chsi.com.cn/",
+            "title": "研招网：英语一考试大纲与试卷结构（历史公开版）",
+            "url": "https://yz.chsi.com.cn/kyzx/en/201209/20120918/343670177.html",
+            "download_url": "https://yz.chsi.com.cn/kyzx/en/201209/20120918/343670177.html",
+            "filename": "kaoyan-english1-outline-reference.txt",
             "role": "reference",
             "content": "# 真题阅读执行清单\n1. 先限时 18 分钟完成一篇。\n2. 标出每段主句与转折词。\n3. 每道错题区分定位、理解、选项比较三类原因。\n4. 48 小时后不看解析重做。\n# 写作自检\n审题、结构、论证、语法、拼写五项逐一核对。\n",
-            "topics": ["真题阅读", "写作自检"],
+            "topics": ["试卷结构", "阅读理解", "英译汉", "写作"],
+            "authority": "institution",
+            "published_year": 2013,
+            "edition": "2013 年历史公开版",
+        },
+        {
+            "key": "english_reading_reference",
+            "title": "研招网：考试大纲指导下的阅读提升策略",
+            "url": "https://yz.chsi.com.cn/kyzx/en/201809/20180917/1721280812.html",
+            "download_url": "https://yz.chsi.com.cn/kyzx/en/201809/20180917/1721280812.html",
+            "filename": "kaoyan-english-reading-strategy.txt",
+            "role": "reference",
+            "content": "",
+            "topics": ["阅读理解", "语篇结构", "复习策略"],
+            "authority": "community",
+            "published_year": 2018,
+            "edition": "2019 考研备考指导（2018 发布）",
         },
     ],
     "math": [
@@ -312,17 +338,39 @@ SOURCES = {
             "key": "math_scope",
             "title": "研招网：数学一统考范围学习边界（公开信息整理）",
             "url": "https://yz.chsi.com.cn/kyzx/math/201809/20180917/1721272942.html",
+            "download_url": "https://yz.chsi.com.cn/kyzx/math/201809/20180917/1721272942.html",
+            "filename": "kaoyan-math1-scope-2025.txt",
             "role": "scope",
             "content": "# 数学一学习范围\n## 高等数学\n函数极限连续、一元微积分、多元微积分、级数、常微分方程。\n## 线性代数\n行列式、矩阵、向量组、线性方程组、特征值与二次型。\n## 概率论与数理统计\n随机事件、随机变量及分布、数字特征、大数定律、参数估计。\n",
-            "topics": ["高等数学", "线性代数", "概率论与数理统计"],
+            "topics": ["高等数学", "函数极限", "一元微积分"],
+            "published_year": 2018,
+            "edition": "2019 数学一大纲对比（高数部分）",
         },
         {
             "key": "math_reference",
-            "title": "数学一错题复盘协议（个人执行参考）",
-            "url": "https://yz.chsi.com.cn/kyzx/math/",
+            "title": "西安电子科技大学：线性代数课程资源说明",
+            "url": "https://faculty.xidian.edu.cn/LRX2/en/jxzy/354981/content/1281.htm",
+            "download_url": "https://faculty.xidian.edu.cn/LRX2/en/jxzy/354981/content/1281.htm",
+            "filename": "xidian-linear-algebra-courseware.txt",
             "role": "reference",
-            "content": "# 错题复盘协议\n首次订正必须写出错误发生在哪一步。\n同类题补做两道，第二天口述条件与方法，七天后闭卷重做。\n若连续两次卡在公式回忆，降级为概念例题；若会方法但算错，增加 15 分钟计算训练。\n",
-            "topics": ["错题归因", "间隔重做", "降级策略"],
+            "content": "",
+            "topics": ["线性代数", "矩阵", "线性方程组"],
+            "authority": "institution",
+            "published_year": 2019,
+            "edition": "2019 课程资源页",
+        },
+        {
+            "key": "math_probability_reference",
+            "title": "中国科学技术大学：概率论与数理统计课程资源",
+            "url": "https://mooc.course.ustc.edu.cn/mooc-ans/course/419670000002256.html?articleId=18000&edit=false",
+            "download_url": "https://mooc.course.ustc.edu.cn/mooc-ans/course/419670000002256.html?articleId=18000&edit=false",
+            "filename": "ustc-probability-statistics-resources.txt",
+            "role": "reference",
+            "content": "",
+            "topics": ["概率论", "随机变量", "数理统计"],
+            "authority": "institution",
+            "published_year": 2023,
+            "edition": "2023 课程资源页",
         },
     ],
     "cet6": [
@@ -330,18 +378,177 @@ SOURCES = {
             "key": "cet6_scope",
             "title": "中国教育考试网：CET-6 笔试结构与时间",
             "url": "https://cet.neea.edu.cn/html1/report/16123/201-1.htm",
+            "download_url": "https://cet.neea.edu.cn/html1/report/16123/201-1.htm",
+            "filename": "cet6-outline-reference.txt",
             "role": "scope",
             "content": "# CET-6 笔试结构\n## 写作\n短文写作，30 分钟，占 15%。\n## 听力理解\n长对话、听力篇章、讲话报道讲座，共 30 分钟，占 35%。\n## 阅读理解\n选词填空、长篇阅读、仔细阅读，共 40 分钟，占 35%。\n## 翻译\n段落翻译，30 分钟，占 15%。\n全卷共 130 分钟。\n",
             "topics": ["写作", "听力理解", "阅读理解", "段落翻译"],
+            "published_year": 2016,
+            "edition": "2016-12-08 公开结构",
         },
         {
             "key": "cet6_reference",
-            "title": "六级听力与翻译执行清单（个人参考）",
-            "url": "https://cet.neea.edu.cn/",
+            "title": "中国教育考试网：CET 报道分数与六级百分位说明",
+            "url": "https://cet.neea.edu.cn/xhtml1/folder/19081/5124-1.htm",
+            "download_url": "https://cet.neea.edu.cn/xhtml1/folder/19081/5124-1.htm",
+            "filename": "cet6-score-percentile-reference.txt",
             "role": "reference",
-            "content": "# 听力执行\n听前浏览选项并圈出人物、数字和转折；第一遍按题作答，复盘时记录漏听原因。\n# 翻译执行\n先划分意群，再确定主干，最后补充修饰；完成后检查时态、单复数和专有名词。\n",
-            "topics": ["听力复盘", "段落翻译"],
+            "content": "",
+            "topics": ["报道分", "常模百分位", "听力分值", "阅读分值"],
+            "authority": "official",
+            "published_year": 2016,
+            "edition": "CET 报道分数说明",
         },
+    ],
+}
+
+
+# Six weeks of imperfect but progressively improving work. These rows make the
+# administrator a longitudinal product persona rather than a pristine demo.
+HISTORY = {
+    "english": [
+        (
+            42,
+            "英语一阅读基线：2013 年 Text 1",
+            50,
+            56,
+            "completed",
+            "L1",
+            "2/5；定位慢，生词一多就回读。",
+        ),
+        (
+            35,
+            "长难句主干训练：定语从句 8 句",
+            45,
+            48,
+            "completed",
+            "L1",
+            "6/8 能独立划主干，嵌套从句仍会断错。",
+        ),
+        (
+            28,
+            "英语一阅读限时训练：因果与态度题",
+            55,
+            31,
+            "partial",
+            "L1",
+            "实验报告挤占晚间，只完成作答和两题定位。",
+        ),
+        (
+            21,
+            "阅读错因重做：定位与选项偷换",
+            50,
+            52,
+            "completed",
+            "L2",
+            "由 2/5 提升到 4/5，仍会把必要条件看成充分条件。",
+        ),
+        (
+            14,
+            "小作文：建议信 20 分钟限时输出",
+            40,
+            43,
+            "completed",
+            "L2",
+            "结构完整；结尾表达重复，积累两个替换句。",
+        ),
+        (
+            7,
+            "英语一阅读周测：两篇连续作答",
+            45,
+            49,
+            "completed",
+            "L2",
+            "7/10；第二篇后半段注意力下降。",
+        ),
+    ],
+    "math": [
+        (
+            41,
+            "数学一基线：极限与积分 12 题",
+            80,
+            86,
+            "completed",
+            "L1",
+            "7/12；等价无穷小使用条件不稳。",
+        ),
+        (
+            34,
+            "换元积分专项：识别结构 10 题",
+            65,
+            68,
+            "completed",
+            "L1",
+            "8/10；根式换元两题选择过慢。",
+        ),
+        (
+            27,
+            "分部积分专项与口述选法",
+            70,
+            38,
+            "partial",
+            "L1",
+            "数据库实验拖堂，只完成 5 题，保留未完成部分。",
+        ),
+        (
+            20,
+            "积分错题七日闭卷重做",
+            55,
+            58,
+            "completed",
+            "L2",
+            "旧错题 6/8 独立完成，两题仍需提示。",
+        ),
+        (
+            13,
+            "线性代数：矩阵秩与方程组",
+            70,
+            0,
+            "skipped",
+            "unknown",
+            "临时班会，主动跳过而非次日双倍补偿。",
+        ),
+        (6, "线性方程组基础题 8 题", 65, 69, "completed", "L2", "7/8；增广矩阵最后一步符号错误。"),
+    ],
+    "cet6": [
+        (
+            40,
+            "六级整卷结构与时间基线",
+            35,
+            37,
+            "completed",
+            "L1",
+            "确认 130 分钟结构；听力是当前最低项。",
+        ),
+        (
+            33,
+            "六级长对话首听：2 组",
+            40,
+            44,
+            "completed",
+            "L1",
+            "9/16；数字题较稳，转折后观点漏听。",
+        ),
+        (26, "六级讲座听力：信号词记录", 45, 22, "partial", "L1", "社团临时活动，只完成一组首听。"),
+        (19, "六级仔细阅读：两篇限时", 40, 42, "completed", "L2", "8/10；词义猜测题证据不足。"),
+        (
+            12,
+            "六级段落翻译：传统节日",
+            35,
+            39,
+            "completed",
+            "L1",
+            "主干完整，但时态和冠词错误 4 处。",
+        ),
+        (
+            5,
+            "六级听力周测：长对话加讲座",
+            50,
+            53,
+            "completed",
+            "L2",
+            "正确率 68%，接近 70% 阶段目标。",
+        ),
     ],
 }
 
@@ -350,11 +557,11 @@ def metadata_for(source: dict[str, Any]) -> dict[str, Any]:
     scope = source["role"] == "scope"
     return {
         "document_type": "syllabus" if scope else "reference",
-        "authority": "official" if scope else "personal",
+        "authority": source.get("authority", "official" if scope else "personal"),
         "difficulty": "mixed",
         "language": "zh-CN",
-        "edition": "网页核对于 2026-09-06",
-        "published_year": 2026 if "CET-6" in source["title"] else None,
+        "edition": source.get("edition", "2026-09 下载快照"),
+        "published_year": source.get("published_year"),
         "scope_topics": source["topics"],
         "covered_chapters": source["topics"],
         "learning_use": (
@@ -364,15 +571,84 @@ def metadata_for(source: dict[str, Any]) -> dict[str, Any]:
         ),
         "exclusions": ["网页中的推广、导航和与本目标无关内容"],
         "review_status": "confirmed",
-        "provenance": "user" if not scope else "ai_reviewed",
+        "provenance": source.get(
+            "provenance",
+            "imported" if source.get("download_url") else ("user" if not scope else "ai_reviewed"),
+        ),
         "processing_policy": "cloud_allowed",
-        "rationale": "仅保存公开网页的学习范围摘要；已由模拟用户核对角色与用途。",
+        "rationale": "下载并保存公开来源文本快照；模拟用户已核对资料角色、覆盖范围与用途。",
+        "source_url": source.get("url"),
+        "local_artifact": source.get("filename"),
+        "license_note": source.get("license_note", "公开发布；仅用于个人学习演示"),
     }
+
+
+async def upload_downloaded_source(
+    client: httpx.AsyncClient,
+    source: dict[str, Any],
+    goal: dict[str, Any],
+) -> dict[str, Any]:
+    """Download a real public artifact, then ingest the local file through the API."""
+    download_url = source.get("download_url") or source["url"]
+    response = await client.get(
+        download_url,
+        follow_redirects=True,
+        headers={"User-Agent": "PlanPilot research importer/1.0 (personal study workspace)"},
+    )
+    response.raise_for_status()
+    suffix = Path(source.get("filename", "source.txt")).suffix or ".txt"
+    payload = response.content
+    # Official pages are downloaded as a local, searchable text snapshot. This
+    # keeps the artifact real and traceable while avoiding raw navigation HTML
+    # dominating lexical retrieval.
+    if suffix.lower() == ".txt" and "html" in response.headers.get("content-type", "").lower():
+        decoded = payload.decode("utf-8", errors="replace")
+        decoded = re.sub(r"(?is)<(script|style).*?>.*?</\1>", " ", decoded)
+        decoded = re.sub(r"(?s)<[^>]+>", " ", decoded)
+        decoded = html.unescape(re.sub(r"\s+", " ", decoded)).strip()
+        payload = (decoded + source.get("download_appendix", "\n")).encode("utf-8")
+    elif source.get("download_appendix"):
+        payload += source["download_appendix"].encode("utf-8")
+    with tempfile.NamedTemporaryFile(
+        prefix="planpilot-source-", suffix=suffix, delete=False
+    ) as handle:
+        handle.write(payload)
+        temporary_path = handle.name
+    try:
+        filename = source.get("filename") or f"{source['key']}.txt"
+        content_type = "application/pdf" if suffix.lower() == ".pdf" else "text/plain"
+        data = {
+            "goal_ids": goal["id"],
+            "kb_ids": goal["kb_id"],
+            "source_role": source["role"],
+        }
+        payload = Path(temporary_path).read_bytes()
+
+        def post_upload() -> httpx.Response:
+            # httpx 0.27 in the API image has a multipart regression when an
+            # AsyncClient receives an in-memory file stream. Keep the network
+            # call synchronous but off the event loop; the product API remains
+            # the only write path.
+            with httpx.Client(
+                base_url=str(client.base_url), headers=dict(client.headers), timeout=90.0
+            ) as sync_client:
+                return sync_client.post(
+                    "/api/v1/knowledge/upload",
+                    data=data,
+                    files=[("file", (filename, payload, content_type))],
+                )
+
+        upload = await asyncio.to_thread(post_upload)
+        upload.raise_for_status()
+        return upload.json()
+    finally:
+        os.unlink(temporary_path)
 
 
 async def seed() -> dict[str, Any]:
     journey = Journey()
     admin, token = await reset_workspace(journey)
+    uploaded_item_ids: list[str] = []
     headers = {"Authorization": f"Bearer {token}"}
     timeout = httpx.Timeout(90.0, connect=10.0)
     async with httpx.AsyncClient(base_url=API_BASE, headers=headers, timeout=timeout) as client:
@@ -404,21 +680,43 @@ async def seed() -> dict[str, Any]:
         for key, source_specs in SOURCES.items():
             goal = journey.ids["goals"][key]
             for source in source_specs:
-                item = await api_call(
-                    journey,
-                    client,
-                    "POST",
-                    "/api/v1/knowledge/url",
-                    json={
-                        "url": source["url"],
-                        "title": source["title"],
-                        "goal_ids": [goal["id"]],
-                        "kb_ids": [goal["kb_id"]],
-                        "source_role": source["role"],
-                    },
-                    action=f"收集公开资料：{source['title']}",
-                    expected="建立可追溯 URL 资料并关联目标",
-                )
+                if source.get("download_url"):
+                    item = await upload_downloaded_source(client, source, goal)
+                    uploaded_item_ids.append(item["id"])
+                    journey.record(
+                        f"下载并导入真实资料：{source['title']}",
+                        "本地文件上传成功并关联目标与资料库",
+                        {
+                            "status": 201,
+                            "filename": source.get("filename"),
+                            "source_url": source["url"],
+                        },
+                    )
+                    item = await api_call(
+                        journey,
+                        client,
+                        "PATCH",
+                        f"/api/v1/knowledge/files/{item['id']}",
+                        json={"title": source["title"]},
+                        action=f"标记资料标题：{source['title']}",
+                        expected="保留真实文件名并显示可理解的资料标题",
+                    )
+                else:
+                    item = await api_call(
+                        journey,
+                        client,
+                        "POST",
+                        "/api/v1/knowledge/url",
+                        json={
+                            "url": source["url"],
+                            "title": source["title"],
+                            "goal_ids": [goal["id"]],
+                            "kb_ids": [goal["kb_id"]],
+                            "source_role": source["role"],
+                        },
+                        action=f"收集公开资料：{source['title']}",
+                        expected="建立可追溯 URL 资料并关联目标",
+                    )
                 item_id = item["id"]
                 journey.ids["sources"][source["key"]] = item_id
                 proposal = await api_call(
@@ -442,30 +740,36 @@ async def seed() -> dict[str, Any]:
                     action=f"审核资料边界：{source['title']}",
                     expected="用户确认后才写入角色与使用权限",
                 )
+                patch_body: dict[str, Any] = {
+                    "summary": "公开来源资料的学习用途摘要；原始文件已作为本地资料保存。",
+                    "source_role": source["role"],
+                    "source_metadata": metadata_for(source),
+                    "title": source["title"],
+                }
+                if not source.get("download_url"):
+                    patch_body.update(
+                        {
+                            "content": source["content"],
+                            "content_format": "markdown",
+                        }
+                    )
                 await api_call(
                     journey,
                     client,
                     "PATCH",
                     f"/api/v1/knowledge/files/{item_id}",
-                    json={
-                        "content": source["content"],
-                        "content_format": "markdown",
-                        "summary": "公开来源的学习边界/执行摘要；不是原网页全文。",
-                        "source_role": source["role"],
-                        "source_metadata": metadata_for(source),
-                    },
+                    json=patch_body,
                     action=f"保存资料正文摘要：{source['title']}",
                     expected="正文、元数据和来源链接同时可追溯",
                 )
 
-        # URL ingestion is asynchronous. The content above was user-confirmed via
-        # API; mark that exact snapshot ready so downstream plan/map services can
-        # consume it. This is recorded as infrastructure setup, not a UI action.
+        # URL summaries are user-authored and can be marked ready immediately;
+        # uploaded PDFs/TXT files remain owned by the normal worker extraction path.
         async with AsyncSessionLocal() as db:
             await db.execute(
                 text(
                     "UPDATE knowledge_items SET processing_status='ready', normalized_content=content, "
-                    "processed_at=now(), content_length=length(content) WHERE user_id=:uid"
+                    "processed_at=now(), content_length=length(content) WHERE user_id=:uid AND source_type='url'"
                 ),
                 {"uid": admin.id},
             )
@@ -473,7 +777,40 @@ async def seed() -> dict[str, Any]:
         journey.record(
             "完成已确认摘要的索引准备",
             "6 份资料进入 ready 状态",
-            {"count": 6, "method": "database infrastructure setup"},
+            {
+                "count": 6,
+                "uploaded_for_worker": len(uploaded_item_ids),
+                "method": "database infrastructure setup",
+            },
+        )
+
+        # Give the normal Celery extraction path time to parse the downloaded
+        # artifacts before building maps; never replace extracted text with a
+        # hand-written placeholder.
+        for _ in range(45):
+            async with AsyncSessionLocal() as db:
+                statuses = (
+                    list(
+                        (
+                            await db.execute(
+                                select(KnowledgeItem.processing_status).where(
+                                    KnowledgeItem.id.in_(uploaded_item_ids)
+                                )
+                            )
+                        ).scalars()
+                    )
+                    if uploaded_item_ids
+                    else []
+                )
+                pending = sum(status not in {"ready", "failed"} for status in statuses)
+            if pending == 0:
+                break
+            await asyncio.sleep(1)
+        journey.record(
+            "等待真实资料解析完成",
+            "下载的 PDF/TXT 由知识处理 worker 提取后再参与检索",
+            {"uploaded_count": len(uploaded_item_ids)},
+            True,
         )
 
         for key in ("english", "math", "cet6"):
@@ -582,6 +919,150 @@ async def seed() -> dict[str, Any]:
                 action="恢复知识地图历史版本",
                 expected="不覆盖历史，形成新的恢复版本",
             )
+
+        # Reconstruct a six-week activity trail through the same task/note APIs
+        # used by the product. Outcomes intentionally include partial and skipped
+        # work so recovery and learner-memory views have meaningful evidence.
+        historical_tasks: dict[str, list[dict[str, Any]]] = {key: [] for key in HISTORY}
+        for key, rows in HISTORY.items():
+            goal = journey.ids["goals"][key]
+            graph = await api_call(
+                journey,
+                client,
+                "GET",
+                f"/api/v1/intelligence/knowledge-graph?goal_id={goal['id']}",
+                action=f"读取长期历史概念：{key}",
+                expected="历史行动引用已确认知识概念",
+            )
+            concept_refs = [c["id"] for c in graph["concepts"][:2]]
+            for days_ago, title, estimate, actual, outcome, mastery_level, reflection in rows:
+                scheduled = date.today() - timedelta(days=days_ago)
+                task = await api_call(
+                    journey,
+                    client,
+                    "POST",
+                    "/api/v1/tasks",
+                    json={
+                        "title": title,
+                        "description": f"完成后记录结果和偏差。阶段复盘：{reflection}",
+                        "goalId": goal["id"],
+                        "estimatedMinutes": estimate,
+                        "date": scheduled.isoformat(),
+                        "priority": "medium",
+                        "executionGuide": {
+                            "why_now": "来自前一周表现与目标阶段要求",
+                            "steps": ["按时开始并记录基线", "完成核心练习", "核对证据并写错因"],
+                            "source_refs": [journey.ids["sources"][f"{key}_reference"]],
+                            "concept_refs": concept_refs,
+                            "deliverable": "练习结果、用时与一条可回读复盘",
+                            "acceptance": reflection,
+                            "fallback": "课程冲突时只保留一组练习和错因记录，不做双倍补偿",
+                        },
+                    },
+                    action=f"补录长期行动：{title}",
+                    expected="历史任务包含执行步骤、来源、产出与验收",
+                )
+                if outcome in {"completed", "partial"}:
+                    task = await api_call(
+                        journey,
+                        client,
+                        "PATCH",
+                        f"/api/v1/tasks/{task['id']}",
+                        json={
+                            "done": outcome == "completed",
+                            "actual_mins": actual,
+                            "mastery_level": mastery_level,
+                            "expectedVersion": task["version"],
+                        },
+                        action=f"记录历史结果：{title}",
+                        expected=f"持久化 {outcome}、实际用时和掌握自评",
+                    )
+                async with AsyncSessionLocal() as db:
+                    row = await db.get(Task, task["id"])
+                    if row:
+                        historical_time = datetime.combine(
+                            scheduled, datetime.min.time()
+                        ) + timedelta(hours=21)
+                        row.created_at = historical_time
+                        row.updated_at = historical_time
+                        if outcome == "skipped":
+                            row.status = "skipped"
+                            row.actual_mins = 0
+                        elif outcome == "completed":
+                            row.completed_at = historical_time + timedelta(minutes=actual)
+                        await db.commit()
+                await api_call(
+                    journey,
+                    client,
+                    "POST",
+                    "/api/v1/knowledge/notes",
+                    json={
+                        "goalId": goal["id"],
+                        "taskId": task["id"],
+                        "title": f"复盘｜{title}",
+                        "content": (
+                            f"计划 {estimate} 分钟，实际 {actual} 分钟；结果：{outcome}。"
+                            f"{reflection} 下一次先回读本条证据，再决定加量、保持或降级。"
+                        ),
+                        "noteType": "task_note",
+                        "noteDate": scheduled.isoformat(),
+                    },
+                    action=f"保存长期复盘：{title}",
+                    expected="每次执行都留下目标和任务关联的学习证据",
+                )
+                historical_tasks[key].append(task)
+
+        evidence_scores = {
+            "english": (0.40, 0.70),
+            "math": (0.35, 0.65),
+            "cet6": (0.40, 0.68),
+        }
+        async with AsyncSessionLocal() as db:
+            for key, (baseline_score, recent_score) in evidence_scores.items():
+                goal_id = journey.ids["goals"][key]["id"]
+                concept = await db.scalar(
+                    select(LearningConcept)
+                    .where(
+                        LearningConcept.user_id == admin.id,
+                        LearningConcept.goal_id == goal_id,
+                        LearningConcept.review_status == "confirmed",
+                        LearningConcept.lifecycle_status == "active",
+                    )
+                    .limit(1)
+                )
+                if not concept:
+                    continue
+                for index, score in ((0, baseline_score), (-1, recent_score)):
+                    task = historical_tasks[key][index]
+                    days_ago = HISTORY[key][index][0]
+                    db.add(
+                        MasteryEvidence(
+                            user_id=admin.id,
+                            goal_id=goal_id,
+                            task_id=task["id"],
+                            concept_id=concept.id,
+                            evidence_type="practice_result",
+                            score=score,
+                            reliability=0.72,
+                            source_item_id=journey.ids["sources"][f"{key}_reference"],
+                            summary=f"历史练习结果形成的阶段证据：{HISTORY[key][index][6]}",
+                            detail={
+                                "dataset": DATASET,
+                                "planned_minutes": HISTORY[key][index][2],
+                                "actual_minutes": HISTORY[key][index][3],
+                                "outcome": HISTORY[key][index][4],
+                            },
+                            created_at=(datetime.now(UTC) - timedelta(days=days_ago)).replace(
+                                tzinfo=None
+                            ),
+                        )
+                    )
+            await db.commit()
+        journey.record(
+            "建立六周掌握证据曲线",
+            "三个目标均有基线与近期练习证据，而非只看任务勾选",
+            {key: list(scores) for key, scores in evidence_scores.items()},
+        )
 
         # Generate and confirm macro plans through the real model-backed API.
         for key in ("english", "math", "cet6"):
@@ -873,6 +1354,72 @@ async def seed() -> dict[str, Any]:
             expected="如实记录临时实验导致的未完成，而非强行补偿",
         )
 
+        historical_conversations = [
+            (
+                36,
+                "三项目标会不会排得太满",
+                "用户担心课程周同时准备三个考试；Pilo 根据可用晚间时段建议设主次和最低连续动作。",
+                "这周课程作业多，我不想三个目标每天都塞满。",
+                "按你的课程表，数学保留四个晚间主时段，英语用三个 45 分钟段，六级只保留两次 30 分钟。没有完成时先降级，不把欠账全部推到周末。",
+            ),
+            (
+                24,
+                "实验课拖堂后的数学恢复",
+                "用户数学任务只完成一半；Pilo 使用偏差记录提出保持、最小、冲刺三种恢复方案。",
+                "实验拖堂，积分只做了五题。明天还有课，怎么恢复？",
+                "你这次是外部时间冲突，不是能力退步。建议选“保持”：明晚先完成剩余三题，仍限制在 70 分钟；若只有 25 分钟就用最小方案，只重做今天的一道错题。",
+            ),
+            (
+                8,
+                "六周进展和下周重点",
+                "Pilo 对比基线与近期证据，指出英语阅读、数学积分和六级听力的变化及仍待验证处。",
+                "别只看我打了多少勾，按证据说说六周有没有进步。",
+                "英语阅读由 2/5 到周测 7/10，但连续两篇后的稳定性还要验证；数学从积分基线 7/12 到旧错题 6/8，线代只有一次 7/8，证据偏少；六级听力由 9/16 到约 68%，接近阶段目标但尚未稳定超过 70%。",
+            ),
+        ]
+        for index, (days_ago, title, summary, user_text, assistant_text) in enumerate(
+            historical_conversations, start=1
+        ):
+            moment = datetime.now(UTC) - timedelta(days=days_ago)
+            historical_conversation = {
+                "id": f"{DATASET}-pilo-history-{index}",
+                "session_id": f"{DATASET}-history-session-{index}",
+                "goal_id": journey.ids["goals"]["math"]["id"] if index == 2 else None,
+                "goal_title": (
+                    journey.ids["goals"]["math"]["title"] if index == 2 else "全部学习目标"
+                ),
+                "title": title,
+                "summary": summary,
+                "pilo_feedback": "用户保留最终决定权；建议作为后续计划输入。",
+                "association": "课程约束、三个长期目标、任务结果与掌握证据",
+                "is_favorite": index == 3,
+                "created_at": moment.isoformat(),
+                "updated_at": moment.isoformat(),
+                "messages": [
+                    {
+                        "id": f"h{index}-u",
+                        "role": "user",
+                        "content": user_text,
+                        "created_at": moment.isoformat(),
+                    },
+                    {
+                        "id": f"h{index}-a",
+                        "role": "assistant",
+                        "content": assistant_text,
+                        "created_at": (moment + timedelta(minutes=1)).isoformat(),
+                    },
+                ],
+            }
+            await api_call(
+                journey,
+                client,
+                "PUT",
+                f"/api/v1/coach/conversations/{historical_conversation['id']}",
+                json=historical_conversation,
+                action=f"保存长期 Pilo 会话：{title}",
+                expected="对话引用阶段证据、课程约束和用户选择",
+            )
+
         now = datetime.now(UTC)
         conversation = {
             "id": f"{DATASET}-pilo-1",
@@ -1018,15 +1565,108 @@ async def seed() -> dict[str, Any]:
                         mastery,
                         True,
                     )
+        retrieval_cases = [
+            ("english", "主旨 推断", ["主旨", "推断", "阅读"]),
+            ("math", "函数 极限", ["函数", "极限"]),
+            ("math", "线性代数 矩阵", ["线性代数", "矩阵"]),
+            ("math", "概率论 随机变量", ["概率论", "随机变量"]),
+            ("cet6", "讲话 报道 讲座", ["讲话", "报道", "讲座"]),
+            ("cet6", "常模 百分位", ["常模", "百分位"]),
+        ]
+        retrieval_checks = []
+        for key, query, expected_terms in retrieval_cases:
+            results = await api_call(
+                journey,
+                client,
+                "GET",
+                "/api/v1/knowledge/search",
+                params={"q": query, "goal_id": journey.ids["goals"][key]["id"], "limit": 3},
+                action=f"检索真实资料片段：{query}",
+                expected="返回目标范围内的正文片段与来源地址",
+            )
+            first = results[0] if results else {}
+            searchable = " ".join([str(first.get("title", "")), str(first.get("snippet", ""))])
+            passed = bool(
+                results
+                and first.get("source_url")
+                and any(term in searchable for term in expected_terms)
+            )
+            check = {
+                "query": query,
+                "title": first.get("title"),
+                "citation": first.get("citation"),
+                "source_url": first.get("source_url"),
+                "retrieval_method": first.get("retrieval_method"),
+            }
+            retrieval_checks.append(check)
+            journey.record(
+                f"验收检索相关性：{query}",
+                "首条结果包含相关正文词、稳定引用和可追溯来源",
+                check,
+                passed,
+            )
+        async with AsyncSessionLocal() as db:
+            persisted_counts = {
+                "sources": int(
+                    await db.scalar(
+                        text(
+                            "SELECT count(*) FROM knowledge_items "
+                            "WHERE user_id=:uid AND source_type='upload'"
+                        ),
+                        {"uid": admin.id},
+                    )
+                    or 0
+                ),
+                "notes": int(
+                    await db.scalar(
+                        text(
+                            "SELECT count(*) FROM knowledge_items "
+                            "WHERE user_id=:uid AND source_type='task_note'"
+                        ),
+                        {"uid": admin.id},
+                    )
+                    or 0
+                ),
+                "tasks": int(
+                    await db.scalar(
+                        text(
+                            "SELECT count(*) FROM tasks WHERE goal_id IN "
+                            "(SELECT id FROM goals WHERE user_id=:uid)"
+                        ),
+                        {"uid": admin.id},
+                    )
+                    or 0
+                ),
+                "ready_sources": int(
+                    await db.scalar(
+                        text(
+                            "SELECT count(*) FROM knowledge_items WHERE user_id=:uid "
+                            "AND source_type='upload' AND processing_status='ready'"
+                        ),
+                        {"uid": admin.id},
+                    )
+                    or 0
+                ),
+            }
+        dataset_complete = (
+            len(goals) == 3
+            and len(archive["conversations"]) >= 4
+            and persisted_counts["sources"] >= 8
+            and persisted_counts["ready_sources"] == persisted_counts["sources"]
+            and persisted_counts["tasks"] >= 21
+            and persisted_counts["notes"] >= 19
+        )
         journey.record(
             "验收 0-1 数据集",
-            "3 goals / 6 sources / plans / actions / notes / deviations / recovery / Pilo / evidence",
+            "3 goals / 8 real files / 6-week actions and notes / recovery / Pilo / evidence",
             {
                 "goal_count": len(goals),
                 "conversation_count": len(archive["conversations"]),
                 "mastery_evidence_count": len(mastery["items"]),
+                "retrieval_checks": retrieval_checks,
+                **persisted_counts,
             },
-            len(goals) == 3 and len(archive["conversations"]) >= 1,
+            dataset_complete,
         )
 
     report = {
@@ -1034,11 +1674,11 @@ async def seed() -> dict[str, Any]:
         "generated_at": datetime.now(UTC).isoformat(),
         "admin_user_id": admin.id,
         "persona": "大三学生；白天上课；兼顾考研英语一、数学一和大学英语六级",
-        "source_policy": "Only official/public URLs and short user-authored summaries; no copyrighted textbook corpus.",
+        "source_policy": "Downloaded public institutional pages are stored as local text artifacts; no copyrighted textbook corpus.",
         "truthfulness": {
             "http_api_actions": "Recorded with status and response body in steps.",
-            "database_actions": "Limited to reset, account availability, temporary auth session, and marking user-confirmed URL summaries ready.",
-            "historical_claim": "No forged historical check-in dates; the scenario uses current-day execution plus an explicit future recovery.",
+            "database_actions": "Reset/account setup plus explicit backdating of synthetic longitudinal tasks and typed mastery evidence.",
+            "historical_claim": "Six weeks are intentionally synthetic but internally consistent; they are persistent product demo data, not claimed real user activity.",
         },
         "ids": journey.ids,
         "steps": journey.steps,

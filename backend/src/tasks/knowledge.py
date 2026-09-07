@@ -326,20 +326,16 @@ async def _process(item_id: str) -> None:
                     )
                 )
             if not clients:
-                if item.source_type in {
-                    "chat_note",
-                    "daily_log",
-                    "flash_card",
-                    "task_note",
-                    "quick_note",
-                }:
-                    # Keyword retrieval remains available even when optional
-                    # embedding infrastructure is offline.
-                    item.processing_status = "ready"
-                    item.processed_at = utc_now()
-                    await db.commit()
-                    return
-                raise KnowledgeProcessingError("未配置可用的 Embedding 服务")
+                # Embeddings are an optional accelerator, not a prerequisite for
+                # a usable knowledge source.  Chunks have already been persisted
+                # above, so lexical retrieval can serve uploaded documents too.
+                item.processing_status = "ready"
+                item.processing_error = (
+                    "语义索引暂不可用，已启用关键词检索：未配置可用的 Embedding 服务"
+                )
+                item.processed_at = utc_now()
+                await db.commit()
+                return
 
             try:
                 embeddings = await _embed_chunks(
@@ -350,14 +346,10 @@ async def _process(item_id: str) -> None:
                     dimensions=runtime_models.embedding_dimensions,
                 )
             except KnowledgeProcessingError as exc:
-                if item.source_type not in {
-                    "chat_note",
-                    "daily_log",
-                    "flash_card",
-                    "task_note",
-                    "quick_note",
-                }:
-                    raise
+                # Keep the parsed text and chunks searchable if the optional
+                # embedding gateway is down.  This is especially important for
+                # real uploaded sources: a transient model outage must not turn
+                # an otherwise valid document into a failed import.
                 item.processing_status = "ready"
                 item.processing_error = f"语义索引暂不可用，已启用关键词检索：{exc}"[:500]
                 item.processed_at = utc_now()

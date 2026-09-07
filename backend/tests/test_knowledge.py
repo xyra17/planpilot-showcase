@@ -392,6 +392,38 @@ async def test_chunk_search_returns_source_citation(client: AsyncClient, auth: d
     assert result["start_char"] == 11
 
 
+async def test_keyword_search_matches_independent_query_terms_and_metadata_url(
+    client: AsyncClient, auth: dict, db
+):
+    content = "高等数学包括函数极限与一元积分；本段不包含完整查询短语。"
+    uploaded = await client.post(
+        "/api/v1/knowledge/upload",
+        files={"file": ("math-scope.txt", io.BytesIO(content.encode()), "text/plain")},
+        headers=auth,
+    )
+    item = await db.get(KnowledgeItem, uploaded.json()["id"])
+    item.content = content
+    item.content_length = len(content)
+    item.processing_status = "ready"
+    item.source_metadata = {"source_url": "https://example.edu/math-scope"}
+    await db.commit()
+
+    with patch(
+        "src.services.retrieval_service.embed_text",
+        side_effect=EmbeddingUnavailableError("offline contract test"),
+    ):
+        response = await client.get(
+            "/api/v1/knowledge/search?q=高等数学+线性代数+概率论",
+            headers=auth,
+        )
+
+    assert response.status_code == 200
+    result = response.json()[0]
+    assert result["id"] == item.id
+    assert "高等数学" in result["snippet"]
+    assert result["source_url"] == "https://example.edu/math-scope"
+
+
 async def test_ui_and_agent_share_the_same_retrieval_contract(client: AsyncClient, auth: dict, db):
     uploaded = await client.post(
         "/api/v1/knowledge/upload",

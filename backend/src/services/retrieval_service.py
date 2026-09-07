@@ -50,7 +50,7 @@ def _goal_scope(goal_id: str):
 
 
 def _keyword_score(title: str, content: str, query: str) -> float:
-    tokens = [token for token in query.casefold().split() if token]
+    tokens = _query_terms(query)
     haystack = f"{title} {content}".casefold()
     if not tokens:
         return 0.0
@@ -58,6 +58,27 @@ def _keyword_score(title: str, content: str, query: str) -> float:
     phrase_bonus = 0.2 if query.casefold() in haystack else 0.0
     title_bonus = 0.15 if any(token in title.casefold() for token in tokens) else 0.0
     return min(1.0, token_recall * 0.65 + phrase_bonus + title_bonus)
+
+
+def _query_terms(query: str) -> list[str]:
+    return list(dict.fromkeys(token for token in query.casefold().split() if token))
+
+
+def _ilike_pattern(term: str) -> str:
+    escaped = term.replace("\\", "\\\\").replace("%", r"\%").replace("_", r"\_")
+    return f"%{escaped}%"
+
+
+def _matched_snippet(content: str, query: str, length: int = 300) -> str:
+    folded = content.casefold()
+    positions = [folded.find(term) for term in _query_terms(query)]
+    positions = [position for position in positions if position >= 0]
+    start = max(0, min(positions) - 60) if positions else 0
+    return content[start : start + length].strip()
+
+
+def _source_url(item: KnowledgeItem) -> str | None:
+    return item.source_url or (item.source_metadata or {}).get("source_url")
 
 
 def _base_item_filters(user_id: str, source_types: set[str] | None = None):
@@ -96,6 +117,7 @@ class RetrievalService:
             except Exception as exc:
                 logger.warning("retrieval_embedding_failed error_type=%s", type(exc).__name__)
 
+        vector_results: list[RetrievalResult] = []
         if query_vector is not None:
             vector_results = await self._vector_search(
                 db,
@@ -106,14 +128,6 @@ class RetrievalService:
                 limit=bounded_limit,
                 source_types=source_types,
             )
-            if vector_results:
-                logger.info(
-                    "retrieval_completed method=vector_chunk user_id=%s result_count=%d",
-                    user_id,
-                    len(vector_results),
-                )
-                return vector_results
-
         keyword_results = await self._keyword_search(
             db,
             user_id=user_id,
@@ -122,12 +136,24 @@ class RetrievalService:
             limit=bounded_limit,
             source_types=source_types,
         )
+        # Hybrid retrieval prevents a semantically similar chunk from hiding an
+        # exact phrase match. Deduplicate by source/chunk and retain the stronger
+        # score while preserving stable citations.
+        merged: dict[tuple[str, int | None], RetrievalResult] = {}
+        for result in [*vector_results, *keyword_results]:
+            key = (result.id, result.chunk_index)
+            current = merged.get(key)
+            if current is None or result.score > current.score:
+                merged[key] = result
+        results = sorted(merged.values(), key=lambda result: (-result.score, result.id))[
+            :bounded_limit
+        ]
         logger.info(
-            "retrieval_completed method=keyword user_id=%s result_count=%d",
+            "retrieval_completed method=hybrid user_id=%s result_count=%d",
             user_id,
-            len(keyword_results),
+            len(results),
         )
-        return keyword_results
+        return results
 
     async def _vector_search(
         self,
@@ -167,7 +193,7 @@ class RetrievalService:
                 source_type=item.source_type,
                 source_role=item.source_role or "reference",
                 source_metadata=item.source_metadata or {},
-                source_url=item.source_url,
+                source_url=_source_url(item),
                 chunk_index=chunk.chunk_index,
                 start_char=chunk.start_char,
                 end_char=chunk.end_char,
@@ -206,14 +232,15 @@ class RetrievalService:
         limit: int,
         source_types: set[str] | None,
     ) -> list[RetrievalResult]:
-        escaped = query.replace("\\", "\\\\").replace("%", r"\%").replace("_", r"\_")
-        pattern = f"%{escaped}%"
+        terms = _query_terms(query)
+        patterns = [_ilike_pattern(term) for term in terms]
+        chunk_matches = [KnowledgeChunk.content.ilike(pattern, escape="\\") for pattern in patterns]
         chunk_statement = (
             select(KnowledgeChunk, KnowledgeItem)
             .join(KnowledgeItem, KnowledgeItem.id == KnowledgeChunk.item_id)
             .where(
                 *_base_item_filters(user_id, source_types),
-                KnowledgeChunk.content.ilike(pattern, escape="\\"),
+                or_(*chunk_matches),
             )
         )
         if goal_id:
@@ -223,14 +250,14 @@ class RetrievalService:
             RetrievalResult(
                 id=item.id,
                 title=item.title,
-                snippet=chunk.content[:300].strip(),
+                snippet=_matched_snippet(chunk.content, query),
                 score=round(_keyword_score(item.title, chunk.content, query), 3),
                 goal_id=item.goal_id,
                 kb_id=item.kb_id,
                 source_type=item.source_type,
                 source_role=item.source_role or "reference",
                 source_metadata=item.source_metadata or {},
-                source_url=item.source_url,
+                source_url=_source_url(item),
                 chunk_index=chunk.chunk_index,
                 start_char=chunk.start_char,
                 end_char=chunk.end_char,
@@ -242,12 +269,17 @@ class RetrievalService:
         if chunk_results:
             return sorted(chunk_results, key=lambda result: (-result.score, result.id))[:limit]
 
+        item_matches = []
+        for pattern in patterns:
+            item_matches.extend(
+                [
+                    KnowledgeItem.title.ilike(pattern, escape="\\"),
+                    KnowledgeItem.content.ilike(pattern, escape="\\"),
+                ]
+            )
         item_statement = select(KnowledgeItem).where(
             *_base_item_filters(user_id, source_types),
-            or_(
-                KnowledgeItem.title.ilike(pattern, escape="\\"),
-                KnowledgeItem.content.ilike(pattern, escape="\\"),
-            ),
+            or_(*item_matches),
         )
         if goal_id:
             item_statement = item_statement.where(_goal_scope(goal_id))
@@ -267,20 +299,17 @@ class RetrievalService:
 
     @staticmethod
     def _item_result(item: KnowledgeItem, query: str, score: float, method: str) -> RetrievalResult:
-        first_token = query.casefold().split()[0]
-        index = item.content.casefold().find(first_token)
-        start = max(0, index - 50) if index >= 0 else 0
         return RetrievalResult(
             id=item.id,
             title=item.title,
-            snippet=item.content[start : start + 200].strip(),
+            snippet=_matched_snippet(item.content, query, length=200),
             score=round(score, 3),
             goal_id=item.goal_id,
             kb_id=item.kb_id,
             source_type=item.source_type,
             source_role=item.source_role or "reference",
             source_metadata=item.source_metadata or {},
-            source_url=item.source_url,
+            source_url=_source_url(item),
             citation=item.title,
             retrieval_method=method,
         )

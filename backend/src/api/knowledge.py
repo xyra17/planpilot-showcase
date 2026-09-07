@@ -778,6 +778,11 @@ class SourceMetadata(BaseModel):
     provenance: Literal["user", "ai_reviewed", "imported"] = "user"
     processing_policy: Literal["local_only", "cloud_allowed"] = "local_only"
     rationale: str = Field(default="", max_length=1000)
+    # Provenance fields are part of the source contract so clients can show
+    # exactly which downloaded artifact was used and how it may be reused.
+    source_url: str | None = Field(default=None, max_length=2000)
+    local_artifact: str | None = Field(default=None, max_length=255)
+    license_note: str = Field(default="", max_length=500)
 
     @field_validator("scope_topics", "covered_chapters", "exclusions")
     @classmethod
