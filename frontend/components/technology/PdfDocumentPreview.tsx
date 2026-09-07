@@ -18,8 +18,14 @@ type PdfPage = {
 type PdfDocument = {
   numPages: number;
   getPage: (pageNumber: number) => Promise<PdfPage>;
-  destroy: () => Promise<void>;
+  destroy?: () => Promise<void>;
 };
+
+async function destroyPdfDocument(documentProxy: PdfDocument | null) {
+  // pdfjs builds do not all expose PDFDocumentProxy.destroy at runtime. The
+  // viewer must still be safely unmountable when a user closes the drawer.
+  if (typeof documentProxy?.destroy === "function") await documentProxy.destroy();
+}
 
 export function PdfDocumentPreview({ data, name }: PdfDocumentPreviewProps) {
   const [documentProxy, setDocumentProxy] = useState<PdfDocument | null>(null);
@@ -50,7 +56,7 @@ export function PdfDocumentPreview({ data, name }: PdfDocumentPreviewProps) {
       const resolvedDocument = await loadingTask.promise as unknown as PdfDocument;
       loadedDocument = resolvedDocument;
       if (cancelled) {
-        await loadedDocument.destroy();
+        await destroyPdfDocument(loadedDocument);
         return;
       }
       setDocumentProxy(loadedDocument as unknown as PdfDocument);
@@ -63,7 +69,7 @@ export function PdfDocumentPreview({ data, name }: PdfDocumentPreviewProps) {
 
     return () => {
       cancelled = true;
-      if (loadedDocument) void loadedDocument.destroy();
+      void destroyPdfDocument(loadedDocument);
     };
   }, [data]);
 

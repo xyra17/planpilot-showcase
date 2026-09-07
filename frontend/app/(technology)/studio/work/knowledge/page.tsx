@@ -117,7 +117,10 @@ const MediaDocumentPreview = dynamic(
   summary: string;
   size?: string;
   mime?: string;
+  /** Browser object URL for previewing/downloading an uploaded file. */
   url?: string;
+  /** Original public URL kept only as provenance for an imported source. */
+  sourceUrl?: string;
   previewData?: ArrayBuffer;
   content?: string;
   contentFormat?: "plain" | "markdown" | "html";
@@ -250,7 +253,8 @@ function resourceFromApi(
     updated: file.uploadDate || "刚刚",
     size: file.size,
     source,
-    url: file.sourceUrl ?? undefined,
+    url: source === "url" ? file.sourceUrl ?? undefined : undefined,
+    sourceUrl: file.sourceUrl ?? undefined,
     summary: file.summary || (file.status === "ready"
       ? "这份资料已完成索引，可由学习伙伴检索和引用。"
       : "资料正在解析与建立索引，完成后即可用于学习伙伴。"),
@@ -2806,6 +2810,7 @@ export default function KnowledgePage() {
                     <div><dt>文件类型</dt><dd>{selected.type}</dd></div>
                     <div><dt>最近更新</dt><dd>{selected.updated}</dd></div>
                     <div><dt>AI 引用状态</dt><dd className={selected.status === "可用于 AI" ? "is-ready" : "is-pending"}>{selected.status === "可用于 AI" ? "已就绪" : "处理中"}</dd></div>
+                    {selected.sourceUrl && <div><dt>原始来源</dt><dd><a href={selected.sourceUrl} target="_blank" rel="noreferrer">查看来源网页</a></dd></div>}
                   </dl>
                   <section className="document-source-boundary" aria-label="资料的 AI 使用边界">
                     <div>

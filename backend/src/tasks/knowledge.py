@@ -192,7 +192,10 @@ def extract_text(raw: bytes, ext: str) -> str:
     except Exception as exc:
         raise KnowledgeProcessingError(f"文件解析失败：{type(exc).__name__}") from exc
 
-    content = content.strip()
+    # Some valid PDFs contain embedded NUL/control characters in their text
+    # layer. PostgreSQL rejects NUL even when the surrounding string is UTF-8,
+    # so normalize the extracted text before persisting or chunking it.
+    content = content.replace("\x00", "").strip()
     if not content:
         raise KnowledgeProcessingError("未提取到文本；扫描版 PDF 请先进行 OCR")
     return content[:MAX_EXTRACTED_CHARS]

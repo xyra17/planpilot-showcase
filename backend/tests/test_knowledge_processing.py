@@ -13,6 +13,10 @@ def test_extract_text_success():
     assert extract_text("学习资料".encode(), "txt") == "学习资料"
 
 
+def test_extract_text_removes_nul_bytes_before_database_storage():
+    assert extract_text(b"probability\x00 theory", "txt") == "probability theory"
+
+
 def test_extract_text_rejects_empty_content():
     with pytest.raises(KnowledgeProcessingError, match="未提取到文本"):
         extract_text(b"", "txt")

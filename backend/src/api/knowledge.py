@@ -1053,6 +1053,7 @@ async def review_source_metadata_proposal(
 @router.post("/upload", response_model=KnowledgeFileOut)
 async def upload_file(
     file: UploadFile = File(...),
+    source_url: str | None = Form(None),
     kb_id: str | None = Form(None),
     kb_ids: list[str] = Form(default=[]),
     goal_ids: list[str] = Form(default=[]),
@@ -1117,6 +1118,7 @@ async def upload_file(
         title=filename,
         content="",
         source_type="upload",
+        source_url=source_url,
         source_role=source_role,
         file_path=saved_path,
         file_size_bytes=upload_size,

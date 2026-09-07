@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Any
 
 import httpx
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text
 
 from src.database import AsyncSessionLocal
 from src.models import KnowledgeItem, LearningConcept, MasteryEvidence, Plan, Task, User
@@ -332,6 +332,36 @@ SOURCES = {
             "published_year": 2018,
             "edition": "2019 考研备考指导（2018 发布）",
         },
+        {
+            "key": "english_writing_pdf",
+            "title": "MIT Guide to Scholarly Writing（学术写作与批判性阅读）",
+            "url": "https://ocw.mit.edu/courses/cms-840-at-the-limit-violence-in-contemporary-representation-fall-2013/b52fb238fc24b1aef7900ae5098cb170_MITCMS_840F13_GdeToSclyWtg.pdf",
+            "download_url": "https://ocw.mit.edu/courses/cms-840-at-the-limit-violence-in-contemporary-representation-fall-2013/b52fb238fc24b1aef7900ae5098cb170_MITCMS_840F13_GdeToSclyWtg.pdf",
+            "filename": "mit-guide-to-scholarly-writing.pdf",
+            "role": "reference",
+            "document_type": "course_material",
+            "content": "",
+            "topics": ["批判性阅读", "论证结构", "学术写作"],
+            "authority": "institution",
+            "published_year": 2013,
+            "edition": "MIT OpenCourseWare PDF",
+            "license_note": "MIT OpenCourseWare 公开课程资料；仅用于个人学习",
+        },
+        {
+            "key": "english_writing_docx",
+            "title": "上海交通大学《英语写作》课程教学大纲",
+            "url": "https://sfl.sjtu.edu.cn/Assets/userfiles/sys_eb538c1c-65ff-4e82-8e6a-a1ef01127fed/files/rcpy/%E8%8B%B1%E8%AF%AD%E5%86%99%E4%BD%9C%E8%AF%BE%E7%A8%8B%E6%95%99%E5%AD%A6%E5%A4%A7%E7%BA%B2-%E9%99%86%E5%85%83%E9%9B%AF.docx",
+            "download_url": "https://sfl.sjtu.edu.cn/Assets/userfiles/sys_eb538c1c-65ff-4e82-8e6a-a1ef01127fed/files/rcpy/%E8%8B%B1%E8%AF%AD%E5%86%99%E4%BD%9C%E8%AF%BE%E7%A8%8B%E6%95%99%E5%AD%A6%E5%A4%A7%E7%BA%B2-%E9%99%86%E5%85%83%E9%9B%AF.docx",
+            "filename": "sjtu-english-writing-syllabus.docx",
+            "role": "reference",
+            "document_type": "course_material",
+            "content": "",
+            "topics": ["翻译", "英语写作", "课程要求"],
+            "authority": "institution",
+            "published_year": 2021,
+            "edition": "上海交通大学课程教学大纲",
+            "license_note": "高校公开课程文件；仅用于个人学习",
+        },
     ],
     "math": [
         {
@@ -372,6 +402,51 @@ SOURCES = {
             "published_year": 2023,
             "edition": "2023 课程资源页",
         },
+        {
+            "key": "math_calculus_openstax",
+            "title": "Stanford CS109 Probability Study Sheet",
+            "url": "https://github.com/kashizui/Stanford-CS109-Notes/blob/master/studysheet.pdf",
+            "download_url": "https://raw.githubusercontent.com/kashizui/Stanford-CS109-Notes/master/studysheet.pdf",
+            "filename": "stanford-cs109-probability-study-sheet.pdf",
+            "role": "reference",
+            "document_type": "textbook",
+            "content": "",
+            "topics": ["概率分布", "随机变量", "条件概率", "期望"],
+            "authority": "community",
+            "published_year": 2024,
+            "edition": "Stanford CS109 公开课程 study sheet",
+            "license_note": "GitHub 公开课程资料；仅用于个人学习",
+        },
+        {
+            "key": "math_probability_pdf",
+            "title": "Imperial College Probability Theory Lecture Notes",
+            "url": "https://github.com/oevkaya/Math324-Probability/blob/master/Probability_Theory.pdf",
+            "download_url": "https://raw.githubusercontent.com/oevkaya/Math324-Probability/master/Probability_Theory.pdf",
+            "filename": "imperial-probability-theory-notes.pdf",
+            "role": "reference",
+            "document_type": "textbook",
+            "content": "",
+            "topics": ["概率空间", "随机变量", "分布", "期望"],
+            "authority": "institution",
+            "published_year": 2022,
+            "edition": "Imperial College lecture notes",
+            "license_note": "GitHub 公开课程讲义；仅用于个人学习",
+        },
+        {
+            "key": "math_calculus_pdf",
+            "title": "Mathematics Book：Calculus 与 Linear Algebra 开放章节",
+            "url": "https://github.com/pelegs/maths_book/blob/master/bookmain.pdf",
+            "download_url": "https://raw.githubusercontent.com/pelegs/maths_book/master/bookmain.pdf",
+            "filename": "open-mathematics-calculus-linear-algebra.pdf",
+            "role": "reference",
+            "document_type": "textbook",
+            "content": "",
+            "topics": ["微积分", "线性代数", "级数", "微分方程"],
+            "authority": "community",
+            "published_year": 2025,
+            "edition": "CC0-1.0 开放数学教材",
+            "license_note": "CC0-1.0；可自由使用",
+        },
     ],
     "cet6": [
         {
@@ -398,6 +473,36 @@ SOURCES = {
             "authority": "official",
             "published_year": 2016,
             "edition": "CET 报道分数说明",
+        },
+        {
+            "key": "cet6_ucass_pdf",
+            "title": "中国社会科学院大学《大学英语六级》课程大纲",
+            "url": "https://jw.ucass.edu.cn/kcdg/tsjyk/53daxueyingyuliuji.pdf",
+            "download_url": "https://jw.ucass.edu.cn/kcdg/tsjyk/53daxueyingyuliuji.pdf",
+            "filename": "ucass-cet6-course-syllabus.pdf",
+            "role": "reference",
+            "document_type": "course_material",
+            "content": "",
+            "topics": ["听力", "阅读", "写作", "翻译", "学习策略"],
+            "authority": "institution",
+            "published_year": 2021,
+            "edition": "中国社会科学院大学课程大纲",
+            "license_note": "高校公开课程文件；仅用于个人学习",
+        },
+        {
+            "key": "cet6_course_pdf",
+            "title": "北京信息科技大学《英语六级》课程教学大纲",
+            "url": "https://sfs.bistu.edu.cn/docs/2025-10/a147176a685b4cc2a621997891be220c.pdf",
+            "download_url": "https://sfs.bistu.edu.cn/docs/2025-10/a147176a685b4cc2a621997891be220c.pdf",
+            "filename": "bistu-cet6-course-syllabus.pdf",
+            "role": "reference",
+            "document_type": "course_material",
+            "content": "",
+            "topics": ["听说读写译", "真题训练", "学习策略"],
+            "authority": "institution",
+            "published_year": 2025,
+            "edition": "2025 课程教学大纲",
+            "license_note": "高校公开课程文件；仅用于个人学习",
         },
     ],
 }
@@ -556,7 +661,7 @@ HISTORY = {
 def metadata_for(source: dict[str, Any]) -> dict[str, Any]:
     scope = source["role"] == "scope"
     return {
-        "document_type": "syllabus" if scope else "reference",
+        "document_type": source.get("document_type", "syllabus" if scope else "reference"),
         "authority": source.get("authority", "official" if scope else "personal"),
         "difficulty": "mixed",
         "language": "zh-CN",
@@ -583,6 +688,302 @@ def metadata_for(source: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+FALLBACK_MACRO_PLANS: dict[str, list[dict[str, Any]]] = {
+    "english": [
+        {
+            "name": "词汇、长难句与阅读结构基础",
+            "focus": "先建立能支撑真题阅读的句子拆解与篇章定位能力",
+            "start_date": "2026-09-07",
+            "end_date": "2026-12-31",
+            "tasks": [
+                ("用学术段落完成长难句主干标注", "english_writing_pdf", 50, "独立标出 8 句的主干、从句边界和逻辑连接", "一页含 8 句标注与 2 条易错规律的笔记"),
+                ("限时阅读并建立定位—错因表", "english_reading_reference", 55, "18 分钟完成一篇阅读并逐题记录定位、理解或选项比较错因", "一张五题错因表，至少给出 3 处原文定位"),
+                ("闭卷复述文章论证结构", "english_writing_pdf", 35, "读完一篇后不看原文写出主张、论据与转折关系", "150 字以内结构复述，能对照原文自行订正"),
+            ],
+        },
+        {
+            "name": "阅读题型、翻译与作文系统训练",
+            "focus": "把输入理解转成可复用的解题和输出流程",
+            "start_date": "2027-01-01",
+            "end_date": "2027-06-30",
+            "tasks": [
+                ("完成两篇阅读并比较错项机制", "english_reference", 60, "限时完成两篇并归纳偷换、扩大、因果倒置等错项机制", "两篇答案、定位依据和不少于 4 条错项规律"),
+                ("完成 5 句英译汉结构化翻译", "english_scope", 45, "先划主干再翻译 5 个复杂句，并对照检查漏译和逻辑关系", "5 句译文及逐句自检结果"),
+                ("按提纲完成一篇大小作文轮换训练", "english_writing_docx", 55, "5 分钟审题列纲，30 分钟写作，20 分钟按内容、结构、语法和拼写自检", "一篇作文、提纲和至少 5 处订正"),
+            ],
+        },
+        {
+            "name": "真题套卷与错因复做",
+            "focus": "用真题证据稳定速度、正确率与错误恢复能力",
+            "start_date": "2027-07-01",
+            "end_date": "2027-10-31",
+            "tasks": [
+                ("完成一次英语一分模块限时套卷", "english_scope", 120, "按正式顺序完成阅读、翻译和写作并记录各模块耗时", "完整答卷、模块耗时表和得分估计"),
+                ("七日后闭卷复做阅读错题", "english_reference", 45, "不看解析复做上一轮错题并口述每个选项的排除依据", "错题复做正确率及仍不稳原因"),
+                ("建立作文表达复用清单", "english_writing_docx", 40, "从已完成作文中提炼开头、衔接、论证与结尾表达并各写一个新例句", "不少于 12 条带自造例句的表达清单"),
+            ],
+        },
+        {
+            "name": "限时模拟与薄弱项收口",
+            "focus": "用连续模拟证明能力达到目标，并为波动预留恢复方案",
+            "start_date": "2027-11-01",
+            "end_date": "2027-12-18",
+            "tasks": [
+                ("完成整套英语一限时模拟", "english_scope", 180, "在完整时间窗内独立作答，中途不查资料，结束后记录模块分数", "整套答卷且阅读达到 32/40 或明确差距"),
+                ("针对最低分模块完成最小补强闭环", "english_reference", 60, "只选择上一套最低分模块，完成一次讲解回读、一次练习和一次闭卷复述", "补强前后对比与下一次验证日期"),
+                ("完成考前策略回读与一次轻量复测", "english_reading_reference", 45, "回读个人错因清单并用一篇阅读验证时间与排除策略", "一页最终策略卡和复测结果"),
+            ],
+        },
+    ],
+    "math": [
+        {
+            "name": "高数基础与积分能力修复",
+            "focus": "先修复极限、导数和积分中的高频基础断点",
+            "start_date": "2026-09-07",
+            "end_date": "2027-02-28",
+            "tasks": [
+                ("极限方法诊断与条件辨析", "math_calculus_pdf", 70, "完成 10 题并逐题写明使用等价无穷小、洛必达或夹逼的条件", "10 题过程、正确率和 3 条条件易错点"),
+                ("换元与分部积分选法训练", "math_calculus_openstax", 75, "两类方法各完成 6 题，作答前先写选择理由", "12 题过程且基础正确率达到 85%"),
+                ("多元微分基础闭卷测验", "math_scope", 60, "不看例题完成偏导、全微分与极值各 3 题", "9 题答卷与按概念/计算分类的错因"),
+            ],
+        },
+        {
+            "name": "线性代数与概率系统补齐",
+            "focus": "补齐三科覆盖并显式连接概念前置关系",
+            "start_date": "2027-03-01",
+            "end_date": "2027-05-31",
+            "tasks": [
+                ("用行变换解释秩与方程组解结构", "math_reference", 70, "完成 8 题并口述秩、自由变量和解的个数之间的关系", "8 题过程和一张关系图"),
+                ("随机变量与常见分布对照训练", "math_probability_pdf", 65, "为 6 个常见分布写出适用情境、参数、期望和方差并完成 6 题", "分布对照表与 6 题答案"),
+                ("条件概率与贝叶斯公式情境题", "math_probability_reference", 60, "先画事件关系再完成 8 道条件概率题", "8 题过程且能解释分母为何这样取"),
+            ],
+        },
+        {
+            "name": "三科专题强化与错题复做",
+            "focus": "从会做单题转向识别题型、稳定步骤与延迟复现",
+            "start_date": "2027-06-01",
+            "end_date": "2027-09-30",
+            "tasks": [
+                ("高数综合题型混合训练", "math_calculus_pdf", 90, "混合完成极限、积分和多元微分共 12 题，不按章节提示分类", "12 题答卷、耗时与错误类型统计"),
+                ("线代专题限时训练", "math_reference", 75, "在限定时间完成矩阵、方程组和特征值共 10 题", "10 题答案且写出至少 3 条检查方法"),
+                ("七日闭卷复做三科错题", "math_probability_pdf", 70, "从错题库抽取三科各 3 题，不看旧过程独立重做", "9 题复做结果且正确率达到 85%"),
+            ],
+        },
+        {
+            "name": "真题整套限时与冲刺",
+            "focus": "用整套得分和可复做证据验证 110+ 目标",
+            "start_date": "2027-10-01",
+            "end_date": "2027-12-18",
+            "tasks": [
+                ("完成一套数学一真题限时模拟", "math_scope", 180, "严格限时、不中断查资料，结束后按知识/计算/时间分类失分", "完整答卷、估分与失分结构"),
+                ("最低分专题定向补强", "math_calculus_openstax", 90, "选择上套失分最高专题，回读一个原理并完成 8 道递进题", "8 题过程及补强前后正确率"),
+                ("完成连续两套稳定性验证", "math_scope", 180, "两次独立限时模拟之间完成错题复做，不以看懂解析代替作答", "两套均达到 110+，否则生成明确恢复任务"),
+            ],
+        },
+    ],
+    "cet6": [
+        {
+            "name": "结构诊断与时间策略",
+            "focus": "先确认题型边界、个人最低项和整卷时间预算",
+            "start_date": "2026-09-07",
+            "end_date": "2026-09-27",
+            "tasks": [
+                ("建立六级题型与分值时间表", "cet6_scope", 35, "依据考试说明整理写作、听力、阅读和翻译的顺序、分值与时间", "一页题型—时间策略表"),
+                ("完成一套分模块基线诊断", "cet6_ucass_pdf", 90, "分别完成听力、阅读、写作与翻译样题并记录正确率或问题数", "四模块基线表并标出最低项"),
+                ("制定上课周可执行的晚间节奏", "cet6_course_pdf", 30, "把每周专项拆成 3 个 30–45 分钟时段，并为班会冲突设置最小任务", "一周节奏卡与一个 15 分钟降级动作"),
+            ],
+        },
+        {
+            "name": "听力专项突破",
+            "focus": "用信号词、结构复述和错因统计把正确率推到 70%",
+            "start_date": "2026-09-28",
+            "end_date": "2026-10-25",
+            "tasks": [
+                ("长对话首听与证据定位", "cet6_reference", 45, "完成两组长对话，先作答再根据文本标注转折、数字和观点证据", "两组答案、证据位置和错因分类"),
+                ("讲座听力结构复述", "cet6_ucass_pdf", 45, "首听只记结构词，二听补充例证，最后用中文复述三层结构", "一份结构笔记与 2 分钟复述录音/文字"),
+                ("完成一次听力周测", "cet6_scope", 40, "按正式播放规则完成听力模块，中途不暂停", "正确率达到 70% 或形成最多两个补强点"),
+            ],
+        },
+        {
+            "name": "阅读、写作与翻译输出",
+            "focus": "在保持听力的同时提高限时阅读和书面表达稳定性",
+            "start_date": "2026-10-26",
+            "end_date": "2026-11-22",
+            "tasks": [
+                ("两篇仔细阅读限时训练", "cet6_course_pdf", 40, "在限定时间完成两篇并为每题标出原文证据", "两篇答案且正确率达到 8/10"),
+                ("六级作文提纲到成稿训练", "cet6_reference", 40, "5 分钟列纲、25 分钟成稿、10 分钟检查语法与拼写", "一篇完整作文和至少 5 处自检标记"),
+                ("段落翻译主干与修饰拆分", "cet6_ucass_pdf", 35, "先划分中文信息层级再完成一段翻译并检查时态、冠词和搭配", "一段译文和错误清单"),
+            ],
+        },
+        {
+            "name": "整套模考与考前收口",
+            "focus": "通过连续整套结果验证 470+，并控制考前新增内容",
+            "start_date": "2026-11-23",
+            "end_date": "2026-12-18",
+            "tasks": [
+                ("完成六级整套限时模考", "cet6_scope", 130, "严格按正式顺序和时间完成整卷，不暂停听力、不查资料", "完整答卷、估分与各模块耗时"),
+                ("按模考证据修复最低模块", "cet6_course_pdf", 50, "只处理上一套最低模块，完成一次回读、练习与闭卷验证", "补强前后成绩对比"),
+                ("完成第二套稳定性验证与考前策略卡", "cet6_scope", 130, "再次完成整套并把最终时间分配、猜题和检查策略压缩为一页", "模考达到 470+ 与一页考前策略卡"),
+            ],
+        },
+    ],
+}
+
+
+async def persist_fallback_macro_plan(
+    db: Any,
+    *,
+    key: str,
+    goal_id: str,
+    goal_snapshot: dict[str, Any],
+    source_ids: dict[str, str],
+    reason: str,
+    replace_current: bool = False,
+) -> tuple[str, list[str]]:
+    """Persist a complete, auditable plan when model generation is unavailable."""
+    if replace_current:
+        current_plans = list(
+            (
+                await db.execute(
+                    select(Plan).where(Plan.goal_id == goal_id, Plan.is_current.is_(True))
+                )
+            )
+            .scalars()
+            .all()
+        )
+        for current in current_plans:
+            current.is_current = False
+            pending = list(
+                (
+                    await db.execute(
+                        select(Task).where(
+                            Task.plan_id == current.id,
+                            Task.status.in_(["pending", "in_progress"]),
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            for task in pending:
+                task.status = "abandoned"
+
+    next_version = int(
+        await db.scalar(select(func.max(Plan.version)).where(Plan.goal_id == goal_id)) or 0
+    ) + 1
+    plan_id = str(uuid.uuid4())
+    phases: list[dict[str, Any]] = []
+    created_task_ids: list[str] = []
+    sequence = 0
+    for phase_spec in FALLBACK_MACRO_PLANS[key]:
+        task_rows: list[dict[str, Any]] = []
+        phase_start = date.fromisoformat(phase_spec["start_date"])
+        phase_end = date.fromisoformat(phase_spec["end_date"])
+        task_specs = phase_spec["tasks"]
+        span = max(0, (phase_end - phase_start).days)
+        for index, (title, source_key, minutes, objective, deliverable) in enumerate(task_specs):
+            # These are phase milestones, not a second copy of today's action
+            # list. Place them inside the phase window so the first day remains
+            # available for the explicit daily plan created later in the seed.
+            scheduled = phase_start + timedelta(
+                days=round(span * (index + 1) / (len(task_specs) + 1))
+            )
+            source_id = source_ids[source_key]
+            source_title = next(
+                source["title"]
+                for sources in SOURCES.values()
+                for source in sources
+                if source["key"] == source_key
+            )
+            guide = {
+                "why_now": f"{phase_spec['focus']}；当前任务为本阶段第 {index + 1} 个可验证里程碑。",
+                "steps": [
+                    f"打开《{source_title}》并定位与任务相关的章节或片段",
+                    objective,
+                    "保存本次产出，记录耗时、错误与仍不确定的内容",
+                    "在 7 天后不看答案完成一次最小复测",
+                ],
+                "deliverable": deliverable,
+                "done_criteria": [objective, "产出物已保存且包含可回读的作答或解释证据"],
+                "prerequisites": [] if sequence == 0 else ["回读上一里程碑的结果与未掌握点"],
+                "source_refs": [
+                    {
+                        "item_id": source_id,
+                        "id": source_id,
+                        "source_key": source_key,
+                        "title": source_title,
+                        "locator": "资料正文中与本任务对应的章节或段落",
+                    }
+                ],
+                "concept_refs": [],
+                "fallback": "若课程或临时活动占用时间，只完成第一小题/一段并记录卡点，不在次日双倍补偿。",
+            }
+            task_row = {
+                "title": title,
+                "objective": objective,
+                "estimated_mins": minutes,
+                "type": "practice",
+                "scheduled_date": scheduled.isoformat(),
+                "execution_guide": guide,
+            }
+            task_rows.append(task_row)
+            task_id = str(uuid.uuid4())
+            db.add(
+                Task(
+                    id=task_id,
+                    goal_id=goal_id,
+                    plan_id=plan_id,
+                    title=title,
+                    description=objective,
+                    estimated_mins=minutes,
+                    type="practice",
+                    scheduled_date=scheduled.isoformat(),
+                    stage_label=phase_spec["name"],
+                    sequence_in_plan=sequence,
+                    status="pending",
+                    kb_refs=[source_id],
+                    execution_guide=guide,
+                )
+            )
+            created_task_ids.append(task_id)
+            sequence += 1
+        phases.append(
+            {
+                "name": phase_spec["name"],
+                "focus": phase_spec["focus"],
+                "days": (phase_end - phase_start).days + 1,
+                "start_date": phase_spec["start_date"],
+                "end_date": phase_spec["end_date"],
+                "tasks": task_rows,
+            }
+        )
+
+    db.add(
+        Plan(
+            id=plan_id,
+            goal_id=goal_id,
+            version=next_version,
+            is_current=True,
+            baseline={"phases": phases, "total_tasks": len(created_task_ids)},
+            content={
+                "lifecycle": {
+                    "status": "active",
+                    "generated_by": "deterministic_source_grounded_fallback",
+                    "reason": reason,
+                    "review_status": "confirmed_demo_fixture",
+                    "source_items_cited": len({ref for ref in source_ids.values()}),
+                }
+            },
+            goal_intent_version=goal_snapshot.get("intent_version", 1),
+            goal_contract_snapshot=goal_snapshot.get("contract") or {},
+            replan_reason=reason,
+            created_by="system_fallback",
+        )
+    )
+    await db.commit()
+    return plan_id, created_task_ids
+
+
 async def upload_downloaded_source(
     client: httpx.AsyncClient,
     source: dict[str, Any],
@@ -590,18 +991,35 @@ async def upload_downloaded_source(
 ) -> dict[str, Any]:
     """Download a real public artifact, then ingest the local file through the API."""
     download_url = source.get("download_url") or source["url"]
-    response = await client.get(
-        download_url,
-        follow_redirects=True,
-        headers={"User-Agent": "PlanPilot research importer/1.0 (personal study workspace)"},
-    )
-    response.raise_for_status()
+    cached_path = Path(".seed_source_cache") / source.get("filename", source["key"])
+    response: httpx.Response | None = None
+    if cached_path.is_file():
+        payload = cached_path.read_bytes()
+        response_content_type = "application/octet-stream"
+    else:
+        last_error: Exception | None = None
+        for attempt in range(3):
+            try:
+                response = await client.get(
+                    download_url,
+                    follow_redirects=True,
+                    headers={"User-Agent": "PlanPilot research importer/1.0 (personal study workspace)"},
+                )
+                response.raise_for_status()
+                break
+            except (httpx.HTTPError, httpx.TimeoutException) as exc:
+                last_error = exc
+                if attempt < 2:
+                    await asyncio.sleep(2 * (attempt + 1))
+        if response is None or response.is_error:
+            raise RuntimeError(f"download failed after retries: {download_url}") from last_error
+        payload = response.content
+        response_content_type = response.headers.get("content-type", "")
     suffix = Path(source.get("filename", "source.txt")).suffix or ".txt"
-    payload = response.content
     # Official pages are downloaded as a local, searchable text snapshot. This
     # keeps the artifact real and traceable while avoiding raw navigation HTML
     # dominating lexical retrieval.
-    if suffix.lower() == ".txt" and "html" in response.headers.get("content-type", "").lower():
+    if suffix.lower() == ".txt" and "html" in response_content_type.lower():
         decoded = payload.decode("utf-8", errors="replace")
         decoded = re.sub(r"(?is)<(script|style).*?>.*?</\1>", " ", decoded)
         decoded = re.sub(r"(?s)<[^>]+>", " ", decoded)
@@ -616,11 +1034,15 @@ async def upload_downloaded_source(
         temporary_path = handle.name
     try:
         filename = source.get("filename") or f"{source['key']}.txt"
-        content_type = "application/pdf" if suffix.lower() == ".pdf" else "text/plain"
+        content_type = {
+            ".pdf": "application/pdf",
+            ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        }.get(suffix.lower(), "text/plain")
         data = {
             "goal_ids": goal["id"],
             "kb_ids": goal["kb_id"],
             "source_role": source["role"],
+            "source_url": source.get("url", ""),
         }
         payload = Path(temporary_path).read_bytes()
 
@@ -1092,46 +1514,36 @@ async def seed() -> dict[str, Any]:
                 journey.ids["tasks"][key] = confirmed.get("created_task_ids") or []
             except RuntimeError as exc:
                 # A model gateway timeout must not erase a valid, user-authored
-                # learning contract. Persist an explicit, reviewable fallback
-                # plan, then continue with concrete actions via the normal API.
-                fallback_plan_id = str(uuid.uuid4())
+                # learning contract. Persist a complete, source-grounded plan
+                # with the same execution contract as the model-backed path.
                 async with AsyncSessionLocal() as db:
-                    db.add(
-                        Plan(
-                            id=fallback_plan_id,
-                            goal_id=goal_id,
-                            version=1,
-                            is_current=True,
-                            baseline={
-                                "phases": [{"title": "当前周：最小可行学习闭环", "tasks": []}]
-                            },
-                            content={
-                                "lifecycle": {
-                                    "status": "active",
-                                    "generated_by": "fallback_after_model_timeout",
-                                    "reason": str(exc),
-                                }
-                            },
-                            goal_intent_version=journey.ids["goals"][key].get("intent_version", 1),
-                            goal_contract_snapshot=journey.ids["goals"][key].get("contract") or {},
-                            created_by="system_fallback",
-                        )
+                    fallback_plan_id, fallback_task_ids = await persist_fallback_macro_plan(
+                        db,
+                        key=key,
+                        goal_id=goal_id,
+                        goal_snapshot=journey.ids["goals"][key],
+                        source_ids=journey.ids["sources"],
+                        reason=f"模型生成暂不可用：{exc}",
                     )
-                    await db.commit()
                 if journey.steps and journey.steps[-1]["action"] == f"生成宏观计划草案：{key}":
                     journey.steps[-1]["passed"] = True
                     journey.steps[-1]["actual"] = {
                         "status": "degraded",
                         "error": str(exc),
                         "fallback_plan_id": fallback_plan_id,
+                        "created_task_count": len(fallback_task_ids),
                     }
                 journey.record(
                     f"宏观计划模型超时降级：{key}",
-                    "保留目标契约并建立可审核 fallback 计划",
-                    {"plan_id": fallback_plan_id, "error": str(exc)},
+                    "保留目标契约并建立有资料引用、步骤、产出和验收的四阶段计划",
+                    {
+                        "plan_id": fallback_plan_id,
+                        "created_task_count": len(fallback_task_ids),
+                        "error": str(exc),
+                    },
                     True,
                 )
-                journey.ids["tasks"][key] = []
+                journey.ids["tasks"][key] = fallback_task_ids
 
         today = date.today()
         # Add explicit near-term actions if a long macro plan starts later than today.

@@ -668,7 +668,9 @@ export default function WorkPage() {
     0,
   );
   const scheduledTodayMinutes = scheduleBlocks.reduce(
-    (sum, block) => sum + block.durationMinutes,
+    // Calendar constraints such as classes occupy time but are not learning
+    // workload. Only task-backed blocks contribute to today's planned study.
+    (sum, block) => sum + (block.taskId ? block.durationMinutes : 0),
     0,
   );
   const plannedTodayMinutes = Math.max(taskPlannedTodayMinutes, scheduledTodayMinutes);
