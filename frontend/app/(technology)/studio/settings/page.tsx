@@ -148,6 +148,7 @@ export default function SettingsPage() {
   const [avatarBusy, setAvatarBusy] = useState(false);
   const [avatarCropFile, setAvatarCropFile] = useState<File | null>(null);
   const [activeSection, setActiveSection] = useState("settings-appearance");
+  const [remindersExpanded, setRemindersExpanded] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -632,11 +633,13 @@ export default function SettingsPage() {
 
       <section className="settings-detail-stack">
         <article id="settings-reminders" className="settings-card settings-task-card">
-          <header className="settings-section-head"><span><Clock3 size={17} /></span><div><h2>时间与提醒</h2><p>时区和提醒偏好都会在登录后同步到账号。</p></div></header>
+          <header className="settings-section-head"><span><Clock3 size={17} /></span><div><h2>时间与提醒</h2><p>时区和提醒偏好都会在登录后同步到账号。</p></div><button type="button" className="settings-section-collapse" aria-expanded={remindersExpanded} onClick={() => setRemindersExpanded((value) => !value)}><span>{remindersExpanded ? "收起" : "展开"}</span><ChevronDown size={16} /></button></header>
+          {remindersExpanded && <>
           <div className="setting-row setting-row-grid">
             <label className="setting-copy" htmlFor="settings-timezone"><span>学习时区</span><small>用于跨日统计、计划时间和提醒换算</small></label>
             <div className="setting-current"><select id="settings-timezone" value={timezone} onChange={(event) => void changeTimezone(event.target.value)}><option value="Asia/Shanghai">中国 · 上海</option><option value="Asia/Tokyo">日本 · 东京</option><option value="America/New_York">美国 · 纽约</option><option value="Europe/London">英国 · 伦敦</option><option value="UTC">UTC</option></select></div>
           </div>
+          </>}
           <div className="setting-row setting-row-grid email-reminder-row">
             <div className="setting-copy email-reminder-copy"><div className="email-reminder-title"><span>晚间学习邮件提醒</span><button type="button" className={`setting-toggle ${reminderToggleOn ? "is-on" : ""}`} disabled={reminderToggleDisabled} onClick={() => { setReminderEnabled((current) => !current); feedback(reminderEnabled ? "邮件提醒已关闭" : "邮件提醒已开启"); }} aria-pressed={reminderToggleOn} aria-label={`晚间学习邮件提醒：${reminderToggleOn ? "已开启" : "已关闭"}`}><i /></button></div><small>{status !== "authenticated" ? "登录并验证邮箱后可开启" : emailReminderStatus && !emailReminderStatus.configured ? "邮件服务暂未配置，当前不会发送" : emailReminderStatus && !emailReminderStatus.email_verified ? "验证邮箱后开始发送提醒" : "当天仍有待办时，每晚发送一次"}</small></div>
             <div className="setting-current reminder-delivery-settings">{reminderEnabled && status === "authenticated" ? <>

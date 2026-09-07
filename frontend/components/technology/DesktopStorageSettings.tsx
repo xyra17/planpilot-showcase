@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Download, FolderOpen, HardDrive, Laptop, LoaderCircle, RefreshCw } from "lucide-react";
+import { Check, ChevronDown, Download, FolderOpen, HardDrive, Laptop, LoaderCircle, RefreshCw } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 
@@ -23,6 +23,7 @@ export function DesktopStorageSettings() {
   const [busy, setBusy] = useState<"models" | "download" | "private" | "">("");
   const [message, setMessage] = useState("");
   const [downloadProgress, setDownloadProgress] = useState<{ receivedBytes: number; totalBytes: number } | null>(null);
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     if (!bridge) return;
@@ -54,7 +55,7 @@ export function DesktopStorageSettings() {
   }, [downloadProgress]);
 
   if (!bridge) return <article id="settings-desktop" className="settings-card settings-task-card desktop-storage-card">
-    <header className="settings-section-head"><span><Laptop size={17} /></span><div><h2>桌面端与本机能力</h2><p>模型目录、本机文件和私密空间只能在 PlanPilot Desktop 中管理。</p></div></header>
+    <header className="settings-section-head"><span><Laptop size={17} /></span><div><h2>桌面端与本机能力</h2><p>模型目录、本机文件和私密空间只能在 PlanPilot Desktop 中管理。</p></div><button type="button" className="settings-section-collapse" aria-expanded={expanded} onClick={() => setExpanded((value) => !value)}><span>{expanded ? "收起" : "展开"}</span><ChevronDown size={16} /></button></header>
     <div className="desktop-only-callout"><strong>当前正在浏览器中使用</strong><p>你的云端目标、计划、笔记和资料会正常同步；打开桌面端可连接本机目录与模型。</p></div>
   </article>;
   const desktopBridge = bridge;
@@ -98,8 +99,9 @@ export function DesktopStorageSettings() {
   }
 
   return <article id="settings-desktop" className="settings-card settings-task-card desktop-storage-card">
-    <header className="settings-section-head"><span><Laptop size={17} /></span><div><h2>桌面端与本机能力</h2><p>{environment ? `${environment.deviceName} · PlanPilot ${environment.appVersion}` : "正在读取桌面环境…"}</p></div></header>
+    <header className="settings-section-head"><span><Laptop size={17} /></span><div><h2>桌面端与本机能力</h2><p>{environment ? `${environment.deviceName} · PlanPilot ${environment.appVersion}` : "正在读取桌面环境…"}</p></div><button type="button" className="settings-section-collapse" aria-expanded={expanded} onClick={() => setExpanded((value) => !value)}><span>{expanded ? "收起" : "展开"}</span><ChevronDown size={16} /></button></header>
 
+    {expanded && <>
     <div className="desktop-setting-group">
       <div className="desktop-setting-heading"><div><strong>本地模型</strong><p>模型包保存在你指定的目录。PlanPilot 会发现 GGUF 和 Safetensors 文件并记住当前选择。</p></div><div><button type="button" onClick={() => void chooseDirectory()} disabled={Boolean(busy)}><FolderOpen size={14} />选择目录</button><button type="button" onClick={() => void refreshModels()} disabled={Boolean(busy) || !models?.modelDirectory} aria-label="重新扫描模型"><RefreshCw size={14} /></button></div></div>
       <code className="desktop-path">{models?.modelDirectory || "尚未选择模型目录"}</code>
@@ -116,5 +118,6 @@ export function DesktopStorageSettings() {
       <p className="desktop-boundary is-warning">这里只会创建系统加密的空间标识和隔离目录。目标、任务、笔记、向量索引与 Pilo 的完整离线读写尚未开放，因此当前不会显示“进入私密空间”。</p>
     </div>
     {message && <p className="desktop-settings-message" role="status">{message}</p>}
+    </>}
   </article>;
 }

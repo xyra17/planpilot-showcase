@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   Cloud,
+  ChevronDown,
   GitMerge,
   LoaderCircle,
   MonitorSmartphone,
@@ -83,6 +84,7 @@ export function WorkspaceDeviceSettings() {
   const [busyKey, setBusyKey] = useState("");
   const [message, setMessage] = useState("");
   const [loadError, setLoadError] = useState("");
+  const [expanded, setExpanded] = useState(false);
 
   const load = useCallback(async () => {
     if (status !== "authenticated") return;
@@ -186,8 +188,10 @@ export function WorkspaceDeviceSettings() {
       <span><Cloud size={17} /></span>
       <div><h2>空间与设备</h2><p>查看默认云空间、已登记设备，并逐条确认离线冲突。</p></div>
       {status === "authenticated" && <button type="button" className="workspace-device-refresh" onClick={() => void load()} disabled={loading || Boolean(busyKey)} aria-label="刷新空间与设备"><RefreshCw size={14} className={loading ? "is-spinning" : ""} /></button>}
+      <button type="button" className="settings-section-collapse" aria-expanded={expanded} onClick={() => setExpanded((value) => !value)}><span>{expanded ? "收起" : "展开"}</span><ChevronDown size={16} /></button>
     </header>
 
+    {expanded && <>
     {status !== "authenticated" ? <div className="workspace-device-login-note">
       <strong>登录后管理云空间与设备</strong>
       <p>本机私密空间仍可在上方管理；设备登记和离线冲突属于账号同步能力。</p>
@@ -225,6 +229,7 @@ export function WorkspaceDeviceSettings() {
           <footer><button type="button" className="is-secondary" disabled={Boolean(busyKey)} onClick={() => void resolveConflict(conflict, "keep_server")}>保留服务器版</button><button type="button" className="is-primary" disabled={Boolean(busyKey)} onClick={() => void resolveConflict(conflict, "keep_both")}>{busyKey === `conflict:${conflict.operation_id}` ? <LoaderCircle size={13} className="is-spinning" /> : <GitMerge size={13} />}保留两份</button></footer>
         </article>)}</div> : !loading && <div className="workspace-conflict-empty"><CheckCircle2 size={16} /><span><strong>没有待确认冲突</strong><small>同步遇到版本分歧时会在这里保留双方快照。</small></span></div>}
       </section>
+    </>}
     </>}
 
     {loading && !workspaces.length && <p className="workspace-device-loading"><LoaderCircle size={14} className="is-spinning" />正在读取空间与设备…</p>}

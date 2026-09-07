@@ -611,6 +611,31 @@ html[data-theme][data-theme][data-theme] .app-shell .settings-page-redesign #set
   gap: 9px;
 }
 
+/* Secondary settings stay compact until the user asks to inspect them. */
+.app-shell .settings-section-collapse {
+  display: inline-flex;
+  min-height: 30px;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  padding: 0 9px;
+  color: var(--workspace-secondary);
+  background: var(--workspace-panel-subtle);
+  border: 1px solid var(--workspace-border);
+  border-radius: 8px;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.app-shell .settings-section-collapse svg { transition: transform 160ms ease; }
+.app-shell .settings-section-collapse[aria-expanded="true"] svg { transform: rotate(180deg); }
+.app-shell .settings-section-collapse:is(:hover, :focus-visible) {
+  color: var(--workspace-accent);
+  border-color: color-mix(in srgb, var(--workspace-accent) 35%, var(--workspace-border));
+}
+
 .app-shell .settings-page-redesign .settings-detail-stack > .settings-card {
   display: flex;
   flex-wrap: wrap;
