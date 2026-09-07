@@ -35,6 +35,22 @@ test("访客笔记目标筛选显示实际关联篇数", async ({ page }) => {
   await expect(page.locator(".notes-list-row").first()).toContainText("Pandas 分组聚合");
 });
 
+test("选择具体目标后隐藏目标图标并为标题释放宽度", async ({ page }) => {
+  await page.goto("/studio/work/notes");
+
+  const trigger = page.getByRole("button", { name: "筛选笔记目标", exact: true });
+  await expect(trigger.locator(":scope > svg")).toHaveCount(1);
+  await trigger.click();
+  await page.getByRole("listbox", { name: "可筛选目标", exact: true })
+    .getByRole("option", { name: /研究生英语二 80 分冲刺/ })
+    .click();
+
+  await expect(trigger).toHaveClass(/is-specific-goal/);
+  await expect(trigger.locator(":scope > svg")).toHaveCount(0);
+  await expect(trigger.locator(".notes-filter-copy > strong")).toHaveText("研究生英语二 80 分冲刺");
+  await expect(trigger.locator(".notes-filter-copy > strong")).toHaveCSS("text-overflow", "ellipsis");
+});
+
 test("左侧笔记卡片可关联和取消关联目标", async ({ page }) => {
   await page.goto("/studio/work/notes");
 

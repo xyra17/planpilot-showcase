@@ -864,13 +864,13 @@ export default function NotesPage() {
             <div className="notes-goal-control notes-filter-control" ref={filterPickerRef}>
               <button
                 type="button"
-                className="notes-goal-trigger"
+                className={`notes-goal-trigger ${goalFilter !== "all" && goalFilter !== "unlinked" ? "is-specific-goal" : ""}`}
                 aria-label="筛选笔记目标"
                 aria-haspopup="listbox"
                 aria-expanded={filterPickerOpen}
                 onClick={() => setFilterPickerOpen((current) => !current)}
               >
-                <Target size={16} aria-hidden="true" />
+                {(goalFilter === "all" || goalFilter === "unlinked") && <Target size={16} aria-hidden="true" />}
                 <span className="notes-filter-copy">
                   <strong>{selectedFilterTitle}</strong>
                   <span className="notes-filter-meta">
