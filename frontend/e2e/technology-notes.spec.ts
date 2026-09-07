@@ -49,6 +49,8 @@ test("选择具体目标后隐藏目标图标并为标题释放宽度", async ({
   await expect(trigger.locator(":scope > svg")).toHaveCount(0);
   await expect(trigger.locator(".notes-filter-copy > strong")).toHaveText("研究生英语二 80 分冲刺");
   await expect(trigger.locator(".notes-filter-copy > strong")).toHaveCSS("text-overflow", "ellipsis");
+  await expect(trigger).toHaveClass(/is-title-overflowing/);
+  await expect(trigger.locator(".notes-filter-copy > strong")).toHaveCSS("text-align", "left");
 });
 
 test("左侧笔记卡片可关联和取消关联目标", async ({ page }) => {

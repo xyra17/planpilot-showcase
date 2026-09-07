@@ -273,6 +273,7 @@ export default function NotesPage() {
   const [indexWidth, setIndexWidth] = useState(228);
   const [goalFilter, setGoalFilter] = useState("all");
   const [filterPickerOpen, setFilterPickerOpen] = useState(false);
+  const [filterTitleOverflowing, setFilterTitleOverflowing] = useState(false);
   const [goalOptions, setGoalOptions] = useState<ApiGoal[]>([]);
   const [dataLoading, setDataLoading] = useState(false);
   const [dataError, setDataError] = useState("");
@@ -285,6 +286,7 @@ export default function NotesPage() {
   const draftDirtyRef = useRef(draftDirty);
   const draftIsNewRef = useRef(draftIsNew);
   const filterPickerRef = useRef<HTMLDivElement>(null);
+  const filterTitleRef = useRef<HTMLElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const indexDraggingRef = useRef(false);
   const indexDragStartRef = useRef(0);
@@ -447,6 +449,16 @@ export default function NotesPage() {
   }, [draft, draftIsNew, noteGoalId, notes, query, selectedId]);
 
   const selectedFilterTitle = filterGoals.find((goal) => goal.id === goalFilter)?.title ?? "全部目标";
+
+  useEffect(() => {
+    const title = filterTitleRef.current;
+    if (!title) return;
+    const measure = () => setFilterTitleOverflowing(title.scrollWidth > title.clientWidth + 1);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(title);
+    return () => observer.disconnect();
+  }, [selectedFilterTitle]);
 
   useEffect(() => {
     if (authStatus === "loading") return;
@@ -864,7 +876,7 @@ export default function NotesPage() {
             <div className="notes-goal-control notes-filter-control" ref={filterPickerRef}>
               <button
                 type="button"
-                className={`notes-goal-trigger ${goalFilter !== "all" && goalFilter !== "unlinked" ? "is-specific-goal" : ""}`}
+                className={`notes-goal-trigger ${goalFilter !== "all" && goalFilter !== "unlinked" ? "is-specific-goal" : ""} ${filterTitleOverflowing ? "is-title-overflowing" : ""}`}
                 aria-label="筛选笔记目标"
                 aria-haspopup="listbox"
                 aria-expanded={filterPickerOpen}
@@ -872,7 +884,7 @@ export default function NotesPage() {
               >
                 {(goalFilter === "all" || goalFilter === "unlinked") && <Target size={16} aria-hidden="true" />}
                 <span className="notes-filter-copy">
-                  <strong>{selectedFilterTitle}</strong>
+                  <strong ref={filterTitleRef}>{selectedFilterTitle}</strong>
                   <span className="notes-filter-meta">
                     <small className="notes-filter-count" aria-label={`${visibleNotes.length} 篇笔记`}>
                       <b aria-hidden="true">{visibleNotes.length}</b>
