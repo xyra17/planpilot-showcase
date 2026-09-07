@@ -10253,9 +10253,9 @@
   gap: 12px;
   margin-top: 10px;
   padding: 10px 12px;
-  color: var(--comp-text);
-  background: color-mix(in srgb, var(--comp-violet) 8%, var(--comp-panel-soft));
-  border: 1px solid color-mix(in srgb, var(--comp-violet) 20%, var(--comp-line));
+  color: var(--coach-drawer-text);
+  background: color-mix(in srgb, var(--coach-drawer-accent) 7%, var(--coach-drawer-control));
+  border: 1px solid color-mix(in srgb, var(--coach-drawer-accent) 22%, var(--coach-drawer-line));
   border-radius: 10px;
   text-decoration: none;
 }
@@ -10269,15 +10269,15 @@
 }
 
 .app-shell .companion-memory-management-link > span > svg,
-.app-shell .companion-memory-management-link > svg { color: var(--comp-violet); }
+.app-shell .companion-memory-management-link > svg { color: var(--coach-drawer-accent); }
 .app-shell .companion-memory-management-link strong,
 .app-shell .companion-memory-management-link small { display: block; }
-.app-shell .companion-memory-management-link strong { font-size: 12px; line-height: 1.4; }
-.app-shell .companion-memory-management-link small { margin-top: 2px; color: var(--comp-muted); font-size: 10px; line-height: 1.5; }
+.app-shell .companion-memory-management-link strong { color: var(--coach-drawer-title); font-size: 12px; line-height: 1.4; }
+.app-shell .companion-memory-management-link small { margin-top: 2px; color: var(--coach-drawer-muted); font-size: 10px; line-height: 1.5; }
 .app-shell .companion-memory-management-link > svg { flex: 0 0 auto; transition: transform 160ms ease; }
-.app-shell .companion-memory-management-link:hover { border-color: color-mix(in srgb, var(--comp-violet) 38%, var(--comp-line)); }
+.app-shell .companion-memory-management-link:hover { background: var(--coach-drawer-hover); border-color: color-mix(in srgb, var(--coach-drawer-accent) 42%, var(--coach-drawer-line)); }
 .app-shell .companion-memory-management-link:hover > svg { transform: translateX(2px); }
-.app-shell .companion-memory-management-link:focus-visible { outline: 2px solid color-mix(in srgb, var(--comp-violet) 62%, transparent); outline-offset: 2px; }
+.app-shell .companion-memory-management-link:focus-visible { outline: 2px solid color-mix(in srgb, var(--coach-drawer-accent) 62%, transparent); outline-offset: 2px; }
 
 @media (max-width: 620px) {
   .app-shell .companion-action-operations { grid-template-columns: 1fr; }
