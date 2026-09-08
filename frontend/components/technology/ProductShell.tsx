@@ -9,6 +9,7 @@ import {
   Bot,
   BrainCircuit,
   CalendarCheck2,
+  CircleAlert,
   FileText,
   Library,
   Menu,
@@ -77,6 +78,17 @@ type NotificationItem = {
   generated_at: string;
 };
 
+type AiHealth = {
+  cloud_routine_configured?: boolean;
+  local_reachable?: boolean;
+  embedding_configured?: boolean;
+  embedding_reachable?: boolean;
+};
+
+const PLANPILOT_INSTALL_URL =
+  process.env.NEXT_PUBLIC_PLANPILOT_INSTALL_GUIDE_URL?.trim()
+  || "https://planpilot-website.planpilot-wxyra.workers.dev/#download";
+
 const DEFAULT_SEARCH_ITEMS: SearchItem[] = [
   { id: "task-guest-skill", label: "完成 Pandas 分组聚合练习", meta: "今日任务 · 掌握 Python 数据分析", href: "/studio/work" },
   { id: "goal-guest-skill", label: "掌握 Python 数据分析", meta: "目标 · 进度 63%", href: "/studio/work/goals" },
@@ -97,6 +109,7 @@ export function ProductShell({
   const [query, setQuery] = useState("");
   const [searchIndex, setSearchIndex] = useState<SearchItem[]>([]);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [aiNotice, setAiNotice] = useState<"hidden" | "generation" | "embedding">("hidden");
   const searchRequestRef = useRef(0);
   const notificationRequestRef = useRef(0);
   const scrollbarTimersRef = useRef<Map<HTMLElement, number>>(new Map());
@@ -125,6 +138,21 @@ export function ProductShell({
   useEffect(() => {
     setBrandImageFailed(false);
   }, [theme]);
+
+  useEffect(() => {
+    if (authStatus !== "authenticated" || window.sessionStorage.getItem("planpilot:hide-ai-setup") === "1") {
+      setAiNotice("hidden");
+      return;
+    }
+    let active = true;
+    void api.get<AiHealth>("/health/ai").then((health) => {
+      if (!active) return;
+      const generationReady = Boolean(health.cloud_routine_configured || health.local_reachable);
+      const embeddingReady = Boolean(health.embedding_configured && health.embedding_reachable);
+      setAiNotice(!generationReady ? "generation" : !embeddingReady ? "embedding" : "hidden");
+    }).catch(() => undefined);
+    return () => { active = false; };
+  }, [authStatus]);
 
   useEffect(() => {
     const interval = window.setInterval(
@@ -551,6 +579,26 @@ export function ProductShell({
         >
           <Menu size={19} />
         </button>
+        {aiNotice !== "hidden" && (
+          <aside className="ai-setup-notice" aria-label="AI 配置提示">
+            <CircleAlert size={16} aria-hidden="true" />
+            <p>
+              <strong>{aiNotice === "generation" ? "AI 尚未配置" : "语义检索尚未配置"}</strong>
+              <span>{aiNotice === "generation" ? "目标、任务、打卡和笔记仍可正常使用；配置模型后可启用学习建议与计划生成。" : "AI 对话可以使用；配置 Embedding 后可启用知识库语义检索。"}</span>
+            </p>
+            <a href={PLANPILOT_INSTALL_URL} target="_blank" rel="noreferrer">查看配置方式</a>
+            <button
+              type="button"
+              aria-label="暂时关闭 AI 配置提示"
+              onClick={() => {
+                window.sessionStorage.setItem("planpilot:hide-ai-setup", "1");
+                setAiNotice("hidden");
+              }}
+            >
+              <X size={14} />
+            </button>
+          </aside>
+        )}
         <main className="page-content">{children}</main>
       </div>
 

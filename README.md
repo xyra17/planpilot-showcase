@@ -13,16 +13,27 @@ PlanPilot 是一个面向自主学习的 AI 计划与执行工作台。它把目
 - 学习者画像、模式、记忆和自适应计划
 - Prompt、模型、策略、灰度和评测运营后台
 
-## 最快体验方式
+## 下载体验版
 
-需要安装 Docker Desktop（或 Docker Engine + Compose v2）。首次构建会下载镜像和依赖，请预留约 10 GB 磁盘空间。
+需要安装 Docker Desktop（或 Docker Engine + Compose v2）。首次构建会下载镜像和依赖，请预留至少 10 GB 磁盘空间。
+
+从 GitHub Releases 下载 `PlanPilot-*-docker-preview.zip` 并解压，然后运行一键启动脚本。脚本会自动检查运行环境、生成安全密钥和配置文件，并引导选择 AI 模式。
+
+macOS / Linux：
 
 ```bash
-git clone <your-github-repository-url>
-cd PlanPilot
-cp backend/.env.example backend/.env
-docker compose up --build
+chmod +x start.sh stop.sh scripts/release/*.sh
+./start.sh
 ```
+
+Windows PowerShell：
+
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass
+.\start.ps1
+```
+
+完整的硬件要求、AI 模型链接、配置方式和故障排查见 [下载体验版安装指南](documents/06_运维与部署/PlanPilot_下载体验版安装指南.md)。
 
 服务启动后访问：
 
@@ -30,11 +41,7 @@ docker compose up --build
 - API 文档：http://localhost:8000/docs
 - 健康检查：http://localhost:8000/ready
 
-首次启动会自动执行数据库迁移。停止服务使用：
-
-```bash
-docker compose down
-```
+首次启动会自动执行数据库迁移。停止服务使用 `./stop.sh`，Windows 使用 `.\stop.ps1`。
 
 保留的数据位于 Docker volumes 中；如需删除全部本地体验数据，可使用 `docker compose down -v`。该命令不可恢复。
 
@@ -42,7 +49,7 @@ docker compose down
 
 不配置模型也可以启动产品并体验账户、目标、任务、打卡等基础功能。学习建议（内部模块标识为 `coach`）、计划生成、验题和知识库语义检索需要模型。
 
-最简单的方式是在 `backend/.env` 中填写 DeepSeek API Key：
+最简单的方式是在首次启动向导中选择云端 API。也可以在 `backend/.env` 中填写 DeepSeek API Key：
 
 ```env
 SMART_API_KEY=你的_API_Key
@@ -109,7 +116,7 @@ docker-compose.prod.yml  生产部署参考，不用于零配置体验
 
 ## 当前限制
 
-- 这是源码分发，不是 DMG/Windows 安装包。
+- 这是 Docker 下载体验版，不是 DMG/MSI 桌面安装包。
 - AI 功能需要用户自行提供云端 API Key 或本地模型服务。
 - Embedding 未配置时，知识库语义索引不可用。
 - 首次 Docker 构建时间取决于网络和机器性能。
