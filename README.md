@@ -17,7 +17,7 @@ PlanPilot 是一个面向自主学习的 AI 计划与执行工作台。它把目
 
 需要安装 Docker Desktop（或 Docker Engine + Compose v2）。首次构建会下载镜像和依赖，请预留至少 10 GB 磁盘空间。
 
-从 GitHub Releases 下载 `PlanPilot-*-docker-preview.zip` 并解压，然后运行一键启动脚本。脚本会自动检查运行环境、生成安全密钥和配置文件，并引导选择 AI 模式。
+从 [GitHub Releases](https://github.com/xyra17/planpilot-showcase/releases/latest) 下载 `PlanPilot-*-docker-preview.zip` 并解压，然后运行一键启动脚本。脚本会自动检查运行环境、生成安全密钥和配置文件，并引导选择 AI 模式。
 
 macOS / Linux：
 

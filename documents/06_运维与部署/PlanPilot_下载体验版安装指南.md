@@ -18,7 +18,7 @@ PlanPilot 下载体验版会在本机运行产品界面、API、PostgreSQL、Red
 
 ## 2. 下载和启动
 
-从项目 GitHub Releases 页面下载名称类似 `PlanPilot-v*-docker-preview.zip` 的文件并解压。不要下载模型权重，也不要将程序解压到系统只读目录。
+从 [PlanPilot GitHub Releases](https://github.com/xyra17/planpilot-showcase/releases/latest) 下载名称类似 `PlanPilot-v*-docker-preview.zip` 的文件并解压。不要下载模型权重，也不要将程序解压到系统只读目录。
 
 ### macOS / Linux
 
